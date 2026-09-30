@@ -75,7 +75,10 @@ pub fn failure_before_headers_releases_admission_test() {
   let rejection =
     fixture.Exchange(
       req(),
-      fixture.Reject(error.Failure(error.ConnectionFailed, error.NotSubmitted)),
+      fixture.Reject(error.Failure(
+        error.ConnectionFailed(error.UnknownTransport),
+        error.NotSubmitted,
+      )),
     )
   let c = config.default()
   let assert Ok(client) =
@@ -89,8 +92,8 @@ pub fn failure_before_headers_releases_admission_test() {
     )
   let assert Error(first) = http_gun.send(client, req())
   let assert Error(second) = http_gun.send(client, req())
-  first.reason |> should.equal(error.ConnectionFailed)
-  second.reason |> should.equal(error.ConnectionFailed)
+  first.reason |> should.equal(error.ConnectionFailed(error.UnknownTransport))
+  second.reason |> should.equal(error.ConnectionFailed(error.UnknownTransport))
   let _ = http_gun.stop(client)
 }
 
@@ -156,10 +159,15 @@ pub fn disk_read_limit_is_exact_test() {
   let path = store(encoded)
   cassette.load(path, size) |> should.be_ok
   let assert Error(too_large) = cassette.load(path, size - 1)
-  too_large.reason |> should.equal(error.LimitExceeded("fixture", size - 1))
+  too_large.reason
+  |> should.equal(error.LimitExceeded(error.FixtureBytes, size - 1, size))
   let assert Error(negative) = cassette.load(path, -1)
-  negative.reason |> should.equal(error.LimitExceeded("fixture", -1))
+  negative.reason
+  |> should.equal(error.InvalidConfig("fixture byte limit must not be negative"))
   remove(path)
+  // Invalid policy is rejected before attempting to open the now-missing file.
+  cassette.load(path, -1) |> should.equal(Error(negative))
+  cassette.parse("not JSON", -1) |> should.equal(Error(negative))
   let empty = store("")
   let assert Error(corrupt) = cassette.load(empty, 0)
   corrupt.reason |> should.equal(error.FixtureCorrupt)

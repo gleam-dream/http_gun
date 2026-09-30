@@ -36,6 +36,8 @@ pub type Config {
   )
 }
 
+/// Finite H1 policy with verified system TLS trust and a 30-second request budget.
+/// Compose record updates before starting a client; no processes or IO are started.
 pub fn default() -> Config {
   Config(
     Http1,
@@ -58,6 +60,8 @@ pub fn default() -> Config {
   )
 }
 
+/// Check supported policies and positive capacities without starting processes.
+/// Returns the unchanged settings or a diagnostic for invalid configuration.
 pub fn validate(config: Config) -> Result(Config, String) {
   let l = config.limits
   case

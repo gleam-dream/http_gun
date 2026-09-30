@@ -1,0 +1,13 @@
+   Checking http_gun
+error: Private type used in public interface
+    ┌─ /code/gleam-dream/http_gun/test/http_gun_stream_test.gleam:187:1
+    │
+187 │ pub fn fallible_scope_maps_open_and_read_failures_test() {
+    │ ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The following type is private, but is being used by this public export.
+
+    ConsumerError
+
+Private types can only be used within the module that defines them.
+

@@ -166,7 +166,8 @@ pub fn informational_headers_respect_admitted_head_limit_test() {
       config.Config(..c, limits: config.Limits(..c.limits, head_bytes: 16)),
     )
   let assert Error(failure) = http_gun.send(client, req(port))
-  failure.reason |> should.equal(error.LimitExceeded("headers", 16))
+  failure.reason
+  |> should.equal(error.LimitExceeded(error.ResponseHeaderBytes, 16, 36))
   let _ = http_gun.stop(client)
 }
 

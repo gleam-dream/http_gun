@@ -1,0 +1,11 @@
+  Compiling http_gun
+error: Type mismatch
+    ┌─ /code/gleam-dream/http_gun/test/http_gun_h2_test.gleam:120:19
+    │
+120 │   |> should.equal(error.ConnectionFailed(error.CertificateRejected))
+    │                   ^^^^^^^^^^^^^^^^^^^^^^
+
+This value is being called as a function but its type is:
+
+    error.Reason
+

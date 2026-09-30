@@ -1,0 +1,28 @@
+   Checking http_gun
+   Compiled in 0.26s
+  Compiling http_gun
+   Compiled in 0.24s
+   Compiled in 0.28s
+    Running http_gun_test.main
+[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m
+[1m[31mpanic[39m[22m [90msrc/gleeunit/should.gleam:10[39m
+[36m test[39m: http_gun_error_test.limit_fixture_requires_an_observed_size_test
+[36m info[39m: 
+Ok(Cassette([Exchange(Request(Get, [], "", Https, "localhost", None, "/", None), Reject(Failure(LimitExceeded(CollectedBodyBytes, 2, None), MayHaveBeenSent)))]))
+should equal
+Error(Failure(FixtureCorrupt, NotSubmitted))
+[32m.[39m[32m.[39m[32m.[39m[32m.[39m=NOTICE REPORT==== 30-Sep-2026::11:19:21.499336 ===
+TLS client: In state wait_cert_cr at ssl_handshake.erl:2254 generated CLIENT ALERT: Fatal - Unknown CA
+
+=NOTICE REPORT==== 30-Sep-2026::11:19:21.500540 ===
+TLS server: In state wait_finished received CLIENT ALERT: Fatal - Unknown CA
+
+[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m=NOTICE REPORT==== 30-Sep-2026::11:19:21.547458 ===
+TLS client: In state wait_cert_cr at ssl_handshake.erl:2262 generated CLIENT ALERT: Fatal - Bad Certificate
+ - {bad_cert,{hostname_check_failed,{requested,"127.0.0.1"},
+                                    {received,[{dNSName,"localhost"}]}}}
+=NOTICE REPORT==== 30-Sep-2026::11:19:21.547579 ===
+TLS server: In state wait_finished received CLIENT ALERT: Fatal - Bad Certificate
+
+[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[31m
+85 passed, 1 failures[39m

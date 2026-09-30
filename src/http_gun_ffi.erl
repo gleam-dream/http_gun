@@ -1,7 +1,7 @@
 %% Narrow transport/runtime boundary. No client state or server loops.
 -module(http_gun_ffi).
 -export([start/0, open/7, request/5, credit/3, cancel/2, close/1, now/0, scoped/2, decode/1]).
--export([on_exception/2]).
+-export([on_exception/2, cause/1]).
 start() ->
     case application:ensure_all_started(gun) of
         {ok, _} -> {ok, nil};
@@ -36,12 +36,12 @@ open(Host, Port, Tls, Protocol, Trust, Timeout, HeaderCount) ->
         end,
         case gun:open(binary_to_list(Host), Port, Options) of
             {ok, Pid} -> {ok, Pid};
-            {error, _} -> {error, nil}
+            {error, Reason} -> {error, cause(Reason)}
         end
-    catch _:_ -> {error, nil} end.
+    catch _:Caught -> {error, cause(Caught)} end.
 request(Pid, Method, Path, Headers, Body) ->
     try {ok, gun:request(Pid, Method, Path, Headers, Body, #{reply_to => self(), flow => 1})}
-    catch _:_ -> {error, nil} end.
+    catch _:Reason -> {error, cause(Reason)} end.
 credit(Pid, Ref, Amount) -> gun:update_flow(Pid, Ref, Amount), nil.
 cancel(Pid, Ref) -> gun:cancel(Pid, Ref), nil.
 close(Pid) -> try gun:close(Pid) catch _:_ -> ok end, nil.
@@ -51,14 +51,34 @@ on_exception(Run, Cleanup) ->
     try Run() catch Class:Reason:Stack -> Cleanup(), erlang:raise(Class, Reason, Stack) end.
 decode({gun_up, P, http}) -> {up, P, h1};
 decode({gun_up, P, http2}) -> {up, P, h2};
-decode({gun_down, P, _, _, _}) -> {down, P};
-decode({gun_error, P, _}) -> {down, P};
+decode({gun_down, P, _, Reason, _}) -> {down, P, cause(Reason)};
+decode({gun_error, P, Reason}) -> {down, P, cause(Reason)};
 decode({gun_notify, P, settings_changed, Settings}) ->
     {capacity, P, maps:get(max_concurrent_streams, Settings, 2147483647)};
 decode({gun_response, _, R, Fin, Status, Headers}) -> {head, R, Fin =:= fin, Status, Headers};
 decode({gun_data, _, R, Fin, Bytes}) -> {data, R, Fin =:= fin, Bytes};
 decode({gun_trailers, _, R, Headers}) -> {trailers, R, Headers};
-decode({gun_error, _, R, _}) -> {failed, R};
+decode({gun_error, _, R, Reason}) -> {failed, R, cause(Reason)};
 decode({gun_inform, _, R, _, H}) -> {inform, R, H};
-decode({gun_upgrade, _, R, _, _}) -> {failed, R};
+decode({gun_upgrade, _, R, _, _}) -> {failed, R, unexpected_protocol};
 decode(_) -> ignore.
+
+%% Classify supported runtime reasons; never format arbitrary peer/runtime terms.
+cause({shutdown, Reason}) -> cause(Reason);
+cause({error, Reason}) -> cause(Reason);
+cause(nxdomain) -> name_resolution_failed;
+cause(econnrefused) -> connection_refused;
+cause(econnreset) -> connection_reset;
+cause(closed) -> peer_closed;
+cause(normal) -> peer_closed;
+cause(closing) -> peer_draining;
+cause(timeout) -> transport_timeout;
+cause(etimedout) -> transport_timeout;
+cause({tls_alert, {Alert, _}}) when Alert =:= unknown_ca; Alert =:= bad_certificate;
+    Alert =:= certificate_expired; Alert =:= certificate_revoked;
+    Alert =:= certificate_unknown -> certificate_rejected;
+cause({tls_alert, _}) -> tls_failed;
+cause({bad_cert, _}) -> certificate_rejected;
+cause({stream_error, _, _}) -> protocol_error;
+cause({connection_error, _, _}) -> protocol_error;
+cause(_) -> unknown_transport.

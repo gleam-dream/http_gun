@@ -119,7 +119,10 @@ fn handle(
                   results: [
                     #(
                       worker.index,
-                      Error(Failure(error.RequestFailed, MayHaveBeenSent)),
+                      Error(Failure(
+                        error.RequestFailed(error.UnknownTransport),
+                        MayHaveBeenSent,
+                      )),
                     ),
                     ..state.results
                   ],

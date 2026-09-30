@@ -1,5 +1,6 @@
 -module(http_gun_test_server).
 
+-export([unused_port/0]).
 -export([remove_fixture/1]).
 
 -export([start/0,
@@ -166,3 +167,9 @@ disconnect(P) ->
 remove_fixture(Path) ->
     file:delete(Path),
     nil.
+
+unused_port() ->
+    {ok, Socket} = gen_tcp:listen(0, [{ip, {127,0,0,1}}]),
+    {ok, {_, Port}} = inet:sockname(Socket),
+    ok = gen_tcp:close(Socket),
+    Port.

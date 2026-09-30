@@ -1,0 +1,65 @@
+  Compiling http_gun
+warning: Unused imported item
+  ┌─ /code/gleam-dream/http_gun/test/http_gun_options_test.gleam:2:22
+  │
+2 │ import gleam/option.{Some}
+  │                      ^^^^ This imported constructor is never used
+
+Hint: You can safely remove it.
+
+warning: Unused variable
+   ┌─ /code/gleam-dream/http_gun/test/http_gun_options_test.gleam:12:17
+   │
+12 │   let assert Ok(budget) = deadline.after(0)
+   │                 ^^^^^^ This variable is never used
+
+Hint: You can ignore it with an underscore: `_budget`.
+
+error: Unknown module
+  ┌─ /code/gleam-dream/http_gun/test/http_gun_options_test.gleam:6:1
+  │
+6 │ import http_gun/deadline
+  │ ^^^^^^^^^^^^^^^^^^^^^^^^
+
+No module has been found with the name `http_gun/deadline`.
+
+error: Unknown module
+  ┌─ /code/gleam-dream/http_gun/test/http_gun_options_test.gleam:8:1
+  │
+8 │ import http_gun/request_options
+  │ ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+No module has been found with the name `http_gun/request_options`.
+
+error: Unknown module
+   ┌─ /code/gleam-dream/http_gun/test/http_gun_options_test.gleam:12:27
+   │
+12 │   let assert Ok(budget) = deadline.after(0)
+   │                           ^^^^^^^^
+
+No module has been found with the name `deadline`.
+
+error: Unknown module
+   ┌─ /code/gleam-dream/http_gun/test/http_gun_options_test.gleam:14:5
+   │
+14 │     request_options.Options(..request_options.default(), deadline: Some(budget))
+   │     ^^^^^^^^^^^^^^^
+
+No module has been found with the name `request_options`.
+
+error: Invalid record constructor
+   ┌─ /code/gleam-dream/http_gun/test/http_gun_options_test.gleam:14:5
+   │
+14 │     request_options.Options(..request_options.default(), deadline: Some(budget))
+   │     ^^^^^^^^^^^^^^^^^^^^^^^ This is not a record constructor
+
+Only record constructors can be used with the update syntax.
+
+error: Unknown module value
+   ┌─ /code/gleam-dream/http_gun/test/http_gun_options_test.gleam:17:40
+   │
+17 │   let assert Error(failure) = http_gun.send_with_options(client, req, options)
+   │                                        ^^^^^^^^^^^^^^^^^
+
+The module `http_gun` does not have a `send_with_options` value.
+

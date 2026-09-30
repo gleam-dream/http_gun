@@ -1,0 +1,9 @@
+  Compiling http_gun
+error: Unknown module value
+    ┌─ /code/gleam-dream/http_gun/test/http_gun_stream_test.gleam:178:12
+    │
+178 │   http_gun.try_with_response(client, req(port), Http, fn(_) {
+    │            ^^^^^^^^^^^^^^^^^ Did you mean `with_response`?
+
+The module `http_gun` does not have a `try_with_response` value.
+

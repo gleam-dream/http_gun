@@ -10,11 +10,13 @@ cp test/http_gun_test_server.erl "$work/ordinary/src/"
 (cd "$work/ordinary" && gleam build --warnings-as-errors && gleam run)
 if [ "${UPDATE_CONSUMER_LOCKS:-0}" = 1 ]; then cp "$work/ordinary/manifest.toml" examples/ordinary/manifest.toml; fi
 # Compile-time rejection from a separate package, never same-package visibility.
-for check in client body wrong_body recording; do
+for check in client body wrong_body recording deadline cancellation; do
   case "$check" in
     client) source='import http_gun\npub fn invalid() { http_gun.Client }'; expected='Unknown module value';;
     body) source='import http_gun/body\npub fn invalid() { body.Body }'; expected='Unknown module value';;
     wrong_body) source='import http_gun\nimport gleam/http/request\npub fn invalid(client: http_gun.Client) { http_gun.send(client, request.new()) }'; expected='Type mismatch';;
+    deadline) source='import http_gun/deadline\npub fn invalid() { deadline.Deadline }'; expected='Unknown module value';;
+    cancellation) source='import http_gun/cancellation\npub fn invalid() { cancellation.Token }'; expected='Unknown module value';;
     recording) source='import http_gun/recording\npub fn invalid() { recording.Recording }'; expected='Unknown module value';;
   esac
   printf '%b\n' "$source" > "$work/ordinary/src/invalid.gleam"
@@ -36,4 +38,4 @@ cp -R examples/llm "$work/llm"
 cp test/http_gun_test_server.erl "$work/llm/test/"
 (cd "$work/llm" && gleam build --warnings-as-errors && gleam run && gleam run -m http_gun_llm_integration)
 if [ "${UPDATE_CONSUMER_LOCKS:-0}" = 1 ]; then cp "$work/llm/manifest.toml" examples/llm/manifest.toml; fi
-echo 'Independent consumer, four rejection fixtures and isolated LLM consumer passed.'
+echo 'Independent consumer, six rejection fixtures and isolated LLM consumer passed.'

@@ -1,4 +1,4 @@
-//// Version 1 JSON codec. Dynamic decoding is confined to this boundary.
+//// One strict cassette schema. Dynamic decoding is confined to this boundary.
 
 import gleam/bit_array
 import gleam/dynamic/decode
@@ -6,7 +6,9 @@ import gleam/http
 import gleam/http/request
 import gleam/http/response
 import gleam/json
+import gleam/option.{Some}
 import gleam/result
+import gleam/string
 import gleam/uri
 import http_gun/error.{type Failure, Failure, NotSubmitted}
 import http_gun/fixture
@@ -111,14 +113,20 @@ pub fn failure_json(failure: Failure) -> json.Json {
     error.InvalidRequest(text) -> #("invalid_request", text, 0)
     error.ClientClosed -> #("client_closed", "", 0)
     error.AdmissionFull -> #("admission_full", "", 0)
-    error.ConnectionFailed -> #("connection_failed", "", 0)
-    error.RequestFailed -> #("request_failed", "", 0)
+    error.ConnectionFailed(cause) -> #("connection_failed", cause_tag(cause), 0)
+    error.RequestFailed(cause) -> #("request_failed", cause_tag(cause), 0)
     error.DeadlineExceeded -> #("deadline", "", 0)
     error.ReadTimeout -> #("read_timeout", "", 0)
     error.ReadConflict -> #("read_conflict", "", 0)
     error.WrongOwner -> #("wrong_owner", "", 0)
+    error.Cancelled -> #("cancelled", "", 0)
     error.Closed -> #("closed", "", 0)
-    error.LimitExceeded(kind, limit) -> #("limit", kind, limit)
+    error.LimitExceeded(kind, limit, _) -> #("limit", limit_tag(kind), limit)
+    error.FixtureIo(operation, cause) -> #(
+      "fixture_io",
+      file_operation_tag(operation) <> ":" <> file_cause_tag(cause),
+      0,
+    )
     error.FixtureMissing -> #("fixture_missing", "", 0)
     error.FixtureCorrupt -> #("fixture_corrupt", "", 0)
     error.FixtureVersion(version) -> #("fixture_version", "", version)
@@ -130,7 +138,12 @@ pub fn failure_json(failure: Failure) -> json.Json {
     error.NotSubmitted -> "not_submitted"
     error.MayHaveBeenSent -> "may_have_been_sent"
   }
+  let observed = case failure.reason {
+    error.LimitExceeded(_, _, count) -> json.int(count)
+    _ -> json.null()
+  }
   json.object([
+    #("observed", observed),
     #("reason", json.string(tag)),
     #("detail", json.string(detail)),
     #("count", json.int(count)),
@@ -237,19 +250,30 @@ fn failure_decoder() -> decode.Decoder(Failure) {
   use detail <- decode.field("detail", decode.string)
   use count <- decode.field("count", decode.int)
   use evidence <- decode.field("evidence", decode.string)
+  use observed <- decode.field("observed", decode.optional(decode.int))
   let reason = case tag {
     "invalid_config" -> Ok(error.InvalidConfig(detail))
     "invalid_request" -> Ok(error.InvalidRequest(detail))
     "client_closed" -> Ok(error.ClientClosed)
     "admission_full" -> Ok(error.AdmissionFull)
-    "connection_failed" -> Ok(error.ConnectionFailed)
-    "request_failed" -> Ok(error.RequestFailed)
+    "connection_failed" ->
+      result.map(parse_cause(detail), error.ConnectionFailed)
+    "request_failed" -> result.map(parse_cause(detail), error.RequestFailed)
     "deadline" -> Ok(error.DeadlineExceeded)
     "read_timeout" -> Ok(error.ReadTimeout)
     "read_conflict" -> Ok(error.ReadConflict)
     "wrong_owner" -> Ok(error.WrongOwner)
+    "cancelled" -> Ok(error.Cancelled)
     "closed" -> Ok(error.Closed)
-    "limit" -> Ok(error.LimitExceeded(detail, count))
+    "limit" -> {
+      let kind = parse_limit(detail)
+      case observed {
+        Some(n) if n >= 0 ->
+          result.map(kind, fn(k) { error.LimitExceeded(k, count, n) })
+        _ -> Error(Nil)
+      }
+    }
+    "fixture_io" -> parse_file_error(detail)
     "fixture_missing" -> Ok(error.FixtureMissing)
     "fixture_corrupt" -> Ok(error.FixtureCorrupt)
     "fixture_version" -> Ok(error.FixtureVersion(count))
@@ -271,4 +295,122 @@ fn failure_decoder() -> decode.Decoder(Failure) {
         "known failure",
       )
   }
+}
+
+fn limit_tag(kind: error.LimitKind) -> String {
+  case kind {
+    error.RequestBodyBytes -> "request_body_bytes"
+    error.RequestHeaderBytes -> "request_header_bytes"
+    error.RequestHeaderCount -> "request_header_count"
+    error.ResponseHeaderBytes -> "response_header_bytes"
+    error.ResponseHeaderCount -> "response_header_count"
+    error.ResponseChunkBytes -> "response_chunk_bytes"
+    error.ResponseQueueBytes -> "response_queue_bytes"
+    error.CollectedBodyBytes -> "collected_body_bytes"
+    error.FixtureBytes -> "fixture_bytes"
+  }
+}
+
+fn parse_limit(tag: String) -> Result(error.LimitKind, Nil) {
+  case tag {
+    "request_body_bytes" -> Ok(error.RequestBodyBytes)
+    "request_header_bytes" -> Ok(error.RequestHeaderBytes)
+    "request_header_count" -> Ok(error.RequestHeaderCount)
+    "response_header_bytes" -> Ok(error.ResponseHeaderBytes)
+    "response_header_count" -> Ok(error.ResponseHeaderCount)
+    "response_chunk_bytes" -> Ok(error.ResponseChunkBytes)
+    "response_queue_bytes" -> Ok(error.ResponseQueueBytes)
+    "collected_body_bytes" -> Ok(error.CollectedBodyBytes)
+    "fixture_bytes" -> Ok(error.FixtureBytes)
+    _ -> Error(Nil)
+  }
+}
+
+fn cause_tag(cause: error.TransportCause) -> String {
+  case cause {
+    error.NameResolutionFailed -> "name_resolution_failed"
+    error.ConnectionRefused -> "connection_refused"
+    error.CertificateRejected -> "certificate_rejected"
+    error.TlsFailed -> "tls_failed"
+    error.ConnectionReset -> "connection_reset"
+    error.PeerClosed -> "peer_closed"
+    error.PeerDraining -> "peer_draining"
+    error.ProtocolError -> "protocol_error"
+    error.TransportTimeout -> "transport_timeout"
+    error.UnexpectedProtocol -> "unexpected_protocol"
+    error.UnknownTransport -> "unknown_transport"
+  }
+}
+
+fn parse_cause(tag: String) -> Result(error.TransportCause, Nil) {
+  case tag {
+    "name_resolution_failed" -> Ok(error.NameResolutionFailed)
+    "connection_refused" -> Ok(error.ConnectionRefused)
+    "certificate_rejected" -> Ok(error.CertificateRejected)
+    "tls_failed" -> Ok(error.TlsFailed)
+    "connection_reset" -> Ok(error.ConnectionReset)
+    "peer_closed" -> Ok(error.PeerClosed)
+    "peer_draining" -> Ok(error.PeerDraining)
+    "protocol_error" -> Ok(error.ProtocolError)
+    "transport_timeout" -> Ok(error.TransportTimeout)
+    "unexpected_protocol" -> Ok(error.UnexpectedProtocol)
+    "unknown_transport" -> Ok(error.UnknownTransport)
+    _ -> Error(Nil)
+  }
+}
+
+fn file_operation_tag(operation: error.FileOperation) -> String {
+  case operation {
+    error.OpenFile -> "open_file"
+    error.ReadFile -> "read_file"
+    error.WriteFile -> "write_file"
+    error.CloseFile -> "close_file"
+    error.CreateDirectory -> "create_directory"
+    error.SetPermissions -> "set_permissions"
+    error.PublishFixture -> "publish_fixture"
+  }
+}
+
+fn file_cause_tag(cause: error.FileCause) -> String {
+  case cause {
+    error.FileMissing -> "file_missing"
+    error.AlreadyExists -> "already_exists"
+    error.PermissionDenied -> "permission_denied"
+    error.NoSpace -> "no_space"
+    error.ReadOnlyFilesystem -> "read_only_filesystem"
+    error.NotDirectory -> "not_directory"
+    error.IsDirectory -> "is_directory"
+    error.CrossFilesystem -> "cross_filesystem"
+    error.UnknownIoFailure -> "unknown_io_failure"
+  }
+}
+
+fn parse_file_error(detail: String) -> Result(error.Reason, Nil) {
+  use #(operation, cause) <- result.try(case string.split(detail, ":") {
+    [o, c] -> Ok(#(o, c))
+    _ -> Error(Nil)
+  })
+  use operation <- result.try(case operation {
+    "open_file" -> Ok(error.OpenFile)
+    "read_file" -> Ok(error.ReadFile)
+    "write_file" -> Ok(error.WriteFile)
+    "close_file" -> Ok(error.CloseFile)
+    "create_directory" -> Ok(error.CreateDirectory)
+    "set_permissions" -> Ok(error.SetPermissions)
+    "publish_fixture" -> Ok(error.PublishFixture)
+    _ -> Error(Nil)
+  })
+  use cause <- result.try(case cause {
+    "file_missing" -> Ok(error.FileMissing)
+    "already_exists" -> Ok(error.AlreadyExists)
+    "permission_denied" -> Ok(error.PermissionDenied)
+    "no_space" -> Ok(error.NoSpace)
+    "read_only_filesystem" -> Ok(error.ReadOnlyFilesystem)
+    "not_directory" -> Ok(error.NotDirectory)
+    "is_directory" -> Ok(error.IsDirectory)
+    "cross_filesystem" -> Ok(error.CrossFilesystem)
+    "unknown_io_failure" -> Ok(error.UnknownIoFailure)
+    _ -> Error(Nil)
+  })
+  Ok(error.FixtureIo(operation, cause))
 }

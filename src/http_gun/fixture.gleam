@@ -30,6 +30,8 @@ pub fn matches(
   sanitise(expected) == sanitise(actual)
 }
 
+/// Remove the documented credential headers and normalize the request match key.
+/// Bodies, queries and unlisted custom headers remain exact and may contain secrets.
 pub fn sanitise(req: request.Request(BitArray)) -> request.Request(BitArray) {
   request.Request(
     ..req,
@@ -43,6 +45,8 @@ pub fn sanitise(req: request.Request(BitArray)) -> request.Request(BitArray) {
   )
 }
 
+/// Exclude the documented credential-header names, case-insensitively.
+/// This is a finite list, not a general secret detector.
 pub fn safe_headers(
   headers: List(#(String, String)),
 ) -> List(#(String, String)) {
@@ -64,6 +68,8 @@ pub fn safe_headers(
   })
 }
 
+/// Estimate retained request/response observation bytes for admission.
+/// This does not measure VM memory, JSON overhead or upstream parser allocations.
 @internal
 pub fn size(exchange: Exchange) -> Int {
   let request_size =
@@ -81,6 +87,7 @@ pub fn size(exchange: Exchange) -> Int {
   }
 }
 
+/// Validate fixture methods, statuses, byte alignment and terminal observations.
 @internal
 pub fn validate(exchanges: List(Exchange)) -> Result(Nil, Nil) {
   case

@@ -3,14 +3,15 @@
 ## Current state
 
 - Tracker path: docs/implementation/gleam-first/wave-tracker.md
-- Updated: 2026-09-30; adoption-validation waves10–12 accepted.
-- Target: docs/DESIGN.md and the owner's restart prompt; plan revision 5 (adoption review follow-up authorized).
+- Updated: 2026-09-30; API ergonomics and pre-release cleanup waves13–17 accepted.
+- Target: docs/DESIGN.md and the owner's restart prompt; plan revision 7 (pre-release cleanup authorized).
 - Approved first milestone: standard binary Request -> real local Gun HTTP -> buffered Response with trailers, using Gleam ownership. Final acceptance includes all six waves; the first milestone is not completion.
 - Approval: the original prompt explicitly supplied and authorized the complete six-slice program, directed continuation without another broad approval cycle, and selected Gun/OTP/Gleam. Follow-up explicitly requested progressive implementation. This records that existing authorization, not inferred approval from silence.
-- Last closed wave: 12 accepted. Active: none.
+- Last closed wave: 17 accepted. Active: none.
 - Open material decisions: none. Reversible implementation details follow the contract.
 - Temporary production substitutes: none. Loopback H1/H2 servers are test infrastructure, never production paths.
-- Gate: fast passes62 tests. Final full gates pass on Darwin ARM64 and Linux ARM64 for OTP29/28/27, with both consumers, four rejection fixtures,1196 LLM split points, public batch scaling, nghttpd interoperability, concurrent recording/replay and eleven original load scenarios. Exact receipts: docs/VALIDATION.md and docs/evidence/wave12/receipt.json.
+- Gate: fast passes86 tests. Final full gates pass on Darwin ARM64 and Linux ARM64 for OTP29/28/27, with both consumers, six rejection fixtures,1196 LLM split points, public batch scaling, nghttpd interoperability, concurrent recording/replay and eleven original load scenarios. Exact receipts: docs/VALIDATION.md and docs/evidence/wave17/receipt.json.
+- Commit: owner authorized a local commit of waves13–17 after acceptance; frozen inputs and six current gate receipts reverified.
 - Next action: controlled consumer adoption; a full sibling LLM session-runtime migration is separate work. Optional client features remain deferred.
 - Recovery: archives and hashes in docs/PROGRESS.md. No old production runtime was retained. All six retained waves pass the completed gates.
 
@@ -220,3 +221,59 @@ Design anchors: DESIGN.md ownership, batch scheduling, incremental recording and
 - Tooling findings retained: macOS metadata sidecars broke initial Linux compilation; export now omits them. Editing the first host matrix wrapper while it ran caused a trailing-command exit127 after all checks passed; frozen final rerun succeeds. These are our tooling corrections, not dependency failures.
 - Conformance/acceptance: approved outcomes, owning-process guarantees, pure typed decisions, narrow FFI, scoped source reuse/licensing, observable tests, independent public imports, documentation and workspace rules all verified. No library patch, generic framework, untranslated Erlang orchestration, provider credential, sibling write, publication or push. FFI remains72 lines/3650 bytes/12 bindings. Changes are retained locally.
 - Remaining boundary: full LLM Wire session migration must preserve tools/continuations, remaining budgets and complete retry evidence; the example is text-oriented. GitHub-hosted x86_64 CI was not run. Body/query redaction, crash durability and previously listed follow-on HTTP features remain optional. No extra protocol certification or upstream repair is required by these findings.
+
+### Authorized API ergonomics — plan revision 6
+
+Approval: owner accepted the four concrete proposals with “apply them” on 2026-09-30. Design anchors E1–E4 in DESIGN.md. Baseline 1f53017 is clean and recoverable in Git. No additional approval cycle, dependencies, upstream patches, sibling edits or provider traffic. Existing Gleam actors/selectors/monitors/timers and filesystem libraries are retained; no temporary runtime. Design documentation stays in this package's existing Markdown format.
+
+| Wave | Observable delivery and transition | Public red/green checks and exit |
+| --- | --- | --- |
+| 13 | E1 bounded finish: Active -> Closing -> Publishing -> Finalized/Failed; finite removable waiter | Timeout seals without draining, cancellation then publication/replay, concurrent/dead waiter, abort; fast gate and ordinary consumer |
+| 14 | E2 fallible scoped callback with caller errors and identical cleanup | Opening/read/application error mapping, success/early/exception cleanup; fast and public consumers |
+| 15 | E3 monotonic deadline and scoped latched cancellation through existing admission/body ownership | Expired/queued/pre-header/reading requests, scope and creator death, H2 healthy sibling, no replay/history growth; fast and consumers |
+| 16 | E4 typed limits, bounded transport/file diagnostics, codec compatibility, public docs and final qualification | Real TLS/refusal/IO errors, every error roundtrip, strict v1/v2 decode, safe descriptions; full gate and OTP29/28/27 matrix |
+
+Decisions: client deadline remains the ceiling; finish timeout does not abort; cancellation applies to every request deliberately attached to one token; only one recorder completion waiter, rejected extra waits return Busy. Scope exit releases token state. Unexpected raw dependency reasons map to Unknown; no arbitrary term inspection in public errors. These are scoped implementation decisions consistent with the approved proposal. No protocol hardening, full sibling LLM migration, optional redaction or crash durability in this wave.
+
+Initial plan state: wave13 active; waves14–16 pending. Acceptance requires unchanged ordinary workflows plus all four improvements, retained exact failing/passing evidence and no unresolved gate failures. No completion claimed yet.
+
+### Wave 13 — acceptance
+
+E1 delivered: finish_wait seals new reservations, holds one monitored/timed waiter, continues finalization after wait timeout and never reads HTTP bodies. Dead/timed-out waiters are removed; abort remains capture-only. Real cancellation-prefix replay passes; ordinary consumer no longer polls. Fast gate passes64 tests and two consumers/four rejections pass. Exact logs in evidence/wave13 include missing-API red, unused-result gate correction and a contention-test registration race corrected without sleeps. Production FFI/dependencies unchanged. E2–E4 remain pending; wave14 active.
+
+### Wave 14 — acceptance
+
+E2 delivered: try_with_response preserves caller errors, maps opening failures, flattens the result and reuses exception-safe with_response. Public tests cover application/read/open errors, success, early exit and exception cleanup. LLM public consumer uses the helper without trailing flatten. Fast67 tests and both consumers/four rejection fixtures pass (wave14/final-green.log); missing API and a test-only private-return-type correction retained. No FFI/dependency change. Wave15 now active; request controls and E4 remain unbuilt.
+
+### Wave 15 — acceptance
+
+E3 delivered: opaque monotonic deadline with remaining_ms; request options for send/open/arbitrary and fallible scopes; scoped latched token through a small Gleam actor. Pending cancellation monitors have a bounded live-entry index; body owners observe token termination and remove monitors on release. No per-request worker, body forwarding, callback history or new FFI. Cancel while connecting removes unused reservations; queued peers preserve useful connections. Red/green tests cover expired admission, pre-header and queued cancellation, stalled TLS reservation cleanup. Scope/creator death, client ceiling, body deadlines and H2 sibling/reuse pass. Fast76 tests; both external consumers and six type rejections pass in wave15 logs. Options are exercised through live/record/playback. Implementation keeps existing default APIs and same pool. Wave16 active; typed diagnostics, fixture revision and final qualification remain required.
+
+
+### Wave 16 — acceptance
+
+- Status: accepted,2026-09-30. All four approved API improvements E1–E4 are implemented; no required item remains in this follow-up. Default client calls remain; richer error constructors require the documented pattern-match migration. New fixture output is version2; valid version1 is explicitly decoded without corrupt-fixture fallback.
+- Delivered: typed byte/count limits with optional observed size; supported transport categories including real refusal/certificate rejection; operation/cause filesystem failures; safe descriptions excluding free-form data; compiled public documentation and examples. Legacy ambiguous sizes/categories use None/OtherLimit rather than invented precision. Cancellation roundtrips preserve observed prefixes and typed outcomes; completed HTTP survives later cancellation.
+- Red/green: missing typed constructors and safe formatter tests fail before implementation. A final controlled public test exposed retention of a connecting socket after both the reserving caller and its queued peer cancelled. Pool cleanup now closes unused connecting sockets after every relevant pending removal while preserving useful shared connections. Retained red/green logs show84 passed/1 failed then85 passed. No dependency patch or separate networking path.
+- Validation: direct fast85 tests, both separate consumers/six compiler rejection fixtures,1196 LLM split points and generated docs pass. Six isolated full gates pass on ARM64 Darwin/Linux × OTP29/28/27 against the same frozen executable inputs. Each repeats85 tests, format/check/build/FFI warnings/boundaries, two consumers, six rejections, batch trials through10000, seven nghttpd scenarios with one connection/two stream resets,256 recorded/replayed exchanges/8MiB and eleven original load scenarios. See evidence/wave16/receipt.json and per-runtime logs/measurements. Earlier failed test/tooling attempts remain in the wave evidence.
+- Boundaries: no new Dream rerun or60-second soak claimed; those are historical receipts. Host/container timing runs overlap and are qualification observations, not comparative performance claims. Remote x86_64 CI was not run. The isolated LLM example is text-oriented; sibling session-runtime migration is separate. Body/query redaction and crash durability remain optional client features.
+- Review: actor-owned lifetimes and finite admitted subscriptions/waiters, conservative submission evidence, public-only examples, explicit fixture compatibility and unmodified dependency boundaries preserved. Handwritten FFI now92 physical lines/4669 bytes/13 declarations, adding only bounded transport-reason conversion. Gun/runtime bindings and the8-line filesystem primitive bridge remain narrow. No generic framework, raw public transport terms, production substitute, donor copy or sibling write. Changes are local and uncommitted; no push or publication.
+
+
+### Authorized pre-release cleanup — wave 17 / plan revision 7
+
+The owner confirms no released package/external consumer and explicitly permits breaking cleanup. E4 now has one strict fixture schema (marker1), mandatory observed limit sizes and no legacy decoder/OtherLimit. Invalid negative fixture budgets fail before IO; genuine unknown transport/IO causes remain. No package version bump or dependency/FFI change. Public red/green: old experimental failure layout is corrupt, current typed failures roundtrip, unknown versions/tags fail, negative budgets are configuration errors. Keep recording/live/playback consumers on this schema. Gates: ./dev/env sh dev/gate fast; ./dev/env sh dev/gate full; runtime matrix if needed for final qualification. Status: active; prior wave16 evidence remains historical.
+
+
+### Wave 17 — acceptance
+
+- Status: accepted,2026-09-30. The owner's explicit pre-release direction supersedes E4's earlier compatibility decision; no external migration, new package release or further approval is needed. Existing functional capabilities and genuine unknown runtime causes remain.
+- Delivered: one strict fixture schema marked1; version-independent nested decoders; no legacy mapper or OtherLimit; required observed Int in LimitExceeded. Negative file/parse budgets return InvalidConfig before IO/decode. Public docs and local instructions distinguish error pattern syntax, current owned examples and future consumers.
+- Red/green: obsolete failure layout accepted then rejected; negative budget classified as LimitExceeded then InvalidConfig; null observed size accepted then rejected. Typed error roundtrips and strict missing/unknown-marker/tag cases pass. An initial unused import warning was removed. A test-only fixed-count Busy polling loop exhausted before disk completion; the evidenced helper was removed and tests use bounded finish_wait. Both correction logs are retained rather than reported as dependency defects.
+- Validation: fast86 tests, format/check/build, own FFI warnings/boundaries, and generated API docs pass. Six full gates on ARM64 Darwin/Linux × OTP29/28/27 pass against frozen current inputs; each includes86 tests, two isolated public consumers, six type rejections,1196 LLM split points, three batch trials through10000 inputs, seven independent nghttpd scenarios,256 recording/replay exchanges totaling8MiB and eleven controlled load scenarios. Exact receipt and logs: evidence/wave17.
+- Scope/quality: no production substitute, generic framework, dependency/parser patch or wider architecture change. Current typed data matches the design; old experimental artifacts need regeneration rather than compatibility branches. Package/toolchain/FFI unchanged (92 lines/4669 bytes/13 bindings). No sibling/oversight mutation, push, publication, credentials or commit. No pending work in this cleanup. Historical wave16 receipts remain accurate for their captured tree. Remote x86_64 CI, another Dream comparison/soak, optional redaction/durability and full sibling LLM migration are not claimed.
+
+
+### Local integration after wave 17
+
+The owner requested committing the accepted API improvements and pre-release cleanup. They form one coherent local commit with source, examples, documentation and red/green/full-gate evidence. Before staging, all78 frozen executable/fixture inputs and all six current runtime receipt hashes were reverified; no source change invalidates the86-test qualification. Historical entries above retain their original status. No push, publication, sibling or oversight change is included.

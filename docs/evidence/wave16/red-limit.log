@@ -1,0 +1,24 @@
+  Compiling http_gun
+warning: Unused imported item
+  ┌─ /code/gleam-dream/http_gun/test/http_gun_error_test.gleam:3:22
+  │
+3 │ import gleam/option.{Some}
+  │                      ^^^^ This imported constructor is never used
+
+Hint: You can safely remove it.
+
+error: Incorrect arity
+   ┌─ /code/gleam-dream/http_gun/test/http_gun_error_test.gleam:27:7
+   │
+27 │       error.LimitExceeded(error.CollectedBodyBytes, 2, Some(3)),
+   │       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Expected 2 arguments, got 3
+
+
+error: Unknown module value
+   ┌─ /code/gleam-dream/http_gun/test/http_gun_error_test.gleam:27:33
+   │
+27 │       error.LimitExceeded(error.CollectedBodyBytes, 2, Some(3)),
+   │                                 ^^^^^^^^^^^^^^^^^^
+
+The module `http_gun/error` does not have a `CollectedBodyBytes` value.
+

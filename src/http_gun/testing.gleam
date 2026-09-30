@@ -17,15 +17,14 @@ pub fn start(
       error.Failure(error.FixtureCorrupt, error.NotSubmitted)
     }),
   )
-  case
+  let size =
     list.fold(exchanges, 0, fn(total, exchange) {
       total + fixture.size(exchange)
     })
-    <= 16_777_216
-  {
+  case size <= 16_777_216 {
     False ->
       Error(error.Failure(
-        error.LimitExceeded("fixture", 16_777_216),
+        error.LimitExceeded(error.FixtureBytes, 16_777_216, size),
         error.NotSubmitted,
       ))
     True ->

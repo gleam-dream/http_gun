@@ -9,6 +9,7 @@ import gleam/http/response
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import http_gun/body
+import http_gun/cancellation
 import http_gun/error.{type Failure}
 import http_gun/recording
 
@@ -33,6 +34,8 @@ pub type Pending {
     timer: process.Timer,
     reservation: Option(process.Pid),
     capture: Option(recording.Capture),
+    cancellation: Option(cancellation.Token),
+    cancel_monitor: Option(process.Monitor),
   )
 }
 
@@ -56,11 +59,12 @@ pub opaque type Queue {
     owners: Dict(process.Pid, Reference),
     waiting: Int,
     order: List(Group),
+    cancellations: Dict(process.Monitor, Reference),
   )
 }
 
 pub fn new() -> Queue {
-  Queue(dict.new(), dict.new(), dict.new(), 0, [])
+  Queue(dict.new(), dict.new(), dict.new(), 0, [], dict.new())
 }
 
 pub fn waiting(queue: Queue) -> Int {
@@ -137,6 +141,10 @@ pub fn push(queue: Queue, group: Group, p: Pending) -> Queue {
       None -> list.append(queue.order, [group])
       Some(_) -> queue.order
     },
+    case p.cancel_monitor {
+      None -> queue.cancellations
+      Some(monitor) -> dict.insert(queue.cancellations, monitor, p.id)
+    },
   )
 }
 
@@ -187,6 +195,10 @@ pub fn remove(queue: Queue, id: Reference) -> #(Option(Pending), Queue) {
             None, None -> list.filter(queue.order, fn(g) { g != entry.group })
             _, _ -> queue.order
           },
+          case entry.value.cancel_monitor {
+            None -> queue.cancellations
+            Some(monitor) -> dict.delete(queue.cancellations, monitor)
+          },
         ),
       )
     }
@@ -198,6 +210,16 @@ pub fn remove_owner(
   owner: process.Pid,
 ) -> #(Option(Pending), Queue) {
   case dict.get(queue.owners, owner) {
+    Error(_) -> #(None, queue)
+    Ok(id) -> remove(queue, id)
+  }
+}
+
+pub fn remove_cancellation(
+  queue: Queue,
+  monitor: process.Monitor,
+) -> #(Option(Pending), Queue) {
+  case dict.get(queue.cancellations, monitor) {
     Error(_) -> #(None, queue)
     Ok(id) -> remove(queue, id)
   }

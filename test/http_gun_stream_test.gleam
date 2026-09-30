@@ -1,6 +1,7 @@
 import gleam/erlang/process
 import gleam/http/request
 import gleam/int
+import gleam/result
 import gleeunit/should
 import http_gun
 import http_gun/body
@@ -100,7 +101,7 @@ pub fn buffered_limit_closes_socket_test() {
   body.collect(response.body, 2)
   |> should.equal(
     Error(error.Failure(
-      error.LimitExceeded("collection", 2),
+      error.LimitExceeded(error.CollectedBodyBytes, 2, 3),
       error.MayHaveBeenSent,
     )),
   )
@@ -165,4 +166,54 @@ fn await_conflict(stream: body.Body, remaining: Int) -> Bool {
         _ -> False
       }
   }
+}
+
+type ConsumerError {
+  Http(error.Failure)
+  ApplicationStopped
+}
+
+pub fn fallible_scope_preserves_application_error_and_cleanup_test() {
+  let #(port, server) = controlled()
+  let assert Ok(client) = http_gun.start(config.default())
+  http_gun.try_with_response(client, req(port), Http, fn(_) {
+    Error(ApplicationStopped)
+  })
+  |> should.equal(Error(ApplicationStopped))
+  closed(server) |> should.be_true
+  let _ = http_gun.stop(client)
+}
+
+pub fn fallible_scope_maps_open_and_read_failures_test() {
+  let #(port, server) = controlled()
+  let assert Ok(client) = http_gun.start(config.default())
+  http_gun.try_with_response(client, req(port), Http, fn(response) {
+    body.next(response.body, 0) |> result.map_error(Http)
+  })
+  |> should.equal(
+    Error(Http(error.Failure(error.ReadTimeout, error.MayHaveBeenSent))),
+  )
+  closed(server) |> should.be_true
+  let _ = http_gun.stop(client)
+  let assert Error(Http(_)) =
+    http_gun.try_with_response(client, req(port), Http, fn(_) { Ok(Nil) })
+  Nil
+}
+
+pub fn fallible_scope_success_and_exception_cleanup_test() {
+  let #(port, server) = controlled()
+  let assert Ok(client) = http_gun.start(config.default())
+  http_gun.try_with_response(client, req(port), Http, fn(_) { Ok("value") })
+  |> should.equal(Ok("value"))
+  closed(server) |> should.be_true
+  let #(port, server) = controlled()
+  raised(fn() {
+    http_gun.try_with_response(client, req(port), Http, fn(_) {
+      raise(ScopeProbe)
+      Ok(Nil)
+    })
+  })
+  |> should.be_true
+  closed(server) |> should.be_true
+  let _ = http_gun.stop(client)
 }

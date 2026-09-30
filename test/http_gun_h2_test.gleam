@@ -2,11 +2,14 @@ import gleam/bit_array
 import gleam/erlang/process
 import gleam/http/request
 import gleam/list
+import gleam/option.{Some}
 import gleeunit/should
 import http_gun
 import http_gun/body
+import http_gun/cancellation
 import http_gun/config
 import http_gun/error
+import http_gun/request_options
 
 @external(erlang, "http_gun_h2_server", "start")
 fn server() -> Int
@@ -113,7 +116,8 @@ pub fn untrusted_tls_fails_without_submission_test() {
     )
   let assert Error(failure) = http_gun.send(client, req(port, "/fast"))
   failure.evidence |> should.equal(error.NotSubmitted)
-  failure.reason |> should.equal(error.ConnectionFailed)
+  failure.reason
+  |> should.equal(error.ConnectionFailed(error.CertificateRejected))
   let _ = http_gun.stop(client)
 }
 
@@ -251,5 +255,38 @@ pub fn goaway_allows_existing_sibling_to_finish_without_replay_test() {
     != response_header(slow.headers, "x-connection")
   }
   |> should.be_true
+  let _ = http_gun.stop(client)
+}
+
+pub fn cancellation_token_preserves_h2_sibling_and_connection_test() {
+  let port = server()
+  let assert Ok(client) = http_gun.start(settings())
+  let assert Ok(Nil) =
+    cancellation.with_token(fn(token) {
+      let options =
+        request_options.Options(
+          ..request_options.default(),
+          cancellation: Some(token),
+        )
+      let assert Ok(slow) =
+        http_gun.open_with_options(client, req(port, "/slow"), options)
+      body.next(slow.body, 1000)
+      |> should.equal(Ok(body.Chunk(<<"first":utf8>>)))
+      let assert Ok(fast) = http_gun.open(client, req(port, "/fast"))
+      cancellation.cancel(token)
+      body.next(slow.body, 1000)
+      |> should.equal(
+        Error(error.Failure(error.Cancelled, error.MayHaveBeenSent)),
+      )
+      let assert Ok(bytes) = body.collect(fast.body, 100)
+      bytes.bytes |> should.equal(<<0, 255, 128>>)
+      response_header(fast.headers, "x-connection")
+      |> should.equal(response_header(slow.headers, "x-connection"))
+      let _ = body.close(slow.body)
+      let _ = body.close(fast.body)
+      let assert Ok(next) = http_gun.send(client, req(port, "/fast"))
+      response_header(next.response.headers, "x-connection")
+      |> should.equal(response_header(slow.headers, "x-connection"))
+    })
   let _ = http_gun.stop(client)
 }

@@ -12,7 +12,9 @@ import gleam/otp/actor
 import gleam/result
 import gleam/string
 import http_gun/body
+import http_gun/cancellation
 import http_gun/config
+import http_gun/deadline
 import http_gun/error.{type Failure, Failure, NotSubmitted}
 import http_gun/fixture
 import http_gun/internal/bridge
@@ -20,6 +22,7 @@ import http_gun/internal/call
 import http_gun/internal/observation as obs
 import http_gun/internal/pending.{type Origin, type Pending, Origin, Pending}
 import http_gun/recording
+import http_gun/request_options
 
 pub type Stats {
   Stats(connections: Int, bodies: Int, waiting: Int)
@@ -69,6 +72,7 @@ type Message {
   Open(
     request.Request(BitArray),
     Origin,
+    Option(cancellation.Token),
     process.Pid,
     Int,
     process.Subject(Result(response.Response(body.Body), Failure)),
@@ -92,15 +96,38 @@ pub fn open(
   client: Client,
   req: request.Request(BitArray),
 ) -> Result(response.Response(body.Body), Failure) {
+  open_with_options(client, req, request_options.default())
+}
+
+pub fn open_with_options(
+  client: Client,
+  req: request.Request(BitArray),
+  options: request_options.Options,
+) -> Result(response.Response(body.Body), Failure) {
+  use Nil <- result.try(case request_options.cancelled(options) {
+    True -> Error(Failure(error.Cancelled, NotSubmitted))
+    False -> Ok(Nil)
+  })
+  let until = case options.deadline {
+    None -> bridge.now() + client.config.deadline_ms
+    Some(budget) ->
+      int.min(
+        bridge.now() + client.config.deadline_ms,
+        deadline.timestamp(budget),
+      )
+  }
+  use Nil <- result.try(case until <= bridge.now() {
+    True -> Error(Failure(error.DeadlineExceeded, NotSubmitted))
+    False -> Ok(Nil)
+  })
   let req = case req.path {
     "" -> request.Request(..req, path: "/")
     _ -> req
   }
   use origin <- result.try(validate(req, client.config.limits))
-  let deadline = bridge.now() + client.config.deadline_ms
   call.with_failure(
     client.subject,
-    Open(req, origin, process.self(), deadline, _),
+    Open(req, origin, options.cancellation, process.self(), until, _),
     Failure(error.ClientClosed, error.MayHaveBeenSent),
   )
 }
@@ -193,27 +220,41 @@ fn handle(state: State, message: Message) -> actor.Next(State, Message) {
       process.send(reply, Ok(Nil))
       actor.stop()
     }
-    Open(req, origin, owner, deadline, reply) ->
-      open_request(state, req, origin, owner, deadline, reply)
+    Open(req, origin, token, owner, deadline, reply) ->
+      open_request(state, req, origin, token, owner, deadline, reply)
     Expire(id) -> {
       let #(expired, queue) = pending.remove(state.pending, id)
       case expired {
         None -> actor.continue(state)
         Some(p) -> {
           reject(p, error.DeadlineExceeded)
-          actor.continue(dispatch(State(..state, pending: queue)))
+          actor.continue(
+            dispatch(discard_reservation(State(..state, pending: queue), p)),
+          )
         }
       }
     }
     Release(pid, connection, clean) ->
       release_body(state, pid, connection, clean)
     Lost(process.PortDown(..)) -> actor.continue(state)
-    Lost(process.ProcessDown(pid: pid, ..)) -> process_lost(state, pid)
+    Lost(process.ProcessDown(pid: pid, monitor: monitor, reason: reason)) -> {
+      let #(cancelled, queue) =
+        pending.remove_cancellation(state.pending, monitor)
+      case cancelled {
+        Some(p) -> {
+          reject(p, error.Cancelled)
+          actor.continue(
+            dispatch(discard_reservation(State(..state, pending: queue), p)),
+          )
+        }
+        None -> process_lost(state, pid, bridge.exit_cause(reason))
+      }
+    }
     Wire(bridge.Up(pid, protocol)) ->
       case
         state.config.protocol == config.RequireHttp2 && protocol != config.H2
       {
-        True -> handle(state, Wire(bridge.Down(pid)))
+        True -> handle(state, Wire(bridge.Down(pid, error.UnexpectedProtocol)))
         False -> {
           // Wait for initial SETTINGS before admitting H2 application streams.
           let capacity = case protocol {
@@ -247,8 +288,8 @@ fn handle(state: State, message: Message) -> actor.Next(State, Message) {
         })
       actor.continue(dispatch(State(..state, connections: connections)))
     }
-    Wire(bridge.Down(pid)) ->
-      actor.continue(dispatch(connection_lost(state, pid)))
+    Wire(bridge.Down(pid, cause)) ->
+      actor.continue(dispatch(connection_lost(state, pid, cause)))
     Wire(_) -> actor.continue(state)
   }
 }
@@ -263,6 +304,10 @@ fn reject_with(p: Pending, failure: Failure) -> Nil {
     None -> Nil
   }
   let _ = process.cancel_timer(p.timer)
+  case p.cancel_monitor {
+    Some(monitor) -> process.demonitor_process(monitor)
+    None -> Nil
+  }
   process.demonitor_process(p.monitor)
   process.send(p.reply, Error(failure))
 }
@@ -294,7 +339,10 @@ fn dispatch_group(state: State, group: pending.Group) -> State {
         Taken(next) -> {
           let #(_, queue) = pending.remove(next.pending, p.id)
           dispatch_group(
-            State(..next, pending: pending.rotate(queue, group)),
+            discard_reservation(
+              State(..next, pending: pending.rotate(queue, group)),
+              p,
+            ),
             group,
           )
         }
@@ -334,8 +382,8 @@ fn admit_live(state: State, p: Pending) -> Admission {
               state.config.limits.header_count,
             )
           {
-            Error(Nil) -> {
-              reject(p, error.ConnectionFailed)
+            Error(cause) -> {
+              reject(p, error.ConnectionFailed(cause))
               Taken(state)
             }
             Ok(pid) -> {
@@ -377,10 +425,17 @@ fn launch(state: State, p: Pending, connection: Connection) -> State {
       p.reply,
       release,
       p.capture,
+      p.cancellation,
     )
   {
     Error(_) -> {
-      reject_with(p, Failure(error.RequestFailed, error.MayHaveBeenSent))
+      reject_with(
+        p,
+        Failure(
+          error.RequestFailed(error.UnknownTransport),
+          error.MayHaveBeenSent,
+        ),
+      )
       bridge.close(connection.pid)
       State(
         ..state,
@@ -392,6 +447,10 @@ fn launch(state: State, p: Pending, connection: Connection) -> State {
     Ok(started) -> {
       process.unlink(started.pid)
       let _ = process.monitor(started.pid)
+      case p.cancel_monitor {
+        Some(monitor) -> process.demonitor_process(monitor)
+        None -> Nil
+      }
       process.demonitor_process(p.monitor)
       let _ = process.cancel_timer(p.timer)
       State(
@@ -453,11 +512,15 @@ fn validate(
       case bit_array.byte_size(req.body) <= limits.request_bytes {
         False ->
           Error(Failure(
-            error.LimitExceeded("request", limits.request_bytes),
+            error.LimitExceeded(
+              error.RequestBodyBytes,
+              limits.request_bytes,
+              bit_array.byte_size(req.body),
+            ),
             NotSubmitted,
           ))
         True ->
-          body.check_headers(req.headers, limits)
+          body.check_headers(req.headers, limits, body.RequestHeaders)
           |> result.map_error(fn(f) { Failure(f.reason, NotSubmitted) })
           |> result.map(fn(_) { origin })
       }
@@ -465,12 +528,20 @@ fn validate(
 }
 
 fn admit(state: State, p: Pending) -> Admission {
-  case bridge.now() >= p.deadline {
-    True -> {
+  let cancelled = case p.cancellation {
+    None -> False
+    Some(token) -> cancellation.is_cancelled(token)
+  }
+  case cancelled, bridge.now() >= p.deadline {
+    True, _ -> {
+      reject(p, error.Cancelled)
+      Taken(state)
+    }
+    False, True -> {
       reject(p, error.DeadlineExceeded)
       Taken(state)
     }
-    False ->
+    False, False ->
       case dict.size(state.owners) >= state.config.limits.active {
         True -> Deferred(state, p)
         False ->
@@ -516,15 +587,20 @@ fn admit_playback(
               p.reply,
               release,
               None,
+              p.cancellation,
             )
           {
             Error(_) -> {
-              reject(p, error.RequestFailed)
+              reject(p, error.RequestFailed(error.UnknownTransport))
               state
             }
             Ok(started) -> {
               process.unlink(started.pid)
               let _ = process.monitor(started.pid)
+              case p.cancel_monitor {
+                Some(monitor) -> process.demonitor_process(monitor)
+                None -> Nil
+              }
               process.demonitor_process(p.monitor)
               let _ = process.cancel_timer(p.timer)
               State(
@@ -554,7 +630,7 @@ fn reserve_capture(
         Ok(cap) -> Ok(Some(cap))
         Error(recording.SessionClosed) ->
           Error(Failure(
-            error.CaptureFailed("recording is finalized"),
+            error.CaptureFailed("recording is closing or finalized"),
             NotSubmitted,
           ))
         Error(_) -> Ok(None)
@@ -599,6 +675,7 @@ fn open_request(
   state: State,
   req: request.Request(BitArray),
   origin: Origin,
+  token: Option(cancellation.Token),
   owner: process.Pid,
   deadline: Int,
   reply: process.Subject(Result(response.Response(body.Body), Failure)),
@@ -628,6 +705,8 @@ fn open_request(
           timer,
           None,
           capture,
+          token,
+          option.map(token, cancellation.monitor),
         )
       let group = group(state, p)
       // Never let a new arrival overtake an existing head in its lane.
@@ -690,18 +769,26 @@ fn release_body(
   }
 }
 
-fn fail_group(state: State, group: pending.Group) -> State {
+fn fail_group(
+  state: State,
+  group: pending.Group,
+  cause: error.TransportCause,
+) -> State {
   case pending.first(state.pending, group) {
     Error(_) -> state
     Ok(p) -> {
-      reject(p, error.ConnectionFailed)
+      reject(p, error.ConnectionFailed(cause))
       let #(_, queue) = pending.remove(state.pending, p.id)
-      fail_group(State(..state, pending: queue), group)
+      fail_group(State(..state, pending: queue), group, cause)
     }
   }
 }
 
-fn connection_lost(state: State, pid: process.Pid) -> State {
+fn connection_lost(
+  state: State,
+  pid: process.Pid,
+  cause: error.TransportCause,
+) -> State {
   case list.find(state.connections, fn(c) { c.pid == pid }) {
     Error(_) -> state
     Ok(connection) -> {
@@ -712,25 +799,50 @@ fn connection_lost(state: State, pid: process.Pid) -> State {
           connections: list.filter(state.connections, fn(c) { c.pid != pid }),
         )
       case connection.status {
-        Connecting -> fail_group(state, pending.ForOrigin(connection.origin))
+        Connecting ->
+          fail_group(state, pending.ForOrigin(connection.origin), cause)
         Ready(_, _) -> state
       }
     }
   }
 }
 
-fn process_lost(state: State, pid: process.Pid) -> actor.Next(State, Message) {
-  let state = connection_lost(state, pid)
+fn process_lost(
+  state: State,
+  pid: process.Pid,
+  cause: error.TransportCause,
+) -> actor.Next(State, Message) {
+  let state = connection_lost(state, pid, cause)
   let #(cancelled, queue) = pending.remove_owner(state.pending, pid)
   case cancelled {
     Some(p) -> reject(p, error.Closed)
     None -> Nil
   }
   let state = State(..state, pending: queue)
+  let state = case cancelled {
+    Some(p) -> discard_reservation(state, p)
+    None -> state
+  }
   let next = case dict.get(state.owners, pid) {
     Ok(Owned(connection: Some(connection), released: False, ..)) ->
-      connection_lost(state, connection)
+      connection_lost(state, connection, error.UnknownTransport)
     _ -> state
   }
   actor.continue(dispatch(State(..next, owners: dict.delete(next.owners, pid))))
+}
+
+// A cancelled connecting reservation is not an idle established cache entry.
+// Keep it only while another queued request to that origin can use it.
+fn discard_reservation(state: State, p: Pending) -> State {
+  case pending.has_group(state.pending, pending.ForOrigin(p.origin)) {
+    True -> state
+    False -> {
+      let #(unused, keep) =
+        list.partition(state.connections, fn(connection) {
+          connection.origin == p.origin && connection.status == Connecting
+        })
+      list.each(unused, fn(connection) { bridge.close(connection.pid) })
+      State(..state, connections: keep)
+    }
+  }
 }

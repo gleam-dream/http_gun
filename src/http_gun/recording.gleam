@@ -4,6 +4,7 @@
 import gleam/bit_array
 import gleam/dict.{type Dict}
 import gleam/erlang/process
+import gleam/erlang/reference
 import gleam/http/request
 import gleam/int
 import gleam/json
@@ -14,6 +15,7 @@ import gleam/result
 import gleam/string
 import http_gun/error
 import http_gun/fixture
+import http_gun/internal/bridge
 import http_gun/internal/call
 import http_gun/internal/codec
 import http_gun/internal/file
@@ -28,13 +30,15 @@ pub type Options {
   Options(max_bytes: Int, replacement: Replacement)
 }
 
+/// Capture at most 16 MiB of encoded data and refuse replacing an existing file.
+/// Publication provides atomic visibility, without a power-loss durability guarantee.
 pub fn default() -> Options {
   Options(16_777_216, RefuseExisting)
 }
 
 pub type CaptureError {
   CaptureLimit
-  IoFailure
+  IoFailure(operation: error.FileOperation, cause: error.FileCause)
   DestinationExists
   SessionClosed
   Interrupted
@@ -42,6 +46,7 @@ pub type CaptureError {
 
 pub type FinishError {
   Busy
+  WaitTimeout
   CaptureFailed(CaptureError)
 }
 
@@ -62,7 +67,8 @@ type StreamState {
 
 type Phase {
   Active
-  Sealing(process.Subject(Result(String, FinishError)))
+  Closing
+  Sealing
   Sealed
   Broken(CaptureError)
 }
@@ -73,6 +79,15 @@ type Publication {
     destination: String,
     options: Options,
     count: Int,
+  )
+}
+
+type Waiter {
+  Waiter(
+    reply: process.Subject(Result(String, FinishError)),
+    id: reference.Reference,
+    timer: Option(process.Timer),
+    monitor: process.Monitor,
   )
 }
 
@@ -101,6 +116,7 @@ type State {
     queue: List(Job),
     working: Option(Working),
     phase: Phase,
+    waiter: Option(Waiter),
   )
 }
 
@@ -114,6 +130,8 @@ type Message {
   Written(Result(Nil, CaptureError))
   Lost(process.Down)
   Finish(process.Subject(Result(String, FinishError)))
+  FinishWait(Int, process.Subject(Result(String, FinishError)))
+  WaitExpired(reference.Reference)
   Abandon
   Abort(process.Subject(Result(Nil, CaptureError)))
 }
@@ -158,6 +176,7 @@ pub fn start(
           queue: [],
           working: None,
           phase: Active,
+          waiter: None,
         ))
         |> actor.selecting(selector)
         |> actor.returning(Recording(subject, process.self())),
@@ -207,6 +226,21 @@ pub fn finish(recording: Recording) -> Result(String, FinishError) {
   call.with_failure(recording.subject, Finish, CaptureFailed(Interrupted))
 }
 
+/// Seal new reservations and await publication without consuming HTTP bodies.
+/// A timeout removes this waiter only; finalization continues. Additional
+/// concurrent waiters receive Busy. Calling again observes the stable outcome.
+/// Negative waits poll immediately, as zero does. Abort explicitly abandons capture.
+pub fn finish_wait(
+  recording: Recording,
+  wait_ms: Int,
+) -> Result(String, FinishError) {
+  call.with_failure(
+    recording.subject,
+    FinishWait(bridge.now() + int.max(0, wait_ms), _),
+    CaptureFailed(Interrupted),
+  )
+}
+
 fn handle(state: State, message: Message) -> actor.Next(State, Message) {
   case message {
     AttachClient(pid) -> {
@@ -229,15 +263,15 @@ fn handle(state: State, message: Message) -> actor.Next(State, Message) {
         Error(failure) -> advance(break_session(state, failure))
         Ok(Nil) ->
           case state.phase {
-            Sealing(reply) -> {
-              process.send(reply, Ok(state.destination))
+            Sealing -> {
+              let state = notify_waiter(state, Ok(state.destination))
               actor.continue(State(..state, phase: Sealed, streams: dict.new()))
             }
-            Active | Sealed | Broken(_) -> advance(state)
+            Active | Closing | Sealed | Broken(_) -> advance(state)
           }
       }
     }
-    Lost(process.ProcessDown(pid: pid, reason: reason, ..)) ->
+    Lost(process.ProcessDown(pid: pid, reason: reason, ..) as down) ->
       case
         pid == state.owner
         || { state.client == Some(pid) && reason != process.Normal }
@@ -247,12 +281,20 @@ fn handle(state: State, message: Message) -> actor.Next(State, Message) {
           actor.stop()
         }
         False ->
-          case state.working {
-            Some(work) if work.pid == pid -> {
-              work.job.ack(Error(Interrupted))
-              advance(break_session(State(..state, working: None), Interrupted))
-            }
-            _ -> actor.continue(state)
+          case state.waiter {
+            Some(waiter) if waiter.monitor == down.monitor ->
+              advance(clear_waiter(state))
+            _ ->
+              case state.working {
+                Some(work) if work.pid == pid -> {
+                  work.job.ack(Error(Interrupted))
+                  advance(break_session(
+                    State(..state, working: None),
+                    Interrupted,
+                  ))
+                }
+                _ -> actor.continue(state)
+              }
           }
       }
     Lost(process.PortDown(..)) -> actor.continue(state)
@@ -262,6 +304,14 @@ fn handle(state: State, message: Message) -> actor.Next(State, Message) {
       advance(break_session(state, Interrupted))
     }
     Finish(reply) -> finish_session(state, reply)
+    FinishWait(until, reply) ->
+      await_finish(state, reply, Some(int.max(0, until - bridge.now())))
+    WaitExpired(id) ->
+      case state.waiter {
+        Some(waiter) if waiter.id == id ->
+          advance(notify_waiter(state, Error(WaitTimeout)))
+        _ -> actor.continue(state)
+      }
   }
 }
 
@@ -311,7 +361,7 @@ fn reserve_request(
         }
       }
     }
-    Sealing(_) | Sealed -> {
+    Closing | Sealing | Sealed -> {
       process.send(reply, Error(SessionClosed))
       state
     }
@@ -333,11 +383,11 @@ fn append_observation(
       ack(Error(failure))
       state
     }
-    Sealed | Sealing(_) -> {
+    Sealed | Sealing -> {
       ack(Error(SessionClosed))
       state
     }
-    Active ->
+    Active | Closing ->
       case dict.get(state.streams, id) {
         Error(Nil) -> {
           ack(Error(Interrupted))
@@ -432,7 +482,10 @@ fn fragment(
 
 fn advance(state: State) -> actor.Next(State, Message) {
   case state.phase, state.working, state.queue {
-    Active, None, [job, ..rest] | Sealing(_), None, [job, ..rest] -> {
+    Active, None, [job, ..rest]
+    | Closing, None, [job, ..rest]
+    | Sealing, None, [job, ..rest]
+    -> {
       let subject = state.subject
       let write = job.write
       let pid = process.spawn(fn() { process.send(subject, Written(write())) })
@@ -444,6 +497,21 @@ fn advance(state: State) -> actor.Next(State, Message) {
         ),
       )
     }
+    Closing, None, [] ->
+      case unfinished(state) {
+        True -> actor.continue(state)
+        False -> {
+          let publication =
+            Publication(
+              state.directory,
+              state.destination,
+              state.options,
+              state.count,
+            )
+          let job = Job(fn() { publish(publication) }, fn(_) { Nil })
+          advance(State(..state, phase: Sealing, queue: [job]))
+        }
+      }
     _, _, _ -> actor.continue(state)
   }
 }
@@ -451,7 +519,7 @@ fn advance(state: State) -> actor.Next(State, Message) {
 fn break_session(state: State, failure: CaptureError) -> State {
   case state.phase {
     Sealed | Broken(_) -> state
-    Active | Sealing(_) -> {
+    Active | Closing | Sealing -> {
       case state.working {
         Some(work) -> {
           process.unlink(work.pid)
@@ -462,55 +530,102 @@ fn break_session(state: State, failure: CaptureError) -> State {
         None -> Nil
       }
       list.each(state.queue, fn(job) { job.ack(Error(failure)) })
-      case state.phase {
-        Sealing(reply) -> process.send(reply, Error(CaptureFailed(failure)))
-        _ -> Nil
-      }
+      let state = notify_waiter(state, Error(CaptureFailed(failure)))
       State(..state, phase: Broken(failure), working: None, queue: [])
     }
   }
+}
+
+fn unfinished(state: State) -> Bool {
+  state.working != None
+  || state.queue != []
+  || list.any(dict.values(state.streams), fn(stage) { stage != Ended })
 }
 
 fn finish_session(
   state: State,
   reply: process.Subject(Result(String, FinishError)),
 ) -> actor.Next(State, Message) {
-  case state.phase {
-    Sealed -> {
-      process.send(reply, Ok(state.destination))
-      actor.continue(state)
-    }
-    Broken(failure) -> {
-      process.send(reply, Error(CaptureFailed(failure)))
-      actor.continue(state)
-    }
-    Sealing(_) -> {
+  case state.phase, unfinished(state) {
+    Active, True -> {
       process.send(reply, Error(Busy))
       actor.continue(state)
     }
-    Active ->
-      case
-        state.working != None
-        || state.queue != []
-        || list.any(dict.values(state.streams), fn(stage) { stage != Ended })
-      {
-        True -> {
-          process.send(reply, Error(Busy))
-          actor.continue(state)
-        }
-        False -> {
-          let publication =
-            Publication(
-              state.directory,
-              state.destination,
-              state.options,
-              state.count,
-            )
-          let job = Job(fn() { publish(publication) }, fn(_) { Nil })
-          advance(State(..state, phase: Sealing(reply), queue: [job]))
+    Closing, _ | Sealing, _ -> {
+      process.send(reply, Error(Busy))
+      actor.continue(state)
+    }
+    _, _ -> await_finish(state, reply, None)
+  }
+}
+
+fn await_finish(
+  state: State,
+  reply: process.Subject(Result(String, FinishError)),
+  wait_ms: Option(Int),
+) -> actor.Next(State, Message) {
+  case state.phase, state.waiter {
+    Sealed, _ -> {
+      process.send(reply, Ok(state.destination))
+      actor.continue(state)
+    }
+    Broken(failure), _ -> {
+      process.send(reply, Error(CaptureFailed(failure)))
+      actor.continue(state)
+    }
+    _, Some(_) -> {
+      process.send(reply, Error(Busy))
+      actor.continue(state)
+    }
+    _, None -> {
+      let phase = case state.phase {
+        Active -> Closing
+        other -> other
+      }
+      case process.subject_owner(reply) {
+        Error(Nil) -> advance(State(..state, phase: phase))
+        Ok(pid) -> {
+          let id = reference.new()
+          let timer =
+            option.map(wait_ms, fn(ms) {
+              process.send_after(state.subject, ms, WaitExpired(id))
+            })
+          advance(
+            State(
+              ..state,
+              phase: phase,
+              waiter: Some(Waiter(reply, id, timer, process.monitor(pid))),
+            ),
+          )
         }
       }
+    }
   }
+}
+
+fn clear_waiter(state: State) -> State {
+  case state.waiter {
+    None -> state
+    Some(waiter) -> {
+      process.demonitor_process(waiter.monitor)
+      case waiter.timer {
+        Some(timer) -> {
+          let _ = process.cancel_timer(timer)
+          Nil
+        }
+        None -> Nil
+      }
+      State(..state, waiter: None)
+    }
+  }
+}
+
+fn notify_waiter(state: State, outcome: Result(String, FinishError)) -> State {
+  case state.waiter {
+    Some(waiter) -> process.send(waiter.reply, outcome)
+    None -> Nil
+  }
+  clear_waiter(state)
 }
 
 fn publish(state: Publication) -> Result(Nil, CaptureError) {
@@ -580,14 +695,14 @@ fn exchange_path(directory: String, id: Int) -> String {
 
 fn file_error(problem: file.FileError) -> CaptureError {
   case problem {
-    file.Exists -> DestinationExists
+    file.Io(error.PublishFixture, error.AlreadyExists) -> DestinationExists
     file.TooLarge -> CaptureLimit
-    file.Missing | file.Denied | file.IoError -> IoFailure
+    file.Io(operation, cause) -> IoFailure(operation, cause)
   }
 }
 
-/// Abandon capture without cancelling the live HTTP client. No fixture is published.
-/// Already finalized recordings remain finalized.
+/// Abandon capture without cancelling the live HTTP client.
+/// An already committed publication cannot be rolled back; finalized results stay final.
 pub fn abort(recording: Recording) -> Result(Nil, CaptureError) {
   call.with_failure(recording.subject, Abort, Interrupted)
 }

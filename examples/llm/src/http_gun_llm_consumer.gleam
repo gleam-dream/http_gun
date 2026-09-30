@@ -96,46 +96,49 @@ pub fn stream(
   on_progress: fn(types.StreamProgress) -> Decision,
 ) -> Result(provider.Terminal, Error) {
   use req <- result.try(prepare(settings, model, prompt))
-  http_gun.with_response(client, req, fn(reply) {
-    use Nil <- result.try(case reply.status {
-      200 -> Ok(Nil)
-      code -> Error(Status(code, header(reply.headers, "retry-after")))
-    })
-    use Nil <- result.try(case header(reply.headers, "content-encoding") {
-      None | Some("identity") -> Ok(Nil)
-      Some(encoding) -> Error(Compressed(encoding))
-    })
-    use reducer <- result.try(
-      provider.new_reducer(
-        config.adapter(settings),
-        config.limits(settings),
-        [],
+  http_gun.try_with_response(
+    client,
+    req,
+    fn(failure) {
+      Http(
+        failure,
+        types.RetryEvidence(
+          case failure.evidence {
+            http_error.NotSubmitted -> types.NoRequestSent
+            http_error.MayHaveBeenSent -> types.RequestMayHaveReachedProvider
+          },
+          False,
+          False,
+        ),
       )
-      |> result.map_error(Provider),
-    )
-    read(
-      reply.body,
-      framer.new(config.limits(settings)),
-      reducer,
-      settings,
-      0,
-      on_progress,
-    )
-  })
-  |> result.map_error(fn(failure) {
-    Http(
-      failure,
-      types.RetryEvidence(
-        case failure.evidence {
-          http_error.NotSubmitted -> types.NoRequestSent
-          http_error.MayHaveBeenSent -> types.RequestMayHaveReachedProvider
-        },
-        False,
-        False,
-      ),
-    )
-  })
-  |> result.flatten
+    },
+    fn(reply) {
+      use Nil <- result.try(case reply.status {
+        200 -> Ok(Nil)
+        code -> Error(Status(code, header(reply.headers, "retry-after")))
+      })
+      use Nil <- result.try(case header(reply.headers, "content-encoding") {
+        None | Some("identity") -> Ok(Nil)
+        Some(encoding) -> Error(Compressed(encoding))
+      })
+      use reducer <- result.try(
+        provider.new_reducer(
+          config.adapter(settings),
+          config.limits(settings),
+          [],
+        )
+        |> result.map_error(Provider),
+      )
+      read(
+        reply.body,
+        framer.new(config.limits(settings)),
+        reducer,
+        settings,
+        0,
+        on_progress,
+      )
+    },
+  )
 }
 
 fn header(

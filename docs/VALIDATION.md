@@ -4,7 +4,7 @@ Run `./dev/env sh dev/gate fast` for the fast gate and `./dev/env sh dev/gate fu
 
 ## Covered contracts
 
-The fast gate runs formatting, Gleam check, build with warnings as errors, 62 observable tests, `erlc -Werror` over handwritten production/test FFI, and dependency/public-import/Dynamic boundary checks.
+The fast gate runs formatting, Gleam check, build with warnings as errors, 86 observable tests, `erlc -Werror` over handwritten production/test FFI, and dependency/public-import/Dynamic boundary checks.
 
 | Area | Executed observations |
 | --- | --- |
@@ -14,9 +14,11 @@ The fast gate runs formatting, Gleam check, build with warnings as errors, 62 ob
 | TLS/H2 | Verified H1 TLS; unknown-CA and hostname rejection; ALPN H2 and required-H2 fallback refusal; same-connection multiplexing; local cancellation/reset preserving siblings and resuming queued streams; demand/window resumption; zero peer capacity; GOAWAY with an active sibling completing, then an explicit fresh request |
 | Batch | Binary requests, input-associated ordered results, independent failures, bounded workers, public batch scaling through 10,000 inputs, 1,000-request mixed-stream load |
 | Playback | Binary versioned codec; 65 generated exchanges containing all 256 byte values; ordered distinct repeated replies; queued cross-origin session order; mismatch without consumption; missing/corrupt/incompatible/exhausted fixtures; no network fallback; meaningful headers and credential exclusions; exact disk-read limits |
-| Recording | Actual live roundtrip; prefix plus cancellation/failure; pre-header failure; concurrent recording/replay; writer backpressure; finite budget; Busy/finalized/refused states; explicit replacement; real EISDIR/FIFO persistence faults; interrupted capture never publishes; owner-only temporary permissions |
+| Request controls | Expired monotonic deadline, client ceiling, queued/pre-header/body cancellation, shared connecting reservation cleanup, scope/creator death, completed-HTTP preservation, H2 sibling survival, controls in live/record/playback |
+| Diagnostics | Typed limit kind and observed size; real refusal/certificate/file failures; safe formatter; exhaustive typed error codec roundtrip; single strict schema; obsolete layout/missing size/unknown marker rejection; negative budget refusal before IO |
+| Recording | Bounded finish wait, sealing, timeout without draining, waiter contention/death, abort; actual live roundtrip; prefix plus cancellation/failure; pre-header failure; concurrent recording/replay; writer backpressure; finite budget; Busy/finalized/refused states; explicit replacement; real EISDIR/FIFO persistence faults; interrupted capture never publishes; owner-only temporary permissions |
 
-The full gate additionally builds a separate package using public imports only. One consumer performs buffered, scoped and batch calls unchanged across live, record and playback clients. Four negative compilations must fail: constructing Client, Body or Recording, and passing a String body to `send`. The compiler does not prohibit all internal-module imports; public-import use is checked separately, and no stronger opacity claim is made.
+The full gate additionally builds a separate package using public imports only. One consumer performs buffered, scoped and batch calls unchanged across live, record and playback clients. Six negative compilations must fail: constructing Client, Body, Recording, Deadline or Token, and passing a String body to `send`. The compiler does not prohibit all internal-module imports; public-import use is checked separately, and no stronger opacity claim is made.
 
 The isolated LLM consumer verifies retained source hashes, compiles against its own dependency lock, and uses public LLM Wire interfaces over scoped HTTP Gun streams. It checks live progress before EOF, early cancellation, all 1196 provider-fixture split points, finite parsing/body limits, status/compression handling, partial-disconnect evidence, idle expiry and actual recording/playback. Provider semantics and its retained bounded framer remain outside HTTP Gun. This text-oriented example does not migrate or validate the entire LLM Wire session runtime.
 
@@ -31,6 +33,26 @@ The 32 MiB H1 stream is counted incrementally, once at full speed and once with 
 A test-only sampler checks all local BEAM processes approximately every 10 ms. Memory, process, port and mailbox peaks include the client, local server, caller load generator, dependencies and sampler. Fast scenarios may finish between samples. Latency covers `send`, including admission/connection time. Percentiles use the sorted finite sample (floor rank); zero percentile fields on whole-stream/mixed measurements mean “not measured”, not zero latency. Connections are server-observed identities for concurrent runs; port counts include listeners and non-HTTP runtime ports.
 
 These are one-run practical measurements on a local machine, not a throughput SLA, statistical benchmark or adversarial memory certification. The finite admitted queues do not prevent arbitrary external processes from first placing calls in actor mailboxes. See [BOUNDS.md](../BOUNDS.md).
+
+## Current pre-release cleanup receipt
+
+The current tree passes86 tests and all six full gates on ARM64 Darwin/Linux × OTP29/28/27: [receipt](evidence/wave17/receipt.json), [frozen inputs](evidence/wave17/final-inputs.json), [fast/docs gate](evidence/wave17/final-fast-docs.log). Each full gate passes both independent examples, six type rejections,1196 LLM split points, three batch trials through10000 inputs, seven nghttpd scenarios (one connection, two resets),256 recorded/replayed exchanges totaling8MiB and eleven controlled load scenarios. Runtime versions and configuration match the preceding receipt; current per-runtime logs and measurements are under wave17/darwin and wave17/linux. Host/container qualification overlaps, so timing is not an isolated comparative benchmark.
+
+This cleanup rejects obsolete fixture error layouts and removes their decoder/OtherLimit, requires observed limit sizes, and refuses negative fixture budgets before IO. Exact failing/passing logs are retained. An unused-import warning and a fixed-count test polling race were corrected; bounded finish_wait replaces the polling helper. Package version, dependencies and production FFI are unchanged. All current executable input hashes match; historical85-test compatibility evidence below describes the prior tree only.
+
+## API ergonomics receipt (before pre-release cleanup)
+
+Waves13–16 passed the then-current85-test fast gate and all six full gates on ARM64 Darwin/Linux with OTP29/28/27. [Receipt](evidence/wave16/receipt.json) records outcomes, runtime versions and artifact hashes; [frozen inputs](evidence/wave16/final-inputs.json) identify the captured wave16 source, before cleanup. [Direct fast/consumer/docs log](evidence/wave16/final-fast-consumers-docs.log) includes generated public documentation. All runtimes pass both consumers, six expected type rejections,1196 provider split points, three batch trials through10000 requests, seven independent-server scenarios,256 byte-exact recorded/replayed exchanges/8MiB and eleven load scenarios.
+
+| Runtime | Darwin ARM64 | Linux ARM64 |
+| --- | --- | --- |
+| OTP29 / ERTS17.1 | [full PASS](evidence/wave16/darwin/default.log) | [full PASS](evidence/wave16/linux/default.log) |
+| OTP28 / ERTS16.4.0.6 | [full PASS](evidence/wave16/darwin/otp28.log) | [full PASS](evidence/wave16/linux/otp28.log) |
+| OTP27 / ERTS15.2.7.13 | [full PASS](evidence/wave16/darwin/otp27.log) | [full PASS](evidence/wave16/linux/otp27.log) |
+
+The host uses the pinned Gleam1.18.1/Nix runtime. Linux runs the pinned official Nix ARM64 image with4 CPUs,4GiB and `+S4:4`, using a read-only source archive and private build copies. Host and container qualification overlap, so elapsed figures are local observations, not an isolated before/after comparison. Full per-runtime batch, load, recording and nghttpd metrics are adjacent to each log; they include sockets, sampled VM memory/mailboxes and latency. No new Dream comparison or60-second soak is claimed.
+
+The final shared-connection reservation regression fails with84 passing/1 failing test before the pool cleanup and passes85 afterward: [red](evidence/wave16/shared-reservation-red.log), [green](evidence/wave16/shared-reservation-green.log). Other retained waves cover missing APIs, callback errors, token/deadline cleanup, real certificate/refusal/file errors, strict fixture migration and safe descriptions. TLS rejection notices and historical dependency deprecation warnings are expected; this package's own warning gates pass.
 
 ## Adoption follow-up receipt
 
@@ -119,12 +141,12 @@ All requested exchanges/bytes completed without retries. Both large-stream rows 
 
 | File | Physical lines | Bytes | Responsibilities |
 | --- | ---: | ---: | --- |
-| `src/http_gun_ffi.erl` | 64 | 3,219 | Gun application/open/request/flow/cancel/close calls, supported TLS/protocol/header-count options, Gun event decoding, clock, scope cleanup and exception-only cleanup |
+| `src/http_gun_ffi.erl` | 84 | 4,238 | Gun application/open/request/flow/cancel/close calls, supported TLS/protocol/header-count options, Gun event/cause conversion, clock, scope cleanup and exception-only cleanup |
 | `src/http_gun_file_ffi.erl` | 8 | 431 | Unique temporary-directory candidate name and empty-directory removal |
-| Total | 72 | 3,650 | Twelve external bindings; no pool, body, batch or cassette server |
+| Total | 92 | 4,669 | Thirteen external bindings; no pool, body, batch or cassette server |
 
-These are the current wave7 counts, reduced from 102 lines / 4,782 bytes in wave6. file_streams and simplifile now supply ordinary filesystem IO; their released code is a dependency, not counted as handwritten HTTP Gun FFI. Counts include blank/comment lines. Test-only loopback servers and instrumentation are excluded from production FFI. Gleam owns admission policy, states, deadlines, demand, monitoring, batch scheduling, matching, JSON codec, recorder coordination and finalization ordering. Internal typed bridge declarations live in Gleam; raw Dynamic is confined to event/JSON boundaries.
+These are the wave16 counts, including the new narrow transport-cause classifier (wave12 was72 lines/3650 bytes/12 bindings). file_streams and simplifile now supply ordinary filesystem IO; their released code is a dependency, not counted as handwritten HTTP Gun FFI. Counts include blank/comment lines. Test-only loopback servers and instrumentation are excluded from production FFI. Gleam owns admission policy, states, deadlines, demand, monitoring, batch scheduling, matching, JSON codec, recorder coordination and finalization ordering. Internal typed bridge declarations live in Gleam; raw Dynamic is confined to event/JSON boundaries.
 
 ## Optional features and inherited behavior
 
-No required client workflow is deferred after this acceptance. The documented follow-on features are streamed uploads, redirect/decompression policy, proxies/mTLS, cookies/cache and optional SSE. Dependency parsing/TLS/HPACK allocations remain outside our application storage guarantee; that is not evidence of an upstream defect. GOAWAY can race with submission; HTTP Gun owns cleanup and truthful failures without replay. Body/query redaction and crash-durable publication are optional HTTP Gun features, currently unimplemented, that require no Gun/Cowlib changes. Bodies/queries may contain secrets and interrupted recordings may leave private temporary files. Atomic publication provides complete-fixture visibility, not power-loss durability. Performance figures are sampled local observations; Linux CI and other operating systems are not claimed as locally executed.
+No required client workflow is deferred after this acceptance. The documented follow-on features are streamed uploads, redirect/decompression policy, proxies/mTLS, cookies/cache and optional SSE. Dependency parsing/TLS/HPACK allocations remain outside our application storage guarantee; that is not evidence of an upstream defect. GOAWAY can race with submission; HTTP Gun owns cleanup and truthful failures without replay. Body/query redaction and crash-durable publication are optional HTTP Gun features, currently unimplemented, that require no Gun/Cowlib changes. Bodies/queries may contain secrets and interrupted recordings may leave private temporary files. Atomic publication provides complete-fixture visibility, not power-loss durability. Performance figures are sampled local observations. ARM64 Linux container gates are local evidence; remote GitHub-hosted x86_64 CI is not claimed as executed.

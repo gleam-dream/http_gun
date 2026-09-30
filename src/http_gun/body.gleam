@@ -11,6 +11,7 @@ import gleam/option.{type Option, None, Some}
 import gleam/otp/actor
 import gleam/result
 import gleam/string
+import http_gun/cancellation
 import http_gun/config
 import http_gun/error.{type Failure, Failure, MayHaveBeenSent}
 import http_gun/fixture
@@ -78,6 +79,7 @@ type State {
     protocol: config.Negotiated,
     deadline: Int,
     deadline_timer: process.Timer,
+    cancellation_monitor: Option(process.Monitor),
     limits: config.Limits,
     phase: Phase,
     queue: List(BitArray),
@@ -99,6 +101,10 @@ type Message {
   Lost(process.Down)
 }
 
+/// Read one chunk or completion with trailers. Only the opening process may read.
+/// Copies share consumption; an overlapping read returns ReadConflict.
+/// A local ReadTimeout preserves the stream and outstanding demand. Negative waits
+/// poll as zero; the request deadline and cancellation still terminate unfinished work.
 pub fn next(body: Body, wait_ms: Int) -> Result(Event, Failure) {
   call.run(body.subject, Read(
     process.self(),
@@ -113,6 +119,8 @@ pub fn next(body: Body, wait_ms: Int) -> Result(Event, Failure) {
   })
 }
 
+/// Release this handle once and cancel unfinished HTTP locally. Idempotent.
+/// Another holder may close it; this does not establish remote rollback.
 pub fn close(body: Body) -> Result(Nil, Failure) {
   case call.run(body.subject, Close) {
     Error(Failure(error.ClientClosed, _)) -> Ok(Nil)
@@ -120,10 +128,14 @@ pub fn close(body: Body) -> Result(Nil, Failure) {
   }
 }
 
+/// Return the observed protocol, or Offline for scripted/replayed responses.
 pub fn protocol(body: Body) -> config.Negotiated {
   body.protocol
 }
 
+/// Collect bytes and trailers up to limit, closing the body on overflow.
+/// Other read failures propagate. The explicitly owned handle still needs close;
+/// send and scoped response callbacks perform that cleanup for you.
 pub fn collect(body: Body, limit: Int) -> Result(Collected, Failure) {
   collect_loop(body, limit, [], 0)
 }
@@ -150,7 +162,11 @@ fn collect_loop(
         False -> {
           let _ = close(body)
           Error(Failure(
-            error.LimitExceeded("collection", limit),
+            error.LimitExceeded(
+              error.CollectedBodyBytes,
+              limit,
+              size + bit_array.byte_size(bytes),
+            ),
             MayHaveBeenSent,
           ))
         }
@@ -170,6 +186,7 @@ pub fn start(
   reply: process.Subject(Result(response.Response(Body), Failure)),
   release: fn(Bool) -> Nil,
   capture: Option(recording.Capture),
+  token: Option(cancellation.Token),
 ) -> actor.StartResult(Body) {
   actor.new_with_initialiser(1000, fn(subject) {
     let _ = process.monitor(client)
@@ -220,6 +237,7 @@ pub fn start(
         protocol,
         deadline,
         deadline_timer,
+        option.map(token, cancellation.monitor),
         limits,
         Opening(reply),
         [],
@@ -276,7 +294,13 @@ fn handle(state: State, message: Message) -> actor.Next(State, Message) {
       actor.stop()
     }
     Lost(process.PortDown(..)) -> continue(state)
-    Lost(process.ProcessDown(pid: pid, ..)) ->
+    Lost(process.ProcessDown(monitor: monitor, ..))
+      if state.cancellation_monitor == Some(monitor)
+    ->
+      continue(
+        deliver(finish(state, Error(Failure(error.Cancelled, MayHaveBeenSent)))),
+      )
+    Lost(process.ProcessDown(pid: pid, reason: reason, ..)) ->
       case pid == state.owner || pid == state.client {
         True -> {
           let state =
@@ -291,7 +315,10 @@ fn handle(state: State, message: Message) -> actor.Next(State, Message) {
               continue(
                 deliver(finish(
                   state,
-                  Error(Failure(error.ConnectionFailed, MayHaveBeenSent)),
+                  Error(Failure(
+                    error.ConnectionFailed(bridge.exit_cause(reason)),
+                    MayHaveBeenSent,
+                  )),
                 )),
               )
           }
@@ -430,14 +457,14 @@ fn wire(state: State, event: bridge.Event) -> State {
         bridge.Trailers(ref, headers) if ref == expected ->
           observe(state, obs.Complete(headers))
         bridge.Inform(ref, headers) if ref == expected ->
-          case check_headers(headers, state.limits) {
+          case check_headers(headers, state.limits, ResponseHeaders) {
             Ok(Nil) -> state
             Error(failure) -> finish(state, Error(failure))
           }
-        bridge.Failed(ref) if ref == expected ->
+        bridge.Failed(ref, cause) if ref == expected ->
           observe(
             state,
-            obs.Failed(Failure(error.RequestFailed, MayHaveBeenSent)),
+            obs.Failed(Failure(error.RequestFailed(cause), MayHaveBeenSent)),
           )
         _ -> state
       }
@@ -452,7 +479,7 @@ fn observe(state: State, event: obs.Observation) -> State {
         obs.Head(status, headers) ->
           case state.phase {
             Opening(reply) ->
-              case check_headers(headers, state.limits) {
+              case check_headers(headers, state.limits, ResponseHeaders) {
                 Error(failure) -> finish(state, Error(failure))
                 Ok(Nil) -> {
                   process.send(
@@ -481,7 +508,20 @@ fn observe(state: State, event: obs.Observation) -> State {
               finish(
                 state,
                 Error(Failure(
-                  error.LimitExceeded("body queue", state.limits.queue_bytes),
+                  case size > state.limits.chunk_bytes {
+                    True ->
+                      error.LimitExceeded(
+                        error.ResponseChunkBytes,
+                        state.limits.chunk_bytes,
+                        size,
+                      )
+                    False ->
+                      error.LimitExceeded(
+                        error.ResponseQueueBytes,
+                        state.limits.queue_bytes,
+                        state.queued + size,
+                      )
+                  },
                   MayHaveBeenSent,
                 )),
               )
@@ -498,7 +538,7 @@ fn observe(state: State, event: obs.Observation) -> State {
           }
         }
         obs.Complete(headers) ->
-          case check_headers(headers, state.limits) {
+          case check_headers(headers, state.limits, ResponseHeaders) {
             Ok(Nil) -> finish(state, Ok(headers))
             Error(failure) -> finish(state, Error(failure))
           }
@@ -542,7 +582,8 @@ fn finish(
     Opening(reply) -> {
       let failure = case outcome {
         Error(failure) -> failure
-        Ok(_) -> Failure(error.RequestFailed, MayHaveBeenSent)
+        Ok(_) ->
+          Failure(error.RequestFailed(error.UnknownTransport), MayHaveBeenSent)
       }
       process.send(reply, Error(failure))
       let state = capture_event(state, obs.Failed(failure))
@@ -562,6 +603,10 @@ fn finish(
 }
 
 fn release(state: State, outcome: Result(a, Failure)) -> Nil {
+  case state.cancellation_monitor {
+    Some(monitor) -> process.demonitor_process(monitor)
+    None -> Nil
+  }
   case capture_busy(state.capture) {
     False -> {
       let _ = process.cancel_timer(state.deadline_timer)
@@ -577,23 +622,38 @@ fn release(state: State, outcome: Result(a, Failure)) -> Nil {
 }
 
 @internal
+pub type HeaderKind {
+  RequestHeaders
+  ResponseHeaders
+}
+
+@internal
 pub fn check_headers(
   headers: List(#(String, String)),
   limits: config.Limits,
+  kind: HeaderKind,
 ) -> Result(Nil, Failure) {
-  let size =
+  let bytes =
     list.fold(headers, 0, fn(total, pair) {
       total + string.byte_size(pair.0) + string.byte_size(pair.1)
     })
-  case
-    size <= limits.head_bytes && list.length(headers) <= limits.header_count
-  {
-    True -> Ok(Nil)
-    False ->
+  let count = list.length(headers)
+  let #(bytes_kind, count_kind) = case kind {
+    RequestHeaders -> #(error.RequestHeaderBytes, error.RequestHeaderCount)
+    ResponseHeaders -> #(error.ResponseHeaderBytes, error.ResponseHeaderCount)
+  }
+  case bytes > limits.head_bytes, count > limits.header_count {
+    True, _ ->
       Error(Failure(
-        error.LimitExceeded("headers", limits.head_bytes),
+        error.LimitExceeded(bytes_kind, limits.head_bytes, bytes),
         MayHaveBeenSent,
       ))
+    False, True ->
+      Error(Failure(
+        error.LimitExceeded(count_kind, limits.header_count, count),
+        MayHaveBeenSent,
+      ))
+    False, False -> Ok(Nil)
   }
 }
 

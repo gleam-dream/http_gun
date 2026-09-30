@@ -1,0 +1,122 @@
+building '/nix/store/lypwyzf3xpx0a9pwk21j2zcb2zs9pm3w-nix-shell-env.drv'...
+gleam 1.18.1
+OTP 28 ERTS 16.4.0.6
+Downloading packages
+ Downloaded 11 packages in 0.03s
+  Compiling cowlib
+===> Analyzing applications...
+===> Compiling cowlib
+  Compiling gleam_stdlib
+  Compiling file_streams
+  Compiling filepath
+  Compiling gleam_erlang
+  Compiling gleam_http
+  Compiling gleam_json
+  Compiling gleam_otp
+  Compiling gleeunit
+  Compiling gun
+===> Analyzing applications...
+===> Compiling gun
+  Compiling simplifile
+   Checking http_gun
+   Compiled in 15.08s
+  Compiling http_gun
+   Compiled in 0.52s
+   Compiled in 0.19s
+    Running http_gun_test.main
+[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m=NOTICE REPORT==== 30-Sep-2026::14:08:23.727247 ===
+TLS server: In state wait_finished received CLIENT ALERT: Fatal - Unknown CA
+
+=NOTICE REPORT==== 30-Sep-2026::14:08:23.727128 ===
+TLS client: In state wait_cert_cr at ssl_handshake.erl:2218 generated CLIENT ALERT: Fatal - Unknown CA
+
+[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m=NOTICE REPORT==== 30-Sep-2026::14:08:24.140591 ===
+TLS client: In state wait_cert_cr at ssl_handshake.erl:2226 generated CLIENT ALERT: Fatal - Bad Certificate
+ - {bad_cert,{hostname_check_failed,{requested,"127.0.0.1"},
+                                    {received,[{dNSName,"localhost"}]}}}
+=NOTICE REPORT==== 30-Sep-2026::14:08:24.140725 ===
+TLS server: In state wait_finished received CLIENT ALERT: Fatal - Bad Certificate
+
+[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m
+85 passed, no failures[39m
+Production dependency, Dynamic and public-consumer boundaries passed.
+  Resolving versions
+Downloading packages
+ Downloaded 10 packages in 0.03s
+  Compiling cowlib
+===> Analyzing applications...
+===> Compiling cowlib
+  Compiling gleam_stdlib
+  Compiling file_streams
+  Compiling filepath
+  Compiling gleam_erlang
+  Compiling gleam_http
+  Compiling gleam_json
+  Compiling gleam_otp
+  Compiling gun
+===> Analyzing applications...
+===> Compiling gun
+  Compiling simplifile
+  Compiling http_gun
+  Compiling http_gun_consumer
+   Compiled in 14.68s
+   Compiled in 0.18s
+    Running http_gun_consumer.main
+Confirmed public type rejection: client
+Confirmed public type rejection: body
+Confirmed public type rejection: wrong_body
+Confirmed public type rejection: recording
+Confirmed public type rejection: deadline
+Confirmed public type rejection: cancellation
+  Resolving versions
+Downloading packages
+ Downloaded 12 packages in 0.04s
+  Compiling cowlib
+===> Analyzing applications...
+===> Compiling cowlib
+  Compiling gleam_stdlib
+  Compiling file_streams
+  Compiling filepath
+  Compiling gleam_crypto
+  Compiling gleam_erlang
+  Compiling gleam_http
+  Compiling gleam_json
+  Compiling gleam_otp
+  Compiling gun
+===> Analyzing applications...
+===> Compiling gun
+  Compiling simplifile
+  Compiling http_gun
+  Compiling json_blueprint
+  Compiling telemetry
+===> Analyzing applications...
+===> Compiling telemetry
+  Compiling sinal
+  Compiling llm_wire
+  Compiling http_gun_llm_consumer
+   Compiled in 16.10s
+  Resolving versions
+   Compiled in 0.18s
+    Running http_gun_llm_consumer.main
+   Compiled in 0.19s
+    Running http_gun_llm_integration.main
+Provider stream split points checked: 382
+Provider stream split points checked: 671
+Provider stream split points checked: 143
+LLM streaming: live progress, cancellation, provider terminal, fragmentation and real record/replay passed.
+Independent consumer, six rejection fixtures and isolated LLM consumer passed.
+   Compiled in 0.20s
+    Running http_gun_batch_benchmark.main
+   Compiled in 0.18s
+    Running http_gun_batch_benchmark.main
+   Compiled in 0.20s
+    Running http_gun_batch_benchmark.main
+{"median_us": {"100": 25617, "1000": 41482, "5000": 196176, "2000": 77629, "10000": 395042, "500": 19157}, "evidence": "build/evidence/batch.jsonl"}
+   Compiled in 0.18s
+    Running http_gun_interop.main
+{"server": "nghttpd nghttp2/1.70.0", "server_stream_limit": 8, "client_connection_limit": 1, "observed_request_connections": 1, "resets": 2, "log_bytes": 2662021, "log_sha256": "574decde2be891d60ef847277709ccc7b4d796b16a0042d69975ba77a9fe1d54", "soak_seconds": 0, "scenarios": 7, "result": "passed"}
+   Compiled in 0.18s
+    Running http_gun_recording_benchmark.main
+   Compiled in 0.18s
+    Running http_gun_benchmark.main
+All 11 load scenarios passed; measurements: build/evidence/load.jsonl

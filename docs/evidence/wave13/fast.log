@@ -1,0 +1,28 @@
+   Checking http_gun
+   Compiled in 0.25s
+  Compiling http_gun
+   Compiled in 0.28s
+   Compiled in 0.20s
+    Running http_gun_test.main
+[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m=NOTICE REPORT==== 30-Sep-2026::10:33:15.771384 ===
+TLS server: In state wait_finished received CLIENT ALERT: Fatal - Unknown CA
+
+=NOTICE REPORT==== 30-Sep-2026::10:33:15.771270 ===
+TLS client: In state wait_cert_cr at ssl_handshake.erl:2254 generated CLIENT ALERT: Fatal - Unknown CA
+
+[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m=NOTICE REPORT==== 30-Sep-2026::10:33:15.819227 ===
+TLS client: In state wait_cert_cr at ssl_handshake.erl:2262 generated CLIENT ALERT: Fatal - Bad Certificate
+ - {bad_cert,{hostname_check_failed,{requested,"127.0.0.1"},
+                                    {received,[{dNSName,"localhost"}]}}}
+=NOTICE REPORT==== 30-Sep-2026::10:33:15.819292 ===
+TLS server: In state wait_finished received CLIENT ALERT: Fatal - Bad Certificate
+
+[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m
+[1m[31mpanic[39m[22m [90msrc/gleeunit/should.gleam:10[39m
+[36m test[39m: http_gun_recording_test.finish_wait_contention_death_and_abort_test
+[36m info[39m: 
+False
+should equal
+True
+[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[31m
+63 passed, 1 failures[39m

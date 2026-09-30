@@ -1,0 +1,25 @@
+  Compiling http_gun
+error: Unknown module value
+   ┌─ /code/gleam-dream/http_gun/test/http_gun_error_test.gleam:35:9
+   │
+35 │   error.describe(error.Failure(
+   │         ^^^^^^^^
+
+The module `http_gun/error` does not have a `describe` value.
+
+error: Unknown module value
+   ┌─ /code/gleam-dream/http_gun/test/http_gun_error_test.gleam:40:9
+   │
+40 │   error.describe(error.Failure(
+   │         ^^^^^^^^
+
+The module `http_gun/error` does not have a `describe` value.
+
+error: Unknown module value
+   ┌─ /code/gleam-dream/http_gun/test/http_gun_error_test.gleam:45:9
+   │
+45 │   error.describe(error.Failure(
+   │         ^^^^^^^^
+
+The module `http_gun/error` does not have a `describe` value.
+

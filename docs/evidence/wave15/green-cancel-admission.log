@@ -1,0 +1,13 @@
+   Checking http_gun
+error: Unknown variable
+   ┌─ /code/gleam-dream/http_gun/src/http_gun/request_options.gleam:23:5
+   │
+23 │     Some(token) -> cancellation.is_cancelled(token)
+   │     ^^^^^^^^^^^
+
+The custom type variant constructor `Some` is not in scope here.
+Did you mean:
+
+  - option.Some
+
+

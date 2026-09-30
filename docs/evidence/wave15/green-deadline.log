@@ -1,0 +1,24 @@
+   Checking http_gun
+warning: Redundant record update
+   ┌─ /code/gleam-dream/http_gun/test/http_gun_options_test.gleam:14:5
+   │
+14 │     request_options.Options(..request_options.default(), deadline: Some(budget))
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ This record update specifies all fields
+
+Hint: It is better style to use the record creation syntax.
+
+   Compiled in 0.24s
+  Compiling http_gun
+warning: Redundant record update
+   ┌─ /code/gleam-dream/http_gun/test/http_gun_options_test.gleam:14:5
+   │
+14 │     request_options.Options(..request_options.default(), deadline: Some(budget))
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ This record update specifies all fields
+
+Hint: It is better style to use the record creation syntax.
+
+error: 1 warning generated.
+
+Your project was compiled with the `--warnings-as-errors` flag.
+Fix the warnings and try again.
+

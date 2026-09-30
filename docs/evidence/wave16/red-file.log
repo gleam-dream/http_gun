@@ -1,0 +1,11 @@
+  Compiling http_gun
+error: Type mismatch
+    ┌─ /code/gleam-dream/http_gun/test/http_gun_recording_test.gleam:172:31
+    │
+172 │       recording.CaptureFailed(recording.IoFailure(
+    │                               ^^^^^^^^^^^^^^^^^^^
+
+This value is being called as a function but its type is:
+
+    recording.CaptureError
+

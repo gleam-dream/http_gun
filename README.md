@@ -26,19 +26,24 @@ pub fn main() {
 
 ```gleam
 // Returning after one chunk closes locally, even if the callback raises.
-let first = http_gun.with_response(client, req, fn(response) {
-  body.next(response.body, 1000)
-})
+let first = http_gun.try_with_response(
+  client,
+  req,
+  fn(failure) { failure },
+  fn(response) { body.next(response.body, 1000) },
+)
 
 // At most ten workers. Results retain the input order, including failures.
 let results = http_gun.batch(client, requests, 10)
 ```
 
-Import `http_gun/body` for `next`, `close`, `collect` and `protocol`. `next` yields `Chunk(BitArray)` or `End(trailers)`. The outer result from `with_response` reports opening failure; the callback keeps its own return type, including its own `Result`.
+Import `http_gun/body` for `next`, `close`, `collect` and `protocol`. `next` yields `Chunk(BitArray)` or `End(trailers)`. `try_with_response` maps opening failures with the supplied function and returns the callback's Result directly. The original `with_response` preserves arbitrary callback return types. Both close on return or exception.
 
 Advanced callers can use `open` to obtain `Response(Body)` and explicitly `close` its opaque body. The process that opens the response owns consumption. Copies share one cursor. A read while another is pending returns `ReadConflict`; a different consumer otherwise receives `WrongOwner`. Handles do not transfer ownership. Close is idempotent and can be requested by another holder.
 
 A read-wait timeout returns `ReadTimeout` while preserving the stream and outstanding demand. The overall request deadline covers admission, connection setup and consumption; expiry terminates unfinished HTTP work. Completed data remains readable until close or owner death. Early close, scope exit, consumer death and client shutdown release the lease once. Local cancellation says nothing about whether the server continued processing the request.
+
+Per-request controls use `request_options.Options`: an optional opaque monotonic `Deadline` and scoped cancellation `Token`. Use `send_with_options`, `open_with_options` or the corresponding scoped variants. The effective deadline is the earlier of the client ceiling and the supplied deadline. A shared token can cancel associated requests before headers or during consumption; scope exit and creator death also cancel them. See [usage examples](docs/API_ERGONOMICS.md).
 
 ## Configuration and lifecycle
 
@@ -60,7 +65,7 @@ Defaults: H1, verified system TLS trust, 30-second request deadline, five-second
 
 `http_gun.child(settings)` supplies a standard Gleam OTP supervisor child specification. The client process is linked to its starter; `stop` cancels active work and closes connections. A supervisor restart creates a new client capability; old handles remain closed. Gun application startup uses OTP. The library does not stop shared Gun/SSL applications when one client stops.
 
-`Failure(reason, evidence)` distinguishes invalid input, admission, connection, stream, ownership, deadline, limit and fixture failures. `NotSubmitted` describes failures known to precede submission. `MayHaveBeenSent` is conservative, including uncertain client/process races. Neither value establishes remote execution. Status interpretation and retry decisions belong to the caller. `snapshot` returns finite connection/body/waiting counters without request history.
+`Failure(reason, evidence)` distinguishes invalid input, admission, connection, stream, ownership, deadline, limit and fixture failures. Limits carry typed categories and observed sizes; transport and filesystem errors carry bounded causes. `error.describe` omits free-form details and request content. The [API guide](docs/API_ERGONOMICS.md#typed-diagnostics-and-fixture-format) explains error matching. `NotSubmitted` describes failures known to precede submission. `MayHaveBeenSent` is conservative, including uncertain client/process races. Neither value establishes remote execution. Status interpretation and retry decisions belong to the caller. `snapshot` returns finite connection/body/waiting counters without request history.
 
 ## One consumer, explicit startup mode
 
@@ -81,13 +86,13 @@ Concurrent callers use the order in which their requests reach the client actor.
 
 Recording performs real live requests. Status, credential-filtered headers, admitted bytes, trailers, failure and local cancellation are written incrementally. Returning early records the observed prefix and terminal outcome without draining the response. Captured chunk boundaries are observations, not a stable wire framing API.
 
-Consume or close bodies, then call `cassette.finish(recorded.recording)` and inspect its result. `Busy` refuses unfinished HTTP or writer work. Successful or failed finalization is stable while the recording owner lives. Further requests after finalization are refused before submission. Stop `recorded.client` separately; a normal explicit stop still allows finalization of the recorded cancellations.
+Use `recording.finish_wait(recorded.recording, 5000)` to seal new reservations and await publication. It never drains HTTP: accepted consumers must finish or close their bodies. `WaitTimeout` removes only this wait; finalization continues. One active waiter is allowed; overlapping waits receive `Busy`. `cassette.finish` retains its immediate Busy behavior. Successful or failed finalization is stable while the recording owner lives. Further requests after sealing are refused before submission. Stop `recorded.client` separately; a normal explicit stop still allows finalization of the recorded cancellations.
 
 Capture/persistence failure is separate from the HTTP outcome. A recording budget or write failure does not turn an already received HTTP response into a failed remote operation. Writer acknowledgements apply backpressure to further demand. If persistence stalls until the request deadline, capture fails; already completed HTTP remains available. `recording.abort` abandons capture while keeping live HTTP usable.
 
 Credential headers (`authorization`, `proxy-authorization`, `cookie`, `set-cookie`, `x-api-key`, `api-key`, `x-goog-api-key`) are excluded from stored request/response/trailer metadata and matching. Other headers remain significant. Bodies and URL queries remain exact and **can contain secrets**. Body/query redaction is an optional HTTP Gun feature that is not implemented. It would need an explicit query policy and bounded whole-body transformation or exclusion, with matching rules consistent across recording and playback. Per-chunk string replacement would not safely cover split secrets. Choose whether a session is appropriate to record.
 
-Fixtures use versioned JSON with byte lengths and base64 bodies. Capture has a finite encoded-byte budget and exchange-count limit. Publication uses an atomic hard link for `RefuseExisting` or rename for explicit `ReplaceExisting`, on the destination filesystem. Unfinished recordings never publish a completed fixture. Failed or interrupted sessions can leave private temporary directories beside the destination; they are not replay fixtures. Atomic publication prevents readers from seeing a partly assembled fixture; it does not promise survival after power loss. Durable publication is an optional HTTP Gun feature, requiring file and directory synchronization under a stated operating-system/filesystem contract. It does not require changes to Gun or Cowlib.
+Fixtures use one strict JSON schema with byte lengths, base64 bodies and the format marker `"http_gun": 1`. The package is unreleased; earlier experimental layouts have no migration support. Incompatible data fails explicitly, and no package version bump is needed for pre-release cleanup. Capture has a finite encoded-byte budget and exchange-count limit. Publication uses an atomic hard link for `RefuseExisting` or rename for explicit `ReplaceExisting`, on the destination filesystem. Unfinished recordings never publish a completed fixture. Failed or interrupted sessions can leave private temporary directories beside the destination; they are not replay fixtures. Atomic publication prevents readers from seeing a partly assembled fixture; it does not promise survival after power loss. Durable publication is an optional HTTP Gun feature, requiring file and directory synchronization under a stated operating-system/filesystem contract. It does not require changes to Gun or Cowlib.
 
 ## Validation and boundaries
 

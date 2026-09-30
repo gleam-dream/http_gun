@@ -2,14 +2,17 @@ import gleam/erlang/process
 import gleam/http/request
 import gleam/int
 import gleam/list
+import gleam/option.{Some}
 import gleam/result
 import gleeunit/should
 import http_gun
 import http_gun/body
+import http_gun/cancellation
 import http_gun/cassette
 import http_gun/config
 import http_gun/error
 import http_gun/recording
+import http_gun/request_options
 
 @external(erlang, "http_gun_test_server", "start")
 fn server() -> Int
@@ -60,16 +63,6 @@ fn closed(server: process.Pid) -> Bool
 @external(erlang, "http_gun_scope_test_ffi", "fixture")
 fn store(contents: String) -> String
 
-fn finish_ready(
-  rec: recording.Recording,
-  tries: Int,
-) -> Result(String, recording.FinishError) {
-  case cassette.finish(rec) {
-    Error(recording.Busy) if tries > 0 -> finish_ready(rec, tries - 1)
-    result -> result
-  }
-}
-
 pub fn early_cancel_records_without_draining_test() {
   let #(port, server) = controlled()
   let destination = path()
@@ -81,7 +74,8 @@ pub fn early_cancel_records_without_draining_test() {
   body.next(response.body, 1000) |> should.equal(Ok(body.Chunk(<<"abc":utf8>>)))
   let _ = body.close(response.body)
   closed(server) |> should.be_true
-  finish_ready(recorded.recording, 1000) |> should.equal(Ok(destination))
+  recording.finish_wait(recorded.recording, 1000)
+  |> should.equal(Ok(destination))
   let _ = http_gun.stop(recorded.client)
   let assert Ok(cassette) = cassette.load(destination, 10_000)
   let assert Ok(client) = cassette.playback(cassette, config.default())
@@ -167,7 +161,14 @@ pub fn actual_write_failure_does_not_replace_http_result_test() {
   tail.bytes |> should.equal(<<"b":utf8>>)
   let _ = body.close(response.body)
   cassette.finish(recorded.recording)
-  |> should.equal(Error(recording.CaptureFailed(recording.IoFailure)))
+  |> should.equal(
+    Error(
+      recording.CaptureFailed(recording.IoFailure(
+        error.OpenFile,
+        error.IsDirectory,
+      )),
+    ),
+  )
   let assert Error(missing) = cassette.load(destination, 10_000)
   missing.reason |> should.equal(error.FixtureMissing)
   let _ = http_gun.stop(recorded.client)
@@ -237,7 +238,8 @@ pub fn cancelled_before_headers_records_without_inventing_response_test() {
   let _ = http_gun.stop(recorded.client)
   let assert Ok(Error(live)) = process.receive(reply, 1000)
   live.reason |> should.equal(error.Closed)
-  finish_ready(recorded.recording, 1000) |> should.equal(Ok(destination))
+  recording.finish_wait(recorded.recording, 1000)
+  |> should.equal(Ok(destination))
   let assert Ok(value) = cassette.load(destination, 10_000)
   let assert Ok(client) = cassette.playback(value, config.default())
   let assert Error(replayed) = http_gun.open(client, req(port))
@@ -282,7 +284,8 @@ pub fn recorded_failure_retains_observed_prefix_test() {
   let assert Error(failure) = body.next(reply.body, 1000)
   failure.evidence |> should.equal(error.MayHaveBeenSent)
   let _ = body.close(reply.body)
-  finish_ready(recorded.recording, 1000) |> should.equal(Ok(destination))
+  recording.finish_wait(recorded.recording, 1000)
+  |> should.equal(Ok(destination))
   let _ = http_gun.stop(recorded.client)
   let assert Ok(tape) = cassette.load(destination, 10_000)
   let assert Ok(client) = cassette.playback(tape, config.default())
@@ -290,6 +293,120 @@ pub fn recorded_failure_retains_observed_prefix_test() {
   body.next(replay.body, 1000) |> should.equal(Ok(body.Chunk(<<"abc":utf8>>)))
   body.next(replay.body, 1000) |> should.equal(Error(failure))
   let _ = body.close(replay.body)
+  let _ = http_gun.stop(client)
+  remove(destination)
+}
+
+// DESIGN E1: timeout seals capture but neither drains nor cancels HTTP.
+pub fn finish_wait_timeout_then_cancel_and_publish_test() {
+  let #(port, server) = controlled()
+  let destination = path()
+  let assert Ok(recorded) =
+    cassette.record(config.default(), destination, recording.default())
+  let assert Ok(response) = http_gun.open(recorded.client, req(port))
+  recording.finish_wait(recorded.recording, 0)
+  |> should.equal(Error(recording.WaitTimeout))
+  let assert Error(refused) = http_gun.send(recorded.client, req(port))
+  refused.evidence |> should.equal(error.NotSubmitted)
+  emit(server, <<"3\r\nabc\r\n":utf8>>)
+  body.next(response.body, 1000) |> should.equal(Ok(body.Chunk(<<"abc":utf8>>)))
+  let _ = body.close(response.body)
+  closed(server) |> should.be_true
+  recording.finish_wait(recorded.recording, 1000)
+  |> should.equal(Ok(destination))
+  recording.finish_wait(recorded.recording, 0) |> should.equal(Ok(destination))
+  let _ = http_gun.stop(recorded.client)
+  let assert Ok(tape) = cassette.load(destination, 10_000)
+  let assert Ok(client) = cassette.playback(tape, config.default())
+  let assert Ok(replay) = http_gun.open(client, req(port))
+  body.next(replay.body, 1000) |> should.equal(Ok(body.Chunk(<<"abc":utf8>>)))
+  let assert Error(failure) = body.next(replay.body, 1000)
+  failure.reason |> should.equal(error.Closed)
+  let _ = body.close(replay.body)
+  let _ = http_gun.stop(client)
+  remove(destination)
+}
+
+pub fn finish_wait_contention_death_and_abort_test() {
+  let #(port, server) = controlled()
+  let destination = path()
+  let assert Ok(recorded) =
+    cassette.record(config.default(), destination, recording.default())
+  let assert Ok(response) = http_gun.open(recorded.client, req(port))
+  let waiter =
+    process.spawn_unlinked(fn() {
+      let _ = wait_until_registered(recorded.recording)
+      Nil
+    })
+  wait_for_finish_result(recorded.recording, recording.Busy, 1000)
+  |> should.be_true
+  process.kill(waiter)
+  wait_for_finish_result(recorded.recording, recording.WaitTimeout, 1000)
+  |> should.be_true
+  recording.abort(recorded.recording) |> should.equal(Ok(Nil))
+  recording.finish_wait(recorded.recording, 1000)
+  |> should.equal(Error(recording.CaptureFailed(recording.Interrupted)))
+  let _ = body.close(response.body)
+  closed(server) |> should.be_true
+  let _ = http_gun.stop(recorded.client)
+  let assert Error(missing) = cassette.load(destination, 10_000)
+  missing.reason |> should.equal(error.FixtureMissing)
+}
+
+fn wait_for_finish_result(
+  rec: recording.Recording,
+  expected: recording.FinishError,
+  tries: Int,
+) -> Bool {
+  case recording.finish_wait(rec, 0), tries {
+    Error(actual), _ if actual == expected -> True
+    _, 0 -> False
+    _, _ -> wait_for_finish_result(rec, expected, tries - 1)
+  }
+}
+
+fn wait_until_registered(
+  rec: recording.Recording,
+) -> Result(String, recording.FinishError) {
+  case recording.finish_wait(rec, 10_000) {
+    Error(recording.Busy) -> wait_until_registered(rec)
+    result -> result
+  }
+}
+
+pub fn token_cancellation_preserves_typed_outcome_on_replay_test() {
+  let #(port, server) = controlled()
+  let destination = path()
+  let assert Ok(recorded) =
+    cassette.record(config.default(), destination, recording.default())
+  let assert Ok(failure) =
+    cancellation.with_token(fn(token) {
+      let options =
+        request_options.Options(
+          ..request_options.default(),
+          cancellation: Some(token),
+        )
+      let assert Ok(response) =
+        http_gun.open_with_options(recorded.client, req(port), options)
+      emit(server, <<"3\r\nabc\r\n":utf8>>)
+      body.next(response.body, 1000)
+      |> should.equal(Ok(body.Chunk(<<"abc":utf8>>)))
+      cancellation.cancel(token)
+      let assert Error(failure) = body.next(response.body, 1000)
+      failure.reason |> should.equal(error.Cancelled)
+      let _ = body.close(response.body)
+      failure
+    })
+  closed(server) |> should.be_true
+  recording.finish_wait(recorded.recording, 1000)
+  |> should.equal(Ok(destination))
+  let _ = http_gun.stop(recorded.client)
+  let assert Ok(tape) = cassette.load(destination, 100_000)
+  let assert Ok(client) = cassette.playback(tape, config.default())
+  let assert Ok(response) = http_gun.open(client, req(port))
+  body.next(response.body, 1000) |> should.equal(Ok(body.Chunk(<<"abc":utf8>>)))
+  body.next(response.body, 1000) |> should.equal(Error(failure))
+  let _ = body.close(response.body)
   let _ = http_gun.stop(client)
   remove(destination)
 }

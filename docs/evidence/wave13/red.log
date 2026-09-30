@@ -1,0 +1,33 @@
+  Compiling http_gun
+error: Unknown module value
+    ┌─ /code/gleam-dream/http_gun/test/http_gun_recording_test.gleam:304:13
+    │
+304 │   recording.finish_wait(recorded.recording, 0)
+    │             ^^^^^^^^^^^ Did you mean `finish`?
+
+The module `http_gun/recording` does not have a `finish_wait` value.
+
+error: Unknown module value
+    ┌─ /code/gleam-dream/http_gun/test/http_gun_recording_test.gleam:305:35
+    │
+305 │   |> should.equal(Error(recording.WaitTimeout))
+    │                                   ^^^^^^^^^^^
+
+The module `http_gun/recording` does not have a `WaitTimeout` value.
+
+error: Unknown module value
+    ┌─ /code/gleam-dream/http_gun/test/http_gun_recording_test.gleam:312:13
+    │
+312 │   recording.finish_wait(recorded.recording, 1000)
+    │             ^^^^^^^^^^^ Did you mean `finish`?
+
+The module `http_gun/recording` does not have a `finish_wait` value.
+
+error: Unknown module value
+    ┌─ /code/gleam-dream/http_gun/test/http_gun_recording_test.gleam:314:13
+    │
+314 │   recording.finish_wait(recorded.recording, 0) |> should.equal(Ok(destination))
+    │             ^^^^^^^^^^^ Did you mean `finish`?
+
+The module `http_gun/recording` does not have a `finish_wait` value.
+

@@ -1,0 +1,55 @@
+  Compiling http_gun
+error: Unknown module
+  ┌─ /code/gleam-dream/http_gun/test/http_gun_options_test.gleam:5:1
+  │
+5 │ import http_gun/cancellation
+  │ ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+No module has been found with the name `http_gun/cancellation`.
+
+error: Unknown module
+   ┌─ /code/gleam-dream/http_gun/test/http_gun_options_test.gleam:28:5
+   │
+28 │     cancellation.with_token(fn(token) {
+   │     ^^^^^^^^^^^^
+
+No module has been found with the name `cancellation`.
+
+error: Unknown module
+   ┌─ /code/gleam-dream/http_gun/test/http_gun_options_test.gleam:29:7
+   │
+29 │       cancellation.cancel(token)
+   │       ^^^^^^^^^^^^
+
+No module has been found with the name `cancellation`.
+
+error: Unknown module
+   ┌─ /code/gleam-dream/http_gun/test/http_gun_options_test.gleam:30:7
+   │
+30 │       cancellation.cancel(token)
+   │       ^^^^^^^^^^^^
+
+No module has been found with the name `cancellation`.
+
+error: Unknown record field
+   ┌─ /code/gleam-dream/http_gun/test/http_gun_options_test.gleam:34:11
+   │
+34 │           cancellation: Some(token),
+   │           ^^^^^^^^^^^^^^^^^^^^^^^^^ Did you mean `deadline`?
+
+The value being accessed has this type:
+
+    request_options.Options
+
+It has these accessible fields:
+
+    .deadline
+
+error: Unknown module value
+   ┌─ /code/gleam-dream/http_gun/test/http_gun_options_test.gleam:39:49
+   │
+39 │       |> should.equal(Error(error.Failure(error.Cancelled, error.NotSubmitted)))
+   │                                                 ^^^^^^^^^
+
+The module `http_gun/error` does not have a `Cancelled` value.
+
