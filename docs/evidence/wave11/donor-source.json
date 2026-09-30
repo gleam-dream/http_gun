@@ -1,0 +1,11 @@
+{
+  "repository": "llm_wire",
+  "revision": "bbde1d927675e3fe55dcbc5f456a9bcb6fe24107",
+  "files": {
+    "src/llm_wire/internal/sse.gleam": "fa32b70c33e4f84ebf981411e9567cbd9487a8da1dd137eec4f03ed170694f50",
+    "test/llm_wire_provider_fragmentation_test.gleam": "ce6567d64bd7da79b10d774b702ddda0d235ce0a9a8a5c85322d98fcec274a52",
+    "test/llm_wire_sse_test.gleam": "0971cfbe088abbfd39c0fa7d24e5ab727fa600a62cf9b8e7433efb15cbb66d8d",
+    "LICENSE": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+  },
+  "use": "SSE framer retained only in isolated example; provider event fixtures adapted in example tests. Public imports only, no sibling changes."
+}

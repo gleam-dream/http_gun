@@ -1,0 +1,15 @@
+{"trial": 0, "requests": 100, "elapsed_us": 28809, "reductions": 277305}
+{"trial": 0, "requests": 500, "elapsed_us": 36771, "reductions": 1245916}
+{"trial": 0, "requests": 1000, "elapsed_us": 115416, "reductions": 2483384}
+{"trial": 0, "requests": 2000, "elapsed_us": 408202, "reductions": 4971085}
+{"trial": 0, "requests": 5000, "elapsed_us": 2377275, "reductions": 12378393}
+{"trial": 1, "requests": 100, "elapsed_us": 28799, "reductions": 276023}
+{"trial": 1, "requests": 500, "elapsed_us": 32986, "reductions": 1246365}
+{"trial": 1, "requests": 1000, "elapsed_us": 116238, "reductions": 2489213}
+{"trial": 1, "requests": 2000, "elapsed_us": 408884, "reductions": 4970960}
+{"trial": 1, "requests": 5000, "elapsed_us": 2353380, "reductions": 12384196}
+{"trial": 2, "requests": 100, "elapsed_us": 27954, "reductions": 276126}
+{"trial": 2, "requests": 500, "elapsed_us": 36873, "reductions": 1246875}
+{"trial": 2, "requests": 1000, "elapsed_us": 128821, "reductions": 2488788}
+{"trial": 2, "requests": 2000, "elapsed_us": 410602, "reductions": 4972434}
+{"trial": 2, "requests": 5000, "elapsed_us": 2404030, "reductions": 12375231}

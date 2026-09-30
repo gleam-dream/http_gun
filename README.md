@@ -93,14 +93,17 @@ Fixtures use versioned JSON with byte lengths and base64 bodies. Capture has a f
 
 ```sh
 ./dev/env sh dev/gate fast  # format, check, build, tests, FFI warnings, boundaries
-./dev/env sh dev/gate full  # also external consumers, type rejection, load checks
+./dev/env sh dev/gate full  # also streaming consumers, nghttpd, batch/recording/load checks
 sh dev/matrix              # isolated full gates on OTP 29, 28 and 27
+sh dev/linux-gate          # optional isolated ARM64 Linux matrix via Docker
 ```
 
-The toolchain and Hex packages are locked. Cassette IO uses `file_streams` 1.7.0 and `simplifile` 2.7.0, with small bridges only for missing primitives and exception cleanup. See the [filesystem decision](docs/FILESYSTEM.md). Gates use loopback H1/TLS/H2 servers and temporary fixtures, with no provider credentials or public application endpoints. Initial toolchain/package installation may require network access. CI runs the full gate for each selected runtime.
+The toolchain and Hex packages are locked. Cassette IO uses `file_streams` 1.7.0 and `simplifile` 2.7.0, with small bridges only for missing primitives and exception cleanup. See the [filesystem decision](docs/FILESYSTEM.md). Gates use loopback H1/TLS/H2 servers and temporary fixtures, with no provider credentials or public application endpoints. Initial toolchain/package installation may require network access. CI runs the full gate for each selected runtime. The pinned nghttpd1.70.0 server supplies independent TLS/H2 interoperability; controlled servers supply synchronized faults.
 
 See [validation evidence](docs/VALIDATION.md), [guarantees and optional features](BOUNDS.md), [the architecture sketch](docs/DESIGN.md), [progressive wave history](docs/implementation/gleam-first/wave-tracker.md) and [provenance](docs/PROVENANCE.md).
 
 The requested [Dream comparison](docs/DREAM_COMPARISON.md) pins its `codex/http-client-combined` revision and records native-suite results, public contract checks and repeated H1 workloads. Reproduce separately with `./dev/env python3 dev/comparison/run.py all --output build/comparison-recheck`. It is not a production dependency or part of the normal gate. The original 1,000-caller slowdown led to a [Gleam pool correction](docs/BURST_FIX.md): the repeated burst median fell from 705.99 to 45.33 ms with four connections. The report preserves the original results, final measurements, differing connection policies and one failed Dream rerun.
+
+The [adoption follow-up](docs/ADOPTION_VALIDATION.md) records the public batch fix, reference-derived lifecycle tests, independent nghttpd checks, sustained load and [isolated streaming LLM consumer](examples/llm/README.md). That example proves text-stream composition and cancellation; migrating LLM Wire’s session runtime remains a separate integration task.
 
 Streamed uploads, redirect policy, decompression, proxies/mTLS, cookies/cache adapters and optional generic SSE remain follow-on scope. Protocol upgrades/tunnels are not a body-stream API. Provider reducers, tool calls, schemas, token usage and agent continuation belong above this library. Gun/Cowlib remain unmodified and own HTTP parsing, HPACK and protocol state; OTP owns TLS. HTTP Gun owns correct use of their supported APIs, admission, cleanup and truthful error reporting. Inherited allocation behavior and the HTTP/2 draining race do not establish dependency defects or justify a hardening project. Optional body/query redaction and durable publication belong to this client.

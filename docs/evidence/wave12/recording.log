@@ -1,0 +1,4 @@
+  Compiling http_gun
+   Compiled in 0.23s
+    Running http_gun_recording_benchmark.main
+{"scenario":"record-and-replay","requests":256,"workers":16,"connections":4,"request_and_response_bytes":8388608,"capture_and_finish_us":228955,"peak_vm_bytes":60186964,"peak_total_mailbox":16,"peak_one_mailbox":15,"peak_processes":110,"peak_ports":11}

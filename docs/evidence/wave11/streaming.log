@@ -1,0 +1,8 @@
+  Compiling http_gun_llm_consumer
+   Compiled in 0.29s
+   Compiled in 0.19s
+    Running http_gun_llm_integration.main
+Provider stream split points checked: 382
+Provider stream split points checked: 671
+Provider stream split points checked: 143
+LLM streaming: live progress, cancellation, provider terminal, fragmentation and real record/replay passed.

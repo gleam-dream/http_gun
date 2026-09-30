@@ -3,15 +3,15 @@
 ## Current state
 
 - Tracker path: docs/implementation/gleam-first/wave-tracker.md
-- Updated: 2026-09-30; original program and scoped follow-ups complete.
-- Target: docs/DESIGN.md and the owner's restart prompt; plan revision 4 (filesystem, comparison and performance follow-ups authorized).
+- Updated: 2026-09-30; adoption-validation waves10–12 accepted.
+- Target: docs/DESIGN.md and the owner's restart prompt; plan revision 5 (adoption review follow-up authorized).
 - Approved first milestone: standard binary Request -> real local Gun HTTP -> buffered Response with trailers, using Gleam ownership. Final acceptance includes all six waves; the first milestone is not completion.
 - Approval: the original prompt explicitly supplied and authorized the complete six-slice program, directed continuation without another broad approval cycle, and selected Gun/OTP/Gleam. Follow-up explicitly requested progressive implementation. This records that existing authorization, not inferred approval from silence.
-- Last closed wave: 9 accepted. Active: none.
+- Last closed wave: 12 accepted. Active: none.
 - Open material decisions: none. Reversible implementation details follow the contract.
 - Temporary production substitutes: none. Loopback H1/H2 servers are test infrastructure, never production paths.
-- Gate: fast passes 57 tests, formatting, check/build, FFI warnings and boundaries. Full isolated matrix passes OTP29/28/27 with 57 tests, ordinary and LLM consumers, four rejection fixtures and eleven load scenarios each. Final comparison: all 31 contract observations checked, HTTP Gun 27/27 workloads successful, Dream 26/27 with one disclosed failed burst. Exact receipts in docs/VALIDATION.md and docs/BURST_FIX.md.
-- Next action: none required for the authorized performance correction. Optional features remain deferred; further performance work should start from a concrete workload and this evidence.
+- Gate: fast passes62 tests. Final full gates pass on Darwin ARM64 and Linux ARM64 for OTP29/28/27, with both consumers, four rejection fixtures,1196 LLM split points, public batch scaling, nghttpd interoperability, concurrent recording/replay and eleven original load scenarios. Exact receipts: docs/VALIDATION.md and docs/evidence/wave12/receipt.json.
+- Next action: controlled consumer adoption; a full sibling LLM session-runtime migration is separate work. Optional client features remain deferred.
 - Recovery: archives and hashes in docs/PROGRESS.md. No old production runtime was retained. All six retained waves pass the completed gates.
 
 ## Technology and boundary decision register
@@ -178,3 +178,45 @@ Entries below are append-only.
 - Boundaries: only three repeated local H1 trials; connection policies differ; one-run H2 load data is separate. Scheduling still scans waiting origins and configured connections, and external calls may queue before admission. No SLA, universal constant-work guarantee or dependency allocation certification. Linux CI not executed locally. Existing optional redaction/durability and other follow-ons remain unchanged.
 - Acceptance rubric: requested behavior, governing ownership rules, unchanged interface, public behavioral scenarios, covered criteria, approved scope, named general conditions, design documentation, standing rules and focused quality review all pass. No issue or pending design entry needs closure. Production FFI remains72 physical lines/3,650bytes/12bindings; dependencies/manifests unchanged. Source snapshot and receipt hashes are retained; original wave8 results remain intact.
 - Evidence: docs/BURST_FIX.md and docs/evidence/wave9. Remaining required implementation distance: none identified by these accepted scenarios. No further authorized wave remains. Changes stay local and uncommitted; no sibling/oversight edits, push, publication, upstream contact or provider credentials.
+
+
+### Authorized adoption-validation follow-up — plan revision 5
+
+The owner's request to focus on the remaining review items and external reference validation authorizes these intent-preserving waves. The public contract, Gun transport and dependency boundary remain unchanged. No further approval is needed for these scoped tests and fixes. No temporary production substitute is introduced.
+
+| Wave | Outcome / contract | Real boundary and technology | Observable exit / gate |
+| --- | --- | --- | --- |
+| 10 | Bounded batches avoid copying scheduler history into workers; asynchronous callbacks carry only needed values | Existing Gleam actors, same public batch and pool; no dependency or FFI additions | Reproduce reviewed 500/2000/5000 scaling defect, fix narrow captures, retain regression; fast gate and repeated public batch measurements |
+| 11 | Isolated public-import LLM consumer handles incremental bytes and early termination; reference-derived lifecycle scenarios strengthen streaming evidence | Existing public LLM Wire reducers in retained isolated snapshot; framing stays in example, local controlled HTTP servers | Progress before EOF, split events/UTF-8, local cancellation, live/record/replay, bounded framing; fast and independent consumer gates |
+| 12 | Independent server compatibility and practical qualification | nghttp2's nghttpd as dev-only server pinned by existing Nix lock, verified TLS/ALPN; controlled servers retain fault injection | Binary H2 responses, multiplexing, sibling cancellation, repeated workloads; full gate and OTP27/28/29 matrix, exact receipts |
+
+Design anchors: DESIGN.md ownership, batch scheduling, incremental recording and delivery slices 2/3/5/6. References are scenario donors only: Finch timeout/cancellation, Gun flow/trailers/reuse, Mint fragmentation, ReqCassette binary/ordered matching; exact revisions and hashes are in evidence/adoption-review/reference-sources.json. Do not copy dependency parser tests. Independent nghttpd tests client interoperability, not protocol certification. Linux evidence will be reported only if executed; sibling LLM runtime migration remains outside this checkout's authority. Body/query redaction and crash durability remain optional features.
+
+### Wave 10 — acceptance
+
+- Status: accepted for the measured batch defect, 2026-09-30; wave11 now active.
+- Red: retained public benchmark fails its generous tenfold-growth guard (500 inputs36.771ms,5000 inputs2377.275ms median across three fresh VMs). VM reduction counts alone missed the copying cost.
+- Green: extracting the operation and destination before spawning avoids worker copies of pending inputs/results. Body capture acknowledgements and recorder dispatch use the same narrow-capture rule; final publication carries only publication inputs. No public API, dependency or FFI changes.
+- Validation: fast gate passes57 tests, format/check/build, FFI warnings and boundaries. Three fresh-VM public batch trials pass including10000 inputs; medians500=19.812ms,1000=36.374ms,2000=67.674ms,5000=166.490ms,10000=327.580ms. Full gate now retains this regression. Exact red/green output and raw trials are in docs/evidence/wave10.
+- Evidence boundary: elapsed-time guard allows scheduling noise; no absolute latency or universal complexity claim. Existing lifecycle and persistence failures remain green. Broader consumer/server qualification remains waves11–12. No temporary runtime or dependency patch.
+
+### Wave 11 — acceptance
+
+- Status: accepted, 2026-09-30; wave12 now active. Public HTTP Gun API unchanged; no new production FFI.
+- Red/green: original buffered LLM consumer failed to return within the synchronized test window after provider completion without HTTP EOF. Scoped incremental consumption now returns and closes that live stream. A progress callback can stop early; partial-disconnect failures retain observed-byte and semantic-progress evidence. SSE framing remains in the example, retained from the reviewed LLM Wire source with exact hashes and Apache license, never imported from sibling internals.
+- Consumer evidence: all1196 byte split points of OpenAI/Anthropic/Google text fixtures, including UTF-8/CRLF; live progress before EOF; local cancellation; live recording followed by offline playback of the same consumer; bounded body/line errors; status/Retry-After; compression refusal; idle expiry and partial disconnect. The sibling session runtime and tool/continuation orchestration are not migrated or claimed as tested through this example.
+- Reference coverage:25 H1 responses with25 flow-controlled chunks and duplicate trailers on one reused socket; normal owner exit; batch owner death and restored admission; active H2 sibling finishing during GOAWAY;65 ordered binary cassette responses with all256 byte values and non-consuming mismatches. Exact sources recorded in adoption-review and wave11 donor receipts; scenarios re-expressed, no external protocol suite copied.
+- Findings: initial draining test submitted fresh work before Gun's connection-down observation and received truthful ConnectionFailed/MayHaveBeenSent. The corrected test synchronizes on that supported observation; no automatic replay or stronger atomic guarantee was introduced. This test-setup correction is retained in draining-race.log.
+- Validation: fast gate passes62 tests, format/check/build/FFI warnings/boundaries; both separately built consumers and four negative type fixtures pass. Exact final.log and streaming.log are retained in docs/evidence/wave11. No temporary runtime, dependency patch or sibling mutation. Remaining distance: independent server/full runtime qualification and measured sustained load.
+
+
+### Wave 12 — acceptance
+
+- Status: accepted, 2026-09-30. No pending required implementation or temporary production substitute in this authorized follow-up. Remaining sibling migration and optional features are distinguished from HTTP capabilities.
+- Adopted: released nghttpd1.70.0 as test-only infrastructure pinned by existing flake.lock, alongside controlled Cowlib servers for synchronized faults. Official server options verified locally. Nix/Hex toolchain and production Gun/Cowlib versions remain unchanged.
+- Delivered: independent verified TLS/H2, binary PUT/download, HEAD/404/trailers,1/10/100/1000 callers, stalled-large-stream plus bounded batch, two cancellations and a32MiB surviving sibling. Full server-event observation verifies one connection and two resets; diagnostics retain a bounded prefix. Added256 concurrent recorded/replayed binary exchanges (8MiB), public batch regression through10000 inputs, and repeatable evidence export.
+- Sustained check:60 seconds,317900 requests, one connection, no failures; final bodies/waiters zero. Whole-VM sampled peak64066243 bytes, largest mailbox12. This is practical evidence, not an SLA or whole-stack memory/leak certification.
+- Validation: six full local gates pass on ARM64 Darwin/Linux × OTP29/28/27. Every run passes62 tests, formatting/check/build, FFI warnings/boundaries, two public consumers, four type rejections,1196 LLM split points, batch regression, independent server scenarios, recording/replay pressure and all eleven original load cases. Final Darwin wrapper exits0 with frozen executable inputs. Linux snapshot differs only in later README prose and the post-gate copy helper; no client, consumer or executable gate changes. Exact hashes/outcomes and raw logs are in wave12 evidence.
+- Tooling findings retained: macOS metadata sidecars broke initial Linux compilation; export now omits them. Editing the first host matrix wrapper while it ran caused a trailing-command exit127 after all checks passed; frozen final rerun succeeds. These are our tooling corrections, not dependency failures.
+- Conformance/acceptance: approved outcomes, owning-process guarantees, pure typed decisions, narrow FFI, scoped source reuse/licensing, observable tests, independent public imports, documentation and workspace rules all verified. No library patch, generic framework, untranslated Erlang orchestration, provider credential, sibling write, publication or push. FFI remains72 lines/3650 bytes/12 bindings. Changes are retained locally.
+- Remaining boundary: full LLM Wire session migration must preserve tools/continuations, remaining budgets and complete retry evidence; the example is text-oriented. GitHub-hosted x86_64 CI was not run. Body/query redaction, crash durability and previously listed follow-on HTTP features remain optional. No extra protocol certification or upstream repair is required by these findings.

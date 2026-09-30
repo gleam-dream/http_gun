@@ -33,6 +33,7 @@ for package in json.loads(pathlib.Path(sys.argv[1]).read_text()).values():
         assert hashlib.sha256((pathlib.Path(sys.argv[2])/name).read_bytes()).hexdigest()==digest,name
 PY
 cp -R examples/llm "$work/llm"
-(cd "$work/llm" && gleam build --warnings-as-errors && gleam run)
+cp test/http_gun_test_server.erl "$work/llm/test/"
+(cd "$work/llm" && gleam build --warnings-as-errors && gleam run && gleam run -m http_gun_llm_integration)
 if [ "${UPDATE_CONSUMER_LOCKS:-0}" = 1 ]; then cp "$work/llm/manifest.toml" examples/llm/manifest.toml; fi
 echo 'Independent consumer, four rejection fixtures and isolated LLM consumer passed.'

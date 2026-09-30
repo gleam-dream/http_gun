@@ -1,0 +1,22 @@
+{
+  "host": {
+    "system": "Darwin",
+    "release": "25.5.0",
+    "machine": "arm64",
+    "logical_cpus": 12
+  },
+  "linux": {
+    "architecture": "aarch64",
+    "kernel": "7.0.12-linuxkit",
+    "cpus": 4,
+    "memory_bytes": 4294967296,
+    "erlang_schedulers": 4,
+    "image": "ghcr.io/nixos/nix@sha256:7a007c766426c1877758ddc5cb87a965ac131fc78c582ce0083d922d51ae945c",
+    "nix": "2.35.2"
+  },
+  "toolchain": "Gleam 1.18.1; OTP 29/28/27; flake.lock",
+  "transport": "Gun2.6.0 / Cowlib2.20.0, unchanged",
+  "server": "nghttpd1.70.0, one worker, peer max concurrent streams8",
+  "source_commit_before_changes": "04ef776e7a77f94fa2c25a7b60b1125555bc1cec",
+  "benchmarks_run_serially": true
+}

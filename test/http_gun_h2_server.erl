@@ -82,7 +82,7 @@ loop(S, B, Decode, Encode, Id, Observer, Pending) ->
                                              [cow_http2:data(Stream, nofin, DataBlock),
                                               cow_http2:data(Stream, nofin, DataBlock)]),
                                Observer ! {h2_waiting_window, self(), Stream},
-                               Pending#{Stream => true};
+                               Pending#{Stream => window};
                            _ ->
                                case Path of
                                    <<"/capture-count">> ->
@@ -103,6 +103,10 @@ loop(S, B, Decode, Encode, Id, Observer, Pending) ->
                                        ssl:send(S,
                                                 [cow_http2:settings(#{max_concurrent_streams => 0}),
                                                  cow_http2:data(Stream, fin, <<"done">>)]);
+                                   <<"/goaway-active">> ->
+                                       ssl:send(S, [cow_http2:goaway(Stream, no_error, <<>>),
+                                           [cow_http2:data(Id0, fin, <<"tail">>) || {Id0, slow} <- maps:to_list(Pending)],
+                                           cow_http2:data(Stream, fin, <<"done">>)]);
                                    <<"/goaway">> ->
                                        ssl:send(S,
                                                 [cow_http2:goaway(Stream, no_error, <<>>),
@@ -110,10 +114,10 @@ loop(S, B, Decode, Encode, Id, Observer, Pending) ->
                                    <<"/loss">> -> ssl:close(S);
                                    _ -> ssl:send(S, cow_http2:data(Stream, fin, <<0, 255, 128>>))
                                end,
-                               Pending
+                               case Path of <<"/slow">> -> Pending#{Stream => slow}; _ -> Pending end
                        end,
             loop(S, Rest, D1, E1, Id, Observer, Pending1);
-        {ok, {window_update, Stream, _}, Rest} when is_map_key(Stream, Pending) ->
+        {ok, {window_update, Stream, _}, Rest} when map_get(Stream, Pending) =:= window ->
             ok = ssl:send(S, cow_http2:data(Stream, fin, <<"end">>)),
             Observer ! {h2_window_resumed, self(), Stream},
             loop(S, Rest, Decode, Encode, Id, Observer, maps:remove(Stream, Pending));

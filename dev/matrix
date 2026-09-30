@@ -10,5 +10,8 @@ for runtime in default otp28 otp27; do
   cp -R src test examples dev gleam.toml manifest.toml "$work/$runtime/"
   nix develop "path:$root#$runtime" --command sh -c 'cd "$1"; gleam --version; erl -noshell -eval '\''io:format("OTP ~s ERTS ~s~n",[erlang:system_info(otp_release),erlang:system_info(version)]),halt().'\''; sh dev/gate full' sh "$work/$runtime" > "build/evidence/$runtime.log" 2>&1
   cp "$work/$runtime/build/evidence/load.jsonl" "build/evidence/$runtime-load.jsonl"
+  cp "$work/$runtime/build/evidence/recording.jsonl" "build/evidence/$runtime-recording.jsonl"
+  cp "$work/$runtime/build/evidence/batch.jsonl" "build/evidence/$runtime-batch.jsonl"
+  cp -R "$work/$runtime/build/evidence/nghttpd/." "build/evidence/$runtime-nghttpd"
   echo "$runtime full gate passed"
 done

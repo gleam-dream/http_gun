@@ -63,11 +63,19 @@ request_loop(S, Buf, Observer) ->
                        <<"HEAD">> -> <<>>;
                        _ -> <<"abc">>
                    end,
-            ok = gen_tcp:send(S,
+            case Path of
+                <<"/flow-trailers">> ->
+                    ok = gen_tcp:send(S,
+                        [<<"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nX-Connection: ">>,
+                         list_to_binary(pid_to_list(self())), <<"\r\n\r\n">>,
+                         lists:duplicate(25, [<<"1000\r\n">>, binary:copy(<<42>>,4096), <<"\r\n">>]),
+                         <<"0\r\nx-final: yes\r\nx-final: again\r\n\r\n">>]);
+                _ -> ok = gen_tcp:send(S,
                               [<<"HTTP/1.1 200 OK\r\nContent-Length: ">>,
                                integer_to_binary(byte_size(Data)),
                                <<"\r\nX-Connection: ">>, list_to_binary(pid_to_list(self())),
-                               <<"\r\n\r\n">>, Data]),
+                               <<"\r\n\r\n">>, Data])
+            end,
             request_loop(S, Remaining, Observer);
         nomatch ->
             case gen_tcp:recv(S, 0, 5000) of

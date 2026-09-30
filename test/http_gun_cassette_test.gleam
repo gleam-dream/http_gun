@@ -1,5 +1,7 @@
+import gleam/bit_array
 import gleam/http/request
 import gleam/http/response
+import gleam/int
 import gleam/list
 import gleam/string
 import gleeunit/should
@@ -221,3 +223,44 @@ pub fn queued_playback_preserves_session_order_across_origins_test() {
 }
 
 import gleam/erlang/process
+
+// ReqCassette sequence scenarios + Mint-style deterministic fragmentation.
+pub fn generated_binary_sequences_preserve_every_exchange_test() {
+  let bytes = int.range(0, 256, <<>>, fn(acc, byte) { <<acc:bits, byte>> })
+  let exchanges =
+    int.range(0, 65, [], fn(acc, at) {
+      let split = at * 4
+      let assert Ok(first) = bit_array.slice(bytes, 0, split)
+      let assert Ok(last) = bit_array.slice(bytes, split, 256 - split)
+      [
+        fixture.Exchange(
+          req(),
+          fixture.Respond(
+            response.Response(
+              200 + at,
+              [#("x-repeat", "a"), #("x-repeat", "b")],
+              [first, last],
+            ),
+            fixture.Complete([#("x-index", int.to_string(at))]),
+          ),
+        ),
+        ..acc
+      ]
+    })
+    |> list.reverse
+  let assert Ok(tape) = cassette.new(exchanges)
+  let assert Ok(tape) = cassette.parse(cassette.encode(tape), 100_000)
+  let assert Ok(client) = cassette.playback(tape, config.default())
+  list.index_map(exchanges, fn(_, at) {
+    let assert Error(mismatch) =
+      http_gun.send(client, request.set_path(req(), "/mismatch"))
+    mismatch.reason |> should.equal(error.FixtureMismatch(at))
+    let assert Ok(reply) = http_gun.send(client, req())
+    reply.response.status |> should.equal(200 + at)
+    reply.response.body |> should.equal(bytes)
+    reply.trailers |> should.equal([#("x-index", int.to_string(at))])
+  })
+  let assert Error(exhausted) = http_gun.send(client, req())
+  exhausted.reason |> should.equal(error.FixtureExhausted)
+  let _ = http_gun.stop(client)
+}

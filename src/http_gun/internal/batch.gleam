@@ -148,12 +148,11 @@ fn advance(
       actor.stop()
     }
     [#(index, input), ..rest], workers, _ if running < state.concurrency -> {
+      let subject = state.subject
+      let run = state.run
       let pid =
         process.spawn_unlinked(fn() {
-          process.send(
-            state.subject,
-            Done(process.self(), index, state.run(input)),
-          )
+          process.send(subject, Done(process.self(), index, run(input)))
         })
       let worker = Worker(pid, process.monitor(pid), index)
       advance(State(..state, pending: rest, workers: [worker, ..workers]))

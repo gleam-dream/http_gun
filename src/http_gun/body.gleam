@@ -638,8 +638,9 @@ fn capture_bytes(state: State, bytes: BitArray) -> State {
 fn pump_capture(state: State) -> State {
   case state.capture {
     CaptureReady(cap, [event, ..rest]) -> {
+      let subject = state.subject
       recording.write(cap, event, fn(result) {
-        process.send(state.subject, Captured(result))
+        process.send(subject, Captured(result))
       })
       State(..state, capture: CaptureWaiting(cap, rest))
     }

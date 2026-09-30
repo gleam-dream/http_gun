@@ -1,0 +1,1 @@
+Repeatable matrix evidence export: first and second copies replace receipt.json at the same path; no nested nghttpd directory. Passed on Darwin. Changed only the post-gate artifact copy, with gate/runtime inputs unchanged.

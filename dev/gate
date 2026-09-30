@@ -12,6 +12,9 @@ erlc -Werror -o "$out" src/*.erl test/*.erl
 python3 dev/boundaries.py
 if [ "$mode" = full ]; then
   sh dev/consumers
+  python3 dev/check_batch.py
+  python3 dev/nghttpd.py
+  gleam run -m http_gun_recording_benchmark > build/evidence/recording.jsonl
   mkdir -p build/evidence
   gleam run -m http_gun_benchmark > build/evidence/load.jsonl
   python3 - <<'PY'

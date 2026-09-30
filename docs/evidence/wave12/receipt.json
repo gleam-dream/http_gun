@@ -1,0 +1,262 @@
+{
+  "completed_utc": "2026-09-30T11:03:13.288453+00:00",
+  "final_executable_inputs_match": true,
+  "linux_snapshot_differences": {
+    "dev/matrix": "Post-gate artifact export made repeatable; client gate/runtime inputs unchanged. Focused export check and final Darwin matrix passed.",
+    "examples/llm/README.md": "Prose only."
+  },
+  "changed_production": [
+    "src/http_gun/body.gleam",
+    "src/http_gun/internal/batch.gleam",
+    "src/http_gun/recording.gleam"
+  ],
+  "production_ffi": {
+    "lines": 72,
+    "bytes": 3650,
+    "bindings": 12,
+    "unchanged": true
+  },
+  "production_hex_dependencies_unchanged": true,
+  "platforms": {
+    "darwin": {
+      "default": {
+        "runtime": "OTP 29 ERTS 17.1",
+        "full_gate_exit": 0,
+        "tests": 62,
+        "external_consumers": 2,
+        "type_rejections": 4,
+        "llm_split_points": 1196,
+        "batch_trials": 3,
+        "batch_max_inputs": 10000,
+        "controlled_load_scenarios": 11,
+        "independent_server": {
+          "server": "nghttpd nghttp2/1.70.0",
+          "server_stream_limit": 8,
+          "client_connection_limit": 1,
+          "observed_request_connections": 1,
+          "resets": 2,
+          "log_bytes": 2662061,
+          "log_sha256": "3c6d23acf26e46fec64ecdeaf83c1b6210a6f17b1e30b5eb85dd8a69503ccdda",
+          "soak_seconds": 0,
+          "scenarios": 7,
+          "result": "passed"
+        },
+        "recording": {
+          "scenario": "record-and-replay",
+          "requests": 256,
+          "workers": 16,
+          "connections": 4,
+          "request_and_response_bytes": 8388608,
+          "capture_and_finish_us": 214130,
+          "peak_vm_bytes": 59933149,
+          "peak_total_mailbox": 15,
+          "peak_one_mailbox": 15,
+          "peak_processes": 110,
+          "peak_ports": 11
+        }
+      },
+      "otp28": {
+        "runtime": "OTP 28 ERTS 16.4.0.6",
+        "full_gate_exit": 0,
+        "tests": 62,
+        "external_consumers": 2,
+        "type_rejections": 4,
+        "llm_split_points": 1196,
+        "batch_trials": 3,
+        "batch_max_inputs": 10000,
+        "controlled_load_scenarios": 11,
+        "independent_server": {
+          "server": "nghttpd nghttp2/1.70.0",
+          "server_stream_limit": 8,
+          "client_connection_limit": 1,
+          "observed_request_connections": 1,
+          "resets": 2,
+          "log_bytes": 2662021,
+          "log_sha256": "41efb6ec1ec70b10c1b9cc49c08c6868195ba3fab2eb4489f26c33c1c740c133",
+          "soak_seconds": 0,
+          "scenarios": 7,
+          "result": "passed"
+        },
+        "recording": {
+          "scenario": "record-and-replay",
+          "requests": 256,
+          "workers": 16,
+          "connections": 4,
+          "request_and_response_bytes": 8388608,
+          "capture_and_finish_us": 247195,
+          "peak_vm_bytes": 60778636,
+          "peak_total_mailbox": 15,
+          "peak_one_mailbox": 15,
+          "peak_processes": 111,
+          "peak_ports": 11
+        }
+      },
+      "otp27": {
+        "runtime": "OTP 27 ERTS 15.2.7.13",
+        "full_gate_exit": 0,
+        "tests": 62,
+        "external_consumers": 2,
+        "type_rejections": 4,
+        "llm_split_points": 1196,
+        "batch_trials": 3,
+        "batch_max_inputs": 10000,
+        "controlled_load_scenarios": 11,
+        "independent_server": {
+          "server": "nghttpd nghttp2/1.70.0",
+          "server_stream_limit": 8,
+          "client_connection_limit": 1,
+          "observed_request_connections": 1,
+          "resets": 2,
+          "log_bytes": 2662021,
+          "log_sha256": "35d366a113b830d5f23737de712b9149c6ade2bae2d0042400cfc1c42d3118a3",
+          "soak_seconds": 0,
+          "scenarios": 7,
+          "result": "passed"
+        },
+        "recording": {
+          "scenario": "record-and-replay",
+          "requests": 256,
+          "workers": 16,
+          "connections": 4,
+          "request_and_response_bytes": 8388608,
+          "capture_and_finish_us": 372622,
+          "peak_vm_bytes": 60413110,
+          "peak_total_mailbox": 16,
+          "peak_one_mailbox": 15,
+          "peak_processes": 106,
+          "peak_ports": 12
+        }
+      }
+    },
+    "linux": {
+      "default": {
+        "runtime": "OTP 29 ERTS 17.1",
+        "full_gate_exit": 0,
+        "tests": 62,
+        "external_consumers": 2,
+        "type_rejections": 4,
+        "llm_split_points": 1196,
+        "batch_trials": 3,
+        "batch_max_inputs": 10000,
+        "controlled_load_scenarios": 11,
+        "independent_server": {
+          "server": "nghttpd nghttp2/1.70.0",
+          "server_stream_limit": 8,
+          "client_connection_limit": 1,
+          "observed_request_connections": 1,
+          "resets": 2,
+          "log_bytes": 2662061,
+          "log_sha256": "3b7f155f1f8dd9d74edf99c13c16b8f917024c8ce87b243f83799ec940b05d9c",
+          "soak_seconds": 0,
+          "scenarios": 7,
+          "result": "passed"
+        },
+        "recording": {
+          "scenario": "record-and-replay",
+          "requests": 256,
+          "workers": 16,
+          "connections": 4,
+          "request_and_response_bytes": 8388608,
+          "capture_and_finish_us": 137400,
+          "peak_vm_bytes": 56449971,
+          "peak_total_mailbox": 3,
+          "peak_one_mailbox": 2,
+          "peak_processes": 108,
+          "peak_ports": 11
+        }
+      },
+      "otp28": {
+        "runtime": "OTP 28 ERTS 16.4.0.6",
+        "full_gate_exit": 0,
+        "tests": 62,
+        "external_consumers": 2,
+        "type_rejections": 4,
+        "llm_split_points": 1196,
+        "batch_trials": 3,
+        "batch_max_inputs": 10000,
+        "controlled_load_scenarios": 11,
+        "independent_server": {
+          "server": "nghttpd nghttp2/1.70.0",
+          "server_stream_limit": 8,
+          "client_connection_limit": 1,
+          "observed_request_connections": 1,
+          "resets": 2,
+          "log_bytes": 2662021,
+          "log_sha256": "d500ad3928b609ba2f295596fd3083e27f094eb0c8b483b67a1de7a79d469afa",
+          "soak_seconds": 0,
+          "scenarios": 7,
+          "result": "passed"
+        },
+        "recording": {
+          "scenario": "record-and-replay",
+          "requests": 256,
+          "workers": 16,
+          "connections": 4,
+          "request_and_response_bytes": 8388608,
+          "capture_and_finish_us": 144386,
+          "peak_vm_bytes": 73058452,
+          "peak_total_mailbox": 8,
+          "peak_one_mailbox": 6,
+          "peak_processes": 110,
+          "peak_ports": 11
+        }
+      },
+      "otp27": {
+        "runtime": "OTP 27 ERTS 15.2.7.13",
+        "full_gate_exit": 0,
+        "tests": 62,
+        "external_consumers": 2,
+        "type_rejections": 4,
+        "llm_split_points": 1196,
+        "batch_trials": 3,
+        "batch_max_inputs": 10000,
+        "controlled_load_scenarios": 11,
+        "independent_server": {
+          "server": "nghttpd nghttp2/1.70.0",
+          "server_stream_limit": 8,
+          "client_connection_limit": 1,
+          "observed_request_connections": 1,
+          "resets": 2,
+          "log_bytes": 2662021,
+          "log_sha256": "f1cf54b236c77fa45776c7010429969d423850d19e3f375df2664f09f8f3f6de",
+          "soak_seconds": 0,
+          "scenarios": 7,
+          "result": "passed"
+        },
+        "recording": {
+          "scenario": "record-and-replay",
+          "requests": 256,
+          "workers": 16,
+          "connections": 4,
+          "request_and_response_bytes": 8388608,
+          "capture_and_finish_us": 259639,
+          "peak_vm_bytes": 73415106,
+          "peak_total_mailbox": 7,
+          "peak_one_mailbox": 4,
+          "peak_processes": 104,
+          "peak_ports": 12
+        }
+      }
+    }
+  },
+  "soak": {
+    "server": "nghttpd nghttp2/1.70.0",
+    "server_stream_limit": 8,
+    "client_connection_limit": 1,
+    "observed_request_connections": 1,
+    "resets": 2,
+    "soak_seconds": 60,
+    "scenarios": 8,
+    "result": "passed"
+  },
+  "earlier_tooling_failures": {
+    "linux_source_export": "macOS resource-fork sidecars rejected as Erlang; fixed exporter and reran all Linux gates successfully.",
+    "darwin_matrix_wrapper": "Concurrent evidence-export edit caused exit127 after gates passed; frozen final rerun exited0."
+  },
+  "boundaries": [
+    "ARM64 Darwin and Linux container; GitHub-hosted x86_64 CI not executed",
+    "60-second sustained sample, not universal memory/leak certification",
+    "Text-oriented LLM example; sibling session runtime not migrated"
+  ],
+  "no_push_or_publication": true
+}

@@ -67,6 +67,15 @@ type Phase {
   Broken(CaptureError)
 }
 
+type Publication {
+  Publication(
+    directory: String,
+    destination: String,
+    options: Options,
+    count: Int,
+  )
+}
+
 type Job {
   Job(
     write: fn() -> Result(Nil, CaptureError),
@@ -424,8 +433,9 @@ fn fragment(
 fn advance(state: State) -> actor.Next(State, Message) {
   case state.phase, state.working, state.queue {
     Active, None, [job, ..rest] | Sealing(_), None, [job, ..rest] -> {
-      let pid =
-        process.spawn(fn() { process.send(state.subject, Written(job.write())) })
+      let subject = state.subject
+      let write = job.write
+      let pid = process.spawn(fn() { process.send(subject, Written(write())) })
       actor.continue(
         State(
           ..state,
@@ -489,14 +499,21 @@ fn finish_session(
           actor.continue(state)
         }
         False -> {
-          let job = Job(fn() { publish(state) }, fn(_) { Nil })
+          let publication =
+            Publication(
+              state.directory,
+              state.destination,
+              state.options,
+              state.count,
+            )
+          let job = Job(fn() { publish(publication) }, fn(_) { Nil })
           advance(State(..state, phase: Sealing(reply), queue: [job]))
         }
       }
   }
 }
 
-fn publish(state: State) -> Result(Nil, CaptureError) {
+fn publish(state: Publication) -> Result(Nil, CaptureError) {
   let output = state.directory <> "/complete.json"
   use Nil <- result.try(
     file.write_new(
@@ -522,7 +539,7 @@ fn publish(state: State) -> Result(Nil, CaptureError) {
 }
 
 fn copy_exchanges(
-  state: State,
+  state: Publication,
   output: String,
   index: Int,
 ) -> Result(Nil, CaptureError) {
@@ -549,7 +566,7 @@ fn copy_exchanges(
   }
 }
 
-fn cleanup(state: State) -> Nil {
+fn cleanup(state: Publication) -> Nil {
   int.range(0, state.count, Nil, fn(_, index) {
     file.remove(exchange_path(state.directory, index))
   })

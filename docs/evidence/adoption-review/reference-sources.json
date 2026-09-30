@@ -1,0 +1,107 @@
+[
+  {
+    "repo": "sneako/finch",
+    "revision": "3387d4be15d2d56ad18e878e62bea0e354385f15",
+    "path": "test/finch/http1/pool_test.exs",
+    "sha256": "e96772ab66f03eb8e08ef6635c88ba223746f06a579897be266fa5fbb4f21142",
+    "url": "https://raw.githubusercontent.com/sneako/finch/3387d4be15d2d56ad18e878e62bea0e354385f15/test/finch/http1/pool_test.exs"
+  },
+  {
+    "repo": "sneako/finch",
+    "revision": "3387d4be15d2d56ad18e878e62bea0e354385f15",
+    "path": "test/finch/http2/pool_test.exs",
+    "sha256": "10153ba71cb9546242427cf0d71ef1d9ebea7cf82d7791b6d6337f6cd2c44715",
+    "url": "https://raw.githubusercontent.com/sneako/finch/3387d4be15d2d56ad18e878e62bea0e354385f15/test/finch/http2/pool_test.exs"
+  },
+  {
+    "repo": "sneako/finch",
+    "revision": "3387d4be15d2d56ad18e878e62bea0e354385f15",
+    "path": "test/finch/http2/integration_test.exs",
+    "sha256": "ca94494b939bebbfaf2ff28280fbd06989b2316807cc019e578d65c6e0674402",
+    "url": "https://raw.githubusercontent.com/sneako/finch/3387d4be15d2d56ad18e878e62bea0e354385f15/test/finch/http2/integration_test.exs"
+  },
+  {
+    "repo": "sneako/finch",
+    "revision": "3387d4be15d2d56ad18e878e62bea0e354385f15",
+    "path": "LICENSE.md",
+    "sha256": "2c3c57158df2131ff09f57d9c7850da0844910f0fa8ac60294dd9396e3672e81",
+    "url": "https://raw.githubusercontent.com/sneako/finch/3387d4be15d2d56ad18e878e62bea0e354385f15/LICENSE.md"
+  },
+  {
+    "repo": "elixir-mint/mint",
+    "revision": "fb850d3714e4d79b9112d8056fe87cfd96b84f21",
+    "path": "test/mint/http2/conn_test.exs",
+    "sha256": "f435165325c8c8efc4c6a4302831534bc5effa071d78830064323afbe1713efb",
+    "url": "https://raw.githubusercontent.com/elixir-mint/mint/fb850d3714e4d79b9112d8056fe87cfd96b84f21/test/mint/http2/conn_test.exs"
+  },
+  {
+    "repo": "elixir-mint/mint",
+    "revision": "fb850d3714e4d79b9112d8056fe87cfd96b84f21",
+    "path": "test/mint/http1/conn_properties_test.exs",
+    "sha256": "c60721f96c319db3a4baee6aeffe74545bcf33b048b5a6807d1d43a47b255cc1",
+    "url": "https://raw.githubusercontent.com/elixir-mint/mint/fb850d3714e4d79b9112d8056fe87cfd96b84f21/test/mint/http1/conn_properties_test.exs"
+  },
+  {
+    "repo": "elixir-mint/mint",
+    "revision": "fb850d3714e4d79b9112d8056fe87cfd96b84f21",
+    "path": "LICENSE.txt",
+    "sha256": "a6cba85bc92e0cff7a450b1d873c0eaa2e9fc96bf472df0247a26bec77bf3ff9",
+    "url": "https://raw.githubusercontent.com/elixir-mint/mint/fb850d3714e4d79b9112d8056fe87cfd96b84f21/LICENSE.txt"
+  },
+  {
+    "repo": "ninenines/gun",
+    "revision": "9d40b0ff2de1546e5c613205c4f25aaefffc2569",
+    "path": "test/flow_SUITE.erl",
+    "sha256": "db3df71c7885a3fa2683e005c792f3d39cca41fc8e832d8985d3266991fa0e5a",
+    "url": "https://raw.githubusercontent.com/ninenines/gun/9d40b0ff2de1546e5c613205c4f25aaefffc2569/test/flow_SUITE.erl"
+  },
+  {
+    "repo": "ninenines/gun",
+    "revision": "9d40b0ff2de1546e5c613205c4f25aaefffc2569",
+    "path": "test/shutdown_SUITE.erl",
+    "sha256": "bfc30dfdb3d05af6103cb0fc97476ba890b5d21d35e8a366555ca62ad0ea23cf",
+    "url": "https://raw.githubusercontent.com/ninenines/gun/9d40b0ff2de1546e5c613205c4f25aaefffc2569/test/shutdown_SUITE.erl"
+  },
+  {
+    "repo": "ninenines/gun",
+    "revision": "9d40b0ff2de1546e5c613205c4f25aaefffc2569",
+    "path": "test/send_errors_SUITE.erl",
+    "sha256": "9edec5b3795ab00afb191947717d15a039a81ce9d070f9d6774aa89b21a5a79e",
+    "url": "https://raw.githubusercontent.com/ninenines/gun/9d40b0ff2de1546e5c613205c4f25aaefffc2569/test/send_errors_SUITE.erl"
+  },
+  {
+    "repo": "ninenines/gun",
+    "revision": "9d40b0ff2de1546e5c613205c4f25aaefffc2569",
+    "path": "LICENSE",
+    "sha256": "edb14e8a204b4ef3d5d7ce75e553126e3bd58dc5342decedc3fbf0d2bd023098",
+    "url": "https://raw.githubusercontent.com/ninenines/gun/9d40b0ff2de1546e5c613205c4f25aaefffc2569/LICENSE"
+  },
+  {
+    "repo": "lostbean/req_cassette",
+    "revision": "cb0251ca394952de46007bb32f5051feb66e896e",
+    "path": "test/req_cassette/body_type_test.exs",
+    "sha256": "0a7bbb860ab196902cc0a1eeeb4fb9908127a87dc6e88d8a74eb8d16c64d129a",
+    "url": "https://raw.githubusercontent.com/lostbean/req_cassette/cb0251ca394952de46007bb32f5051feb66e896e/test/req_cassette/body_type_test.exs"
+  },
+  {
+    "repo": "lostbean/req_cassette",
+    "revision": "cb0251ca394952de46007bb32f5051feb66e896e",
+    "path": "test/req_cassette/sequential_matching_test.exs",
+    "sha256": "75b335a8a7772d5f7ec722a20fec8ed3a4533c947da96d73abf53d46fb7199c6",
+    "url": "https://raw.githubusercontent.com/lostbean/req_cassette/cb0251ca394952de46007bb32f5051feb66e896e/test/req_cassette/sequential_matching_test.exs"
+  },
+  {
+    "repo": "lostbean/req_cassette",
+    "revision": "cb0251ca394952de46007bb32f5051feb66e896e",
+    "path": "test/req_cassette/session_error_handling_test.exs",
+    "sha256": "22844246d153142180461a428bb4908b9eb02dcc0614d659ca8e2d9c38ec28c0",
+    "url": "https://raw.githubusercontent.com/lostbean/req_cassette/cb0251ca394952de46007bb32f5051feb66e896e/test/req_cassette/session_error_handling_test.exs"
+  },
+  {
+    "repo": "lostbean/req_cassette",
+    "revision": "cb0251ca394952de46007bb32f5051feb66e896e",
+    "path": "LICENSE",
+    "sha256": "a4abe52f2c8ad90bb3643ca701cf57a3f6e4d1856f29bdda1dc8d409a8e8706f",
+    "url": "https://raw.githubusercontent.com/lostbean/req_cassette/cb0251ca394952de46007bb32f5051feb66e896e/LICENSE"
+  }
+]

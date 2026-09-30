@@ -1,0 +1,26 @@
+advance(State) ->
+    Running = erlang:length(erlang:element(5, State)),
+    case {erlang:element(4, State), erlang:element(5, State), erlang:element(7, State)} of
+        {[], [], {some, Reply}} ->
+            gleam@erlang@process:send(Reply, {ok, begin
+                _pipe = erlang:element(6, State),
+                _pipe@1 = gleam@list:sort(_pipe, fun(A, B) ->
+                    gleam@int:compare(erlang:element(1, A), erlang:element(1, B))
+                end),
+                gleam@list:map(_pipe@1, fun(Pair) ->
+                    erlang:element(2, Pair)
+                end)
+            end}),
+            gleam@otp@actor:stop();
+
+        {[{Index, Input} | Rest], Workers, _} when Running < erlang:element(8, State) ->
+            Pid = proc_lib:spawn(fun() ->
+                gleam@erlang@process:send(erlang:element(2, State), {done, erlang:self(), Index, (erlang:element(9, State))(Input)})
+            end),
+            Worker = {worker, Pid, gleam@erlang@process:monitor(Pid), Index},
+            advance({state, erlang:element(2, State), erlang:element(3, State), Rest, [Worker | Workers], erlang:element(6, State), erlang:element(7, State), erlang:element(8, State), erlang:element(9, State)});
+
+        {_, _, _} ->
+            gleam@otp@actor:continue(State)
+    end.
+

@@ -49,6 +49,7 @@
             rebar3
             elixirPackage
             python3
+            nghttp2
             ripgrep
           ];
         };
@@ -59,6 +60,7 @@
             beam28Packages.erlang
             beam28Packages.rebar3
             python3
+            nghttp2
             ripgrep
           ];
         };
@@ -69,6 +71,7 @@
             beam27Packages.erlang
             beam27Packages.rebar3
             python3
+            nghttp2
             ripgrep
           ];
         };

@@ -1,0 +1,12 @@
+{
+  "server": "nghttpd nghttp2/1.70.0",
+  "server_stream_limit": 8,
+  "client_connection_limit": 1,
+  "observed_request_connections": 1,
+  "resets": 2,
+  "log_bytes": 2662061,
+  "log_sha256": "3c6d23acf26e46fec64ecdeaf83c1b6210a6f17b1e30b5eb85dd8a69503ccdda",
+  "soak_seconds": 0,
+  "scenarios": 7,
+  "result": "passed"
+}

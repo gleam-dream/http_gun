@@ -231,3 +231,25 @@ pub fn queued_streams_resume_after_cancellation_on_same_h2_connection_test() {
   })
   let _ = http_gun.stop(client)
 }
+
+// Finch/Gun shutdown scenario: accepted siblings can finish during draining.
+pub fn goaway_allows_existing_sibling_to_finish_without_replay_test() {
+  let port = server()
+  let assert Ok(client) = http_gun.start(settings())
+  let assert Ok(slow) = http_gun.open(client, req(port, "/slow"))
+  body.next(slow.body, 1000) |> should.equal(Ok(body.Chunk(<<"first":utf8>>)))
+  let assert Ok(draining) = http_gun.send(client, req(port, "/goaway-active"))
+  draining.response.body |> should.equal(<<"done":utf8>>)
+  let assert Ok(rest) = body.collect(slow.body, 100)
+  rest.bytes |> should.equal(<<"tail":utf8>>)
+  let _ = body.close(slow.body)
+  // Gun does not expose atomic GOAWAY admission; await observed shutdown.
+  await_no_connections(client, 1000) |> should.be_true
+  let assert Ok(fresh) = http_gun.send(client, req(port, "/fast"))
+  {
+    response_header(fresh.response.headers, "x-connection")
+    != response_header(slow.headers, "x-connection")
+  }
+  |> should.be_true
+  let _ = http_gun.stop(client)
+}

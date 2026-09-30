@@ -1,0 +1,13 @@
+  Compiling http_gun
+   Compiled in 0.27s
+    Running http_gun_batch_benchmark.main
+   Compiled in 0.19s
+    Running http_gun_batch_benchmark.main
+   Compiled in 0.19s
+    Running http_gun_batch_benchmark.main
+{"median_us": {"100": 28799, "1000": 116238, "5000": 2377275, "2000": 408884, "500": 36771}, "evidence": "docs/evidence/wave10/red-batch.jsonl"}
+Traceback (most recent call last):
+  File "/code/gleam-dream/http_gun/dev/check_batch.py", line 23, in <module>
+    assert medians[5000] < medians[500] * 15 + 50_000, 'Public batch shows excessive growth for tenfold input'
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: Public batch shows excessive growth for tenfold input

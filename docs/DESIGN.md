@@ -22,7 +22,7 @@ Gleam pool actor: bounded admission, FIFO waiting work by normalized origin, con
 
 The pool owns queue membership, caller/id indexes, FIFO links, waiting counts and body-owner membership together. Removing an expired or dead caller immediately unlinks its entry; no cancelled-entry history remains behind a blocked head. Cached origins are established during request validation. A connection reservation is distinct from waiting work and remains bounded by connection admission. Scheduling work depends on waiting origins and available capacity, rather than repeatedly traversing every request behind a blocked origin.
 
-Callbacks passed to body actors capture only their message destinations. They must not carry a snapshot of the pool's pending requests or playback session across that process boundary.
+Callbacks crossing process boundaries capture only the values required by that operation. Pool cleanup callbacks carry message destinations; batch workers carry one input and the operation; capture acknowledgements carry their destination. They must not carry unrelated pending work, completed results or body queues across the process boundary.
 
 Gleam body actor: Opening -> Reading -> Complete/Failed/LocallyCancelled. One consumer is the opening process. Copies share the actor state. Another process receives ReadConflict if a read is pending, otherwise WrongOwner. A read-wait timeout clears only that waiting read, retaining credit and admitted bytes. Overall deadline is terminal. Scope exit, owner death, close and shutdown converge on idempotent release. Close means local cancellation, never remote rollback. Completed bytes/trailers survive until read or owner closure, subject to finite retained-owner admission.
 

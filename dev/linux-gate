@@ -1,0 +1,25 @@
+#!/bin/sh
+# Isolated native ARM64 Linux validation on Docker; no sibling/source mounts.
+set -eu
+image=ghcr.io/nixos/nix@sha256:7a007c766426c1877758ddc5cb87a965ac131fc78c582ce0083d922d51ae945c
+root=$(pwd)
+mkdir -p build/evidence/linux
+input=$(mktemp "$root/build/linux-input.XXXXXX")
+trap 'rm -f "$input"' EXIT HUP INT TERM
+COPYFILE_DISABLE=1 tar --no-xattrs -cf "$input" src test dev examples gleam.toml manifest.toml flake.nix flake.lock
+# The repository snapshot is read-only; the container compiles a private copy.
+docker run --rm --platform linux/arm64 --cpus 4 --memory 4g --pids-limit 4096 \
+  -e 'ERL_FLAGS=+S 4:4' \
+  -e 'NIX_CONFIG=experimental-features = nix-command flakes
+sandbox = false' \
+  --mount "type=bind,source=$input,target=/input.tar,readonly" \
+  --mount "type=bind,source=$root/build/evidence/linux,target=/evidence" \
+  "$image" sh -c '
+    mkdir /work
+    tar -xf /input.tar -C /work
+    cd /work
+    trap '\''if [ -d build/evidence ]; then cp -R build/evidence/. /evidence/; fi'\'' EXIT
+    nix --version
+    uname -a
+    sh dev/matrix
+  '
