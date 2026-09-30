@@ -1,0 +1,16 @@
+{"client":"dream","case":"created201","observation":"#(\"ok\", 201, [#(\"content-length\", \"3\")], \"abc\", [])"}
+{"client":"dream","case":"status429","observation":"#(\"response_error\", 429, [#(\"content-length\", \"3\")], \"abc\", [])"}
+{"client":"dream","case":"empty204","observation":"#(\"ok\", 204, [], \"\", [])"}
+{"client":"dream","case":"binary200","observation":"failure: RequestError(\"Failed to convert response to string\")"}
+{"client":"dream","case":"duplicates-and-trailers","observation":"#(\"ok\", 200, [#(\"trailer\", \"x-end\"), #(\"content-length\", \"3\"), #(\"x-end\", \"yes\"), #(\"x-dup\", \"a\"), #(\"x-dup\", \"b\")], \"abc\", [])"}
+{"client":"dream","case":"pull-created201","observation":"Error(\"HTTP 201: abc\")"}
+{"client":"dream","case":"pull-status429","observation":"Error(\"HTTP 429: abc\")"}
+{"client":"dream","case":"pull-empty204","observation":"Ok(0)"}
+{"client":"dream","case":"pull-binary200","observation":"Ok(3)"}
+{"client":"dream","case":"pull-duplicates-and-trailers","observation":"Ok(3)"}
+{"client":"dream","case":"custom-ca-tls","observation":"#(\"ok\", 200, [#(\"content-length\", \"3\")], \"abc\", [])"}
+{"client":"dream","case":"early-pull-closes-within-2s","observation":"False"}
+{"client":"dream","case":"pull-owner-exit-closes-within-2s","observation":"False"}
+{"client":"dream","case":"explicit-callback-cancel-closes-within-2s","observation":"True"}
+{"client":"dream","case":"record-offline-roundtrip","observation":"#(Ok(HttpResponse(200, [Header(\"connection\", \"close\"), Header(\"content-length\", \"3\")], \"abc\")), Ok(HttpResponse(200, [Header(\"connection\", \"close\"), Header(\"content-length\", \"3\")], \"abc\")), Ok(HttpResponse(200, [Header(\"connection\", \"close\"), Header(\"content-length\", \"3\")], \"abc\")), Ok(HttpResponse(200, [Header(\"connection\", \"close\"), Header(\"content-length\", \"3\")], \"abc\")), Ok(HttpResponse(200, [Header(\"connection\", \"close\"), Header(\"content-length\", \"3\")], \"abc\")))"}
+{"client":"dream","case":"record-identical-sequence","observation":"#(Ok(HttpResponse(200, [Header(\"connection\", \"close\"), Header(\"content-length\", \"3\")], \"abc\")), Ok(HttpResponse(200, [Header(\"connection\", \"close\"), Header(\"content-length\", \"3\")], \"xyz\")), Error(RequestError(\"Ambiguous recording match for key: GEThttp://localhost:53313/ (2 recordings)\")), Error(RequestError(\"Ambiguous recording match for key: GEThttp://localhost:53313/ (2 recordings)\")), Error(RequestError(\"Ambiguous recording match for key: GEThttp://localhost:53313/ (2 recordings)\")))"}

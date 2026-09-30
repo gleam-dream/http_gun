@@ -1,0 +1,262 @@
+  Compiling dream_http_client
+   Compiled in 0.50s
+    Running dream_http_client_test.main
+Listening on http://127.0.0.1:9876
+[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39mWARNING: unrecognized Content-Encoding, passing through raw bytes: br
+[32m.[39m[32m.[39m[32m.[39mWARNING: decompression failed, passing through raw bytes
+[32m.[39m[32m.[39m[32m.[39mWARNING: unrecognized Content-Encoding for stream, passing through raw bytes: br
+[32m.[39m[32m.[39m[32m.[39m[32m.[39mWARNING: unrecognized Content-Encoding for stream, passing through raw bytes: br
+[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39mFailed to fetch stream_start headers for recording: Unknown stream_start header error
+[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39mStream started
+Chunk 1
+Chunk 2
+Chunk 3
+Chunk 4
+Chunk 5
+Chunk 6
+Chunk 7
+Chunk 8
+Chunk 9
+Chunk 10
+
+Stream completed
+[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39mHTTP stream error while recording messages for request #Ref<0.3894879643.3531603969.227692>: {failed_connect,[{to_address,{"localhost",19999}},{inet,[inet],econnrefused}]}
+[32m.[39m[32m.[39m[32m.[39m[32m.[39m=CRASH REPORT==== 29-Sep-2026::21:46:37.690015 ===
+  crasher:
+    initial call: dream_http_client@client:'-start_stream/1-anonymous-0-'/0
+    pid: <0.532.0>
+    registered_name: []
+    exception error: #{function =>
+                           <<"callback_crash_cleans_up_underlying_request_test">>,
+                       line => 165,
+                       message => <<"deliberate callback failure">>,
+                       module => <<"start_stream_test">>,
+                       file => <<"test/start_stream_test.gleam">>,
+                       gleam_error => panic}
+      in function  start_stream_test:'-callback_crash_cleans_up_underlying_request_test/0-anonymous-0-'/1 (test/start_stream_test.gleam:167)
+      in call from dream_http_client@client:handle_stream_message/5 (src/dream_http_client/client.gleam:2588)
+    ancestors: [<0.150.0>]
+    message_queue_len: 0
+    messages: []
+    links: []
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 1598
+    stack_size: 29
+    reductions: 2573
+  neighbours:
+
+[32m.[39mHTTP stream error while recording messages for request #Ref<0.3894879643.3531603969.227783>: timeout
+[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39mHTTP stream error while recording messages for request #Ref<0.3894879643.3531603969.227881>: {failed_connect,[{to_address,{"localhost",1}},{inet,[inet],econnrefused}]}
+start_stream connection refused error: {failed_connect,[{to_address,{"localhost",1}},{inet,[inet],econnrefused}]}
+[32m.[39mstream_yielder connection refused error: {failed_connect,[{to_address,{"localhost",1}},{inet,[inet],econnrefused}]}
+[32m.[39msend() connection refused error: {failed_connect,[{to_address,{"localhost",1}},{inet,[inet],econnrefused}]}
+[32m.[39m=CRASH REPORT==== 29-Sep-2026::21:46:38.883920 ===
+  crasher:
+    initial call: gleam@otp@actor:'-start/1-anonymous-0-'/0
+    pid: <0.572.0>
+    registered_name: []
+    exception error: #{function => <<"stream_drop">>,line => 141,
+                       message => <<"intentional crash to drop connection">>,
+                       module =>
+                           <<"dream_mock_server/controllers/stream_controller">>,
+                       file =>
+                           <<"src/dream_mock_server/controllers/stream_controller.gleam">>,
+                       gleam_error => panic}
+      in function  dream_mock_server@controllers@stream_controller:'-stream_drop/3-anonymous-0-'/1 (src/dream_mock_server/controllers/stream_controller.gleam:146)
+      in call from gleam@yielder:'-map_loop/2-anonymous-0-'/2 (src/gleam/yielder.gleam:385)
+      in call from gleam@yielder:'-map_loop/2-anonymous-0-'/2 (src/gleam/yielder.gleam:380)
+      in call from gleam@yielder:append_loop/2 (src/gleam/yielder.gleam:457)
+      in call from gleam@yielder:try_fold_loop/3 (src/gleam/yielder.gleam:1492)
+      in call from mist@internal@http@handler:handle_chunked_body/4 (src/mist/internal/http/handler.gleam:124)
+      in call from mist@internal@http@handler:'-call/5-anonymous-3-'/5 (src/mist/internal/http/handler.gleam:57)
+      in call from mist@internal@handler:'-with_func/1-anonymous-5-'/5 (src/mist/internal/handler.gleam:103)
+    ancestors: [<0.131.0>,<0.127.0>,<0.125.0>,<0.82.0>]
+    message_queue_len: 0
+    messages: []
+    links: [<0.131.0>,#Port<0.45>]
+    dictionary: [{dream_mist_response,none},
+                  {dream_mist_request,
+                      {request,get,
+                          [{<<"accept-encoding">>,<<"gzip, deflate">>},
+                           {<<"connection">>,<<"keep-alive">>},
+                           {<<"host">>,<<"localhost:9876">>}],
+                          {connection,{initial,<<>>},#Port<0.45>,tcp},
+                          http,<<"localhost">>,
+                          {some,9876},
+                          <<"/stream/drop">>,none}},
+                  {dream_mist_upgrade,none}]
+    trap_exit: false
+    status: running
+    heap_size: 4185
+    stack_size: 29
+    reductions: 4400
+  neighbours:
+    neighbour:
+      pid: <0.131.0>
+      registered_name: []
+      initial call: gleam@otp@actor:'-start/1-anonymous-0-'/0
+      current_function: {prim_inet,accept0,3}
+      ancestors: [<0.127.0>,<0.125.0>,<0.82.0>]
+      message_queue_len: 0
+      links: [<0.572.0>,<0.127.0>]
+      trap_exit: false
+      status: waiting
+      heap_size: 2586
+      stack_size: 17
+      reductions: 2174
+      current_stacktrace: [{prim_inet,accept0,3,[]},
+                  {inet_tcp,accept,1,[{file,"inet_tcp.erl"},{line,234}]},
+                  {glisten@internal@acceptor,'-start/2-anonymous-5-',3,
+                      [{file,"src/glisten/internal/acceptor.gleam"},
+                       {line,63}]},
+                  {gleam@otp@actor,loop,1,
+                      [{file,"src/gleam/otp/actor.gleam"},{line,491}]},
+                  {proc_lib,init_p,3,[{file,"proc_lib.erl"},{line,317}]}]
+HTTP stream error while recording messages for request #Ref<0.3894879643.3531603971.223696>: socket_closed_remotely
+=SUPERVISOR REPORT==== 29-Sep-2026::21:46:38.884365 ===
+    supervisor: {<0.127.0>,gleam@otp@static_supervisor}
+    errorContext: child_terminated
+    reason: {#{function => <<"stream_drop">>,line => 141,
+               message => <<"intentional crash to drop connection">>,
+               module => <<"dream_mock_server/controllers/stream_controller">>,
+               file =>
+                   <<"src/dream_mock_server/controllers/stream_controller.gleam">>,
+               gleam_error => panic},
+             [{dream_mock_server@controllers@stream_controller,
+                  '-stream_drop/3-anonymous-0-',1,
+                  [{file,
+                       "src/dream_mock_server/controllers/stream_controller.gleam"},
+                   {line,146}]},
+              {gleam@yielder,'-map_loop/2-anonymous-0-',2,
+                  [{file,"src/gleam/yielder.gleam"},{line,385}]},
+              {gleam@yielder,'-map_loop/2-anonymous-0-',2,
+                  [{file,"src/gleam/yielder.gleam"},{line,380}]},
+              {gleam@yielder,append_loop,2,
+                  [{file,"src/gleam/yielder.gleam"},{line,457}]},
+              {gleam@yielder,try_fold_loop,3,
+                  [{file,"src/gleam/yielder.gleam"},{line,1492}]},
+              {mist@internal@http@handler,handle_chunked_body,4,
+                  [{file,"src/mist/internal/http/handler.gleam"},{line,124}]},
+              {mist@internal@http@handler,'-call/5-anonymous-3-',5,
+                  [{file,"src/mist/internal/http/handler.gleam"},{line,57}]},
+              {mist@internal@handler,'-with_func/1-anonymous-5-',5,
+                  [{file,"src/mist/internal/handler.gleam"},{line,103}]}]}
+    offender: [{pid,<0.131.0>},
+               {id,3},
+               {mfargs,
+                   {gleam@otp@static_supervisor,start_child_callback,
+                       [#Fun<gleam@otp@supervision.0.84844907>]}},
+               {restart_type,permanent},
+               {significant,false},
+               {shutdown,5000},
+               {child_type,worker}]
+
+start_stream drop error: socket_closed_remotely
+[32m.[39m=CRASH REPORT==== 29-Sep-2026::21:46:38.988795 ===
+  crasher:
+    initial call: gleam@otp@actor:'-start/1-anonymous-0-'/0
+    pid: <0.577.0>
+    registered_name: []
+    exception error: #{function => <<"stream_drop">>,line => 141,
+                       message => <<"intentional crash to drop connection">>,
+                       module =>
+                           <<"dream_mock_server/controllers/stream_controller">>,
+                       file =>
+                           <<"src/dream_mock_server/controllers/stream_controller.gleam">>,
+                       gleam_error => panic}
+      in function  dream_mock_server@controllers@stream_controller:'-stream_drop/3-anonymous-0-'/1 (src/dream_mock_server/controllers/stream_controller.gleam:146)
+      in call from gleam@yielder:'-map_loop/2-anonymous-0-'/2 (src/gleam/yielder.gleam:385)
+      in call from gleam@yielder:'-map_loop/2-anonymous-0-'/2 (src/gleam/yielder.gleam:380)
+      in call from gleam@yielder:append_loop/2 (src/gleam/yielder.gleam:457)
+      in call from gleam@yielder:try_fold_loop/3 (src/gleam/yielder.gleam:1492)
+      in call from mist@internal@http@handler:handle_chunked_body/4 (src/mist/internal/http/handler.gleam:124)
+      in call from mist@internal@http@handler:'-call/5-anonymous-3-'/5 (src/mist/internal/http/handler.gleam:57)
+      in call from mist@internal@handler:'-with_func/1-anonymous-5-'/5 (src/mist/internal/handler.gleam:103)
+    ancestors: [<0.132.0>,<0.127.0>,<0.125.0>,<0.82.0>]
+    message_queue_len: 0
+    messages: []
+    links: [<0.132.0>,#Port<0.47>]
+    dictionary: [{dream_mist_response,none},
+                  {dream_mist_request,
+                      {request,get,
+                          [{<<"accept-encoding">>,<<"gzip, deflate">>},
+                           {<<"connection">>,<<"keep-alive">>},
+                           {<<"host">>,<<"localhost:9876">>}],
+                          {connection,{initial,<<>>},#Port<0.47>,tcp},
+                          http,<<"localhost">>,
+                          {some,9876},
+                          <<"/stream/drop">>,none}},
+                  {dream_mist_upgrade,none}]
+    trap_exit: false
+    status: running
+    heap_size: 4185
+    stack_size: 29
+    reductions: 4400
+  neighbours:
+    neighbour:
+      pid: <0.132.0>
+      registered_name: []
+      initial call: gleam@otp@actor:'-start/1-anonymous-0-'/0
+      current_function: {prim_inet,accept0,3}
+      ancestors: [<0.127.0>,<0.125.0>,<0.82.0>]
+      message_queue_len: 0
+      links: [<0.577.0>,<0.127.0>]
+      trap_exit: false
+      status: waiting
+      heap_size: 2586
+      stack_size: 17
+      reductions: 2174
+      current_stacktrace: [{prim_inet,accept0,3,[]},
+                  {inet_tcp,accept,1,[{file,"inet_tcp.erl"},{line,234}]},
+                  {glisten@internal@acceptor,'-start/2-anonymous-5-',3,
+                      [{file,"src/glisten/internal/acceptor.gleam"},
+                       {line,63}]},
+                  {gleam@otp@actor,loop,1,
+                      [{file,"src/gleam/otp/actor.gleam"},{line,491}]},
+                  {proc_lib,init_p,3,[{file,"proc_lib.erl"},{line,317}]}]
+=SUPERVISOR REPORT==== 29-Sep-2026::21:46:38.989450 ===
+    supervisor: {<0.127.0>,gleam@otp@static_supervisor}
+    errorContext: child_terminated
+    reason: {#{function => <<"stream_drop">>,line => 141,
+               message => <<"intentional crash to drop connection">>,
+               module => <<"dream_mock_server/controllers/stream_controller">>,
+               file =>
+                   <<"src/dream_mock_server/controllers/stream_controller.gleam">>,
+               gleam_error => panic},
+             [{dream_mock_server@controllers@stream_controller,
+                  '-stream_drop/3-anonymous-0-',1,
+                  [{file,
+                       "src/dream_mock_server/controllers/stream_controller.gleam"},
+                   {line,146}]},
+              {gleam@yielder,'-map_loop/2-anonymous-0-',2,
+                  [{file,"src/gleam/yielder.gleam"},{line,385}]},
+              {gleam@yielder,'-map_loop/2-anonymous-0-',2,
+                  [{file,"src/gleam/yielder.gleam"},{line,380}]},
+              {gleam@yielder,append_loop,2,
+                  [{file,"src/gleam/yielder.gleam"},{line,457}]},
+              {gleam@yielder,try_fold_loop,3,
+                  [{file,"src/gleam/yielder.gleam"},{line,1492}]},
+              {mist@internal@http@handler,handle_chunked_body,4,
+                  [{file,"src/mist/internal/http/handler.gleam"},{line,124}]},
+              {mist@internal@http@handler,'-call/5-anonymous-3-',5,
+                  [{file,"src/mist/internal/http/handler.gleam"},{line,57}]},
+              {mist@internal@handler,'-with_func/1-anonymous-5-',5,
+                  [{file,"src/mist/internal/handler.gleam"},{line,103}]}]}
+    offender: [{pid,<0.132.0>},
+               {id,4},
+               {mfargs,
+                   {gleam@otp@static_supervisor,start_child_callback,
+                       [#Fun<gleam@otp@supervision.0.84844907>]}},
+               {restart_type,permanent},
+               {significant,false},
+               {shutdown,5000},
+               {child_type,worker}]
+
+[32m.[39mstart_stream non-UTF-8 error: HTTP 400: <non-UTF-8 body>
+[32m.[39mstream_yielder non-UTF-8 error: HTTP 400: <non-UTF-8 body>
+[32m.[39msend() non-UTF-8 body error (expected): Failed to convert response to string
+[32m.[39mHTTP stream error while recording messages for request #Ref<0.3894879643.3531603971.223782>: {failed_connect,[{to_address,{"localhost",1}},{inet,[inet],econnrefused}]}
+[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m
+213 passed, no failures[39m

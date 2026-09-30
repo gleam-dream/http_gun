@@ -1,0 +1,17 @@
+{
+  "production_inputs_unchanged_from_wave7": 19,
+  "modified_dream_original_files": [
+    "modules/http_client/manifest.toml"
+  ],
+  "comparison_lock_and_source_match_tested_copy": true,
+  "http_gun_fast_tests_passed": 50,
+  "dream_reconciled_tests_passed": 213,
+  "contract_cases": {
+    "gun": 15,
+    "dream": 16
+  },
+  "benchmark_runs": 54,
+  "benchmark_request_failures": 0,
+  "comparison_erlc_warnings_as_errors": "passed",
+  "validation_platform": "Darwin arm64; Gleam 1.18.1; OTP 29 / ERTS 17.1; inets 9.8"
+}

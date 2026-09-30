@@ -1,0 +1,14 @@
+   Compiled in 0.21s
+    Running comparison_contract.main
+[31;1mruntime error[39m: let assert[0m
+
+Pattern match failed, no pattern matched the value.
+
+unmatched value:
+  [Error("socket_closed_remotely")]
+
+stacktrace:
+  comparison_contract.first[90m src/comparison_contract.gleam:72[0m
+  comparison_contract.early[90m src/comparison_contract.gleam:103[0m
+  comparison_contract.main[90m src/comparison_contract.gleam:218[0m
+

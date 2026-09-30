@@ -1,0 +1,7 @@
+error: These files have not been formatted
+
+  - ./src/dream_http_client/client.gleam
+  - ./src/dream_http_client/recorder.gleam
+  - ./src/dream_http_client/recording.gleam
+
+

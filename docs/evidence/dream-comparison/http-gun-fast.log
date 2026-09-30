@@ -1,0 +1,20 @@
+   Compiled in 0.24s
+   Compiled in 0.19s
+   Compiled in 0.19s
+    Running http_gun_test.main
+[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m=NOTICE REPORT==== 29-Sep-2026::22:07:15.696896 ===
+TLS server: In state wait_finished received CLIENT ALERT: Fatal - Unknown CA
+
+=NOTICE REPORT==== 29-Sep-2026::22:07:15.696834 ===
+TLS client: In state wait_cert_cr at ssl_handshake.erl:2254 generated CLIENT ALERT: Fatal - Unknown CA
+
+[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m=NOTICE REPORT==== 29-Sep-2026::22:07:15.746277 ===
+TLS client: In state wait_cert_cr at ssl_handshake.erl:2262 generated CLIENT ALERT: Fatal - Bad Certificate
+ - {bad_cert,{hostname_check_failed,{requested,"127.0.0.1"},
+                                    {received,[{dNSName,"localhost"}]}}}
+=NOTICE REPORT==== 29-Sep-2026::22:07:15.746348 ===
+TLS server: In state wait_finished received CLIENT ALERT: Fatal - Bad Certificate
+
+[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m
+50 passed, no failures[39m
+Production dependency, Dynamic and public-consumer boundaries passed.

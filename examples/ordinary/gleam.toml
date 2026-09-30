@@ -1,0 +1,7 @@
+name = "http_gun_consumer"
+version = "0.1.0"
+target = "erlang"
+[dependencies]
+http_gun = { path = "../http_gun" }
+gleam_stdlib = ">= 0.71.0 and < 1.0.0"
+gleam_http = ">= 4.4.0 and < 5.0.0"

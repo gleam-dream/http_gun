@@ -1,0 +1,1082 @@
+[
+  {
+    "scenario": "buffered",
+    "requests": 1,
+    "connection_cap": 4,
+    "client": "gun",
+    "trials": 3,
+    "failed_trials": 0,
+    "metrics": {
+      "elapsed_us": {
+        "median": 614,
+        "min": 390,
+        "max": 665
+      },
+      "p50_us": {
+        "median": 519,
+        "min": 337,
+        "max": 548
+      },
+      "p95_us": {
+        "median": 519,
+        "min": 337,
+        "max": 548
+      },
+      "p99_us": {
+        "median": 519,
+        "min": 337,
+        "max": 548
+      },
+      "connections": {
+        "median": 1,
+        "min": 1,
+        "max": 1
+      },
+      "peak_vm_bytes": {
+        "median": 53590963,
+        "min": 53590707,
+        "max": 53607203
+      },
+      "peak_total_mailbox": {
+        "median": 1,
+        "min": 1,
+        "max": 1
+      },
+      "peak_one_mailbox": {
+        "median": 1,
+        "min": 1,
+        "max": 1
+      },
+      "peak_processes": {
+        "median": 90,
+        "min": 90,
+        "max": 90
+      },
+      "peak_ports": {
+        "median": 5,
+        "min": 5,
+        "max": 5
+      }
+    }
+  },
+  {
+    "scenario": "buffered",
+    "requests": 1,
+    "connection_cap": 4,
+    "client": "dream",
+    "trials": 3,
+    "failed_trials": 0,
+    "metrics": {
+      "elapsed_us": {
+        "median": 1502,
+        "min": 1389,
+        "max": 2030
+      },
+      "p50_us": {
+        "median": 438,
+        "min": 392,
+        "max": 464
+      },
+      "p95_us": {
+        "median": 438,
+        "min": 392,
+        "max": 464
+      },
+      "p99_us": {
+        "median": 438,
+        "min": 392,
+        "max": 464
+      },
+      "connections": {
+        "median": 1,
+        "min": 1,
+        "max": 1
+      },
+      "peak_vm_bytes": {
+        "median": 52795649,
+        "min": 52788769,
+        "max": 52837505
+      },
+      "peak_total_mailbox": {
+        "median": 0,
+        "min": 0,
+        "max": 0
+      },
+      "peak_one_mailbox": {
+        "median": 0,
+        "min": 0,
+        "max": 0
+      },
+      "peak_processes": {
+        "median": 90,
+        "min": 90,
+        "max": 90
+      },
+      "peak_ports": {
+        "median": 5,
+        "min": 5,
+        "max": 5
+      }
+    }
+  },
+  {
+    "scenario": "buffered",
+    "requests": 10,
+    "connection_cap": 4,
+    "client": "gun",
+    "trials": 3,
+    "failed_trials": 0,
+    "metrics": {
+      "elapsed_us": {
+        "median": 1920,
+        "min": 1684,
+        "max": 2316
+      },
+      "p50_us": {
+        "median": 1294,
+        "min": 1231,
+        "max": 1412
+      },
+      "p95_us": {
+        "median": 1737,
+        "min": 1574,
+        "max": 2024
+      },
+      "p99_us": {
+        "median": 1737,
+        "min": 1574,
+        "max": 2024
+      },
+      "connections": {
+        "median": 3,
+        "min": 3,
+        "max": 3
+      },
+      "peak_vm_bytes": {
+        "median": 54005443,
+        "min": 53761979,
+        "max": 54252635
+      },
+      "peak_total_mailbox": {
+        "median": 1,
+        "min": 0,
+        "max": 2
+      },
+      "peak_one_mailbox": {
+        "median": 1,
+        "min": 0,
+        "max": 1
+      },
+      "peak_processes": {
+        "median": 96,
+        "min": 95,
+        "max": 97
+      },
+      "peak_ports": {
+        "median": 9,
+        "min": 7,
+        "max": 10
+      }
+    }
+  },
+  {
+    "scenario": "buffered",
+    "requests": 10,
+    "connection_cap": 4,
+    "client": "dream",
+    "trials": 3,
+    "failed_trials": 0,
+    "metrics": {
+      "elapsed_us": {
+        "median": 2524,
+        "min": 2511,
+        "max": 2598
+      },
+      "p50_us": {
+        "median": 1103,
+        "min": 1003,
+        "max": 1295
+      },
+      "p95_us": {
+        "median": 1242,
+        "min": 1098,
+        "max": 1333
+      },
+      "p99_us": {
+        "median": 1242,
+        "min": 1098,
+        "max": 1333
+      },
+      "connections": {
+        "median": 5,
+        "min": 5,
+        "max": 5
+      },
+      "peak_vm_bytes": {
+        "median": 52914345,
+        "min": 52824297,
+        "max": 52915433
+      },
+      "peak_total_mailbox": {
+        "median": 9,
+        "min": 1,
+        "max": 9
+      },
+      "peak_one_mailbox": {
+        "median": 9,
+        "min": 1,
+        "max": 9
+      },
+      "peak_processes": {
+        "median": 90,
+        "min": 90,
+        "max": 90
+      },
+      "peak_ports": {
+        "median": 5,
+        "min": 5,
+        "max": 5
+      }
+    }
+  },
+  {
+    "scenario": "buffered",
+    "requests": 100,
+    "connection_cap": 4,
+    "client": "gun",
+    "trials": 3,
+    "failed_trials": 0,
+    "metrics": {
+      "elapsed_us": {
+        "median": 6173,
+        "min": 6161,
+        "max": 6279
+      },
+      "p50_us": {
+        "median": 3969,
+        "min": 3922,
+        "max": 4122
+      },
+      "p95_us": {
+        "median": 5782,
+        "min": 5738,
+        "max": 5829
+      },
+      "p99_us": {
+        "median": 5888,
+        "min": 5838,
+        "max": 5894
+      },
+      "connections": {
+        "median": 4,
+        "min": 4,
+        "max": 4
+      },
+      "peak_vm_bytes": {
+        "median": 55468555,
+        "min": 55435659,
+        "max": 55897547
+      },
+      "peak_total_mailbox": {
+        "median": 0,
+        "min": 0,
+        "max": 1
+      },
+      "peak_one_mailbox": {
+        "median": 0,
+        "min": 0,
+        "max": 1
+      },
+      "peak_processes": {
+        "median": 188,
+        "min": 181,
+        "max": 189
+      },
+      "peak_ports": {
+        "median": 8,
+        "min": 8,
+        "max": 11
+      }
+    }
+  },
+  {
+    "scenario": "buffered",
+    "requests": 100,
+    "connection_cap": 4,
+    "client": "dream",
+    "trials": 3,
+    "failed_trials": 0,
+    "metrics": {
+      "elapsed_us": {
+        "median": 95121,
+        "min": 57770,
+        "max": 95725
+      },
+      "p50_us": {
+        "median": 2966,
+        "min": 2608,
+        "max": 3819
+      },
+      "p95_us": {
+        "median": 62531,
+        "min": 4071,
+        "max": 63493
+      },
+      "p99_us": {
+        "median": 63583,
+        "min": 4209,
+        "max": 94291
+      },
+      "connections": {
+        "median": 20,
+        "min": 17,
+        "max": 24
+      },
+      "peak_vm_bytes": {
+        "median": 55489681,
+        "min": 54606305,
+        "max": 55581273
+      },
+      "peak_total_mailbox": {
+        "median": 0,
+        "min": 0,
+        "max": 0
+      },
+      "peak_one_mailbox": {
+        "median": 0,
+        "min": 0,
+        "max": 0
+      },
+      "peak_processes": {
+        "median": 128,
+        "min": 122,
+        "max": 136
+      },
+      "peak_ports": {
+        "median": 40,
+        "min": 36,
+        "max": 50
+      }
+    }
+  },
+  {
+    "scenario": "buffered",
+    "requests": 1000,
+    "connection_cap": 4,
+    "client": "gun",
+    "trials": 3,
+    "failed_trials": 0,
+    "metrics": {
+      "elapsed_us": {
+        "median": 174907,
+        "min": 173306,
+        "max": 182528
+      },
+      "p50_us": {
+        "median": 119690,
+        "min": 116818,
+        "max": 121074
+      },
+      "p95_us": {
+        "median": 166768,
+        "min": 162752,
+        "max": 166949
+      },
+      "p99_us": {
+        "median": 168644,
+        "min": 165541,
+        "max": 169365
+      },
+      "connections": {
+        "median": 4,
+        "min": 4,
+        "max": 4
+      },
+      "peak_vm_bytes": {
+        "median": 75796507,
+        "min": 74315531,
+        "max": 83572003
+      },
+      "peak_total_mailbox": {
+        "median": 86,
+        "min": 62,
+        "max": 337
+      },
+      "peak_one_mailbox": {
+        "median": 82,
+        "min": 35,
+        "max": 334
+      },
+      "peak_processes": {
+        "median": 1056,
+        "min": 1026,
+        "max": 1059
+      },
+      "peak_ports": {
+        "median": 11,
+        "min": 11,
+        "max": 11
+      }
+    }
+  },
+  {
+    "scenario": "buffered",
+    "requests": 1000,
+    "connection_cap": 4,
+    "client": "dream",
+    "trials": 3,
+    "failed_trials": 0,
+    "metrics": {
+      "elapsed_us": {
+        "median": 40302,
+        "min": 36572,
+        "max": 141888
+      },
+      "p50_us": {
+        "median": 20447,
+        "min": 17334,
+        "max": 20756
+      },
+      "p95_us": {
+        "median": 32735,
+        "min": 30977,
+        "max": 33704
+      },
+      "p99_us": {
+        "median": 35268,
+        "min": 32123,
+        "max": 77745
+      },
+      "connections": {
+        "median": 14,
+        "min": 8,
+        "max": 31
+      },
+      "peak_vm_bytes": {
+        "median": 68430897,
+        "min": 65392217,
+        "max": 71830297
+      },
+      "peak_total_mailbox": {
+        "median": 995,
+        "min": 983,
+        "max": 996
+      },
+      "peak_one_mailbox": {
+        "median": 994,
+        "min": 982,
+        "max": 995
+      },
+      "peak_processes": {
+        "median": 822,
+        "min": 796,
+        "max": 900
+      },
+      "peak_ports": {
+        "median": 31,
+        "min": 19,
+        "max": 61
+      }
+    }
+  },
+  {
+    "scenario": "bounded",
+    "requests": 1000,
+    "connection_cap": 4,
+    "client": "gun",
+    "trials": 3,
+    "failed_trials": 0,
+    "metrics": {
+      "elapsed_us": {
+        "median": 37586,
+        "min": 36244,
+        "max": 41317
+      },
+      "p50_us": {
+        "median": 135,
+        "min": 131,
+        "max": 151
+      },
+      "p95_us": {
+        "median": 217,
+        "min": 212,
+        "max": 236
+      },
+      "p99_us": {
+        "median": 334,
+        "min": 333,
+        "max": 409
+      },
+      "connections": {
+        "median": 4,
+        "min": 4,
+        "max": 4
+      },
+      "peak_vm_bytes": {
+        "median": 54769179,
+        "min": 54689739,
+        "max": 54958683
+      },
+      "peak_total_mailbox": {
+        "median": 4,
+        "min": 2,
+        "max": 4
+      },
+      "peak_one_mailbox": {
+        "median": 2,
+        "min": 2,
+        "max": 2
+      },
+      "peak_processes": {
+        "median": 100,
+        "min": 100,
+        "max": 100
+      },
+      "peak_ports": {
+        "median": 11,
+        "min": 11,
+        "max": 11
+      }
+    }
+  },
+  {
+    "scenario": "bounded",
+    "requests": 1000,
+    "connection_cap": 4,
+    "client": "dream",
+    "trials": 3,
+    "failed_trials": 0,
+    "metrics": {
+      "elapsed_us": {
+        "median": 60297,
+        "min": 60281,
+        "max": 60396
+      },
+      "p50_us": {
+        "median": 219,
+        "min": 217,
+        "max": 222
+      },
+      "p95_us": {
+        "median": 343,
+        "min": 322,
+        "max": 367
+      },
+      "p99_us": {
+        "median": 507,
+        "min": 490,
+        "max": 563
+      },
+      "connections": {
+        "median": 1,
+        "min": 1,
+        "max": 1
+      },
+      "peak_vm_bytes": {
+        "median": 54122673,
+        "min": 53583737,
+        "max": 54344945
+      },
+      "peak_total_mailbox": {
+        "median": 2,
+        "min": 2,
+        "max": 3
+      },
+      "peak_one_mailbox": {
+        "median": 2,
+        "min": 1,
+        "max": 3
+      },
+      "peak_processes": {
+        "median": 94,
+        "min": 94,
+        "max": 94
+      },
+      "peak_ports": {
+        "median": 5,
+        "min": 5,
+        "max": 5
+      }
+    }
+  },
+  {
+    "scenario": "buffered",
+    "requests": 1000,
+    "connection_cap": 100,
+    "client": "gun",
+    "trials": 3,
+    "failed_trials": 0,
+    "metrics": {
+      "elapsed_us": {
+        "median": 183249,
+        "min": 181735,
+        "max": 184318
+      },
+      "p50_us": {
+        "median": 123812,
+        "min": 122767,
+        "max": 124680
+      },
+      "p95_us": {
+        "median": 174530,
+        "min": 174487,
+        "max": 177476
+      },
+      "p99_us": {
+        "median": 176828,
+        "min": 176524,
+        "max": 179435
+      },
+      "connections": {
+        "median": 43,
+        "min": 43,
+        "max": 43
+      },
+      "peak_vm_bytes": {
+        "median": 75919931,
+        "min": 75171827,
+        "max": 77070443
+      },
+      "peak_total_mailbox": {
+        "median": 294,
+        "min": 182,
+        "max": 371
+      },
+      "peak_one_mailbox": {
+        "median": 288,
+        "min": 170,
+        "max": 369
+      },
+      "peak_processes": {
+        "median": 1067,
+        "min": 1059,
+        "max": 1072
+      },
+      "peak_ports": {
+        "median": 85,
+        "min": 85,
+        "max": 87
+      }
+    }
+  },
+  {
+    "scenario": "buffered",
+    "requests": 1000,
+    "connection_cap": 100,
+    "client": "dream",
+    "trials": 3,
+    "failed_trials": 0,
+    "metrics": {
+      "elapsed_us": {
+        "median": 135187,
+        "min": 134225,
+        "max": 186385
+      },
+      "p50_us": {
+        "median": 20764,
+        "min": 19866,
+        "max": 23080
+      },
+      "p95_us": {
+        "median": 35453,
+        "min": 34113,
+        "max": 38832
+      },
+      "p99_us": {
+        "median": 70631,
+        "min": 69933,
+        "max": 121189
+      },
+      "connections": {
+        "median": 30,
+        "min": 27,
+        "max": 32
+      },
+      "peak_vm_bytes": {
+        "median": 67038449,
+        "min": 66179689,
+        "max": 71814393
+      },
+      "peak_total_mailbox": {
+        "median": 981,
+        "min": 980,
+        "max": 988
+      },
+      "peak_one_mailbox": {
+        "median": 980,
+        "min": 980,
+        "max": 985
+      },
+      "peak_processes": {
+        "median": 867,
+        "min": 828,
+        "max": 883
+      },
+      "peak_ports": {
+        "median": 62,
+        "min": 55,
+        "max": 67
+      }
+    }
+  },
+  {
+    "scenario": "large",
+    "requests": 1,
+    "connection_cap": 4,
+    "client": "gun",
+    "trials": 3,
+    "failed_trials": 0,
+    "metrics": {
+      "elapsed_us": {
+        "median": 198326,
+        "min": 196159,
+        "max": 206406
+      },
+      "p50_us": {
+        "median": 0,
+        "min": 0,
+        "max": 0
+      },
+      "p95_us": {
+        "median": 0,
+        "min": 0,
+        "max": 0
+      },
+      "p99_us": {
+        "median": 0,
+        "min": 0,
+        "max": 0
+      },
+      "connections": {
+        "median": 1,
+        "min": 1,
+        "max": 1
+      },
+      "peak_vm_bytes": {
+        "median": 54498187,
+        "min": 54324403,
+        "max": 54501875
+      },
+      "peak_total_mailbox": {
+        "median": 2,
+        "min": 2,
+        "max": 2
+      },
+      "peak_one_mailbox": {
+        "median": 1,
+        "min": 1,
+        "max": 1
+      },
+      "peak_processes": {
+        "median": 90,
+        "min": 90,
+        "max": 90
+      },
+      "peak_ports": {
+        "median": 4,
+        "min": 4,
+        "max": 5
+      }
+    }
+  },
+  {
+    "scenario": "large",
+    "requests": 1,
+    "connection_cap": 4,
+    "client": "dream",
+    "trials": 3,
+    "failed_trials": 0,
+    "metrics": {
+      "elapsed_us": {
+        "median": 206770,
+        "min": 198220,
+        "max": 208308
+      },
+      "p50_us": {
+        "median": 0,
+        "min": 0,
+        "max": 0
+      },
+      "p95_us": {
+        "median": 0,
+        "min": 0,
+        "max": 0
+      },
+      "p99_us": {
+        "median": 0,
+        "min": 0,
+        "max": 0
+      },
+      "connections": {
+        "median": 1,
+        "min": 1,
+        "max": 1
+      },
+      "peak_vm_bytes": {
+        "median": 53823954,
+        "min": 53690130,
+        "max": 53891114
+      },
+      "peak_total_mailbox": {
+        "median": 1,
+        "min": 0,
+        "max": 2
+      },
+      "peak_one_mailbox": {
+        "median": 1,
+        "min": 0,
+        "max": 1
+      },
+      "peak_processes": {
+        "median": 90,
+        "min": 90,
+        "max": 90
+      },
+      "peak_ports": {
+        "median": 4,
+        "min": 4,
+        "max": 4
+      }
+    }
+  },
+  {
+    "scenario": "slow",
+    "requests": 1,
+    "connection_cap": 4,
+    "client": "gun",
+    "trials": 3,
+    "failed_trials": 0,
+    "metrics": {
+      "elapsed_us": {
+        "median": 1548193,
+        "min": 1538285,
+        "max": 1554981
+      },
+      "p50_us": {
+        "median": 0,
+        "min": 0,
+        "max": 0
+      },
+      "p95_us": {
+        "median": 0,
+        "min": 0,
+        "max": 0
+      },
+      "p99_us": {
+        "median": 0,
+        "min": 0,
+        "max": 0
+      },
+      "connections": {
+        "median": 1,
+        "min": 1,
+        "max": 1
+      },
+      "peak_vm_bytes": {
+        "median": 54355211,
+        "min": 54081955,
+        "max": 54402267
+      },
+      "peak_total_mailbox": {
+        "median": 1,
+        "min": 0,
+        "max": 2
+      },
+      "peak_one_mailbox": {
+        "median": 1,
+        "min": 0,
+        "max": 1
+      },
+      "peak_processes": {
+        "median": 90,
+        "min": 90,
+        "max": 90
+      },
+      "peak_ports": {
+        "median": 4,
+        "min": 4,
+        "max": 4
+      }
+    }
+  },
+  {
+    "scenario": "slow",
+    "requests": 1,
+    "connection_cap": 4,
+    "client": "dream",
+    "trials": 3,
+    "failed_trials": 0,
+    "metrics": {
+      "elapsed_us": {
+        "median": 1557684,
+        "min": 1547762,
+        "max": 1578558
+      },
+      "p50_us": {
+        "median": 0,
+        "min": 0,
+        "max": 0
+      },
+      "p95_us": {
+        "median": 0,
+        "min": 0,
+        "max": 0
+      },
+      "p99_us": {
+        "median": 0,
+        "min": 0,
+        "max": 0
+      },
+      "connections": {
+        "median": 1,
+        "min": 1,
+        "max": 1
+      },
+      "peak_vm_bytes": {
+        "median": 53791098,
+        "min": 53667370,
+        "max": 53835594
+      },
+      "peak_total_mailbox": {
+        "median": 1,
+        "min": 1,
+        "max": 2
+      },
+      "peak_one_mailbox": {
+        "median": 1,
+        "min": 1,
+        "max": 1
+      },
+      "peak_processes": {
+        "median": 90,
+        "min": 90,
+        "max": 90
+      },
+      "peak_ports": {
+        "median": 4,
+        "min": 4,
+        "max": 4
+      }
+    }
+  },
+  {
+    "scenario": "mixed",
+    "requests": 1000,
+    "connection_cap": 4,
+    "client": "gun",
+    "trials": 3,
+    "failed_trials": 0,
+    "metrics": {
+      "elapsed_us": {
+        "median": 1542368,
+        "min": 1540143,
+        "max": 1552194
+      },
+      "p50_us": {
+        "median": 121395,
+        "min": 119750,
+        "max": 124082
+      },
+      "p95_us": {
+        "median": 172332,
+        "min": 170322,
+        "max": 173526
+      },
+      "p99_us": {
+        "median": 174091,
+        "min": 172129,
+        "max": 175341
+      },
+      "connections": {
+        "median": 4,
+        "min": 4,
+        "max": 4
+      },
+      "peak_vm_bytes": {
+        "median": 74860835,
+        "min": 74549995,
+        "max": 77444251
+      },
+      "peak_total_mailbox": {
+        "median": 7,
+        "min": 6,
+        "max": 8
+      },
+      "peak_one_mailbox": {
+        "median": 6,
+        "min": 5,
+        "max": 6
+      },
+      "peak_processes": {
+        "median": 1076,
+        "min": 1076,
+        "max": 1078
+      },
+      "peak_ports": {
+        "median": 11,
+        "min": 11,
+        "max": 11
+      }
+    }
+  },
+  {
+    "scenario": "mixed",
+    "requests": 1000,
+    "connection_cap": 4,
+    "client": "dream",
+    "trials": 3,
+    "failed_trials": 0,
+    "metrics": {
+      "elapsed_us": {
+        "median": 1555436,
+        "min": 1548233,
+        "max": 1556652
+      },
+      "p50_us": {
+        "median": 21020,
+        "min": 17437,
+        "max": 23288
+      },
+      "p95_us": {
+        "median": 35301,
+        "min": 30808,
+        "max": 115862
+      },
+      "p99_us": {
+        "median": 37246,
+        "min": 31916,
+        "max": 228218
+      },
+      "connections": {
+        "median": 34,
+        "min": 8,
+        "max": 389
+      },
+      "peak_vm_bytes": {
+        "median": 69784101,
+        "min": 69531109,
+        "max": 74330589
+      },
+      "peak_total_mailbox": {
+        "median": 996,
+        "min": 987,
+        "max": 1014
+      },
+      "peak_one_mailbox": {
+        "median": 996,
+        "min": 985,
+        "max": 1012
+      },
+      "peak_processes": {
+        "median": 923,
+        "min": 909,
+        "max": 991
+      },
+      "peak_ports": {
+        "median": 71,
+        "min": 19,
+        "max": 188
+      }
+    }
+  }
+]

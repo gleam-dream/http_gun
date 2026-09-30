@@ -1,0 +1,8 @@
+  Resolving versions
+error: Incompatible locked version
+
+There is an incompatiblity between a version specified in
+manifest.toml and a version range specified in gleam.toml:
+
+    dream is specified with the requirement `== 2.4.1`, but it is locked to 2.3.1, which is incompatible.
+

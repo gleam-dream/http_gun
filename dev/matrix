@@ -1,0 +1,14 @@
+#!/bin/sh
+# Every runtime receives a separate build tree, including independent consumers.
+set -eu
+root=$(pwd)
+work=$(mktemp -d)
+trap 'rm -rf "$work"' EXIT HUP INT TERM
+mkdir -p build/evidence
+for runtime in default otp28 otp27; do
+  mkdir "$work/$runtime"
+  cp -R src test examples dev gleam.toml manifest.toml "$work/$runtime/"
+  nix develop "path:$root#$runtime" --command sh -c 'cd "$1"; gleam --version; erl -noshell -eval '\''io:format("OTP ~s ERTS ~s~n",[erlang:system_info(otp_release),erlang:system_info(version)]),halt().'\''; sh dev/gate full' sh "$work/$runtime" > "build/evidence/$runtime.log" 2>&1
+  cp "$work/$runtime/build/evidence/load.jsonl" "build/evidence/$runtime-load.jsonl"
+  echo "$runtime full gate passed"
+done

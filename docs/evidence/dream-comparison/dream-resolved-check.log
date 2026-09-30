@@ -1,0 +1,40 @@
+  Compiling gleam_stdlib
+/code/gleam-dream/http_gun/build/dream-comparison/dream-bbc4b5402a7e0cb5247829c8f4be8fb273afc2a5/modules/http_client/build/dev/erlang/gleam_stdlib/_gleam_artefacts/gleam_stdlib.erl:75:10: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%   75|     case catch binary_to_integer(String, Base) of
+%     |          ^
+
+/code/gleam-dream/http_gun/build/dream-comparison/dream-bbc4b5402a7e0cb5247829c8f4be8fb273afc2a5/modules/http_client/build/dev/erlang/gleam_stdlib/_gleam_artefacts/gleam_stdlib.erl:81:10: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%   81|     case catch binary_to_integer(String) of
+%     |          ^
+
+/code/gleam-dream/http_gun/build/dream-comparison/dream-bbc4b5402a7e0cb5247829c8f4be8fb273afc2a5/modules/http_client/build/dev/erlang/gleam_stdlib/_gleam_artefacts/gleam_stdlib.erl:87:10: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%   87|     case catch binary_to_float(String) of
+%     |          ^
+
+  Compiling gleam_erlang
+  Compiling gleam_http
+  Compiling gleam_json
+  Compiling gleam_otp
+  Compiling gleam_time
+  Compiling gleam_yielder
+  Compiling marceau
+  Compiling exception
+  Compiling logging
+  Compiling telemetry
+===> Analyzing applications...
+===> Compiling telemetry
+  Compiling glisten
+error: Unknown module value
+    ┌─ /code/gleam-dream/http_gun/build/dream-comparison/dream-bbc4b5402a7e0cb5247829c8f4be8fb273afc2a5/modules/http_client/build/packages/glisten/src/glisten/internal/acceptor.gleam:121:24
+    │
+121 │   let acceptors = list.range(from: 0, to: pool.pool_count)
+    │                        ^^^^^
+
+The module `gleam/list` does not have a `range` value.
+

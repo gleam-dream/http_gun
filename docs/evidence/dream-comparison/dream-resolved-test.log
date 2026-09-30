@@ -1,0 +1,9 @@
+  Compiling glisten
+error: Unknown module value
+    ┌─ /code/gleam-dream/http_gun/build/dream-comparison/dream-bbc4b5402a7e0cb5247829c8f4be8fb273afc2a5/modules/http_client/build/packages/glisten/src/glisten/internal/acceptor.gleam:121:24
+    │
+121 │   let acceptors = list.range(from: 0, to: pool.pool_count)
+    │                        ^^^^^
+
+The module `gleam/list` does not have a `range` value.
+

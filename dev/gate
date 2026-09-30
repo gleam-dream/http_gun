@@ -1,0 +1,27 @@
+#!/bin/sh
+set -eu
+mode=${1:-fast}
+case "$mode" in fast|full) ;; *) echo 'Usage: dev/gate fast|full' >&2; exit 2;; esac
+gleam format --check src test dev examples
+gleam check
+gleam build --warnings-as-errors
+gleam test
+out=$(mktemp -d)
+trap 'rm -rf "$out"' EXIT HUP INT TERM
+erlc -Werror -o "$out" src/*.erl test/*.erl
+python3 dev/boundaries.py
+if [ "$mode" = full ]; then
+  sh dev/consumers
+  mkdir -p build/evidence
+  gleam run -m http_gun_benchmark > build/evidence/load.jsonl
+  python3 - <<'PY'
+import json,pathlib
+rows=[json.loads(line) for line in pathlib.Path('build/evidence/load.jsonl').read_text().splitlines()]
+assert len(rows)==11
+for row in rows:
+    if row['scenario']=='h2-concurrent': assert row['connections']==1
+    if row['scenario']=='h1-concurrent': assert 1<=row['connections']<=4
+    if row['scenario'].startswith('large'): assert row['bytes']==33554432
+print('All 11 load scenarios passed; measurements: build/evidence/load.jsonl')
+PY
+fi

@@ -1,0 +1,203 @@
+gleam 1.18.1
+OTP 29 ERTS 17.1
+Downloading packages
+ Downloaded 11 packages in 0.06s
+  Compiling cowlib
+===> Analyzing applications...
+===> Compiling cowlib
+  Compiling gleam_stdlib
+/private/var/folders/qt/bn49b5nx2ld8kjrp_z_90z1r0000gn/T/tmp.ACPMtt0rSE/default/build/dev/erlang/gleam_stdlib/_gleam_artefacts/gleam_stdlib.erl:75:10: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%   75|     case catch binary_to_integer(String, Base) of
+%     |          ^
+
+/private/var/folders/qt/bn49b5nx2ld8kjrp_z_90z1r0000gn/T/tmp.ACPMtt0rSE/default/build/dev/erlang/gleam_stdlib/_gleam_artefacts/gleam_stdlib.erl:81:10: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%   81|     case catch binary_to_integer(String) of
+%     |          ^
+
+/private/var/folders/qt/bn49b5nx2ld8kjrp_z_90z1r0000gn/T/tmp.ACPMtt0rSE/default/build/dev/erlang/gleam_stdlib/_gleam_artefacts/gleam_stdlib.erl:87:10: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%   87|     case catch binary_to_float(String) of
+%     |          ^
+
+  Compiling file_streams
+  Compiling filepath
+  Compiling gleam_erlang
+  Compiling gleam_http
+  Compiling gleam_json
+  Compiling gleam_otp
+  Compiling gleeunit
+  Compiling gun
+===> Analyzing applications...
+===> Compiling gun
+  Compiling simplifile
+   Checking http_gun
+   Compiled in 13.07s
+  Compiling http_gun
+   Compiled in 0.34s
+   Compiled in 0.20s
+    Running http_gun_test.main
+..........=NOTICE REPORT==== 29-Sep-2026::21:32:56.722167 ===
+TLS server: In state wait_finished received CLIENT ALERT: Fatal - Unknown CA
+
+=NOTICE REPORT==== 29-Sep-2026::21:32:56.722087 ===
+TLS client: In state wait_cert_cr at ssl_handshake.erl:2254 generated CLIENT ALERT: Fatal - Unknown CA
+
+.....=NOTICE REPORT==== 29-Sep-2026::21:32:56.772152 ===
+TLS client: In state wait_cert_cr at ssl_handshake.erl:2262 generated CLIENT ALERT: Fatal - Bad Certificate
+ - {bad_cert,{hostname_check_failed,{requested,"127.0.0.1"},
+                                    {received,[{dNSName,"localhost"}]}}}
+=NOTICE REPORT==== 29-Sep-2026::21:32:56.772246 ===
+TLS server: In state wait_finished received CLIENT ALERT: Fatal - Bad Certificate
+
+...................................
+50 passed, no failures
+Production dependency, Dynamic and public-consumer boundaries passed.
+  Resolving versions
+Downloading packages
+ Downloaded 10 packages in 0.04s
+  Compiling cowlib
+===> Analyzing applications...
+===> Compiling cowlib
+  Compiling gleam_stdlib
+/private/tmp/nix-shell.XbQwMC/tmp.p7JqAyjcH3/ordinary/build/dev/erlang/gleam_stdlib/_gleam_artefacts/gleam_stdlib.erl:75:10: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%   75|     case catch binary_to_integer(String, Base) of
+%     |          ^
+
+/private/tmp/nix-shell.XbQwMC/tmp.p7JqAyjcH3/ordinary/build/dev/erlang/gleam_stdlib/_gleam_artefacts/gleam_stdlib.erl:81:10: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%   81|     case catch binary_to_integer(String) of
+%     |          ^
+
+/private/tmp/nix-shell.XbQwMC/tmp.p7JqAyjcH3/ordinary/build/dev/erlang/gleam_stdlib/_gleam_artefacts/gleam_stdlib.erl:87:10: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%   87|     case catch binary_to_float(String) of
+%     |          ^
+
+  Compiling file_streams
+  Compiling filepath
+  Compiling gleam_erlang
+  Compiling gleam_http
+  Compiling gleam_json
+  Compiling gleam_otp
+  Compiling gun
+===> Analyzing applications...
+===> Compiling gun
+  Compiling simplifile
+  Compiling http_gun
+  Compiling http_gun_consumer
+   Compiled in 12.81s
+   Compiled in 0.19s
+    Running http_gun_consumer.main
+Confirmed public type rejection: client
+Confirmed public type rejection: body
+Confirmed public type rejection: wrong_body
+Confirmed public type rejection: recording
+  Resolving versions
+Downloading packages
+ Downloaded 12 packages in 0.06s
+  Compiling cowlib
+===> Analyzing applications...
+===> Compiling cowlib
+  Compiling gleam_stdlib
+/private/tmp/nix-shell.XbQwMC/tmp.p7JqAyjcH3/llm/build/dev/erlang/gleam_stdlib/_gleam_artefacts/gleam_stdlib.erl:75:10: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%   75|     case catch binary_to_integer(String, Base) of
+%     |          ^
+
+/private/tmp/nix-shell.XbQwMC/tmp.p7JqAyjcH3/llm/build/dev/erlang/gleam_stdlib/_gleam_artefacts/gleam_stdlib.erl:81:10: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%   81|     case catch binary_to_integer(String) of
+%     |          ^
+
+/private/tmp/nix-shell.XbQwMC/tmp.p7JqAyjcH3/llm/build/dev/erlang/gleam_stdlib/_gleam_artefacts/gleam_stdlib.erl:87:10: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%   87|     case catch binary_to_float(String) of
+%     |          ^
+
+  Compiling file_streams
+  Compiling filepath
+  Compiling gleam_crypto
+  Compiling gleam_erlang
+  Compiling gleam_http
+  Compiling gleam_json
+  Compiling gleam_otp
+  Compiling gun
+===> Analyzing applications...
+===> Compiling gun
+  Compiling simplifile
+  Compiling http_gun
+  Compiling json_blueprint
+  Compiling telemetry
+===> Analyzing applications...
+===> Compiling telemetry
+  Compiling sinal
+  Compiling llm_wire
+/private/tmp/nix-shell.XbQwMC/tmp.p7JqAyjcH3/llm/build/dev/erlang/llm_wire/_gleam_artefacts/llm_wire_gun_ffi.erl:360:5: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%  360|     catch gun:close(Conn),
+%     |     ^
+
+/private/tmp/nix-shell.XbQwMC/tmp.p7JqAyjcH3/llm/build/dev/erlang/llm_wire/_gleam_artefacts/llm_wire_gun_ffi.erl:367:13: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%  367|             catch gun:close(Conn),
+%     |             ^
+
+/private/tmp/nix-shell.XbQwMC/tmp.p7JqAyjcH3/llm/build/dev/erlang/llm_wire/_gleam_artefacts/llm_wire_gun_pool.erl:323:5: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%  323|     catch erlang:cancel_timer(State#state.prune_timer),
+%     |     ^
+
+/private/tmp/nix-shell.XbQwMC/tmp.p7JqAyjcH3/llm/build/dev/erlang/llm_wire/_gleam_artefacts/llm_wire_gun_pool.erl:331:9: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%  331|         catch gun:close(C#conn_entry.conn)
+%     |         ^
+
+/private/tmp/nix-shell.XbQwMC/tmp.p7JqAyjcH3/llm/build/dev/erlang/llm_wire/_gleam_artefacts/llm_wire_gun_pool.erl:334:9: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%  334|         catch erlang:cancel_timer(W#waiter.timer_ref),
+%     |         ^
+
+/private/tmp/nix-shell.XbQwMC/tmp.p7JqAyjcH3/llm/build/dev/erlang/llm_wire/_gleam_artefacts/llm_wire_gun_pool.erl:336:9: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%  336|         catch gen_server:reply(W#waiter.from, {error, pool_stopped})
+%     |         ^
+
+/private/tmp/nix-shell.XbQwMC/tmp.p7JqAyjcH3/llm/build/dev/erlang/llm_wire/_gleam_artefacts/llm_wire_gun_pool.erl:339:9: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%  339|         catch erlang:cancel_timer(C#connecting.timer_ref),
+%     |         ^
+
+/private/tmp/nix-shell.XbQwMC/tmp.p7JqAyjcH3/llm/build/dev/erlang/llm_wire/_gleam_artefacts/llm_wire_gun_pool.erl:342:9: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%  342|         catch exit(C#connecting.worker_pid, kill),
+%     |         ^
+
+  Compiling http_gun_llm_consumer
+   Compiled in 14.13s
+  Resolving versions
+   Compiled in 0.22s
+    Running http_gun_llm_consumer.main
+Independent consumer, four rejection fixtures and isolated LLM consumer passed.
+   Compiled in 0.20s
+    Running http_gun_benchmark.main
+All 11 load scenarios passed; measurements: build/evidence/load.jsonl

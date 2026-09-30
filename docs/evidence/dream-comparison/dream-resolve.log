@@ -1,0 +1,23 @@
+  Resolving versions
+Downloading packages
+ Downloaded 21 packages in 2.30s
+    Changed dream v2.3.1 -> v2.4.1
+    Changed dream_mock_server v1.0.0 -> v1.1.1
+    Changed exception v2.1.0 -> v2.1.1
+    Changed gleam_crypto v1.5.1 -> v1.5.2
+    Changed gleam_http v4.3.0 -> v4.4.0
+    Changed gleam_otp v1.2.0 -> v1.3.0
+    Changed gleam_stdlib v0.67.1 -> v0.71.0
+    Changed gleam_time v1.6.0 -> v1.11.0
+    Changed glisten v8.0.1 -> v8.0.3
+    Changed logging v1.3.0 -> v1.5.0
+    Changed mist v5.0.3 -> v5.0.4
+    Changed simplifile v2.3.2 -> v2.7.0
+    Changed telemetry v1.3.0 -> v1.4.2
+
+The following dependencies have new major versions available:
+
+Package       Current  Latest
+-------       -------  ------
+gleam_stdlib  0.71.0   1.0.5
+

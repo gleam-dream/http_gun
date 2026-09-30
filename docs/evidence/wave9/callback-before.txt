@@ -1,0 +1,11 @@
+launch(State, P, Connection) ->
+    Protocol = case erlang:element(4, Connection) of
+        {ready, Protocol@1, _} ->
+            Protocol@1;
+
+        connecting ->
+            h1
+    end,
+    Release = fun(Clean) ->
+        gleam@erlang@process:send(erlang:element(2, State), {release, erlang:self(), {some, erlang:element(2, Connection)}, Clean})
+    end,

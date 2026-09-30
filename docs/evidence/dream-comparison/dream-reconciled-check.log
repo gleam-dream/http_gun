@@ -1,0 +1,86 @@
+Downloading packages
+ Downloaded 11 packages in 1.03s
+  Compiling gleam_stdlib
+/code/gleam-dream/http_gun/build/dream-comparison/dream-bbc4b5402a7e0cb5247829c8f4be8fb273afc2a5/modules/http_client/build/dev/erlang/gleam_stdlib/_gleam_artefacts/gleam_stdlib.erl:79:10: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%   79|     case catch binary_to_integer(String, Base) of
+%     |          ^
+
+/code/gleam-dream/http_gun/build/dream-comparison/dream-bbc4b5402a7e0cb5247829c8f4be8fb273afc2a5/modules/http_client/build/dev/erlang/gleam_stdlib/_gleam_artefacts/gleam_stdlib.erl:85:10: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%   85|     case catch binary_to_integer(String) of
+%     |          ^
+
+/code/gleam-dream/http_gun/build/dream-comparison/dream-bbc4b5402a7e0cb5247829c8f4be8fb273afc2a5/modules/http_client/build/dev/erlang/gleam_stdlib/_gleam_artefacts/gleam_stdlib.erl:91:10: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%   91|     case catch binary_to_float(String) of
+%     |          ^
+
+  Compiling gleam_erlang
+  Compiling gleam_http
+  Compiling gleam_json
+  Compiling gleam_otp
+  Compiling gleam_time
+  Compiling gleam_yielder
+  Compiling exception
+  Compiling logging
+  Compiling telemetry
+===> Analyzing applications...
+===> Compiling telemetry
+  Compiling glisten
+warning: Deprecated value used
+    ┌─ /code/gleam-dream/http_gun/build/dream-comparison/dream-bbc4b5402a7e0cb5247829c8f4be8fb273afc2a5/modules/http_client/build/packages/glisten/src/glisten/internal/handler.gleam:208:19
+    │
+208 │         |> result.unwrap_both
+    │                   ^^^^^^^^^^^ This value has been deprecated
+
+It was deprecated with this message: Use a case expression instead of this
+function
+
+  Compiling gleam_crypto
+  Compiling gramps
+  Compiling hpack_erl
+===> Analyzing applications...
+===> Compiling hpack
+  Compiling mist
+warning: Deprecated value used
+    ┌─ /code/gleam-dream/http_gun/build/dream-comparison/dream-bbc4b5402a7e0cb5247829c8f4be8fb273afc2a5/modules/http_client/build/packages/mist/src/mist/internal/http.gleam:327:19
+    │
+327 │         |> result.unwrap_both
+    │                   ^^^^^^^^^^^ This value has been deprecated
+
+It was deprecated with this message: Use a case expression instead of this
+function
+
+warning: Deprecated value used
+    ┌─ /code/gleam-dream/http_gun/build/dream-comparison/dream-bbc4b5402a7e0cb5247829c8f4be8fb273afc2a5/modules/http_client/build/packages/mist/src/mist/internal/http2/stream.gleam:110:19
+    │
+110 │         |> result.unwrap_both
+    │                   ^^^^^^^^^^^ This value has been deprecated
+
+It was deprecated with this message: Use a case expression instead of this
+function
+
+warning: Deprecated value used
+    ┌─ /code/gleam-dream/http_gun/build/dream-comparison/dream-bbc4b5402a7e0cb5247829c8f4be8fb273afc2a5/modules/http_client/build/packages/mist/src/mist/internal/handler.gleam:126:15
+    │
+126 │     |> result.unwrap_both
+    │               ^^^^^^^^^^^ This value has been deprecated
+
+It was deprecated with this message: Use a case expression instead of this
+function
+
+  Compiling filepath
+  Compiling simplifile
+  Compiling dream
+  Compiling dream_mock_server
+  Compiling gleeunit
+  Compiling meck
+===> Analyzing applications...
+===> Compiling meck
+  Compiling mockth
+   Checking dream_http_client
+   Compiled in 2.73s

@@ -1,0 +1,38 @@
+#!/bin/sh
+set -eu
+root=$(pwd)
+work=$(mktemp -d)
+trap 'rm -rf "$work"' EXIT HUP INT TERM
+mkdir "$work/http_gun"
+cp -R src gleam.toml manifest.toml "$work/http_gun/"
+cp -R examples/ordinary "$work/ordinary"
+cp test/http_gun_test_server.erl "$work/ordinary/src/"
+(cd "$work/ordinary" && gleam build --warnings-as-errors && gleam run)
+if [ "${UPDATE_CONSUMER_LOCKS:-0}" = 1 ]; then cp "$work/ordinary/manifest.toml" examples/ordinary/manifest.toml; fi
+# Compile-time rejection from a separate package, never same-package visibility.
+for check in client body wrong_body recording; do
+  case "$check" in
+    client) source='import http_gun\npub fn invalid() { http_gun.Client }'; expected='Unknown module value';;
+    body) source='import http_gun/body\npub fn invalid() { body.Body }'; expected='Unknown module value';;
+    wrong_body) source='import http_gun\nimport gleam/http/request\npub fn invalid(client: http_gun.Client) { http_gun.send(client, request.new()) }'; expected='Type mismatch';;
+    recording) source='import http_gun/recording\npub fn invalid() { recording.Recording }'; expected='Unknown module value';;
+  esac
+  printf '%b\n' "$source" > "$work/ordinary/src/invalid.gleam"
+  if (cd "$work/ordinary" && gleam build --warnings-as-errors) > "$work/rejected.log" 2>&1; then
+    echo "Expected rejection did not happen: $check" >&2; exit 1
+  fi
+  if ! rg -i "$expected" "$work/rejected.log" >/dev/null; then cat "$work/rejected.log"; exit 1; fi
+  rm "$work/ordinary/src/invalid.gleam"
+  echo "Confirmed public type rejection: $check"
+done
+tar -xzf test/oracle/llm-consumer-source.tar.gz -C "$work"
+python3 - "$root/test/oracle/consumer-source.json" "$work" <<'PY'
+import hashlib,json,pathlib,sys
+for package in json.loads(pathlib.Path(sys.argv[1]).read_text()).values():
+    for name,digest in package['files'].items():
+        assert hashlib.sha256((pathlib.Path(sys.argv[2])/name).read_bytes()).hexdigest()==digest,name
+PY
+cp -R examples/llm "$work/llm"
+(cd "$work/llm" && gleam build --warnings-as-errors && gleam run)
+if [ "${UPDATE_CONSUMER_LOCKS:-0}" = 1 ]; then cp "$work/llm/manifest.toml" examples/llm/manifest.toml; fi
+echo 'Independent consumer, four rejection fixtures and isolated LLM consumer passed.'

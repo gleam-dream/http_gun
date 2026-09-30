@@ -1,0 +1,16 @@
+HTTP Gun
+
+This package is distributed under the Apache License, Version 2.0; see LICENSE.
+Reviewed loopback test servers, certificates, original package metadata and the
+adapted LLM consumer came from the prior local HTTP Gun implementation at
+ a1ad984a9249389988bbc936a9af71002419fe79.
+Original revisions and file hashes are preserved in docs/provenance.json and
+ test/oracle/consumer-example-source.json.
+
+The development-only consumer source snapshot preserves the available LLM Wire
+and sinal license files and json_blueprint's original MIT declaration. Their
+revisions, file hashes and intended local test use are in docs/PROVENANCE.md and
+ test/oracle/consumer-source.json. These are not HTTP Gun production dependencies.
+
+Gun, Cowlib and the Gleam packages remain unmodified released dependencies.
+Their own licenses apply; versions and checksums are locked in manifest.toml.

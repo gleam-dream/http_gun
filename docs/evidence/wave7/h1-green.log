@@ -1,0 +1,22 @@
+   Checking http_gun
+   Compiled in 0.23s
+  Compiling http_gun
+   Compiled in 0.37s
+   Compiled in 0.20s
+    Running http_gun_test.main
+.........=NOTICE REPORT==== 29-Sep-2026::21:29:41.386765 ===
+TLS server: In state wait_finished received CLIENT ALERT: Fatal - Unknown CA
+
+=NOTICE REPORT==== 29-Sep-2026::21:29:41.386672 ===
+TLS client: In state wait_cert_cr at ssl_handshake.erl:2254 generated CLIENT ALERT: Fatal - Unknown CA
+
+.....=NOTICE REPORT==== 29-Sep-2026::21:29:41.440595 ===
+TLS client: In state wait_cert_cr at ssl_handshake.erl:2262 generated CLIENT ALERT: Fatal - Bad Certificate
+ - {bad_cert,{hostname_check_failed,{requested,"127.0.0.1"},
+                                    {received,[{dNSName,"localhost"}]}}}
+=NOTICE REPORT==== 29-Sep-2026::21:29:41.440685 ===
+TLS server: In state wait_finished received CLIENT ALERT: Fatal - Bad Certificate
+
+...................................
+49 passed, no failures
+Production dependency, Dynamic and public-consumer boundaries passed.

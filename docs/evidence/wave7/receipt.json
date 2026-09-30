@@ -1,0 +1,13 @@
+{
+  "completed_utc": "2026-09-30T00:37:33.065546+00:00",
+  "runtimes": [
+    "OTP29/ERTS17.1",
+    "OTP28/ERTS16.4.0.6",
+    "OTP27/ERTS15.2.7.13"
+  ],
+  "tests_per_runtime": 50,
+  "consumer_packages_per_runtime": 2,
+  "expected_compile_rejections_per_runtime": 4,
+  "load_scenarios_per_runtime": 11,
+  "source_receipt": "inputs-sha256.json"
+}

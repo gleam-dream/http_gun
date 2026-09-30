@@ -1,0 +1,4 @@
+{ok,"9.8"}
+{ok,[{max_sessions,2},
+     {max_connections_open,infinity},
+     {max_pipeline_length,2}]}

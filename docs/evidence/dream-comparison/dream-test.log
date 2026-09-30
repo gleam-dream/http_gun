@@ -1,0 +1,8 @@
+  Resolving versions
+error: Incompatible locked version
+
+There is an incompatiblity between a version specified in
+manifest.toml and a version range specified in gleam.toml:
+
+    dream_mock_server is specified with the requirement `== 1.1.1`, but it is locked to 1.0.0, which is incompatible.
+

@@ -1,0 +1,92 @@
+gleam 1.18.1
+OTP 28 ERTS 16.4.0.6
+Downloading packages
+ Downloaded 8 packages in 0.05s
+  Compiling cowlib
+===> Analyzing applications...
+===> Compiling cowlib
+  Compiling gleam_stdlib
+  Compiling gleam_erlang
+  Compiling gleam_http
+  Compiling gleam_json
+  Compiling gleam_otp
+  Compiling gleeunit
+  Compiling gun
+===> Analyzing applications...
+===> Compiling gun
+   Checking http_gun
+   Compiled in 14.27s
+  Compiling http_gun
+   Compiled in 0.36s
+   Compiled in 0.20s
+    Running http_gun_test.main
+........=NOTICE REPORT==== 29-Sep-2026::21:05:49.793370 ===
+TLS server: In state wait_finished received CLIENT ALERT: Fatal - Unknown CA
+
+=NOTICE REPORT==== 29-Sep-2026::21:05:49.793291 ===
+TLS client: In state wait_cert_cr at ssl_handshake.erl:2218 generated CLIENT ALERT: Fatal - Unknown CA
+
+.....=NOTICE REPORT==== 29-Sep-2026::21:05:49.840232 ===
+TLS client: In state wait_cert_cr at ssl_handshake.erl:2226 generated CLIENT ALERT: Fatal - Bad Certificate
+ - {bad_cert,{hostname_check_failed,{requested,"127.0.0.1"},
+                                    {received,[{dNSName,"localhost"}]}}}
+=NOTICE REPORT==== 29-Sep-2026::21:05:49.840308 ===
+TLS server: In state wait_finished received CLIENT ALERT: Fatal - Bad Certificate
+
+..................................
+47 passed, no failures
+Production dependency, Dynamic and public-consumer boundaries passed.
+  Resolving versions
+Downloading packages
+ Downloaded 7 packages in 0.04s
+  Compiling cowlib
+===> Analyzing applications...
+===> Compiling cowlib
+  Compiling gleam_stdlib
+  Compiling gleam_erlang
+  Compiling gleam_http
+  Compiling gleam_json
+  Compiling gleam_otp
+  Compiling gun
+===> Analyzing applications...
+===> Compiling gun
+  Compiling http_gun
+  Compiling http_gun_consumer
+   Compiled in 13.24s
+   Compiled in 0.20s
+    Running http_gun_consumer.main
+Confirmed public type rejection: client
+Confirmed public type rejection: body
+Confirmed public type rejection: wrong_body
+Confirmed public type rejection: recording
+  Resolving versions
+Downloading packages
+ Downloaded 9 packages in 0.04s
+  Compiling cowlib
+===> Analyzing applications...
+===> Compiling cowlib
+  Compiling gleam_stdlib
+  Compiling gleam_crypto
+  Compiling gleam_erlang
+  Compiling gleam_http
+  Compiling gleam_json
+  Compiling gleam_otp
+  Compiling gun
+===> Analyzing applications...
+===> Compiling gun
+  Compiling http_gun
+  Compiling json_blueprint
+  Compiling telemetry
+===> Analyzing applications...
+===> Compiling telemetry
+  Compiling sinal
+  Compiling llm_wire
+  Compiling http_gun_llm_consumer
+   Compiled in 14.58s
+  Resolving versions
+   Compiled in 0.23s
+    Running http_gun_llm_consumer.main
+Independent consumer, four rejection fixtures and isolated LLM consumer passed.
+   Compiled in 0.20s
+    Running http_gun_benchmark.main
+All 11 load scenarios passed; measurements: build/evidence/load.jsonl
