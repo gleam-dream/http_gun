@@ -1,10 +1,50 @@
 # Local acceptance evidence
 
+## Sinal lifecycle integration: waves22–24
+
+All three full gates pass on Darwin ARM64 with Gleam 1.18.1 and OTP29/ERTS17.1, OTP28/ERTS16.4.0.6 and OTP27/ERTS15.2.7.13. Each includes 98 tests, format/check/build, handwritten FFI warnings as errors, three public consumers, a positive compiler control and seven intended type rejections, 1196 archived LLM stream split points, 11 async lifecycle groups and startup-failure control, batch scaling through 10000, seven independent nghttpd scenarios, 256 record/replay exchanges totaling 8 MiB and eleven controlled load scenarios. All 97 frozen executable/dependency inputs stayed unchanged. [Receipt and commands](evidence/wave24/receipt.json), [inputs](evidence/wave24/inputs.json), [runtime logs/measurements](evidence/wave24/runtimes/).
+
+Sinal's own 93 tests and three synchronized startup/restart probes pass on each runtime. A capacity1 blocked observation handler does not prevent a 1000-request, 16-worker batch from completing: one coalesced drop notice remains queued and at least3999 observations are rejected. An isolated synchronous-delivery mutation fails that same public test for the intended timeout. [Wave23 red/green evidence and final Sinal source hashes](evidence/wave23/README.md). No permanent runtime test hooks exist.
+
+Current LLM Wire at `1c0ad614` passes 223 tests, its public consumer/boundary controls and five local TLS/H2 scenarios on OTP29. At1000 simultaneous callers it reports no failures and one connection; cancellation preserves a healthy 2 MiB sibling. All selected originals remain unchanged during validation. [Downstream receipt](evidence/wave24/current-downstream/receipt.json).
+
+`sh dev/matrix` first passed OTP29, then hit Hex's API rate limit on OTP28. A parallel downstream attempt also hit that limit during its public boundary check, after all223 tests passed. Both failed attempts are retained under [rate-limit-attempt](evidence/wave24/rate-limit-attempt/). The remaining two full gates and downstream check subsequently passed sequentially with no production change. The [resume command](evidence/wave24/resume-matrix.sh) is retained. Generated dependency/archived-donor deprecation warnings remain; owned handwritten FFI passes `-Werror`.
+
+Representative independent-server runs use nghttpd1.70.0, one H2 connection, peer stream limit8, client active128/waiting1024, a60-second request budget and256-byte replies. Observation is disabled for these existing load scenarios; the enabled-observation bound is tested separately above. These single local runs are not an overhead comparison or universal memory guarantee. Sampling can miss peaks and excludes the C server. The complete1/10/100/1000,32 MiB and mixed slow/fast measurements are retained beside each runtime log.
+
+| OTP |1000 callers elapsed ms|p95 ms|Peak sampled VM bytes|Largest sampled mailbox|Connections|
+|---|---:|---:|---:|---:|---:|
+|29|95.509|82.375|70027911|57|1|
+|28|82.794|72.342|67360009|140|1|
+|27|97.341|78.104|73398335|91|1|
+
+HTTP Gun production FFI is unchanged: 92 lines/4669 bytes/13 bindings. Sinal is the only authorized sibling changed; Gun/Cowlib remain unmodified. No Linux/hosted CI, new Dream comparison, sustained soak or comparative enabled-telemetry overhead benchmark is claimed for this follow-up. Observation remains best effort, with no remote-receipt, durable-delivery or exporter-queue guarantee. The exact API and one-source dependency arrangement are in [OBSERVATIONS.md](OBSERVATIONS.md).
+
+## Historical adoption follow-up: waves18–21
+
+The final local matrix passes on Darwin ARM64 with Gleam1.18.1 and OTP29/ERTS17.1, OTP28/ERTS16.4.0.6 and OTP27/ERTS15.2.7.13. Command: `sh dev/matrix`. Each isolated full gate passes91 tests, formatting/check/build, FFI warnings/boundaries, three public consumers, positive compilation control/six intended symbol-specific rejections,1196 archived LLM split points,11 async lifecycle groups plus token-startup fault injection, batch trials through10000, seven independent nghttpd scenarios,256 record/replay exchanges (8MiB), and eleven controlled load scenarios. All90 frozen executable/dependency inputs remained unchanged. [Final receipt](evidence/wave21/receipt.json), [input hashes](evidence/wave21/inputs.json), [raw runtime logs and measurements](evidence/wave21/runtimes/).
+
+The opt-in current downstream check separately passes223 LLM Wire tests, its public boundary/consumer and five independent local H2 scenarios on OTP29. Its receipt precedes the final example-only startup correction; [source recheck](evidence/wave21/downstream-source-recheck.json) proves every production HTTP Gun/dependency input still matches. All selected sibling source bytes also match. Sinal's Git metadata advanced afterward from77fcbef to098a2d5 without changing these selected bytes; it was not modified by this task. [Exact downstream commands, revisions and hashes](evidence/wave21/current-downstream/receipt.json).
+
+Representative independent-server qualification uses one H2 connection, peer limit8, client active128/waiting1024,60-second deadlines and256-byte responses. These are individual local observations, not a comparative benchmark or allocation guarantee. The VM sampler can miss transient peaks; it excludes the independent C server. Other1/10/100,32MiB and mixed slow/fast results are retained alongside the logs.
+
+| OTP |1000 callers elapsed ms|p95 ms|Peak sampled VM bytes|Largest sampled mailbox|Connections|
+|---|---:|---:|---:|---:|---:|
+|29|80.730|74.123|70147564|227|1|
+|28|80.644|71.606|71613137|158|1|
+|27|86.421|78.653|67822303|152|1|
+
+Red/green evidence includes missing public functions, an intentionally incompatible downstream export, and the async example's stray completion message on token-startup failure. The controlled fault is injected only into a temporary copy at the OTP startup boundary; it checks exact Failure mapping, callback suppression and64 failed starts without mailbox retention. Normal production code contains no injection hook. See [startup red](evidence/wave21/startup-red.log) and [green](evidence/wave21/startup-green.log).
+
+The bounded observation experiment is documented separately in [ADOPTION_IMPROVEMENTS.md](ADOPTION_IMPROVEMENTS.md); its synthetic storage results do not constitute integrated HTTP telemetry. No production observation API was added. Linux, hosted CI, a new Dream comparison and another sustained soak were not rerun here. Their earlier receipts remain historical. FFI is unchanged at92 lines/4669 bytes/13 declarations, covering only Gun/runtime bindings, event/error conversion, exception-safe cleanup and missing filesystem primitives.
+
+Current downstream check: [dev/check_downstream.py](../dev/check_downstream.py) runs explicitly selected LLM Wire/HTTP Gun sources in temporary copies, independent of the ordinary package gate. Wave18 passes223 downstream tests, public-boundary positive control/six intended rejections and five local H2 scenarios on Darwin ARM64/OTP29. Exact working-source hashes and commands: [receipt](evidence/wave18/current-downstream/receipt.json). Historical sections retain their original source/runtime scope. See [usage](DOWNSTREAM.md).
+
 Run `./dev/env sh dev/gate fast` for the fast gate and `./dev/env sh dev/gate full` for the complete local gate. `sh dev/matrix` creates independent build directories and runs the full gate on the three pinned OTP shells. No sibling checkout is written and no provider credentials or public application endpoints are used. Fresh Nix/Hex dependency installation can need network access.
 
 ## Covered contracts
 
-The fast gate runs formatting, Gleam check, build with warnings as errors, 86 observable tests, `erlc -Werror` over handwritten production/test FFI, and dependency/public-import/Dynamic boundary checks.
+The fast gate runs formatting, Gleam check, build with warnings as errors, 98 observable tests, `erlc -Werror` over handwritten production/test FFI, and dependency/public-import/Dynamic boundary checks.
 
 | Area | Executed observations |
 | --- | --- |

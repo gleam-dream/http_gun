@@ -1,7 +1,9 @@
+import gleam/erlang/process
 import gleam/http/request
 import gleam/int
 import gleam/list
 import gleam/option.{Some}
+import gleam/otp/static_supervisor
 import gleam/result
 import http_gun
 import http_gun/body
@@ -11,6 +13,9 @@ import http_gun/config
 import http_gun/deadline
 import http_gun/recording
 import http_gun/request_options
+import http_gun/telemetry
+import sinal
+import sinal/forwarder
 
 @external(erlang, "http_gun_test_server", "persistent")
 fn server() -> Int
@@ -49,6 +54,7 @@ pub fn main() {
   let assert Ok(req) =
     request.to("http://localhost:" <> int.to_string(server()))
   let req = request.set_body(req, <<>>)
+  observed_request(req)
   let assert Ok(live) = http_gun.start(config.default())
   consume(live, req)
   let assert Ok(Nil) = http_gun.stop(live)
@@ -64,4 +70,38 @@ pub fn main() {
   consume(playback, req)
   let assert Ok(Nil) = http_gun.stop(playback)
   remove_fixture(path)
+}
+
+// Application startup owns the forwarder and its supervision. The HTTP client
+// emits fixed milestones; a handler does not run in its pool or body processes.
+fn observed_request(req: request.Request(BitArray)) -> Nil {
+  let assert Ok(target) =
+    forwarder.new(process.new_name("http-observations"), 64)
+  let assert Ok(_supervisor) =
+    static_supervisor.new(static_supervisor.OneForOne)
+    |> static_supervisor.add(forwarder.supervised(target))
+    |> static_supervisor.start
+  let completed = process.new_subject()
+  let assert Ok(handler_id) = sinal.handler_id("ordinary-consumer-completion")
+  let assert Ok(attachment) =
+    sinal.observe(handler_id, telemetry.event(), fn(time, metadata) {
+      case metadata.milestone {
+        telemetry.HttpTerminated(telemetry.Complete) ->
+          process.send(completed, #(time, metadata))
+        _ -> Nil
+      }
+    })
+  let settings = config.Config(..config.default(), observations: Some(target))
+  let assert Ok(shared) = http_gun.start(settings)
+  let correlation = telemetry.new_id()
+  let client = http_gun.with_correlation(shared, correlation)
+  let assert Ok(_) = http_gun.send(client, req)
+  let assert Ok(#(_, metadata)) = process.receive(completed, 1000)
+  let assert True = metadata.correlation == Some(correlation)
+  let assert telemetry.Live = metadata.mode
+  let assert Ok(Nil) = sinal.detach(attachment)
+  let assert Ok(Nil) = http_gun.stop(shared)
+  // The application supervisor lives until this executable exits; individual
+  // request/client completion does not stop its shared observation service.
+  Nil
 }

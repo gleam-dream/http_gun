@@ -1,0 +1,13 @@
+  Compiling http_gun
+   Compiled in 0.42s
+    Running observation_isolation_probe.main
+[31;1mruntime error[39m: let assert[0m
+
+Pattern match failed, no pattern matched the value.
+
+unmatched value:
+  Error(Nil)
+
+stacktrace:
+  http_gun_telemetry_test.blocked_observer_drops_without_stalling_bounded_batch_test[90m test/http_gun_telemetry_test.gleam:135[0m
+

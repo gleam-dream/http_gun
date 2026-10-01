@@ -1,0 +1,55 @@
+  Compiling gleam_stdlib
+/private/tmp/nix-shell.TpKq8H/sinal-forwarder-race-mmnr8qtx/build/dev/erlang/gleam_stdlib/_gleam_artefacts/gleam_stdlib.erl:75:10: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%   75|     case catch binary_to_integer(String, Base) of
+%     |          ^
+
+/private/tmp/nix-shell.TpKq8H/sinal-forwarder-race-mmnr8qtx/build/dev/erlang/gleam_stdlib/_gleam_artefacts/gleam_stdlib.erl:81:10: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%   81|     case catch binary_to_integer(String) of
+%     |          ^
+
+/private/tmp/nix-shell.TpKq8H/sinal-forwarder-race-mmnr8qtx/build/dev/erlang/gleam_stdlib/_gleam_artefacts/gleam_stdlib.erl:87:10: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%   87|     case catch binary_to_float(String) of
+%     |          ^
+
+  Compiling gleam_erlang
+  Compiling gleam_otp
+  Compiling gleeunit
+  Compiling telemetry
+===> Analyzing applications...
+===> Compiling telemetry
+  Compiling sinal
+warning: Unused private function
+   ┌─ /private/tmp/nix-shell.TpKq8H/sinal-forwarder-race-mmnr8qtx/src/restart_probe.gleam:10:1
+   │
+10 │ fn set_start_gate(gate: fn() -> Nil) -> Nil
+   │ ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ This private function is never used
+
+Hint: You can safely remove it.
+
+warning: Unused private function
+   ┌─ /private/tmp/nix-shell.TpKq8H/sinal-forwarder-race-mmnr8qtx/src/restart_probe.gleam:32:1
+   │
+32 │ fn startup() {
+   │ ^^^^^^^^^^^^ This private function is never used
+
+Hint: You can safely remove it.
+
+   Compiled in 0.94s
+    Running restart_probe.main
+Delayed sender across restart: mailbox before=0, after=1
+runtime error: let assert
+
+Pattern match failed, no pattern matched the value.
+
+unmatched value:
+  False
+
+stacktrace:
+  restart_probe.delayed_sender src/restart_probe.gleam:111
+

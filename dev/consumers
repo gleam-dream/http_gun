@@ -5,13 +5,25 @@ work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT HUP INT TERM
 mkdir "$work/http_gun"
 cp -R src gleam.toml manifest.toml "$work/http_gun/"
+python3 dev/sinal_source.py "$work/sinal"
 cp -R examples/ordinary "$work/ordinary"
 cp test/http_gun_test_server.erl "$work/ordinary/src/"
 (cd "$work/ordinary" && gleam build --warnings-as-errors && gleam run)
 if [ "${UPDATE_CONSUMER_LOCKS:-0}" = 1 ]; then cp "$work/ordinary/manifest.toml" examples/ordinary/manifest.toml; fi
+# Resolve dependencies in the successful consumer, then type-check standalone
+# probes against that closure. A positive probe proves the compiler setup works.
+mkdir -p "$work/negative/src"
+cp examples/ordinary/gleam.toml "$work/negative/gleam.toml"
+compile_probe() {
+  gleam compile-package --target erlang --no-beam --package "$work/negative" \
+    --out "$work/negative/build" --lib "$work/ordinary/build/dev/erlang"
+}
+printf '%s\n' 'import http_gun' 'pub fn valid(client: http_gun.Client) { http_gun.snapshot(client) }' > "$work/negative/src/probe.gleam"
+compile_probe
 # Compile-time rejection from a separate package, never same-package visibility.
-for check in client body wrong_body recording deadline cancellation; do
+for check in client body wrong_body recording deadline cancellation observation_id; do
   case "$check" in
+    observation_id) source='import http_gun/telemetry\npub fn invalid() { telemetry.Id }'; expected='Unknown module value';;
     client) source='import http_gun\npub fn invalid() { http_gun.Client }'; expected='Unknown module value';;
     body) source='import http_gun/body\npub fn invalid() { body.Body }'; expected='Unknown module value';;
     wrong_body) source='import http_gun\nimport gleam/http/request\npub fn invalid(client: http_gun.Client) { http_gun.send(client, request.new()) }'; expected='Type mismatch';;
@@ -19,12 +31,17 @@ for check in client body wrong_body recording deadline cancellation; do
     cancellation) source='import http_gun/cancellation\npub fn invalid() { cancellation.Token }'; expected='Unknown module value';;
     recording) source='import http_gun/recording\npub fn invalid() { recording.Recording }'; expected='Unknown module value';;
   esac
-  printf '%b\n' "$source" > "$work/ordinary/src/invalid.gleam"
-  if (cd "$work/ordinary" && gleam build --warnings-as-errors) > "$work/rejected.log" 2>&1; then
+  case "$check" in
+    observation_id) symbol='Id';;
+    client) symbol='Client';; body) symbol='Body';; recording) symbol='Recording';;
+    deadline) symbol='Deadline';; cancellation) symbol='Token';; wrong_body) symbol='BitArray';;
+  esac
+  printf '%b\n' "$source" > "$work/negative/src/probe.gleam"
+  if compile_probe > "$work/rejected.log" 2>&1; then
     echo "Expected rejection did not happen: $check" >&2; exit 1
   fi
-  if ! rg -i "$expected" "$work/rejected.log" >/dev/null; then cat "$work/rejected.log"; exit 1; fi
-  rm "$work/ordinary/src/invalid.gleam"
+  if ! rg -Fq "$expected" "$work/rejected.log" || ! rg -Fq "$symbol" "$work/rejected.log"; then cat "$work/rejected.log"; exit 1; fi
+  if rg -q '^error: Unknown module$|error:.*dependency' "$work/rejected.log"; then cat "$work/rejected.log"; exit 1; fi
   echo "Confirmed public type rejection: $check"
 done
 tar -xzf test/oracle/llm-consumer-source.tar.gz -C "$work"
@@ -34,8 +51,11 @@ for package in json.loads(pathlib.Path(sys.argv[1]).read_text()).values():
     for name,digest in package['files'].items():
         assert hashlib.sha256((pathlib.Path(sys.argv[2])/name).read_bytes()).hexdigest()==digest,name
 PY
+rm -rf "$work/sinal"
+python3 dev/sinal_source.py "$work/sinal"
 cp -R examples/llm "$work/llm"
 cp test/http_gun_test_server.erl "$work/llm/test/"
 (cd "$work/llm" && gleam build --warnings-as-errors && gleam run && gleam run -m http_gun_llm_integration)
 if [ "${UPDATE_CONSUMER_LOCKS:-0}" = 1 ]; then cp "$work/llm/manifest.toml" examples/llm/manifest.toml; fi
-echo 'Independent consumer, six rejection fixtures and isolated LLM consumer passed.'
+sh dev/async-consumer
+echo 'Ordinary, async and archived LLM consumers; seven rejection fixtures passed.'

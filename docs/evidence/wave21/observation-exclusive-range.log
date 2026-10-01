@@ -1,0 +1,16 @@
+  Compiling observation_probe
+   Compiled in 0.25s
+    Running observation_probe.main
+[31;1mruntime error[39m: let assert[0m
+
+Pattern match failed, no pattern matched the value.
+
+unmatched value:
+  False
+
+stacktrace:
+  observation_probe.ring_trial[90m src/observation_probe.gleam:149[0m
+  observation_probe.-main/0-anonymous-0-[90m src/observation_probe.gleam:241[0m
+  gleam/list.each[90m src/gleam/list.gleam:1654[0m
+  observation_probe.main[90m src/observation_probe.gleam:240[0m
+

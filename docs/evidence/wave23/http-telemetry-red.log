@@ -1,0 +1,190 @@
+  Resolving versions
+Downloading packages
+ Downloaded 1 package in 0.00s
+      Added sinal v0.1.0
+      Added telemetry v1.4.2
+  Compiling telemetry
+===> Analyzing applications...
+===> Compiling telemetry
+  Compiling sinal
+  Compiling http_gun
+error: Unknown module
+   ┌─ /code/gleam-dream/http_gun/test/http_gun_telemetry_test.gleam:10:1
+   │
+10 │ import http_gun/telemetry
+   │ ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+No module has been found with the name `http_gun/telemetry`.
+
+error: Unknown module
+   ┌─ /code/gleam-dream/http_gun/test/http_gun_telemetry_test.gleam:21:49
+   │
+21 │   let assert Ok(attachment) = sinal.observe(id, telemetry.event(), fn(time, metadata) {
+   │                                                 ^^^^^^^^^
+
+No module has been found with the name `telemetry`.
+
+error: Unknown module value
+   ┌─ /code/gleam-dream/http_gun/test/http_gun_telemetry_test.gleam:26:13
+   │
+26 │     fixture.exact(req),
+   │             ^^^^^
+
+The module `http_gun/fixture` does not have a `exact` value.
+
+error: Unknown module value
+   ┌─ /code/gleam-dream/http_gun/test/http_gun_telemetry_test.gleam:27:13
+   │
+27 │     fixture.Reply(201, [], [<<0, 255>>], [], fixture.Complete),
+   │             ^^^^^
+
+http_gun/fixture.Reply is a type constructor, it cannot be used as a value
+
+error: Unknown record field
+   ┌─ /code/gleam-dream/http_gun/test/http_gun_telemetry_test.gleam:29:52
+   │
+29 │   let settings = config.Config(..config.default(), observations: Some(fwd))
+   │                                                    ^^^^^^^^^^^^^^^^^^^^^^^ This field does not exist
+
+The value being accessed has this type:
+
+    config.Config
+
+It has these accessible fields:
+
+    .connect_ms
+    .deadline_ms
+    .limits
+    .protocol
+    .trust
+
+error: Unknown module
+   ┌─ /code/gleam-dream/http_gun/test/http_gun_telemetry_test.gleam:31:21
+   │
+31 │   let correlation = telemetry.new_id()
+   │                     ^^^^^^^^^
+
+No module has been found with the name `telemetry`.
+
+error: Unknown module value
+   ┌─ /code/gleam-dream/http_gun/test/http_gun_telemetry_test.gleam:32:25
+   │
+32 │   let client = http_gun.with_correlation(shared, correlation)
+   │                         ^^^^^^^^^^^^^^^^
+
+The module `http_gun` does not have a `with_correlation` value.
+
+error: Unknown type for record access
+   ┌─ /code/gleam-dream/http_gun/test/http_gun_telemetry_test.gleam:36:30
+   │
+36 │   list.map(seen, fn(event) { event.1.milestone })
+   │                              ^^^^^^^ I don't know what type this is
+
+In order to access a record field we need to know what type it is, but I
+can't tell the type here. Try adding type annotations to your function and
+try again.
+
+error: Unknown module
+   ┌─ /code/gleam-dream/http_gun/test/http_gun_telemetry_test.gleam:38:5
+   │
+38 │     telemetry.AdmissionEntered,
+   │     ^^^^^^^^^
+
+No module has been found with the name `telemetry`.
+
+error: Unknown module
+   ┌─ /code/gleam-dream/http_gun/test/http_gun_telemetry_test.gleam:39:5
+   │
+39 │     telemetry.AdmissionGranted,
+   │     ^^^^^^^^^
+
+No module has been found with the name `telemetry`.
+
+error: Unknown module
+   ┌─ /code/gleam-dream/http_gun/test/http_gun_telemetry_test.gleam:40:5
+   │
+40 │     telemetry.ResponseHeaders(201),
+   │     ^^^^^^^^^
+
+No module has been found with the name `telemetry`.
+
+error: Unknown module
+   ┌─ /code/gleam-dream/http_gun/test/http_gun_telemetry_test.gleam:41:5
+   │
+41 │     telemetry.HttpTerminated(telemetry.Complete),
+   │     ^^^^^^^^^
+
+No module has been found with the name `telemetry`.
+
+error: Unknown module
+   ┌─ /code/gleam-dream/http_gun/test/http_gun_telemetry_test.gleam:41:30
+   │
+41 │     telemetry.HttpTerminated(telemetry.Complete),
+   │                              ^^^^^^^^^
+
+No module has been found with the name `telemetry`.
+
+error: Unknown type for record access
+   ┌─ /code/gleam-dream/http_gun/test/http_gun_telemetry_test.gleam:45:5
+   │
+45 │     event.1.request_id |> should.equal(first.1.request_id)
+   │     ^^^^^^^ I don't know what type this is
+
+In order to access a record field we need to know what type it is, but I
+can't tell the type here. Try adding type annotations to your function and
+try again.
+
+error: Unknown type for record access
+   ┌─ /code/gleam-dream/http_gun/test/http_gun_telemetry_test.gleam:45:40
+   │
+45 │     event.1.request_id |> should.equal(first.1.request_id)
+   │                                        ^^^^^^^ I don't know what type this is
+
+In order to access a record field we need to know what type it is, but I
+can't tell the type here. Try adding type annotations to your function and
+try again.
+
+error: Unknown type for record access
+   ┌─ /code/gleam-dream/http_gun/test/http_gun_telemetry_test.gleam:46:5
+   │
+46 │     event.1.correlation |> should.equal(Some(correlation))
+   │     ^^^^^^^ I don't know what type this is
+
+In order to access a record field we need to know what type it is, but I
+can't tell the type here. Try adding type annotations to your function and
+try again.
+
+error: Unknown type for record access
+   ┌─ /code/gleam-dream/http_gun/test/http_gun_telemetry_test.gleam:47:5
+   │
+47 │     event.1.mode |> should.equal(telemetry.Offline)
+   │     ^^^^^^^ I don't know what type this is
+
+In order to access a record field we need to know what type it is, but I
+can't tell the type here. Try adding type annotations to your function and
+try again.
+
+error: Unknown module
+   ┌─ /code/gleam-dream/http_gun/test/http_gun_telemetry_test.gleam:47:34
+   │
+47 │     event.1.mode |> should.equal(telemetry.Offline)
+   │                                  ^^^^^^^^^
+
+No module has been found with the name `telemetry`.
+
+error: Unknown module
+   ┌─ /code/gleam-dream/http_gun/test/http_gun_telemetry_test.gleam:56:30
+   │
+56 │   subject: process.Subject(#(telemetry.Timing, telemetry.Metadata)),
+   │                              ^^^^^^^^^
+
+No module has been found with the name `telemetry`.
+
+error: Unknown module
+   ┌─ /code/gleam-dream/http_gun/test/http_gun_telemetry_test.gleam:58:13
+   │
+58 │ ) -> List(#(telemetry.Timing, telemetry.Metadata)) {
+   │             ^^^^^^^^^
+
+No module has been found with the name `telemetry`.
+

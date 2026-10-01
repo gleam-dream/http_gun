@@ -1,0 +1,55 @@
+{
+  "scope": "Synthetic storage/ingress experiment only; not integrated HTTP telemetry",
+  "command": "./dev/env sh -c 'cd /private/tmp/http-gun-observation-wave21 && gleam format src && gleam build --warnings-as-errors && gleam run && mkdir -p build/ffi-check && erlc -Werror -o build/ffi-check src/probe_ffi.erl'",
+  "exit": 0,
+  "source_files": {
+    "/private/tmp/http-gun-observation-wave21/gleam.toml": "192534be42e4488a98e24bc7a4524e56b05efc6314cfab48d80b922cb8b4f793",
+    "/private/tmp/http-gun-observation-wave21/manifest.toml": "9072bc8a41ad10d2bb46eef2046bcbe2ac9e2b238324518e123f99e538d9f76b",
+    "/private/tmp/http-gun-observation-wave21/src/observation_probe.gleam": "3c5d7569bde35f01678dfd2c221a8263607bf72fa4cb2b6f0e65ea30d0da03e1",
+    "/private/tmp/http-gun-observation-wave21/src/probe_ffi.erl": "341cb1877b0c86a0a2dd2ffa274770e415b2179ff8856a5f2d221ff3af3679db"
+  },
+  "runtime": "Darwin ARM64 / OTP29 ERTS17.1 / Gleam1.18.1",
+  "results": {
+    "ring_capacity": 64,
+    "requests": [
+      1,
+      100,
+      10000
+    ],
+    "ring_mailboxes": [
+      6,
+      600,
+      60000
+    ],
+    "ring_retained": [
+      6,
+      64,
+      64
+    ],
+    "slot_rows": [
+      1,
+      64,
+      64
+    ],
+    "slot_mailboxes": [
+      0,
+      0,
+      0
+    ],
+    "slot_ets_bytes": [
+      2840,
+      24512,
+      24512
+    ],
+    "synchronized_contenders": 64,
+    "cas_commits": 1,
+    "cas_losses": 63
+  },
+  "dependency_sources": {
+    "build/packages/gun/src/gun.erl": "b052b36cd073943e9f1236a2741d56a8189136eefdaa9e20382e8f3bcf7a8466",
+    "build/packages/gun/src/gun_http.erl": "e5c8c9231eb03b94fdb523b697b5532060546e4f7347a8649f51d3505c46d4ff",
+    "build/packages/gun/src/gun_http2.erl": "cbfa64a46da1d28b130ed4230b7df7c39ea10c885dfe5e34c598b17d491bc532",
+    "build/packages/gleam_erlang/src/gleam/erlang/process.gleam": "90695e122ddb2b2a8e191179cf61fa1a7069d4a0358ffffb2cc7aef04c19ac9d",
+    "build/packages/gleam_otp/src/gleam/otp/actor.gleam": "997e4ac65208ca829bb5b18bd90c40c3c125448f058c421dbbd228f40d1c174f"
+  }
+}

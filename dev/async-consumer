@@ -1,0 +1,32 @@
+#!/bin/sh
+set -eu
+root=$(pwd)
+work=$(mktemp -d)
+trap 'rm -rf "$work"' EXIT HUP INT TERM
+mkdir "$work/http_gun"
+cp -R src gleam.toml manifest.toml "$work/http_gun/"
+python3 dev/sinal_source.py "$work/sinal"
+cp -R examples/async "$work/async"
+cp test/http_gun_test_server.erl test/http_gun_h2_server.erl "$work/async/test/"
+cp -R test/fixtures "$work/async/test/"
+mkdir "$work/ffi"
+erlc -Werror -o "$work/ffi" examples/async/test/*.erl
+(cd "$work/async" && gleam build --warnings-as-errors && gleam run && gleam run -m http_gun_async_test)
+if [ "${UPDATE_CONSUMER_LOCKS:-0}" = 1 ]; then cp "$work/async/manifest.toml" "$root/examples/async/manifest.toml"; fi
+# Controlled fault at the OTP startup boundary in the DISPOSABLE source copy.
+# No production fault switch or VM resource exhaustion. Preserve the real error
+# mapping and scope wrapper, replacing only the actor.start result.
+python3 - "$work/http_gun/src/http_gun/cancellation.gleam" <<'PY'
+from pathlib import Path
+import sys
+p = Path(sys.argv[1])
+s = p.read_text()
+assert s.count('|> actor.start') == 1
+s = s.replace('|> actor.start', '''|> fn(_builder) {
+      let failed: actor.StartResult(Token) = Error(actor.InitTimeout)
+      failed
+    }''')
+p.write_text(s)
+PY
+(cd "$work/async" && ERL_FLAGS='+S 1:1' gleam run -m http_gun_async_startup_test)
+echo 'Public async consumer: 11 synchronized lifecycle groups and startup-failure control passed.'

@@ -1,0 +1,223 @@
+gleam 1.18.1
+OTP 27 ERTS 15.2.7.13
+  Resolving versions
+Downloading packages
+ Downloaded 12 packages in 0.05s
+  Compiling cowlib
+===> Analyzing applications...
+===> Compiling cowlib
+  Compiling gleam_stdlib
+  Compiling file_streams
+  Compiling filepath
+  Compiling gleam_erlang
+  Compiling gleam_http
+  Compiling gleam_json
+  Compiling gleam_otp
+  Compiling gleeunit
+  Compiling gun
+===> Analyzing applications...
+===> Compiling gun
+  Compiling simplifile
+  Compiling telemetry
+===> Analyzing applications...
+===> Compiling telemetry
+  Compiling sinal
+   Checking http_gun
+   Compiled in 14.27s
+  Compiling http_gun
+   Compiled in 0.43s
+   Compiled in 0.20s
+    Running http_gun_test.main
+[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m=NOTICE REPORT==== 1-Oct-2026::01:36:39.180183 ===
+TLS client: In state wait_cert_cr at ssl_handshake.erl:2189 generated CLIENT ALERT: Fatal - Unknown CA
+
+=NOTICE REPORT==== 1-Oct-2026::01:36:39.180287 ===
+TLS server: In state wait_finished received CLIENT ALERT: Fatal - Unknown CA
+
+[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m=NOTICE REPORT==== 1-Oct-2026::01:36:39.225070 ===
+TLS client: In state wait_cert_cr at ssl_handshake.erl:2197 generated CLIENT ALERT: Fatal - Bad Certificate
+ - {bad_cert,{hostname_check_failed,{requested,"127.0.0.1"},
+                                    {received,[{dNSName,"localhost"}]}}}
+=NOTICE REPORT==== 1-Oct-2026::01:36:39.225156 ===
+TLS server: In state wait_finished received CLIENT ALERT: Fatal - Bad Certificate
+
+[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m
+98 passed, no failures[39m
+Production dependency, Dynamic and public-consumer boundaries passed.
+  Resolving versions
+Downloading packages
+ Downloaded 11 packages in 0.07s
+  Compiling cowlib
+===> Analyzing applications...
+===> Compiling cowlib
+  Compiling gleam_stdlib
+  Compiling file_streams
+  Compiling filepath
+  Compiling gleam_erlang
+  Compiling gleam_http
+  Compiling gleam_json
+  Compiling gleam_otp
+  Compiling gun
+===> Analyzing applications...
+===> Compiling gun
+  Compiling simplifile
+  Compiling telemetry
+===> Analyzing applications...
+===> Compiling telemetry
+  Compiling sinal
+  Compiling http_gun
+  Compiling http_gun_consumer
+   Compiled in 13.71s
+  Resolving versions
+   Compiled in 0.22s
+    Running http_gun_consumer.main
+Confirmed public type rejection: client
+Confirmed public type rejection: body
+Confirmed public type rejection: wrong_body
+Confirmed public type rejection: recording
+Confirmed public type rejection: deadline
+Confirmed public type rejection: cancellation
+Confirmed public type rejection: observation_id
+  Resolving versions
+Downloading packages
+ Downloaded 12 packages in 0.07s
+  Compiling cowlib
+===> Analyzing applications...
+===> Compiling cowlib
+  Compiling gleam_stdlib
+  Compiling file_streams
+  Compiling filepath
+  Compiling gleam_crypto
+  Compiling gleam_erlang
+  Compiling gleam_http
+  Compiling gleam_json
+  Compiling gleam_otp
+  Compiling gun
+===> Analyzing applications...
+===> Compiling gun
+  Compiling simplifile
+  Compiling telemetry
+===> Analyzing applications...
+===> Compiling telemetry
+  Compiling sinal
+  Compiling http_gun
+  Compiling json_blueprint
+  Compiling llm_wire
+  Compiling http_gun_llm_consumer
+   Compiled in 14.20s
+  Resolving versions
+   Compiled in 0.22s
+    Running http_gun_llm_consumer.main
+   Compiled in 0.20s
+    Running http_gun_llm_integration.main
+Provider stream split points checked: 382
+Provider stream split points checked: 671
+Provider stream split points checked: 143
+LLM streaming: live progress, cancellation, provider terminal, fragmentation and real record/replay passed.
+  Resolving versions
+Downloading packages
+ Downloaded 11 packages in 0.07s
+  Compiling cowlib
+===> Analyzing applications...
+===> Compiling cowlib
+  Compiling gleam_stdlib
+  Compiling file_streams
+  Compiling filepath
+  Compiling gleam_erlang
+  Compiling gleam_http
+  Compiling gleam_json
+  Compiling gleam_otp
+  Compiling gun
+===> Analyzing applications...
+===> Compiling gun
+  Compiling simplifile
+  Compiling telemetry
+===> Analyzing applications...
+===> Compiling telemetry
+  Compiling sinal
+  Compiling http_gun
+  Compiling http_gun_async
+   Compiled in 13.94s
+   Compiled in 0.19s
+    Running http_gun_async.main
+Two application-owned jobs completed on one shared client.
+   Compiled in 0.20s
+    Running http_gun_async_test.main
+PASS head gap, header/body cancellation, shared-client reuse
+PASS admission and TLS-connection cancellation
+Ceiling probe: supplied 5000 ms, client 100 ms, supplied budget still has 4899 ms
+PASS ceiling, queued expiry, expired budget, read wait
+=CRASH REPORT==== 1-Oct-2026::01:37:33.601942 ===
+  crasher:
+    initial call: http_gun_async@feed_job:'-start/4-anonymous-4-'/0
+    pid: <0.179.0>
+    registered_name: []
+    exception error: #{function => <<"early_error_and_exception">>,
+                       line => 226,message => <<"controlled sink exception">>,
+                       module => <<"http_gun_async_test">>,
+                       file => <<"test/http_gun_async_test.gleam">>,
+                       gleam_error => panic}
+      in function  http_gun_async_test:'-early_error_and_exception/0-anonymous-2-'/1 (test/http_gun_async_test.gleam, line 236)
+      in call from http_gun_async@feed_job:read/3 (src/http_gun_async/feed_job.gleam, line 137)
+      in call from http_gun_ffi:scoped/2 (/private/tmp/nix-shell.nl5SrB/tmp.gP2YdVNUzp/async/build/dev/erlang/http_gun/_gleam_artefacts/http_gun_ffi.erl, line 49)
+      in call from http_gun:'-with_response_with_options/4-anonymous-2-'/2 (src/http_gun.gleam, line 109)
+      in call from http_gun:try_with_response_with_options/5 (src/http_gun.gleam, line 138)
+      in call from http_gun_ffi:scoped/2 (/private/tmp/nix-shell.nl5SrB/tmp.gP2YdVNUzp/async/build/dev/erlang/http_gun/_gleam_artefacts/http_gun_ffi.erl, line 49)
+      in call from http_gun@cancellation:'-with_token/1-anonymous-6-'/2 (src/http_gun/cancellation.gleam, line 52)
+      in call from http_gun_async@feed_job:'-start/4-anonymous-4-'/7 (src/http_gun_async/feed_job.gleam, line 76)
+    ancestors: [<0.82.0>]
+    message_queue_len: 0
+    messages: []
+    links: []
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 376
+    stack_size: 29
+    reductions: 728
+  neighbours:
+
+PASS early stop, sink error, exception cleanup
+PASS consumer death, copied job, bounded worker shutdown
+PASS shared body cursor, wrong owner, conflicting read, idempotent close
+=SUPERVISOR REPORT==== 1-Oct-2026::01:37:33.625547 ===
+    supervisor: {<0.205.0>,gleam@otp@static_supervisor}
+    errorContext: child_terminated
+    reason: normal
+    offender: [{pid,<0.206.0>},
+               {id,0},
+               {mfargs,
+                   {gleam@otp@static_supervisor,start_child_callback,
+                       [#Fun<gleam@otp@supervision.0.84104820>]}},
+               {restart_type,permanent},
+               {significant,false},
+               {shutdown,5000},
+               {child_type,worker}]
+
+PASS supervision restart, new capability, stale capability
+PASS same async consumer live/script/record/replay, strict matching, two fallible-scope use cases
+PASS verified H2, one connection, cancelled job and unfinished healthy sibling
+PASS synchronous sink backpressure and shared-client shutdown
+PASS live prefix recording/offline replay and independent capture failure
+  Compiling http_gun
+  Compiling http_gun_async
+   Compiled in 0.69s
+    Running http_gun_async_startup_test.main
+PASS token startup maps Failure; callback skipped; 64 failed job starts leave no completion messages
+Public async consumer: 11 synchronized lifecycle groups and startup-failure control passed.
+Ordinary, async and archived LLM consumers; seven rejection fixtures passed.
+   Compiled in 0.20s
+    Running http_gun_batch_benchmark.main
+   Compiled in 0.20s
+    Running http_gun_batch_benchmark.main
+   Compiled in 0.20s
+    Running http_gun_batch_benchmark.main
+{"median_us": {"100": 30845, "1000": 34999, "5000": 174120, "2000": 70237, "10000": 341267, "500": 17964}, "evidence": "build/evidence/batch.jsonl"}
+   Compiled in 0.19s
+    Running http_gun_interop.main
+{"server": "nghttpd nghttp2/1.70.0", "server_stream_limit": 8, "client_connection_limit": 1, "observed_request_connections": 1, "resets": 2, "log_bytes": 2662021, "log_sha256": "4cf80d3fbe66cf074c6e978f329badba9626ab600040c78d4e807b0c13003ee8", "soak_seconds": 0, "scenarios": 7, "result": "passed"}
+   Compiled in 0.20s
+    Running http_gun_recording_benchmark.main
+   Compiled in 0.20s
+    Running http_gun_benchmark.main
+All 11 load scenarios passed; measurements: build/evidence/load.jsonl

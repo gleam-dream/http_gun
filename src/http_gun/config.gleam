@@ -1,4 +1,7 @@
 /// Pure startup policy. All limits are checked before starting a client.
+import gleam/option.{type Option, None}
+import sinal/forwarder
+
 pub type Protocol {
   Http1
   PreferHttp2
@@ -33,6 +36,7 @@ pub type Config {
     deadline_ms: Int,
     connect_ms: Int,
     limits: Limits,
+    observations: Option(forwarder.Forwarder),
   )
 }
 
@@ -57,6 +61,7 @@ pub fn default() -> Config {
       131_072,
       8_388_608,
     ),
+    None,
   )
 }
 

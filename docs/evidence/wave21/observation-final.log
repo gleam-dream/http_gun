@@ -1,0 +1,35 @@
+  Compiling observation_probe
+   Compiled in 0.30s
+   Compiled in 0.22s
+    Running observation_probe.main
+ring requests=1 mailbox=6 retained=6
+slots requests=1 mailbox=0 rows=1 ets_bytes=2840
+ring requests=100 mailbox=600 retained=64
+slots requests=100 mailbox=0 rows=64 ets_bytes=24512
+ring requests=10000 mailbox=60000 retained=64
+slots requests=10000 mailbox=0 rows=64 ets_bytes=24512
+PASS stale generation, bounded CAS loss, first terminal, reordered arrivals, simulated modes, dead owner
+=CRASH REPORT==== 30-Sep-2026::23:11:00.208375 ===
+  crasher:
+    initial call: observation_probe:'-simultaneous_contention/0-anonymous-5-'/0
+    pid: <0.151.0>
+    registered_name: []
+    exception error: #{function => <<"simultaneous_contention">>,line => 273,
+                       message => <<"controlled observer exception">>,
+                       module => <<"observation_probe">>,
+                       file => <<"src/observation_probe.gleam">>,
+                       gleam_error => panic}
+      in function  observation_probe:'-simultaneous_contention/0-anonymous-5-'/1 (src/observation_probe.gleam:346)
+    ancestors: [<0.82.0>]
+    message_queue_len: 0
+    messages: []
+    links: []
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 233
+    stack_size: 29
+    reductions: 23
+  neighbours:
+
+PASS 64 synchronized contenders: 1 commit, 63 losses; throwing reader cannot stop writes

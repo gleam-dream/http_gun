@@ -1,0 +1,104 @@
+{
+  "status": "prepared correction; not applied; HTTP Gun integration not implemented",
+  "source_revision": "098a2d5df70ed7dfff71151a865e986fb44987eb",
+  "source_originals_unchanged": true,
+  "original_files": {
+    "README.md": "bfda05e03767cbd4351f77ad829ca7349c2dec9cfb8478444850268adee74e25",
+    "src/sinal/forwarder.gleam": "9a54991454cee0a1f6ad7db3c69c469d8351e1b5b0e9873d1c6796c183468f40",
+    "src/sinal_forwarder_ffi.erl": "70e2f6a5a200fcea5ef09cb4df864f94f165152a506eaec23c11be66317bd57c",
+    "test/forwarder_test.gleam": "4eb4a553c71f62cce88850b991d9b69e37769f9bd88a62f57b265f8f90ef9b71",
+    "dev/check_forwarder.py": null,
+    "dev/restart_probe.gleam.txt": null,
+    "dev/restart_probe_ffi.erl.txt": null
+  },
+  "candidate_files": {
+    "README.md": "78495d4e4806ce5c3300f5397c080cc3ccc35c7428bfbe2e09c43e2a69fcb1e6",
+    "src/sinal/forwarder.gleam": "e68c9270842f1956edbc945d28e1a97f3065f6cbf7b48ef4afd76f3fa97fab88",
+    "src/sinal_forwarder_ffi.erl": "cb5fe9332f648d26643dae9781575e3d61e2c8564e85fba72df7455d11b69698",
+    "test/forwarder_test.gleam": "552522e1b9968d2c0431b7d992efbea920f229a29fdcd3ffff0a8c24c2c8de28",
+    "dev/check_forwarder.py": "938f6728714e710a30e4e7fdb7d3b8419a9dafbe96bb9047bb30acfea166f36f",
+    "dev/restart_probe.gleam.txt": "200c252b026863d4df797c5b459a75d797d7092da380027df96e74f457a3ef35",
+    "dev/restart_probe_ffi.erl.txt": "e155e47e8ad0232d58f5eb7676fbeb2879ae731810072c19672fc3034bc700c5"
+  },
+  "validation": [
+    {
+      "shell": "default",
+      "runtime": "OTP 29 ERTS 17.1",
+      "gleam": "gleam 1.18.1",
+      "commands": [
+        "gleam format --check src test",
+        "gleam check",
+        "gleam build --warnings-as-errors",
+        "gleam test",
+        "erlc -Werror (src and test FFI)",
+        "python3 dev/check_forwarder.py"
+      ],
+      "tests_passed": 93,
+      "synchronized_probes_passed": 2,
+      "exit": 0,
+      "log": "default.log"
+    },
+    {
+      "shell": "otp28",
+      "runtime": "OTP 28 ERTS 16.4.0.6",
+      "gleam": "gleam 1.18.1",
+      "commands": [
+        "gleam format --check src test",
+        "gleam check",
+        "gleam build --warnings-as-errors",
+        "gleam test",
+        "erlc -Werror (src and test FFI)",
+        "python3 dev/check_forwarder.py"
+      ],
+      "tests_passed": 93,
+      "synchronized_probes_passed": 2,
+      "exit": 0,
+      "log": "otp28.log"
+    },
+    {
+      "shell": "otp27",
+      "runtime": "OTP 27 ERTS 15.2.7.13",
+      "gleam": "gleam 1.18.1",
+      "commands": [
+        "gleam format --check src test",
+        "gleam check",
+        "gleam build --warnings-as-errors",
+        "gleam test",
+        "erlc -Werror (src and test FFI)",
+        "python3 dev/check_forwarder.py"
+      ],
+      "tests_passed": 93,
+      "synchronized_probes_passed": 2,
+      "exit": 0,
+      "log": "otp27.log"
+    }
+  ],
+  "red_cases": {
+    "startup_capacity_one": "accepted two events with first handler blocked",
+    "delayed_sender": "old reservation increased replacement mailbox from 0 to 1"
+  },
+  "probe_method": "Hooks injected only into disposable source copies; no production hook or dependency parser change",
+  "skipped": [
+    "Applying to Sinal checkout pending sibling-write clarification",
+    "HTTP lifecycle instrumentation and Sinal dependency integration",
+    "HTTP full gate and current downstream after integration",
+    "Linux/hosted CI"
+  ],
+  "artifacts": {
+    "default.log": "ca23f1e86c941fef57ccd0858e77298209d5983a1a4df50bfe1491951ea49a32",
+    "startup-red.log": "ae0452ecfcdfb0dd96be2b3b1c33690ebfc9d883b509a804caa562a3397a7ccf",
+    "otp27.log": "a5234d25b70112e23845c6a6f0098706615ad9298d78591811198b2a82eb5510",
+    "source.json": "82984636685ee79d3878c3e1810e74d99134ca534867479eb096b98c7fd5edee",
+    "sinal-forwarder.patch": "b0ec746923d577832456b381f2c6f5ef081e869e5e938123c311b0812202bb60",
+    "validate_candidate.py": "bf59ab061dd6906e2a29fca125a577dba0fd79ff341d76ac07e2f239239723b7",
+    "probes-green.log": "7bb56ae7e987b512bb4e5ee0ada2cb2787adb2851be94d57253c537107dbf8dd",
+    "otp28.log": "89f0626056990c905f2304ee211b1009c89b8dc6d7730a1f47b741692c58ca76",
+    "sender-red.log": "7b89d641563a1ed969679b0166e2f9a4c4e73530a8cb01b8227a1ba9b3a3fb5b"
+  },
+  "host": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+  "patch_apply_check": {
+    "command": "git -C /code/gleam-dream/sinal apply --check /code/gleam-dream/http_gun/docs/evidence/wave22/sinal-forwarder.patch",
+    "exit": 0,
+    "mutation": false
+  }
+}

@@ -1,5 +1,9 @@
 # Adoption validation follow-up
 
+Current adoption: LLM Wire migrated at `1c0ad614149b6ba286a6f778e223bd294f403b30`, with HTTP Gun `ebf2b479761e8c932b0c85a8f83cf8460c014d4f` unchanged. Wave18 reran223 tests, the actual public consumer and six negative compilation controls, live recording/offline playback, and independent verified TLS/H2 at1/10/100/1000 callers on Darwin ARM64/OTP29. These are specific receipts, not universal readiness. See [current downstream validation](DOWNSTREAM.md) and [receipt](evidence/wave18/current-downstream/receipt.json).
+
+The rest of this report preserves waves10–12 and their historical migration status. The archived LLM example still supplies useful text-stream scenarios, but does not prove current downstream compatibility.
+
 All six full local gates pass: OTP 27/28/29 on Darwin ARM64 and Linux ARM64. The client now has real streaming-consumer, independent-server and sustained-load evidence for controlled adoption.
 
 The owner's follow-up authorizes fixes and focused reference validation after the historical [adoption review](ADOPTION_REVIEW.md). This report supersedes that review's implementation status; its original evidence remains intact.

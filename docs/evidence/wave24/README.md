@@ -1,0 +1,14 @@
+# Final Sinal/HTTP Gun integration qualification
+
+All required work in waves22–24 is complete. [receipt.json](receipt.json) identifies exact commands, outcomes, unchanged executable inputs, source scope and skipped checks. [inputs.json](inputs.json) freezes 97 HTTP Gun source/test/example/toolchain/dependency inputs. Sinal's exact source and own three-runtime gates are in [wave23](../wave23/README.md).
+
+- HTTP Gun: 98 tests and full gates on Darwin ARM64/OTP29,28,27; public consumers, positive compiler control/seven intended restrictions, real H1/TLS/H2, cancellation, recording/replay, finite batches and large/mixed streams.
+- Sinal: 93 tests plus three synchronized races on each runtime; generic implementation, unchanged public API. Startup cannot admit against reset counters. Delayed events and drop notices retain their old process destination.
+- Actual LLM Wire `1c0ad614`: 223 tests, public consumer/boundary, and five local H2 scenarios including cancellation with a healthy sibling and1/10/100/1000 callers. [Current receipt](current-downstream/receipt.json) verifies all originals unchanged during the run.
+- HTTP observation: live/script/replay/recording contracts, queued expiry before submission, Gun-call return before headers, separate capture failure, dead/throwing observers, and H2 sibling survival. A blocked capacity1 observer leaves a1000-request batch working. A synchronous mutation fails for the intended timeout.
+
+The initial matrix completed OTP29, then Hex rate limiting stopped OTP28. A simultaneous current-downstream run passed223 tests but hit the same limit during boundary validation. Those failures remain under `rate-limit-attempt`; successful sequential reruns required no implementation change. `resume-matrix.sh` records the remaining runtime commands. Nothing was marked passed based on a dependency-fetch failure.
+
+`runtimes` retains logs and batch/load/recording/nghttpd measurements. Full server logs remain in local build evidence; their hashes are in the nghttpd receipts. Default observations are disabled for existing scaling scenarios. These runs are practical regression evidence, not an enabled-telemetry overhead comparison, isolated speed benchmark or universal memory bound. The current downstream run was separate from the final OTP28/27 load runs; the first OTP29 gate overlapped part of the initially rate-limited downstream validation.
+
+No Linux or hosted CI execution, fresh Dream comparison, long soak, publication or commit is claimed. HTTP Gun's production FFI is unchanged at92 lines/4669 bytes/13 bindings. Sinal alone was edited with explicit owner authorization. Best-effort observation, one canonical unpublished dependency source, and application-owned exporter storage remain explicit boundaries; see [OBSERVATIONS.md](../../OBSERVATIONS.md).

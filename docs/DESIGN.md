@@ -62,3 +62,24 @@ E4 Useful errors: limit kinds are typed and include observed sizes where known. 
 E4 representation: observed sizes are required Int values measured at enforcement, with typed byte/count categories. Invalid byte budgets are configuration errors before IO. The package is unreleased: keep one current fixture schema under marker1 and no legacy decoder, compatibility-only error variants or release migration burden. Unknown transport/IO causes remain valid runtime uncertainty. Publication is the filesystem atomic commit point; abort cannot roll back an already committed publication.
 
 Pre-release cleanup (2026-09-30): the owner explicitly accepts breaking changes and confirms no external consumers or released versions. Earlier experimental fixtures may be regenerated. Retain the format marker to detect incompatible data, without introducing a package release or parallel codec. Tests and examples evolve with the API; update them in the same wave.
+
+
+## Accepted adoption improvements (2026-09-30)
+
+A1 Current adoption: LLM Wire at1c0ad614 is a migrated downstream consumer of HTTP Gun at ebf2b479. Revalidate explicitly against selected working copies in an isolated closure, recording revisions and source hashes and checking originals unchanged. Normal package gates remain independent of sibling checkouts. Archived examples do not prove current downstream compatibility.
+
+A2 Asynchronous composition: a maintained application example owns a shared supervised client and a bounded number of jobs. Each job's worker opens and reads its own body under a cancellation scope spanning its whole lifetime. A monitor-only guardian terminates that worker on application-owner death. Synchronous sink processing precedes further demand; there is no chunk-forwarding mailbox. Application shutdown has a finite grace and may terminate its own blocked worker. One job completing never stops the shared client. This is application recipe code, not a second library body server or task runtime.
+
+A3 Policy inspection: `request_ceiling_ms(client)` returns the positive immutable startup ceiling carried by that exact capability, in every mode and after stop. It performs no actor call and makes no liveness claim. A restart delivers a new capability; inspecting an old one returns its old policy. Default30000ms and min(client ceiling, supplied monotonic deadline) enforcement remain unchanged. Read waits, connection timeouts and recording finalization waits remain separate.
+
+A4 Fallible cancellation scope: `cancellation.try_with_token(on_start_error, run)` maps only token-startup Failure into the caller's error type and returns the fallible callback's Result directly. Success, callback failure and exceptions have identical lifetime/cleanup to with_token. Group cancellation and typed request evidence are unchanged. Exceptions propagate after cleanup; no error or retry inference is introduced.
+
+## Accepted Sinal observation boundary (2026-10-01)
+
+The owner selected Sinal for lifecycle observation delivery. HTTP Gun supplies typed HTTP milestones, opaque request correlation and monotonic VM-local timestamps. An application-owned, supervised Sinal forwarder owns bounded asynchronous delivery and drop reporting. HTTP Gun does not add an observation collector, mailbox, retained timeline, ETS store or forwarding actor. The earlier fixed-slot experiment remains historical evidence, not the implementation target.
+
+Observation is opt-in. HTTP Gun uses an explicitly supplied forwarder and direct forwarding; neither synchronous `sinal.emit` nor `emit_routed`'s synchronous no-route fallback may run user handlers inside HTTP owners. Full, unavailable or failed observation delivery must not alter HTTP outcomes, cancellation, deadlines or recording. Events contain no URLs, queries, headers, bodies, credentials or raw dependency terms, and there are no default per-chunk events. Applications own any retained history and downstream export queues.
+
+The pool remains authoritative for admission; the request/body owner remains authoritative for local Gun-call return, accepted final response headers and HTTP termination. Observations are best effort and unsuitable for correctness or retry decisions. Gun-call return establishes only return from a local asynchronous API, not transport processing, bytes written or remote receipt. Script/playback observations must identify their simulated execution and never claim network submission. Recording persistence remains separate.
+
+Implemented through `config.observations`, `telemetry.event()` and a pure correlated Client view. Request options, HTTP failures and cassette schema are unchanged. The generic Sinal correction gives each actor incarnation its own direct destination, admission slots and drop-notice flag. No HTTP-specific server is added to Sinal. Dependency source and gate isolation are described in [OBSERVATIONS.md](OBSERVATIONS.md); exact qualification is in the current wave tracker.

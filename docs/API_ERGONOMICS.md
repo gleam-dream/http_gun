@@ -35,7 +35,20 @@ let options = request_options.Options(
 let outcome = http_gun.send_with_options(client, req, options)
 ```
 
-`Deadline` is opaque and VM-local; `remaining_ms` reports remaining time without renewing it. Zero is expired; a negative duration is invalid. The effective deadline is the earlier of this deadline and the client's request ceiling. It covers admission, connection, headers and unfinished body consumption. Existing calls use the client ceiling.
+`Deadline` is opaque and VM-local; `remaining_ms` reports remaining time without renewing it. Zero is expired; a negative duration is invalid. The effective deadline is the earlier of this deadline and the client's request ceiling. It covers admission, connection, headers and unfinished body consumption. Existing calls use the client ceiling. `config.Config.deadline_ms` is a ceiling from HTTP call entry, not a read wait or a default that per-request options can override. Its default remains30000ms. An application supplying a60000ms deadline to that client still has at most30000ms of unfinished HTTP.
+
+Inspect a shared capability without retaining a parallel configuration record:
+
+```gleam
+let ceiling_ms = http_gun.request_ceiling_ms(client)
+let estimate_now = int.min(ceiling_ms, deadline.remaining_ms(budget))
+```
+
+Import `gleam/int` for this application-side estimate. It is not a reservation or an effective-deadline accessor: preparation and queuing continue spending time. The scalar is pure immutable startup policy in live, script, playback and recording clients. A stopped or stale capability still returns its old value, without a liveness guarantee; a supervisor restart supplies a new capability. Use `snapshot` or request results for live operation, not this inspection.
+
+For a short REST request, create `deadline.after(2000)` and call `send_with_options`; the client ceiling can shorten it further. For a long download, explicitly start a client with `config.Config(..config.default(), deadline_ms: 300_000)` and supply a finite deadline appropriate to that operation. Sharing a30-second client cannot make a five-minute HTTP stream. A queued request whose100ms budget expires returns DeadlineExceeded/NotSubmitted; using that expired Deadline again remains expired. The [compiled workflows](../examples/async/src/http_gun_async/workflow.gleam) and [synchronized tests](../examples/async/test/http_gun_async_test.gleam) demonstrate these distinctions.
+
+Connection setup has its separate `connect_ms` bound within the overall deadline. Read waits preserve HTTP. Application idle/sink policies are application decisions; an HTTP deadline cannot interrupt arbitrary callback code. Recording finalization waits are separate too.
 
 ```gleam
 let outcome = cancellation.with_token(fn(token) {
@@ -45,7 +58,16 @@ let outcome = cancellation.with_token(fn(token) {
 })
 ```
 
-`with_token` returns an outer Result for token startup and preserves the callback's value. When the callback returns a Result, flatten or map that outer error as appropriate. Copies share latched state. `cancellation.cancel(token)` returns Nil after latching; associated owners release resources asynchronously. Repeated cancellation is harmless. Scope exit, exceptions and creator death cancel unfinished associated requests; a token kept beyond its scope stays cancelled. A token can deliberately group several requests. Completed HTTP is preserved. No token transfers body-consumption ownership or proves remote cancellation.
+`with_token` returns an outer Result for token startup and preserves the callback's value. For fallible callbacks, `try_with_token` removes that repeated plumbing:
+
+```gleam
+use token <- cancellation.try_with_token(Http)
+let options = request_options.Options(Some(budget), Some(token))
+http_gun.send_with_options(client, req, options)
+|> result.map_error(Http)
+```
+
+Here `Http(error.Failure)` belongs to the application error type. Only token startup failure passes through the first `Http`; the callback maps request failures itself and may return unrelated application errors. This is equivalent to `with_token(run) |> result.map_error(Http) |> result.flatten`. Exceptions propagate after cleanup. Both a streaming download and a grouped REST operation use the helper in the compiled workflows. Copies share latched state. `cancellation.cancel(token)` returns Nil after latching; associated owners release resources asynchronously. Repeated cancellation is harmless. Scope exit, exceptions and creator death cancel unfinished associated requests; a token kept beyond its scope stays cancelled. A token can deliberately group several requests. Completed HTTP is preserved. No token transfers body-consumption ownership or proves remote cancellation.
 
 Use `open_with_options`, `with_response_with_options` or `try_with_response_with_options` for streaming. Execution controls never change cassette matching. `batch` retains its small policy and client defaults; custom grouped control can be composed by applications using the same client.
 
@@ -57,7 +79,7 @@ The three waits differ: `body.next` timeout preserves HTTP, a request deadline t
 
 `ConnectionFailed(cause)` and `RequestFailed(cause)` classify known DNS, refusal, TLS/certificate, reset/close, draining, timeout and protocol causes. Unsupported dependency reasons become `UnknownTransport`; raw Erlang terms are not exposed. Filesystem errors retain operation and cause: `FixtureIo(operation, cause)` for loading and `recording.IoFailure(operation, cause)` for capture. `error.describe(failure)` uses fixed vocabulary and numbers; it omits free-form details and request/response content. It does not sanitize a separately logged Failure value.
 
-This package is unreleased and has no external consumers. Owned tests and examples use the current error types; no downstream migration is pending. For example, a `case` branch can match `ConnectionFailed(ConnectionRefused)` to inspect the cause, or `ConnectionFailed(_)` to handle all connection causes. No retry is inferred from the category.
+This package is unreleased. LLM Wire migrated at `1c0ad614` without changing HTTP Gun. Owned tests/examples and the opt-in [current downstream gate](DOWNSTREAM.md) validate the current error types; the archived example alone cannot establish downstream compatibility. For example, a `case` branch can match `ConnectionFailed(ConnectionRefused)` to inspect the cause, or `ConnectionFailed(_)` to handle all connection causes. No retry is inferred from the category.
 
 Cassettes have one current schema marked `"http_gun": 1`. The marker detects incompatible data; it is separate from a package release/version. Old experimental layouts are not migrated: regenerate those fixtures. Missing required values, unknown tags and unsupported format markers fail explicitly, with no legacy or network fallback. Pre-release API/schema changes are allowed without compatibility scaffolding or a package version bump.
 
@@ -66,3 +88,7 @@ Cassettes have one current schema marked `"http_gun": 1`. The marker detects inc
 Gleam owns finish waiting, scopes, deadlines, cancellation, pool/body cleanup, typed file errors and the strict fixture codec. One small Erlang classifier converts supported Gun/OTP failure terms to bounded transport categories. Production handwritten FFI totals 92 physical lines / 4,669 bytes across two files and 13 declarations: Gun bindings/message conversion, transport cause conversion, monotonic time, exception-safe cleanup, unique temporary names and directory removal. Dependencies remain pinned and unmodified. No handwritten server, parser, second transport path or provider semantics were added.
 
 Exact validation is recorded in [VALIDATION.md](VALIDATION.md) and the append-only [wave tracker](implementation/gleam-first/wave-tracker.md).
+
+## Optional lifecycle observations
+
+Use `config.observations` with an application-supervised Sinal forwarder and attach to `http_gun/telemetry.event()`. `with_correlation` returns a view sharing the same client lifetime. Milestones include admission entry/wait/grant, local Gun-call return, accepted headers and HTTP termination. These are best-effort diagnostics, independent of typed failure evidence and recording outcomes. Read [the exact ownership, timing, delivery and mode contracts](OBSERVATIONS.md).

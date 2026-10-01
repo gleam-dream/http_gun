@@ -1,0 +1,11 @@
+gleam 1.18.1
+OTP 28 ERTS 16.4.0.6
+  Resolving versions
+error: Hex API failure
+
+There was a problem when using the Hex API.
+
+This was error from the Hex client library:
+
+    The rate limit for the Hex API has been exceeded
+

@@ -1,0 +1,135 @@
+  Resolving versions
+Downloading packages
+ Downloaded 21 packages in 0.12s
+  Compiling gleam_stdlib
+/private/tmp/nix-shell.n5du96/http-gun-downstream-vz6d9_ng/llm_wire/build/dev/erlang/gleam_stdlib/_gleam_artefacts/gleam_stdlib.erl:75:10: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%   75|     case catch binary_to_integer(String, Base) of
+%     |          ^
+
+/private/tmp/nix-shell.n5du96/http-gun-downstream-vz6d9_ng/llm_wire/build/dev/erlang/gleam_stdlib/_gleam_artefacts/gleam_stdlib.erl:81:10: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%   81|     case catch binary_to_integer(String) of
+%     |          ^
+
+/private/tmp/nix-shell.n5du96/http-gun-downstream-vz6d9_ng/llm_wire/build/dev/erlang/gleam_stdlib/_gleam_artefacts/gleam_stdlib.erl:87:10: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%   87|     case catch binary_to_float(String) of
+%     |          ^
+
+  Compiling gleam_erlang
+  Compiling gleam_http
+  Compiling gleam_json
+  Compiling gleam_httpc
+  Compiling anthropic_gleam
+warning: Deprecated value used
+    ┌─ /private/tmp/nix-shell.n5du96/http-gun-downstream-vz6d9_ng/llm_wire/build/packages/anthropic_gleam/src/anthropic/streaming/handler.gleam:404:35
+    │
+404 │   use stream_result <- result.try(stream_message(api_client, message_request))
+    │                                   ^^^^^^^^^^^^^^ This value has been deprecated
+
+It was deprecated with this message: Use api.chat_stream instead
+
+  Compiling cowlib
+===> Analyzing applications...
+===> Compiling cowlib
+  Compiling exception
+  Compiling file_streams
+  Compiling filepath
+  Compiling gleam_crypto
+  Compiling gleam_otp
+  Compiling gleeunit
+  Compiling logging
+  Compiling glisten
+  Compiling gramps
+warning: Deprecated type used
+    ┌─ /private/tmp/nix-shell.n5du96/http-gun-downstream-vz6d9_ng/llm_wire/build/packages/gramps/src/gramps/http.gleam:132:52
+    │
+132 │ pub fn response_builder(status: Int, headers: List(Header)) -> BytesTree {
+    │                                                    ^^^^^^ This type has been deprecated
+
+It was deprecated with this message: Use #(String, String) instead
+
+warning: Deprecated type used
+    ┌─ /private/tmp/nix-shell.n5du96/http-gun-downstream-vz6d9_ng/llm_wire/build/packages/gramps/src/gramps/http.gleam:209:37
+    │
+209 │ pub fn encode_headers(headers: List(Header)) -> BytesTree {
+    │                                     ^^^^^^ This type has been deprecated
+
+It was deprecated with this message: Use #(String, String) instead
+
+  Compiling gun
+===> Analyzing applications...
+===> Compiling gun
+  Compiling hpack_erl
+===> Analyzing applications...
+===> Compiling hpack
+  Compiling simplifile
+  Compiling telemetry
+===> Analyzing applications...
+===> Compiling telemetry
+  Compiling sinal
+  Compiling http_gun
+  Compiling json_blueprint
+  Compiling mist
+warning: Deprecated type used
+   ┌─ /private/tmp/nix-shell.n5du96/http-gun-downstream-vz6d9_ng/llm_wire/build/packages/mist/src/mist/internal/encoder.gleam:16:17
+   │
+16 │   headers: List(Header),
+   │                 ^^^^^^ This type has been deprecated
+
+It was deprecated with this message: Use #(String, String) instead
+
+warning: Deprecated type used
+   ┌─ /private/tmp/nix-shell.n5du96/http-gun-downstream-vz6d9_ng/llm_wire/build/packages/mist/src/mist/internal/encoder.gleam:95:37
+   │
+95 │ pub fn encode_headers(headers: List(Header)) -> BytesTree {
+   │                                     ^^^^^^ This type has been deprecated
+
+It was deprecated with this message: Use #(String, String) instead
+
+warning: Deprecated type used
+   ┌─ /private/tmp/nix-shell.n5du96/http-gun-downstream-vz6d9_ng/llm_wire/build/packages/mist/src/mist/internal/http2.gleam:63:17
+   │
+63 │   headers: List(Header),
+   │                 ^^^^^^ This type has been deprecated
+
+It was deprecated with this message: Use #(String, String) instead
+
+warning: Deprecated type used
+    ┌─ /private/tmp/nix-shell.n5du96/http-gun-downstream-vz6d9_ng/llm_wire/build/packages/mist/src/mist/internal/http2.gleam:169:20
+    │
+169 │ ) -> Result(#(List(Header), HpackContext), HpackError)
+    │                    ^^^^^^ This type has been deprecated
+
+It was deprecated with this message: Use #(String, String) instead
+
+warning: Deprecated type used
+    ┌─ /private/tmp/nix-shell.n5du96/http-gun-downstream-vz6d9_ng/llm_wire/build/packages/mist/src/mist/internal/http2.gleam:174:17
+    │
+174 │   headers: List(Header),
+    │                 ^^^^^^ This type has been deprecated
+
+It was deprecated with this message: Use #(String, String) instead
+
+warning: Deprecated type used
+   ┌─ /private/tmp/nix-shell.n5du96/http-gun-downstream-vz6d9_ng/llm_wire/build/packages/mist/src/mist/internal/http2/stream.gleam:60:17
+   │
+60 │   headers: List(Header),
+   │                 ^^^^^^ This type has been deprecated
+
+It was deprecated with this message: Use #(String, String) instead
+
+warning: Deprecated type used
+    ┌─ /private/tmp/nix-shell.n5du96/http-gun-downstream-vz6d9_ng/llm_wire/build/packages/mist/src/mist/internal/http2/stream.gleam:143:17
+    │
+143 │   headers: List(Header),
+    │                 ^^^^^^ This type has been deprecated
+
+It was deprecated with this message: Use #(String, String) instead
+
+   Checking llm_wire
+   Compiled in 18.26s

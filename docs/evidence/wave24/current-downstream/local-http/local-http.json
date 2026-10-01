@@ -1,0 +1,89 @@
+{
+  "command": "python3 dev/local-http.py",
+  "peer_max_streams": 8,
+  "client_connections": 1,
+  "client_active": 2048,
+  "client_waiting": 2048,
+  "slow_stream_bytes": 2097152,
+  "sampling_interval_ms": 10,
+  "log_prefix_limit": 262144,
+  "log_sha256": "a2d4ac895819979f16dda341eaa2803affd554b9233b11ec6455d4a4ce832477",
+  "request_connection_ids": [
+    "2"
+  ],
+  "rst_stream": 2,
+  "request_headers": 1116,
+  "h2_selected": 1,
+  "results": [
+    {
+      "scenario": "h2_cancel_sibling",
+      "healthy_text_bytes": 2097152,
+      "cancelled": true
+    },
+    {
+      "scenario": "simultaneous",
+      "callers": 1,
+      "failures": 0,
+      "elapsed_us": 571,
+      "p50_us": 540,
+      "p95_us": 540,
+      "max_us": 540,
+      "connections": 1,
+      "vm_memory_peak_bytes": 61852715,
+      "process_memory_peak_bytes": 689488,
+      "mailbox_total_peak": 1,
+      "mailbox_single_peak": 1,
+      "process_count_peak": 98,
+      "ports_peak": 3
+    },
+    {
+      "scenario": "simultaneous",
+      "callers": 10,
+      "failures": 0,
+      "elapsed_us": 1346,
+      "p50_us": 1032,
+      "p95_us": 1235,
+      "max_us": 1282,
+      "connections": 1,
+      "vm_memory_peak_bytes": 63057235,
+      "process_memory_peak_bytes": 689488,
+      "mailbox_total_peak": 1,
+      "mailbox_single_peak": 1,
+      "process_count_peak": 103,
+      "ports_peak": 3
+    },
+    {
+      "scenario": "simultaneous",
+      "callers": 100,
+      "failures": 0,
+      "elapsed_us": 12282,
+      "p50_us": 7671,
+      "p95_us": 11783,
+      "max_us": 12091,
+      "connections": 1,
+      "vm_memory_peak_bytes": 63931651,
+      "process_memory_peak_bytes": 689488,
+      "mailbox_total_peak": 4,
+      "mailbox_single_peak": 4,
+      "process_count_peak": 338,
+      "ports_peak": 3
+    },
+    {
+      "scenario": "simultaneous",
+      "callers": 1000,
+      "failures": 0,
+      "elapsed_us": 117027,
+      "p50_us": 62324,
+      "p95_us": 109290,
+      "max_us": 115318,
+      "connections": 1,
+      "vm_memory_peak_bytes": 101945835,
+      "process_memory_peak_bytes": 2847784,
+      "mailbox_total_peak": 12,
+      "mailbox_single_peak": 12,
+      "process_count_peak": 3564,
+      "ports_peak": 3
+    }
+  ],
+  "consumer_exit": 0
+}

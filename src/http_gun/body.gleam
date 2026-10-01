@@ -19,6 +19,7 @@ import http_gun/internal/bridge
 import http_gun/internal/call
 import http_gun/internal/observation as obs
 import http_gun/recording
+import http_gun/telemetry
 
 pub opaque type Body {
   Body(subject: process.Subject(Message), protocol: config.Negotiated)
@@ -87,6 +88,7 @@ type State {
     credit: Int,
     waiting: Option(Waiting),
     release: fn(Bool) -> Nil,
+    observation: Option(telemetry.Context),
   )
 }
 
@@ -187,6 +189,7 @@ pub fn start(
   release: fn(Bool) -> Nil,
   capture: Option(recording.Capture),
   token: Option(cancellation.Token),
+  observation: Option(telemetry.Context),
 ) -> actor.StartResult(Body) {
   actor.new_with_initialiser(1000, fn(subject) {
     let _ = process.monitor(client)
@@ -217,6 +220,7 @@ pub fn start(
           )
           |> result.map_error(fn(_) { "request submission failed" }),
         )
+        telemetry.emit(observation, telemetry.GunCallReturned)
         Ok(#(Gun(connection, stream), protocol))
       }
       Script(reply) -> Ok(#(Scripted(script_steps(reply)), config.Offline))
@@ -245,6 +249,7 @@ pub fn start(
         1,
         None,
         release,
+        observation,
       )
     let selector =
       process.new_selector()
@@ -482,6 +487,10 @@ fn observe(state: State, event: obs.Observation) -> State {
               case check_headers(headers, state.limits, ResponseHeaders) {
                 Error(failure) -> finish(state, Error(failure))
                 Ok(Nil) -> {
+                  telemetry.emit(
+                    state.observation,
+                    telemetry.ResponseHeaders(status),
+                  )
                   process.send(
                     reply,
                     Ok(response.Response(
@@ -585,12 +594,14 @@ fn finish(
         Ok(_) ->
           Failure(error.RequestFailed(error.UnknownTransport), MayHaveBeenSent)
       }
+      telemetry.emit(state.observation, telemetry.termination(Error(failure)))
       process.send(reply, Error(failure))
       let state = capture_event(state, obs.Failed(failure))
       release(state, outcome)
       State(..state, phase: Rejected(failure))
     }
     Reading -> {
+      telemetry.emit(state.observation, telemetry.termination(outcome))
       let state =
         capture_event(state, case outcome {
           Ok(headers) -> obs.Complete(headers)

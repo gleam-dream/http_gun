@@ -1,0 +1,65 @@
+  Compiling http_gun
+error: Unknown module value
+   ┌─ /code/gleam-dream/http_gun/test/http_gun_adoption_test.gleam:20:12
+   │
+20 │   http_gun.request_ceiling_ms(live) |> should.equal(1234)
+   │            ^^^^^^^^^^^^^^^^^^
+
+The module `http_gun` does not have a `request_ceiling_ms` value.
+
+error: Unknown module value
+   ┌─ /code/gleam-dream/http_gun/test/http_gun_adoption_test.gleam:21:12
+   │
+21 │   http_gun.request_ceiling_ms(script) |> should.equal(1234)
+   │            ^^^^^^^^^^^^^^^^^^
+
+The module `http_gun` does not have a `request_ceiling_ms` value.
+
+error: Unknown module value
+   ┌─ /code/gleam-dream/http_gun/test/http_gun_adoption_test.gleam:24:12
+   │
+24 │   http_gun.request_ceiling_ms(live) |> should.equal(1234)
+   │            ^^^^^^^^^^^^^^^^^^
+
+The module `http_gun` does not have a `request_ceiling_ms` value.
+
+error: Unknown module value
+   ┌─ /code/gleam-dream/http_gun/test/http_gun_adoption_test.gleam:25:12
+   │
+25 │   http_gun.request_ceiling_ms(script) |> should.equal(1234)
+   │            ^^^^^^^^^^^^^^^^^^
+
+The module `http_gun` does not have a `request_ceiling_ms` value.
+
+error: Unknown module value
+   ┌─ /code/gleam-dream/http_gun/test/http_gun_adoption_test.gleam:27:12
+   │
+27 │   http_gun.request_ceiling_ms(other) |> should.equal(30_000)
+   │            ^^^^^^^^^^^^^^^^^^
+
+The module `http_gun` does not have a `request_ceiling_ms` value.
+
+error: Unknown module value
+   ┌─ /code/gleam-dream/http_gun/test/http_gun_adoption_test.gleam:28:12
+   │
+28 │   http_gun.request_ceiling_ms(live) |> should.equal(1234)
+   │            ^^^^^^^^^^^^^^^^^^
+
+The module `http_gun` does not have a `request_ceiling_ms` value.
+
+error: Unknown module value
+   ┌─ /code/gleam-dream/http_gun/test/http_gun_adoption_test.gleam:33:16
+   │
+33 │   cancellation.try_with_token(Startup, fn(_) { Error(Rejected) })
+   │                ^^^^^^^^^^^^^^ Did you mean `with_token`?
+
+The module `http_gun/cancellation` does not have a `try_with_token` value.
+
+error: Unknown module value
+   ┌─ /code/gleam-dream/http_gun/test/http_gun_adoption_test.gleam:36:18
+   │
+36 │     cancellation.try_with_token(Startup, fn(token) { Ok(#(token, 42)) })
+   │                  ^^^^^^^^^^^^^^ Did you mean `with_token`?
+
+The module `http_gun/cancellation` does not have a `try_with_token` value.
+

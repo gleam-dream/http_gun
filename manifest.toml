@@ -18,6 +18,8 @@ packages = [
   { name = "gleeunit", version = "1.9.0", build_tools = ["gleam"], requirements = ["gleam_stdlib"], otp_app = "gleeunit", source = "hex", outer_checksum = "DA9553CE58B67924B3C631F96FE3370C49EB6D6DC6B384EC4862CC4AAA718F3C" },
   { name = "gun", version = "2.6.0", build_tools = ["make", "rebar3"], requirements = ["cowlib"], otp_app = "gun", source = "hex", outer_checksum = "69BB957F4BD6C475B5714460FD65C26FC7EB85760AA64B74754DE36CE5CCED7D" },
   { name = "simplifile", version = "2.7.0", build_tools = ["gleam"], requirements = ["filepath", "gleam_stdlib"], otp_app = "simplifile", source = "hex", outer_checksum = "A2727627B063E87351934C7F7F008F2D1FDB16F6DE0B8C79F9E46459CFC9C164" },
+  { name = "sinal", version = "0.1.0", build_tools = ["gleam"], requirements = ["gleam_erlang", "gleam_otp", "gleam_stdlib", "telemetry"], source = "local", path = "../sinal" },
+  { name = "telemetry", version = "1.4.2", build_tools = ["rebar3"], requirements = [], otp_app = "telemetry", source = "hex", outer_checksum = "928F6495066506077862C0D1646609EED891A4326BEE3126BA54B60AF61FEBB1" },
 ]
 
 [requirements]
@@ -31,3 +33,4 @@ gleam_stdlib = { version = ">= 0.71.0 and < 1.0.0" }
 gleeunit = { version = ">= 1.0.0 and < 2.0.0" }
 gun = { version = "== 2.6.0" }
 simplifile = { version = "== 2.7.0" }
+sinal = { path = "../sinal" }

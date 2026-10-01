@@ -1,0 +1,536 @@
+--- a/README.md
++++ b/README.md
+@@ -458,8 +458,8 @@
+ - **Routed ordering holds per route**: a producer's `emit_routed` events that resolve to the same forwarder, or that are all unrouted, keep its send order. Events split across routes, or across a route change, have no relative order; after an `unroute`, a later synchronous event can run before an earlier forwarded one.
+ - **Routes are node-global setup values**: they live in `persistent_term`, so `emit_routed` reads them without a lock (with no routes, it costs one lookup over `sinal.emit`; see the benchmark), while `route` and `unroute` are expensive and belong at application start and shutdown. Unroute before stopping a routed forwarder, or its events are dropped as unavailable (counted, but reported only if that forwarder starts again).
+ - **Forwarder shutdown does not drain**: messages still in flight when the forwarder process stops are lost, not delivered. A supervised restart drains and reports that loss once, as `Dropped(lost:)`, from the fresh incarnation's own first message.
+-- **Every drop is counted; only a running forwarder reports**: the three `Dropped` counts never overlap. `rejected` counts `CapacityExceeded`, `lost` counts admitted messages a stopped incarnation never handled, and `unavailable` counts `ForwarderUnavailable` sends. The counts belong to the `Forwarder` value, so they survive restarts. A starting incarnation reports all three once as its first message; while it runs, the next drop report also carries any `unavailable` drop that raced its start. Each report resets what it carries. If no incarnation of that `Forwarder` ever starts again, its counts are never reported, and the `ForwarderUnavailable` result is the only signal; a start report is also lost if its incarnation stops before handling it.
+-- **A forwarder's `lost` count is an approximate upper bound, not exact**: `gleam_otp` registers a restarting actor's name before its initialiser runs, so a concurrent `emit` can already resolve to the new incarnation and queue a real `Execute` message before that incarnation has drained the slot it inherited; such a message can be counted as `lost` even though it is still delivered. The in-flight counter itself is protected against going negative from this (a floored decrement), so this can only ever overcount `lost`, never let the live counter under-count what is truly in flight or silently raise capacity.
++- **Drop reporting is best effort**: `rejected` counts capacity refusals and `unavailable` counts sends made without a published target. These diagnostic counters survive restarts. `lost` snapshots outstanding work when a replacement starts; races with producers and handler completion can over- or under-count it. Reports can themselves be lost when their process stops. Observation success is never a delivery receipt.
++- **Capacity belongs to an incarnation**: a one-row named ETS table publishes a direct event subject together with fresh admission counters after initialisation. The table is owned by the actor and disappears on its death. A delayed producer retains the old subject and counters and cannot send into a replacement actor. Before publication, sends return `ForwarderUnavailable`. Admission counts pending events plus the executing handler; coalesced control messages are separate. An existing ETS table with the forwarder name makes startup fail with `InitFailed`.
+ - **Concurrent emitters may see a spurious, safe rejection near the capacity boundary**: admission is a single atomic increment-then-check, so it never over-admits, but under concurrent load at the boundary it can reject a send that would have fit under a different ordering. It never admits past capacity.
+ 
+ ---
+--- a/src/sinal/forwarder.gleam
++++ b/src/sinal/forwarder.gleam
+@@ -30,21 +30,21 @@
+ ////   context on the producer is not carried across the hop, and a native
+ ////   telemetry span cannot be forwarded (its start and stop must share one
+ ////   process to measure duration).
+-//// - **Shutdown does not drain.** Messages still in flight when the
+-////   forwarder process stops are lost, not delivered. A supervised restart
+-////   reports that loss: the leftover in-flight count inherited from the
+-////   previous incarnation is read and reset once the new incarnation starts
+-////   handling messages, and reported through `dropped_event`.
+-//// - **`lost` is an approximate upper bound, not an exact count.** `gleam_otp`
+-////   registers a restarting actor's name before its initialiser runs, so a
+-////   concurrent `emit` can already resolve to the new incarnation and queue
+-////   a real Execute message before that incarnation drains the slot it
+-////   inherited; such a message can be counted as `lost` even though it is
+-////   still delivered. A kill between a handler finishing and its decrement
+-////   running has the same effect. The in-flight counter itself never goes
+-////   negative from this (a floored decrement), so it cannot silently raise
+-////   capacity — only `lost` can overcount, never the live counter undercount
+-////   what is truly in flight.
++//// - **Shutdown does not drain.** Pending events are lost when the process
++////   stops. A restart takes a best-effort snapshot of the shared diagnostic
++////   count and reports it as `lost`. This count is not a delivery receipt:
++////   producers racing termination and handler completion can make it over-
++////   or under-count. It never controls admission.
++//// - **Capacity belongs to one incarnation.** Each running actor owns a
++////   single-row named ETS table pairing its direct subject with fresh slot
++////   counters. It publishes that row only after initialisation. Before that,
++////   producers receive `ForwarderUnavailable`. A delayed producer keeps the
++////   old subject and counters; it cannot enqueue into the replacement actor.
++////   The table disappears automatically when its owner dies. Its name is the
++////   forwarder's process name in the separate ETS namespace; a pre-existing
++////   ETS table of that name makes startup fail with a typed InitFailed error.
++////   Capacity counts queued Execute messages plus the executing handler;
++////   coalesced control messages are additional, bounded bookkeeping.
+ //// - **One `Forwarder` per name.** Each call to `new` allocates its own,
+ ////   independent counters; constructing two `Forwarder` values for the same
+ ////   `process.Name` does not share capacity accounting between them.
+@@ -134,13 +134,13 @@
+   ForwarderUnavailable
+ }
+ 
+-/// One drop report. Every count covers the drops since the previous report
+-/// of the same `Forwarder`, and no send is counted in two of them.
++/// One best-effort diagnostic report. Refusal counters cover increments
++/// since their preceding drain. `lost` is a snapshot, not exact accounting.
+ ///
+ /// - `rejected`: sends refused with `CapacityExceeded`.
+ /// - `lost`: admitted sends still in flight when the previous incarnation
+ ///   stopped (zero outside a report made when an incarnation starts; an
+-///   approximate upper bound, see the module doc).
++///   best-effort diagnostic snapshot, see the module doc).
+ /// - `unavailable`: sends refused with `ForwarderUnavailable` because no
+ ///   incarnation was running. They took no capacity.
+ pub type Dropped {
+@@ -152,6 +152,23 @@
+ }
+ 
+ type Counters
++
++type Target {
++  Target(subject: process.Subject(Message), slots: Counters)
++}
++
++type Running {
++  Running(forwarder: Forwarder, slots: Counters)
++}
++
++@external(erlang, "sinal_forwarder_ffi", "publish_target")
++fn publish_target(
++  name: process.Name(Message),
++  target: Target,
++) -> Result(Nil, Nil)
++
++@external(erlang, "sinal_forwarder_ffi", "find_target")
++fn find_target(name: process.Name(Message)) -> Result(Target, Nil)
+ 
+ @external(erlang, "sinal_forwarder_ffi", "new_counters")
+ fn new_counters() -> Counters
+@@ -198,27 +215,27 @@
+   }
+ }
+ 
+-/// Describes the forwarder's process for an OTP supervisor. Restarting under
+-/// this specification reuses the same counters, so a fresh incarnation can
+-/// report what the previous one lost.
++/// Describes the forwarder's process for an OTP supervisor. Drop diagnostics
++/// survive a restart; admission counters and the direct event subject do not.
+ pub fn supervised(forwarder: Forwarder) -> supervision.ChildSpecification(Nil) {
+   supervision.worker(fn() { start_forwarder(forwarder) })
+ }
+ 
+-/// Drains all three counters and, if any held anything, queues the report as
+-/// the incarnation's own first message rather than emitting it here. Native
+-/// telemetry handlers for `dropped_event` run synchronously and are
+-/// arbitrary application code; running them inside the initialiser would
+-/// count against the 1000ms initialisation timeout and could fail the whole
+-/// restart. Draining now and reporting from `handle_message` keeps the
+-/// timeout bounded to the drain itself.
++/// Initialise diagnostics and fresh admission slots before publishing a target.
++/// User handlers run only from handle_message, outside actor initialisation.
+ fn start_forwarder(
+   forwarder: Forwarder,
+ ) -> Result(actor.Started(Nil), actor.StartError) {
+   actor.new_with_initialiser(1000, fn(subject) {
++    let slots = new_counters()
++    let events = process.new_subject()
+     let lost = exchange(forwarder.counters, in_flight_index, 0)
+     let rejected = exchange(forwarder.counters, drop_index, 0)
+     let unavailable = exchange(forwarder.counters, unavailable_index, 0)
++    use Nil <- result.try(
++      publish_target(forwarder.name, Target(events, slots))
++      |> result.map_error(fn(_) { "forwarder target table already exists" }),
++    )
+     case lost > 0 || rejected > 0 || unavailable > 0 {
+       True ->
+         process.send(
+@@ -227,7 +244,14 @@
+         )
+       False -> Nil
+     }
+-    actor.initialised(forwarder) |> actor.returning(Nil) |> Ok
++    actor.initialised(Running(forwarder, slots))
++    |> actor.selecting(
++      process.new_selector()
++      |> process.select(subject)
++      |> process.select(events),
++    )
++    |> actor.returning(Nil)
++    |> Ok
+   })
+   |> actor.named(forwarder.name)
+   |> actor.on_message(handle_message)
+@@ -235,37 +259,29 @@
+ }
+ 
+ fn handle_message(
+-  state: Forwarder,
++  state: Running,
+   message: Message,
+-) -> actor.Next(Forwarder, Message) {
++) -> actor.Next(Running, Message) {
++  let forwarder = state.forwarder
+   case message {
+     Execute(name, measurements, metadata) -> {
+       ffi.telemetry_execute(name, measurements, metadata)
+-      let _ = decrement_floor(state.counters, in_flight_index)
++      let _ = decrement_floor(state.slots, in_flight_index)
++      let _ = decrement_floor(forwarder.counters, in_flight_index)
+       actor.continue(state)
+     }
+     ReportDrops -> {
+-      let rejected = exchange(state.counters, drop_index, 0)
+-      let unavailable = exchange(state.counters, unavailable_index, 0)
+-      // Guards against a spurious empty `Dropped(0, 0, 0)`: normally this
+-      // message is only ever sent after `report_drop`'s own 0→1 transition
+-      // of one of the two slots, so one of them is positive here. The
+-      // exceptions are a restart racing this exact send (see the module
+-      // doc's registration-before-initialiser note and
+-      // `restart_under_load_never_inflates_capacity_test`'s dropped-event
+-      // assertion), where a fresh incarnation's own startup drain reads and
+-      // resets the slots before a `ReportDrops` sent to the old
+-      // incarnation's name is processed by the new one, and a second
+-      // `ReportDrops` queued by the other slot's transition in the same
+-      // cycle, which finds both slots already drained by the first.
++      let rejected = exchange(forwarder.counters, drop_index, 0)
++      let unavailable = exchange(forwarder.counters, unavailable_index, 0)
+       case rejected > 0 || unavailable > 0 {
+-        True -> emit_dropped(state, Dropped(rejected:, lost: 0, unavailable:))
++        True ->
++          emit_dropped(forwarder, Dropped(rejected:, lost: 0, unavailable:))
+         False -> Nil
+       }
+       actor.continue(state)
+     }
+     ReportStartDrops(dropped) -> {
+-      emit_dropped(state, dropped)
++      emit_dropped(forwarder, dropped)
+       actor.continue(state)
+     }
+   }
+@@ -413,29 +429,28 @@
+   raw_measurements: Dynamic,
+   raw_metadata: Dynamic,
+ ) -> Result(Nil, ForwardError) {
+-  let in_flight = add_get(forwarder.counters, in_flight_index, 1)
++  use target <- result.try(
++    find_target(forwarder.name)
++    |> result.map_error(fn(_) {
++      report_drop(forwarder, unavailable_index)
++      ForwarderUnavailable
++    }),
++  )
++  let in_flight = add_get(target.slots, in_flight_index, 1)
+   case in_flight > forwarder.capacity {
+     True -> {
+-      let _ = decrement_floor(forwarder.counters, in_flight_index)
++      let _ = decrement_floor(target.slots, in_flight_index)
+       report_drop(forwarder, drop_index)
+       Error(CapacityExceeded)
+     }
+-    False ->
+-      case
+-        try_send_thunk(fn() {
+-          process.send(
+-            process.named_subject(forwarder.name),
+-            Execute(name, raw_measurements, raw_metadata),
+-          )
+-        })
+-      {
+-        Ok(Nil) -> Ok(Nil)
+-        Error(Nil) -> {
+-          let _ = decrement_floor(forwarder.counters, in_flight_index)
+-          report_drop(forwarder, unavailable_index)
+-          Error(ForwarderUnavailable)
+-        }
+-      }
++    False -> {
++      let _ = add_get(forwarder.counters, in_flight_index, 1)
++      process.send(
++        target.subject,
++        Execute(name, raw_measurements, raw_metadata),
++      )
++      Ok(Nil)
++    }
+   }
+ }
+ 
+--- a/src/sinal_forwarder_ffi.erl
++++ b/src/sinal_forwarder_ffi.erl
+@@ -1,6 +1,8 @@
+ -module(sinal_forwarder_ffi).
+ 
+ -export([
++    publish_target/2,
++    find_target/1,
+     new_counters/0,
+     add_get/3,
+     exchange/3,
+@@ -11,7 +13,8 @@
+     find_route/1
+ ]).
+ 
+-%% Three lock-free signed slots shared across a forwarder's lifetime,
++%% Three lock-free signed slots used for diagnostic counts or local admission.
++%% Diagnostic slots are shared across a forwarder's lifetime,
+ %% including across a supervisor restart of the process that drains them.
+ %% They belong to the `Forwarder` value, not to any process, so they outlive
+ %% every incarnation for as long as that value is referenced:
+@@ -31,21 +34,9 @@
+ exchange(Ref, Index, Value) ->
+     atomics:exchange(Ref, Index, Value).
+ 
+-%% Decrements a slot but never past 0, via a compare-and-swap retry loop.
+-%%
+-%% A restarting forwarder is registered under its name before its own
+-%% initialiser runs (an `actor.start`/`gleam_otp` ordering, not something
+-%% this module controls), so a concurrent `emit` can resolve the name to the
+-%% new incarnation and queue an Execute message before that incarnation has
+-%% drained the slot it inherited from the one that crashed. The queued
+-%% message is real and will still be processed, but the drain can already
+-%% have counted it (or count towards it) as `lost`. Without a floor, the
+-%% later post-execute decrement for that same message would then take the
+-%% freshly-reset counter negative, permanently and silently raising the
+-%% effective capacity for the rest of that incarnation's life. Flooring at 0
+-%% cannot make the counter under-count a message still genuinely in flight
+-%% (the increment that admitted it already happened), so it only ever
+-%% removes a spurious negative, never a real one.
++%% Floored decrement is also used by best-effort diagnostic counters that
++%% may be drained across a restart. Admission uses separate counters belonging
++%% exclusively to one incarnation; those are never reset while it is alive.
+ decrement_floor(Ref, Index) ->
+     decrement_floor(Ref, Index, atomics:get(Ref, Index)).
+ 
+@@ -116,3 +107,21 @@
+         true -> {ok, Forwarder};
+         false -> find_route(Name, Rest)
+     end.
++
++%% The table belongs to this actor incarnation and disappears on its death.
++%% Its single typed row couples a direct subject to that incarnation's slots.
++%% Concurrent producers cannot see the target before it is fully initialised.
++publish_target(Name, Target) ->
++    try
++        Table = ets:new(Name, [named_table, protected, {read_concurrency, true}]),
++        true = ets:insert(Table, {target, Target}),
++        {ok, nil}
++    catch error:badarg -> {error, nil}
++    end.
++
++find_target(Name) ->
++    try ets:lookup(Name, target) of
++        [{target, Target}] -> {ok, Target};
++        [] -> {error, nil}
++    catch error:badarg -> {error, nil}
++    end.
+--- a/test/forwarder_test.gleam
++++ b/test/forwarder_test.gleam
+@@ -619,38 +619,9 @@
+   { dropped.rejected > 0 } |> should.equal(True)
+ }
+ 
+-// (race) Restart racing concurrent emitters must never leave the in-flight
+-// counter negative, which would silently raise the effective capacity for
+-// the rest of that incarnation's life. `gleam_otp` registers a restarting
+-// actor's name before its initialiser runs, so a concurrent emit can land an
+-// Execute message in the new incarnation's mailbox before that incarnation's
+-// own reset-to-0 has run (see the module doc and `decrement_floor_never_
+-// goes_negative_test` above, which is what actually prevents the negative
+-// value). This test drives many concurrent emitters through several forced
+-// restarts and then checks capacity is still exactly enforced on whichever
+-// incarnation is left running, without an intervening "clean" restart that
+-// would mask the leak by resetting the counter again.
+-//
+-// This is a best-effort stress test, not a guaranteed reproduction: hitting
+-// the exact race window is not deterministic. It cannot go red on a correct
+-// implementation (capacity is respected whether or not the window is hit),
+-// and it raises the odds of catching a regression that removes the floored
+-// decrement, without being able to guarantee it on any single run.
+-//
+-// A deterministic reproduction was considered and rejected. The window this
+-// races against is entirely inside `gleam_otp`'s own `actor.start`: it
+-// registers the restarting actor's name, then runs this module's
+-// initialiser, and nothing in `sinal/forwarder` runs between those two
+-// steps for a test to hook. The only way to widen the window on demand
+-// would be to add a test-only delay inside the initialiser itself (a
+-// production code path) purely so a test elsewhere could schedule a
+-// concurrent `emit` into it — a permanent seam in shipped code for one
+-// test's benefit, which this module avoids. `erlang:suspend_process`
+-// cannot substitute for that seam either: there is no way to name the new
+-// incarnation's pid until it has already registered, and by then the
+-// initialiser is typically already running or done, so suspending it only
+-// after the fact narrows nothing. Hammering many concurrent emitters
+-// through several forced restarts, as below, is the practical alternative.
++// Smoke-test restarts under concurrent production. A separate synchronized
++// temporary-copy probe covers publication during startup and stale senders.
++// Capacity belongs to the current incarnation, never the diagnostic counter.
+ pub fn restart_under_load_never_inflates_capacity_test() {
+   let name = process.new_name("forwarder-race")
+   let assert Ok(fwd) = forwarder.new(name, 3)
+--- /dev/null
++++ b/dev/check_forwarder.py
+@@ -0,0 +1,50 @@
++#!/usr/bin/env python3
++"""Synchronize startup and delayed-send races in an isolated source copy.
++
++No production test seam: instrumentation is applied only in the temporary copy.
++Requires gleam/OTP on PATH. --source selects an original or candidate checkout.
++"""
++import argparse
++from pathlib import Path
++import shutil
++import subprocess
++import tempfile
++
++parser = argparse.ArgumentParser(description=__doc__)
++parser.add_argument('--source', type=Path, default=Path(__file__).resolve().parent.parent)
++parser.add_argument('--scenario', choices=['both', 'startup', 'delayed_sender'], default='both')
++args = parser.parse_args()
++assets = Path(__file__).resolve().parent
++with tempfile.TemporaryDirectory(prefix='sinal-forwarder-race-') as directory:
++    work = Path(directory)
++    for name in ['src', 'gleam.toml', 'manifest.toml']:
++        source = args.source / name
++        if source.is_dir():
++            shutil.copytree(source, work / name)
++        else:
++            shutil.copy2(source, work / name)
++    cache = args.source / 'build/packages'
++    if cache.exists():
++        shutil.copytree(cache, work / 'build/packages')
++    target = work / 'src/sinal/forwarder.gleam'
++    text = target.read_text()
++    anchor = 'actor.new_with_initialiser(1000, fn(subject) {'
++    assert text.count(anchor) == 1
++    text = text.replace(anchor, anchor + '\n    probe_before_start()')
++    start = text.index('fn forward(')
++    end = text.index('/// Increments a drop slot', start)
++    body = text[start:end]
++    assert body.count('process.send(') == 1
++    body = body.replace('process.send(', 'probe_before_send()\n          process.send(', 1)
++    text = text[:start] + body + text[end:]
++    text += '\n@external(erlang, "restart_probe_ffi", "before_start")\nfn probe_before_start() -> Nil\n'
++    text += '\n@external(erlang, "restart_probe_ffi", "before_send")\nfn probe_before_send() -> Nil\n'
++    target.write_text(text)
++    for filename in ['restart_probe.gleam', 'restart_probe_ffi.erl']:
++        shutil.copy2(assets / (filename + '.txt'), work / 'src' / filename)
++    if args.scenario != 'both':
++        probe = work / 'src/restart_probe.gleam'
++        other = 'startup' if args.scenario == 'delayed_sender' else 'delayed_sender'
++        probe.write_text(probe.read_text().replace('  ' + other + '()\n', ''))
++    code = subprocess.run(['gleam', 'run', '-m', 'restart_probe'], cwd=work, timeout=60).returncode
++    raise SystemExit(code)
+--- /dev/null
++++ b/dev/restart_probe.gleam.txt
+@@ -0,0 +1,116 @@
++import gleam/erlang/atom
++import gleam/erlang/process
++import gleam/io
++import gleam/string
++import sinal
++import sinal/fields
++import sinal/forwarder
++
++@external(erlang, "restart_probe_ffi", "set_start_gate")
++fn set_start_gate(gate: fn() -> Nil) -> Nil
++
++@external(erlang, "restart_probe_ffi", "set_send_gate")
++fn set_send_gate(gate: fn() -> Nil) -> Nil
++
++@external(erlang, "restart_probe_ffi", "message_queue_len")
++fn message_queue_len(pid: process.Pid) -> Int
++
++pub fn main() {
++  startup()
++  delayed_sender()
++}
++
++fn stop(pid: process.Pid) {
++  let monitor = process.monitor(pid)
++  process.unlink(pid)
++  process.kill(pid)
++  let selector = process.new_selector()
++    |> process.select_specific_monitor(monitor, fn(down) { down })
++  let assert Ok(_) = process.selector_receive(selector, 1000)
++  Nil
++}
++
++fn startup() {
++  let initialising = process.new_subject()
++  let started = process.new_subject()
++  let entered = process.new_subject()
++  let assert Ok(fwd) = forwarder.new(process.new_name("startup_probe"), 1)
++  let assert Ok(event) = sinal.event([atom.create("startup_probe")], fields.empty(), fields.empty())
++  let assert Ok(id) = sinal.handler_id("startup-probe-handler")
++  let assert Ok(attachment) = sinal.observe(id, event, fn(_, _) {
++    let release = process.new_subject()
++    process.send(entered, release)
++    process.receive_forever(release)
++  })
++  set_start_gate(fn() {
++    let release = process.new_subject()
++    process.send(initialising, release)
++    process.receive_forever(release)
++  })
++  let launcher = process.spawn_unlinked(fn() {
++    let spec = forwarder.supervised(fwd)
++    let assert Ok(child) = spec.start()
++    process.send(started, child.pid)
++    let keep_alive = process.new_subject()
++    process.receive_forever(keep_alive)
++  })
++  let assert Ok(release_init) = process.receive(initialising, 1000)
++  let first = forwarder.emit(fwd, event, Nil, Nil)
++  process.send(release_init, Nil)
++  let assert Ok(pid) = process.receive(started, 1000)
++  case first {
++    Ok(Nil) -> Nil
++    Error(forwarder.ForwarderUnavailable) -> {
++      let assert Ok(Nil) = forwarder.emit(fwd, event, Nil, Nil)
++      Nil
++    }
++    other -> panic as string.inspect(other)
++  }
++  let assert Ok(_) = process.receive(entered, 1000)
++  let second = forwarder.emit(fwd, event, Nil, Nil)
++  io.println("Startup capacity=1: first=" <> string.inspect(first) <> ", second=" <> string.inspect(second))
++  let assert Error(forwarder.CapacityExceeded) = second
++  stop(pid)
++  stop(launcher)
++  let assert Ok(Nil) = sinal.detach(attachment)
++  set_start_gate(fn() { Nil })
++}
++
++fn delayed_sender() {
++  let sending = process.new_subject()
++  let done = process.new_subject()
++  let entered = process.new_subject()
++  let assert Ok(fwd) = forwarder.new(process.new_name("delayed_probe"), 1)
++  let spec = forwarder.supervised(fwd)
++  let assert Ok(first) = spec.start()
++  let assert Ok(event) = sinal.event([atom.create("delayed_probe")], fields.empty(), fields.empty())
++  let assert Ok(id) = sinal.handler_id("delayed-probe-handler")
++  let assert Ok(attachment) = sinal.observe(id, event, fn(_, _) {
++    let release = process.new_subject()
++    process.send(entered, release)
++    process.receive_forever(release)
++  })
++  set_send_gate(fn() {
++    let release = process.new_subject()
++    process.send(sending, release)
++    process.receive_forever(release)
++  })
++  let _ = process.spawn_unlinked(fn() {
++    process.send(done, forwarder.emit(fwd, event, Nil, Nil))
++  })
++  let assert Ok(release_send) = process.receive(sending, 1000)
++  stop(first.pid)
++  set_send_gate(fn() { Nil })
++  let assert Ok(second) = spec.start()
++  let assert Ok(Nil) = forwarder.emit(fwd, event, Nil, Nil)
++  let assert Ok(_) = process.receive(entered, 1000)
++  let before = message_queue_len(second.pid)
++  process.send(release_send, Nil)
++  let assert Ok(_) = process.receive(done, 1000)
++  let after = message_queue_len(second.pid)
++  io.println("Delayed sender across restart: mailbox before=" <> string.inspect(before) <> ", after=" <> string.inspect(after))
++  let assert True = before == after
++  let assert Error(forwarder.CapacityExceeded) = forwarder.emit(fwd, event, Nil, Nil)
++  stop(second.pid)
++  let assert Ok(Nil) = sinal.detach(attachment)
++}
+--- /dev/null
++++ b/dev/restart_probe_ffi.erl.txt
+@@ -0,0 +1,7 @@
++-module(restart_probe_ffi).
++-export([set_start_gate/1, set_send_gate/1, before_start/0, before_send/0, message_queue_len/1]).
++set_start_gate(F) -> persistent_term:put(restart_probe_start, F), nil.
++set_send_gate(F) -> persistent_term:put(restart_probe_send, F), nil.
++before_start() -> (persistent_term:get(restart_probe_start, fun() -> nil end))().
++before_send() -> (persistent_term:get(restart_probe_send, fun() -> nil end))().
++message_queue_len(Pid) -> {message_queue_len, Len} = process_info(Pid, message_queue_len), Len.

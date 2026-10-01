@@ -1,0 +1,38 @@
++ gleam --version
+gleam 1.18.1
++ erl -noshell -eval io:format("OTP ~s ERTS ~s~n",[erlang:system_info(otp_release),erlang:system_info(version)]),halt().
+OTP 27 ERTS 15.2.7.13
++ gleam format --check src test
++ gleam check
+  Compiling gleam_stdlib
+  Compiling gleam_erlang
+  Compiling gleam_otp
+  Compiling gleeunit
+  Compiling telemetry
+===> Analyzing applications...
+===> Compiling telemetry
+   Checking sinal
+   Compiled in 1.48s
++ gleam build --warnings-as-errors
+  Compiling sinal
+   Compiled in 0.72s
++ gleam test
+   Compiled in 0.25s
+    Running sinal_test.main
+.............................................................................................
+93 passed, no failures
++ erlc -Werror -o /tmp/nix-shell.y9nDTF/sinal-candidate-gate-3oq6x43y/ffi-check /tmp/nix-shell.y9nDTF/sinal-candidate-gate-3oq6x43y/src/sinal_ffi.erl /tmp/nix-shell.y9nDTF/sinal-candidate-gate-3oq6x43y/src/sinal_forwarder_ffi.erl /tmp/nix-shell.y9nDTF/sinal-candidate-gate-3oq6x43y/src/sinal_scope_ffi.erl /tmp/nix-shell.y9nDTF/sinal-candidate-gate-3oq6x43y/test/scope_test_ffi.erl /tmp/nix-shell.y9nDTF/sinal-candidate-gate-3oq6x43y/test/forwarder_test_ffi.erl
++ python3 /tmp/nix-shell.y9nDTF/sinal-candidate-gate-3oq6x43y/dev/check_forwarder.py
+  Compiling gleam_stdlib
+  Compiling gleam_erlang
+  Compiling gleam_otp
+  Compiling gleeunit
+  Compiling telemetry
+===> Analyzing applications...
+===> Compiling telemetry
+  Compiling sinal
+   Compiled in 1.33s
+    Running restart_probe.main
+Startup capacity=1: first=Error(ForwarderUnavailable), second=Error(CapacityExceeded)
+Delayed sender across restart: mailbox before=0, after=0
+CANDIDATE GATE PASSED

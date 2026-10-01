@@ -1,6 +1,6 @@
 %% Test-only measurements and finite load source. Never linked into the package.
 -module(http_gun_measure_ffi).
--export([now/0, sampler/0, finish/1, large/1, pause/1, reductions/0]).
+-export([now/0, sampler/0, finish/1, large/1, pause/1, reductions/0, queue_len/1]).
 reductions() -> {N,_} = erlang:statistics(reductions), N.
 now() -> erlang:monotonic_time(microsecond).
 pause(Ms) -> receive after Ms -> nil end.
@@ -23,3 +23,5 @@ large(Bytes) ->
     end), Port.
 send(_,0) -> ok;
 send(S,N) -> Size=min(8192,N), case gen_tcp:send(S,binary:copy(<<42>>,Size)) of ok -> send(S,N-Size); _ -> ok end.
+
+queue_len(Pid) -> {message_queue_len, N} = process_info(Pid, message_queue_len), N.

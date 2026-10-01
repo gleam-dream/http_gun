@@ -43,7 +43,7 @@ Advanced callers can use `open` to obtain `Response(Body)` and explicitly `close
 
 A read-wait timeout returns `ReadTimeout` while preserving the stream and outstanding demand. The overall request deadline covers admission, connection setup and consumption; expiry terminates unfinished HTTP work. Completed data remains readable until close or owner death. Early close, scope exit, consumer death and client shutdown release the lease once. Local cancellation says nothing about whether the server continued processing the request.
 
-Per-request controls use `request_options.Options`: an optional opaque monotonic `Deadline` and scoped cancellation `Token`. Use `send_with_options`, `open_with_options` or the corresponding scoped variants. The effective deadline is the earlier of the client ceiling and the supplied deadline. A shared token can cancel associated requests before headers or during consumption; scope exit and creator death also cancel them. See [usage examples](docs/API_ERGONOMICS.md).
+Per-request controls use `request_options.Options`: an optional opaque monotonic `Deadline` and scoped cancellation `Token`. Use `send_with_options`, `open_with_options` or the corresponding scoped variants. The effective deadline is the earlier of the client ceiling and the supplied deadline. A shared token can cancel associated requests before headers or during consumption; scope exit and creator death also cancel them. See [usage examples](docs/API_ERGONOMICS.md) and the [maintained asynchronous feed recipe](examples/async/README.md), including supervised startup and cancellation before headers.
 
 ## Configuration and lifecycle
 
@@ -59,13 +59,19 @@ let settings = config.Config(
 )
 ```
 
-Defaults: H1, verified system TLS trust, 30-second request deadline, five-second connection budget, 16 connections, four per origin, 100 streams per H2 connection, 128 active body handles and 128 waiting requests. Byte defaults and their precise scope are in [BOUNDS.md](BOUNDS.md).
+`http_gun.request_ceiling_ms(client)` reads that capability’s immutable startup ceiling, even after stop. It does not check liveness or extend a request budget.
+
+Defaults: H1, verified system TLS trust, 30-second request ceiling, five-second connection budget, 16 connections, four per origin, 100 streams per H2 connection, 128 active body handles and 128 waiting requests. Byte defaults and their precise scope are in [BOUNDS.md](BOUNDS.md).
 
 `CustomCa(path)` replaces system trust with a CA file while retaining hostname verification. Each client owns its pool; different trust or transport policies never share connections. `PreferHttp2` negotiates H2 over TLS and otherwise uses H1. `RequireHttp2` requires H2 over TLS; explicit plaintext HTTP uses H2 prior knowledge. Eligible connections are reused before another is opened. Idle sockets yield global slots to other origins. H1 leases are exclusive; H2 leases respect configured and observed peer capacity.
 
 `http_gun.child(settings)` supplies a standard Gleam OTP supervisor child specification. The client process is linked to its starter; `stop` cancels active work and closes connections. A supervisor restart creates a new client capability; old handles remain closed. Gun application startup uses OTP. The library does not stop shared Gun/SSL applications when one client stops.
 
 `Failure(reason, evidence)` distinguishes invalid input, admission, connection, stream, ownership, deadline, limit and fixture failures. Limits carry typed categories and observed sizes; transport and filesystem errors carry bounded causes. `error.describe` omits free-form details and request content. The [API guide](docs/API_ERGONOMICS.md#typed-diagnostics-and-fixture-format) explains error matching. `NotSubmitted` describes failures known to precede submission. `MayHaveBeenSent` is conservative, including uncertain client/process races. Neither value establishes remote execution. Status interpretation and retry decisions belong to the caller. `snapshot` returns finite connection/body/waiting counters without request history.
+
+## Lifecycle observations
+
+Set `config.Config(..defaults, observations: Some(target))` with an application-supervised `sinal/forwarder.Forwarder`. HTTP Gun emits typed admission, local Gun-call return, headers and HTTP termination through `http_gun/telemetry.event()`. `http_gun.with_correlation(client, telemetry.new_id())` makes a pure correlated view of the shared client. Delivery is bounded and best effort; slow observers cause drops, never HTTP backpressure. No URLs, headers, bodies or per-chunk events are emitted. Use HTTP failures for submission evidence, never missing telemetry. See the [contract and public example](docs/OBSERVATIONS.md).
 
 ## One consumer, explicit startup mode
 
@@ -103,12 +109,12 @@ sh dev/matrix              # isolated full gates on OTP 29, 28 and 27
 sh dev/linux-gate          # optional isolated ARM64 Linux matrix via Docker
 ```
 
-The toolchain and Hex packages are locked. Cassette IO uses `file_streams` 1.7.0 and `simplifile` 2.7.0, with small bridges only for missing primitives and exception cleanup. See the [filesystem decision](docs/FILESYSTEM.md). Gates use loopback H1/TLS/H2 servers and temporary fixtures, with no provider credentials or public application endpoints. Initial toolchain/package installation may require network access. CI runs the full gate for each selected runtime. The pinned nghttpd1.70.0 server supplies independent TLS/H2 interoperability; controlled servers supply synchronized faults.
+The toolchain and Hex packages are locked. Unpublished Sinal uses one canonical local source; independent gates materialize its verified snapshot in temporary workspaces. See the [source arrangement](docs/OBSERVATIONS.md#one-sinal-source). Cassette IO uses `file_streams` 1.7.0 and `simplifile` 2.7.0, with small bridges only for missing primitives and exception cleanup. See the [filesystem decision](docs/FILESYSTEM.md). Gates use loopback H1/TLS/H2 servers and temporary fixtures, with no provider credentials or public application endpoints. Initial toolchain/package installation may require network access. CI runs the full gate for each selected runtime. The pinned nghttpd1.70.0 server supplies independent TLS/H2 interoperability; controlled servers supply synchronized faults.
 
-See [validation evidence](docs/VALIDATION.md), [guarantees and optional features](BOUNDS.md), [the architecture sketch](docs/DESIGN.md), [progressive wave history](docs/implementation/gleam-first/wave-tracker.md) and [provenance](docs/PROVENANCE.md).
+See the [current API/adoption follow-up](docs/ADOPTION_IMPROVEMENTS.md), [validation evidence](docs/VALIDATION.md), [guarantees and optional features](BOUNDS.md), [the architecture sketch](docs/DESIGN.md), [progressive wave history](docs/implementation/gleam-first/wave-tracker.md) and [provenance](docs/PROVENANCE.md).
 
 The requested [Dream comparison](docs/DREAM_COMPARISON.md) pins its `codex/http-client-combined` revision and records native-suite results, public contract checks and repeated H1 workloads. Reproduce separately with `./dev/env python3 dev/comparison/run.py all --output build/comparison-recheck`. It is not a production dependency or part of the normal gate. The original 1,000-caller slowdown led to a [Gleam pool correction](docs/BURST_FIX.md): the repeated burst median fell from 705.99 to 45.33 ms with four connections. The report preserves the original results, final measurements, differing connection policies and one failed Dream rerun.
 
-The [adoption follow-up](docs/ADOPTION_VALIDATION.md) records the public batch fix, reference-derived lifecycle tests, independent nghttpd checks, sustained load and [isolated streaming LLM consumer](examples/llm/README.md). That example proves text-stream composition and cancellation; migrating LLM Wire’s session runtime remains a separate integration task.
+The [adoption follow-up](docs/ADOPTION_VALIDATION.md) records the public batch fix, reference-derived lifecycle tests, independent nghttpd checks, sustained load and [isolated streaming LLM consumer](examples/llm/README.md). That archived example proves text-stream composition and cancellation. LLM Wire’s session runtime has since migrated at `1c0ad614`; use the separate [current downstream gate](docs/DOWNSTREAM.md) to validate the actual selected checkout.
 
 Streamed uploads, redirect policy, decompression, proxies/mTLS, cookies/cache adapters and optional generic SSE remain follow-on scope. Protocol upgrades/tunnels are not a body-stream API. Provider reducers, tool calls, schemas, token usage and agent continuation belong above this library. Gun/Cowlib remain unmodified and own HTTP parsing, HPACK and protocol state; OTP owns TLS. HTTP Gun owns correct use of their supported APIs, admission, cleanup and truthful error reporting. Inherited allocation behavior and the HTTP/2 draining race do not establish dependency defects or justify a hardening project. Optional body/query redaction and durable publication belong to this client.

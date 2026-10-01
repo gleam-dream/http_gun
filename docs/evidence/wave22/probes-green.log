@@ -1,0 +1,30 @@
+  Compiling gleam_stdlib
+/private/tmp/nix-shell.FM651p/sinal-forwarder-race-0x2p5wtc/build/dev/erlang/gleam_stdlib/_gleam_artefacts/gleam_stdlib.erl:75:10: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%   75|     case catch binary_to_integer(String, Base) of
+%     |          ^
+
+/private/tmp/nix-shell.FM651p/sinal-forwarder-race-0x2p5wtc/build/dev/erlang/gleam_stdlib/_gleam_artefacts/gleam_stdlib.erl:81:10: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%   81|     case catch binary_to_integer(String) of
+%     |          ^
+
+/private/tmp/nix-shell.FM651p/sinal-forwarder-race-0x2p5wtc/build/dev/erlang/gleam_stdlib/_gleam_artefacts/gleam_stdlib.erl:87:10: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%   87|     case catch binary_to_float(String) of
+%     |          ^
+
+  Compiling gleam_erlang
+  Compiling gleam_otp
+  Compiling gleeunit
+  Compiling telemetry
+===> Analyzing applications...
+===> Compiling telemetry
+  Compiling sinal
+   Compiled in 0.91s
+    Running restart_probe.main
+Startup capacity=1: first=Error(ForwarderUnavailable), second=Error(CapacityExceeded)
+Delayed sender across restart: mailbox before=0, after=0

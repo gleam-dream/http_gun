@@ -1,0 +1,53 @@
+[
+  {
+    "runtime": "default",
+    "scenario": "nghttpd-concurrent",
+    "latency_kind": "request_when_sampled",
+    "requests": 1000,
+    "elapsed_us": 95509,
+    "p50_us": 43431,
+    "p95_us": 82375,
+    "p99_us": 86084,
+    "connections": 1,
+    "peak_vm_bytes": 70027911,
+    "peak_total_mailbox": 102,
+    "peak_one_mailbox": 57,
+    "peak_processes": 884,
+    "peak_ports": 3,
+    "bytes": 256000
+  },
+  {
+    "runtime": "otp28",
+    "scenario": "nghttpd-concurrent",
+    "latency_kind": "request_when_sampled",
+    "requests": 1000,
+    "elapsed_us": 82794,
+    "p50_us": 36887,
+    "p95_us": 72342,
+    "p99_us": 75754,
+    "connections": 1,
+    "peak_vm_bytes": 67360009,
+    "peak_total_mailbox": 178,
+    "peak_one_mailbox": 140,
+    "peak_processes": 889,
+    "peak_ports": 3,
+    "bytes": 256000
+  },
+  {
+    "runtime": "otp27",
+    "scenario": "nghttpd-concurrent",
+    "latency_kind": "request_when_sampled",
+    "requests": 1000,
+    "elapsed_us": 97341,
+    "p50_us": 40851,
+    "p95_us": 78104,
+    "p99_us": 81437,
+    "connections": 1,
+    "peak_vm_bytes": 73398335,
+    "peak_total_mailbox": 102,
+    "peak_one_mailbox": 91,
+    "peak_processes": 847,
+    "peak_ports": 4,
+    "bytes": 256000
+  }
+]

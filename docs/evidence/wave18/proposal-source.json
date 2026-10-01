@@ -1,0 +1,7 @@
+{
+  "source": "/private/tmp/http-gun-api-review-xxex_vlc/PROPOSAL.md",
+  "sha256": "67c25901b2c38e7cfed3367e0d0ee95309b702bb3f56d74c629ed0192d6645d0",
+  "http_gun": "ebf2b479761e8c932b0c85a8f83cf8460c014d4f",
+  "llm_wire": "1c0ad614149b6ba286a6f778e223bd294f403b30",
+  "approval": "Proceed; no commits or sibling changes"
+}

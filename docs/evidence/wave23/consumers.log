@@ -1,0 +1,268 @@
+  Resolving versions
+Downloading packages
+ Downloaded 11 packages in 0.05s
+      Added sinal v0.1.0
+      Added telemetry v1.4.2
+  Compiling cowlib
+===> Analyzing applications...
+===> Compiling cowlib
+  Compiling gleam_stdlib
+/private/tmp/nix-shell.jnTuXz/tmp.OHdyzkQJvx/ordinary/build/dev/erlang/gleam_stdlib/_gleam_artefacts/gleam_stdlib.erl:75:10: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%   75|     case catch binary_to_integer(String, Base) of
+%     |          ^
+
+/private/tmp/nix-shell.jnTuXz/tmp.OHdyzkQJvx/ordinary/build/dev/erlang/gleam_stdlib/_gleam_artefacts/gleam_stdlib.erl:81:10: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%   81|     case catch binary_to_integer(String) of
+%     |          ^
+
+/private/tmp/nix-shell.jnTuXz/tmp.OHdyzkQJvx/ordinary/build/dev/erlang/gleam_stdlib/_gleam_artefacts/gleam_stdlib.erl:87:10: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%   87|     case catch binary_to_float(String) of
+%     |          ^
+
+  Compiling file_streams
+  Compiling filepath
+  Compiling gleam_erlang
+  Compiling gleam_http
+  Compiling gleam_json
+  Compiling gleam_otp
+  Compiling gun
+===> Analyzing applications...
+===> Compiling gun
+  Compiling simplifile
+  Compiling telemetry
+===> Analyzing applications...
+===> Compiling telemetry
+  Compiling sinal
+  Compiling http_gun
+  Compiling http_gun_consumer
+   Compiled in 14.29s
+  Resolving versions
+   Compiled in 0.24s
+    Running http_gun_consumer.main
+Confirmed public type rejection: client
+Confirmed public type rejection: body
+Confirmed public type rejection: wrong_body
+Confirmed public type rejection: recording
+Confirmed public type rejection: deadline
+Confirmed public type rejection: cancellation
+Confirmed public type rejection: observation_id
+  Resolving versions
+Downloading packages
+ Downloaded 12 packages in 0.06s
+  Compiling cowlib
+===> Analyzing applications...
+===> Compiling cowlib
+  Compiling gleam_stdlib
+/private/tmp/nix-shell.jnTuXz/tmp.OHdyzkQJvx/llm/build/dev/erlang/gleam_stdlib/_gleam_artefacts/gleam_stdlib.erl:75:10: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%   75|     case catch binary_to_integer(String, Base) of
+%     |          ^
+
+/private/tmp/nix-shell.jnTuXz/tmp.OHdyzkQJvx/llm/build/dev/erlang/gleam_stdlib/_gleam_artefacts/gleam_stdlib.erl:81:10: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%   81|     case catch binary_to_integer(String) of
+%     |          ^
+
+/private/tmp/nix-shell.jnTuXz/tmp.OHdyzkQJvx/llm/build/dev/erlang/gleam_stdlib/_gleam_artefacts/gleam_stdlib.erl:87:10: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%   87|     case catch binary_to_float(String) of
+%     |          ^
+
+  Compiling file_streams
+  Compiling filepath
+  Compiling gleam_crypto
+  Compiling gleam_erlang
+  Compiling gleam_http
+  Compiling gleam_json
+  Compiling gleam_otp
+  Compiling gun
+===> Analyzing applications...
+===> Compiling gun
+  Compiling simplifile
+  Compiling telemetry
+===> Analyzing applications...
+===> Compiling telemetry
+  Compiling sinal
+  Compiling http_gun
+  Compiling json_blueprint
+  Compiling llm_wire
+/private/tmp/nix-shell.jnTuXz/tmp.OHdyzkQJvx/llm/build/dev/erlang/llm_wire/_gleam_artefacts/llm_wire_gun_ffi.erl:360:5: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%  360|     catch gun:close(Conn),
+%     |     ^
+
+/private/tmp/nix-shell.jnTuXz/tmp.OHdyzkQJvx/llm/build/dev/erlang/llm_wire/_gleam_artefacts/llm_wire_gun_ffi.erl:367:13: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%  367|             catch gun:close(Conn),
+%     |             ^
+
+/private/tmp/nix-shell.jnTuXz/tmp.OHdyzkQJvx/llm/build/dev/erlang/llm_wire/_gleam_artefacts/llm_wire_gun_pool.erl:323:5: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%  323|     catch erlang:cancel_timer(State#state.prune_timer),
+%     |     ^
+
+/private/tmp/nix-shell.jnTuXz/tmp.OHdyzkQJvx/llm/build/dev/erlang/llm_wire/_gleam_artefacts/llm_wire_gun_pool.erl:331:9: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%  331|         catch gun:close(C#conn_entry.conn)
+%     |         ^
+
+/private/tmp/nix-shell.jnTuXz/tmp.OHdyzkQJvx/llm/build/dev/erlang/llm_wire/_gleam_artefacts/llm_wire_gun_pool.erl:334:9: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%  334|         catch erlang:cancel_timer(W#waiter.timer_ref),
+%     |         ^
+
+/private/tmp/nix-shell.jnTuXz/tmp.OHdyzkQJvx/llm/build/dev/erlang/llm_wire/_gleam_artefacts/llm_wire_gun_pool.erl:336:9: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%  336|         catch gen_server:reply(W#waiter.from, {error, pool_stopped})
+%     |         ^
+
+/private/tmp/nix-shell.jnTuXz/tmp.OHdyzkQJvx/llm/build/dev/erlang/llm_wire/_gleam_artefacts/llm_wire_gun_pool.erl:339:9: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%  339|         catch erlang:cancel_timer(C#connecting.timer_ref),
+%     |         ^
+
+/private/tmp/nix-shell.jnTuXz/tmp.OHdyzkQJvx/llm/build/dev/erlang/llm_wire/_gleam_artefacts/llm_wire_gun_pool.erl:342:9: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%  342|         catch exit(C#connecting.worker_pid, kill),
+%     |         ^
+
+  Compiling http_gun_llm_consumer
+   Compiled in 13.80s
+  Resolving versions
+   Compiled in 0.22s
+    Running http_gun_llm_consumer.main
+   Compiled in 0.21s
+    Running http_gun_llm_integration.main
+Provider stream split points checked: 382
+Provider stream split points checked: 671
+Provider stream split points checked: 143
+LLM streaming: live progress, cancellation, provider terminal, fragmentation and real record/replay passed.
+  Resolving versions
+Downloading packages
+ Downloaded 11 packages in 0.05s
+      Added sinal v0.1.0
+      Added telemetry v1.4.2
+  Compiling cowlib
+===> Analyzing applications...
+===> Compiling cowlib
+  Compiling gleam_stdlib
+/private/tmp/nix-shell.jnTuXz/tmp.XFHbmpyMBB/async/build/dev/erlang/gleam_stdlib/_gleam_artefacts/gleam_stdlib.erl:75:10: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%   75|     case catch binary_to_integer(String, Base) of
+%     |          ^
+
+/private/tmp/nix-shell.jnTuXz/tmp.XFHbmpyMBB/async/build/dev/erlang/gleam_stdlib/_gleam_artefacts/gleam_stdlib.erl:81:10: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%   81|     case catch binary_to_integer(String) of
+%     |          ^
+
+/private/tmp/nix-shell.jnTuXz/tmp.XFHbmpyMBB/async/build/dev/erlang/gleam_stdlib/_gleam_artefacts/gleam_stdlib.erl:87:10: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%   87|     case catch binary_to_float(String) of
+%     |          ^
+
+  Compiling file_streams
+  Compiling filepath
+  Compiling gleam_erlang
+  Compiling gleam_http
+  Compiling gleam_json
+  Compiling gleam_otp
+  Compiling gun
+===> Analyzing applications...
+===> Compiling gun
+  Compiling simplifile
+  Compiling telemetry
+===> Analyzing applications...
+===> Compiling telemetry
+  Compiling sinal
+  Compiling http_gun
+  Compiling http_gun_async
+   Compiled in 12.90s
+   Compiled in 0.19s
+    Running http_gun_async.main
+Two application-owned jobs completed on one shared client.
+   Compiled in 0.19s
+    Running http_gun_async_test.main
+PASS head gap, header/body cancellation, shared-client reuse
+PASS admission and TLS-connection cancellation
+Ceiling probe: supplied 5000 ms, client 100 ms, supplied budget still has 4898 ms
+PASS ceiling, queued expiry, expired budget, read wait
+=CRASH REPORT==== 1-Oct-2026::01:22:46.833140 ===
+  crasher:
+    initial call: http_gun_async@feed_job:'-start/4-anonymous-4-'/0
+    pid: <0.178.0>
+    registered_name: []
+    exception error: #{function => <<"early_error_and_exception">>,
+                       line => 226,message => <<"controlled sink exception">>,
+                       module => <<"http_gun_async_test">>,
+                       file => <<"test/http_gun_async_test.gleam">>,
+                       gleam_error => panic}
+      in function  http_gun_async_test:'-early_error_and_exception/0-anonymous-2-'/1 (test/http_gun_async_test.gleam:236)
+      in call from http_gun_async@feed_job:read/3 (src/http_gun_async/feed_job.gleam:137)
+      in call from http_gun_ffi:scoped/2 (/private/tmp/nix-shell.jnTuXz/tmp.XFHbmpyMBB/async/build/dev/erlang/http_gun/_gleam_artefacts/http_gun_ffi.erl:49)
+      in call from http_gun:'-with_response_with_options/4-anonymous-2-'/2 (src/http_gun.gleam:109)
+      in call from http_gun:try_with_response_with_options/5 (src/http_gun.gleam:138)
+      in call from http_gun_ffi:scoped/2 (/private/tmp/nix-shell.jnTuXz/tmp.XFHbmpyMBB/async/build/dev/erlang/http_gun/_gleam_artefacts/http_gun_ffi.erl:49)
+      in call from http_gun@cancellation:'-with_token/1-anonymous-6-'/2 (src/http_gun/cancellation.gleam:52)
+      in call from http_gun_async@feed_job:'-start/4-anonymous-4-'/7 (src/http_gun_async/feed_job.gleam:76)
+    ancestors: [<0.82.0>]
+    message_queue_len: 0
+    messages: []
+    links: []
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 233
+    stack_size: 29
+    reductions: 747
+  neighbours:
+
+PASS early stop, sink error, exception cleanup
+PASS consumer death, copied job, bounded worker shutdown
+PASS shared body cursor, wrong owner, conflicting read, idempotent close
+=SUPERVISOR REPORT==== 1-Oct-2026::01:22:46.853676 ===
+    supervisor: {<0.204.0>,gleam@otp@static_supervisor}
+    errorContext: child_terminated
+    reason: normal
+    offender: [{pid,<0.205.0>},
+               {id,0},
+               {mfargs,
+                   {gleam@otp@static_supervisor,start_child_callback,
+                       [#Fun<gleam@otp@supervision.0.84844907>]}},
+               {restart_type,permanent},
+               {significant,false},
+               {shutdown,5000},
+               {child_type,worker}]
+
+PASS supervision restart, new capability, stale capability
+PASS same async consumer live/script/record/replay, strict matching, two fallible-scope use cases
+PASS verified H2, one connection, cancelled job and unfinished healthy sibling
+PASS synchronous sink backpressure and shared-client shutdown
+PASS live prefix recording/offline replay and independent capture failure
+  Compiling http_gun
+  Compiling http_gun_async
+   Compiled in 0.69s
+    Running http_gun_async_startup_test.main
+PASS token startup maps Failure; callback skipped; 64 failed job starts leave no completion messages
+Public async consumer: 11 synchronized lifecycle groups and startup-failure control passed.
+Ordinary, async and archived LLM consumers; seven rejection fixtures passed.

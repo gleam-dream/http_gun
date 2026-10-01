@@ -1,0 +1,39 @@
+error (ignored): SQLite database '/Users/edgar/.cache/nix/eval-cache-v6/f193d72487b74f1a2b56ab60f815fe509c00164dc21a57bb7a80e2f49748d73a.sqlite' is busy
++ gleam --version
+gleam 1.18.1
++ erl -noshell -eval io:format("OTP ~s ERTS ~s~n",[erlang:system_info(otp_release),erlang:system_info(version)]),halt().
+OTP 28 ERTS 16.4.0.6
++ gleam format --check src test
++ gleam check
+  Compiling gleam_stdlib
+  Compiling gleam_erlang
+  Compiling gleam_otp
+  Compiling gleeunit
+  Compiling telemetry
+===> Analyzing applications...
+===> Compiling telemetry
+   Checking sinal
+   Compiled in 1.37s
++ gleam build --warnings-as-errors
+  Compiling sinal
+   Compiled in 0.71s
++ gleam test
+   Compiled in 0.22s
+    Running sinal_test.main
+.............................................................................................
+93 passed, no failures
++ erlc -Werror -o /tmp/nix-shell.pia28F/sinal-candidate-gate-vof1hl5b/ffi-check /tmp/nix-shell.pia28F/sinal-candidate-gate-vof1hl5b/src/sinal_ffi.erl /tmp/nix-shell.pia28F/sinal-candidate-gate-vof1hl5b/src/sinal_forwarder_ffi.erl /tmp/nix-shell.pia28F/sinal-candidate-gate-vof1hl5b/src/sinal_scope_ffi.erl /tmp/nix-shell.pia28F/sinal-candidate-gate-vof1hl5b/test/scope_test_ffi.erl /tmp/nix-shell.pia28F/sinal-candidate-gate-vof1hl5b/test/forwarder_test_ffi.erl
++ python3 /tmp/nix-shell.pia28F/sinal-candidate-gate-vof1hl5b/dev/check_forwarder.py
+  Compiling gleam_stdlib
+  Compiling gleam_erlang
+  Compiling gleam_otp
+  Compiling gleeunit
+  Compiling telemetry
+===> Analyzing applications...
+===> Compiling telemetry
+  Compiling sinal
+   Compiled in 1.26s
+    Running restart_probe.main
+Startup capacity=1: first=Error(ForwarderUnavailable), second=Error(CapacityExceeded)
+Delayed sender across restart: mailbox before=0, after=0
+CANDIDATE GATE PASSED

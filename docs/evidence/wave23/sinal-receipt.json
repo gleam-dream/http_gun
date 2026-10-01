@@ -1,0 +1,76 @@
+{
+  "status": "generic Sinal correction applied and validated; HTTP runtime qualification in wave24",
+  "baseline": "098a2d5df70ed7dfff71151a865e986fb44987eb",
+  "source_status": " M .github/workflows/ci.yml\n M README.md\n M flake.nix\n M src/sinal/forwarder.gleam\n M src/sinal_forwarder_ffi.erl\n M test/forwarder_test.gleam\n?? dev/\n",
+  "files": {
+    "src/sinal/exception.gleam": "5473e8895019eefc2c499ddb2d05e976bd7c0d3094baf58878e3ab2e30043c8b",
+    "src/sinal/fields.gleam": "b97427f86a3aced8d4eb8961ff42a8d17138a3657a0ba07c72d33422b1565552",
+    "src/sinal/forwarder.gleam": "c3d0528431514e354de7420d9a437e691f4287912ef0a6b72a0ee0d6a896e4a5",
+    "src/sinal/internal/ffi.gleam": "66a7563d964462a460f016a9498a21ee370f8ad85ebec7abf98bee27c5cefecf",
+    "src/sinal/span.gleam": "dcde6307478257b7d334a95cca4b96a888d3922db86b9034d4eb2b51df70eed3",
+    "src/sinal.gleam": "7281c47d83898aca4499552e0c7e164aab0a314f839e86f4dabb271eeb7bacde",
+    "src/sinal_ffi.erl": "b0608e77b2317fe23d34b3b818a6378656b956e1cb4db40d8999b00d6dec1916",
+    "src/sinal_forwarder_ffi.erl": "875691fd4d388af9826ecc8496d339f4be7f444e6dd3d00d4631ba3da80801d5",
+    "src/sinal_scope_ffi.erl": "4c584450eee7bcaefbf9875521980b2327e842154fe623946cc2150a392a9093",
+    "test/api_control_test.gleam": "87024fd16811cb3bf0a46fb03ecd9b0552d94f641272ca77afe4b298fbc5cc59",
+    "test/benchmark.gleam": "289c0180ab1767e53be79aec9dada8c8984ed6ea68d3ea9f8f1ccc56ab87ccb9",
+    "test/focused_behavior.gleam": "5baacd369863107e3bc658aba4ee6c4aaed5c7ad7937324367359533891a678d",
+    "test/forwarder_route_test.gleam": "1de7823604b9d7629fa8fbdd9536b9a69388498c61259e1501b8dbd37b910c45",
+    "test/forwarder_test.gleam": "552522e1b9968d2c0431b7d992efbea920f229a29fdcd3ffff0a8c24c2c8de28",
+    "test/forwarder_test_ffi.erl": "08c68322e81b68a821e1fb303fa6f9b753eb58f172013e1252e3ac72faaeedbb",
+    "test/oracle/expected-red-catalog.md": "32c47b244cf14563bd14a1edd015af4515da48e3318f485d2de7dc5313d12830",
+    "test/oracle/telemetry-1.4.2.md": "8f2a8deab9b03e785059c250c49906da509a8f40e05e00218231cd4d4070c04e",
+    "test/oracle/wave-2-capabilities.md": "237013fb32c3c1ed814d250469aab8440b0ffc221179365e59921040a8a5925b",
+    "test/oracle/wave-3-capabilities.md": "bcdacf4004ad159c6ef46c79de25278eeba67c7b76d63f9fc5499b9928534447",
+    "test/oracle/wave-4-capabilities.md": "655dd67ad726d973ec6027799d7e971bced408082f5295cc34d4d6712114fbf1",
+    "test/oracle/wave-4-completion.md": "8ad36c723ddcc56725394f46f40e52c46ec3d146eaca799af3d7c9e24eda7ccf",
+    "test/readme_example_test.gleam": "eeb504fa3dbf7fba643f67d7278e79e3232d080f556da29984b228ed85681742",
+    "test/scope_test_ffi.erl": "c4bf27a01c5c48e3606ca96c2155bfac4bb95c9424465b68dde619a2f59b87a3",
+    "test/sinal_test.gleam": "e187b5c452e5d902503a793a773cb4f374e403bad212be464750db0d30c3985d",
+    "test/stress_test.gleam": "25382be6c542203636bdb972ddeb58f4578114d2b0b89957380a3b584ad4d095",
+    "dev/check_forwarder.py": "6638bb6a593c3f65210990cf157438277ba50689466ab7871f2e7b4fe58b1610",
+    "dev/restart_probe.gleam.txt": "facac2c1f5a8fc2260c5fd3ab052680b9dbdde4aca35f9c847b02ba78fafa4e4",
+    "dev/restart_probe_ffi.erl.txt": "035bb06f60fa4f7caae32a8e85e768303db9c8202e2febba16d42cf0e81e39d3",
+    "README.md": "d1f9f6d1d910e7f5eba3faa2c8a79c818d078754bd55ca580f539dd2c2c9d053",
+    "LICENSE": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+    "gleam.toml": "8f9210af590562da00b6645da940e359c265fd01bc56f6c4913d5e6b71a245c6",
+    "manifest.toml": "18c2032b83202c4e1a1e26166a4f76678240c3ff1df59dc7a2d5e9a0a1896f96",
+    "flake.nix": "ce50b9f522b09203aed766f582daddf72fe3ebfc4d323cb66193b2c4bb4e7da3",
+    ".github/workflows/ci.yml": "af72b9c7f123b12e740ac2ad3e047f1c095da741307b29d7bb4d4e11dd70b137"
+  },
+  "runtimes": [
+    {
+      "shell": "default",
+      "command": "nix develop path:/code/gleam-dream/http_gun#default --command python3 docs/evidence/wave23/validate-sinal.py --source /code/gleam-dream/sinal",
+      "exit": 0,
+      "tests": 93,
+      "probes": 3,
+      "log": "sinal-final-default.log"
+    },
+    {
+      "shell": "otp28",
+      "command": "nix develop path:/code/gleam-dream/http_gun#otp28 --command python3 docs/evidence/wave23/validate-sinal.py --source /code/gleam-dream/sinal",
+      "exit": 0,
+      "tests": 93,
+      "probes": 3,
+      "log": "sinal-final-otp28.log"
+    },
+    {
+      "shell": "otp27",
+      "command": "nix develop path:/code/gleam-dream/http_gun#otp27 --command python3 docs/evidence/wave23/validate-sinal.py --source /code/gleam-dream/sinal",
+      "exit": 0,
+      "tests": 93,
+      "probes": 3,
+      "log": "sinal-final-otp27.log"
+    }
+  ],
+  "probes": [
+    "startup admission while initialization paused",
+    "delayed event reserved before restart",
+    "delayed drop notice before restart"
+  ],
+  "scope": "Sinal only; public API unchanged; no HTTP-specific code",
+  "skipped": [
+    "Linux/hosted Sinal CI execution"
+  ]
+}

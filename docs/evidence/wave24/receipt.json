@@ -1,0 +1,153 @@
+{
+  "status": "complete: Sinal correction, typed HTTP observations, independent runtime and current downstream qualification",
+  "http_gun_revision": "ebf2b479761e8c932b0c85a8f83cf8460c014d4f",
+  "host": "Darwin ARM64",
+  "gleam": "1.18.1",
+  "commands": [
+    {
+      "command": "./dev/env sh dev/gate fast",
+      "exit": 0,
+      "tests": 98,
+      "log": "../wave23/fast.log"
+    },
+    {
+      "command": "sh dev/matrix",
+      "exit": 1,
+      "result": "default full gate passed; otp28 stopped at Hex API rate limit; preserved attempt under rate-limit-attempt"
+    },
+    {
+      "command": "sh /private/tmp/http-gun-sinal-bn2b5vph/http-remaining-matrix.sh",
+      "exit": 0,
+      "result": "otp28 and otp27 full gates passed; retained script resume-matrix.sh"
+    }
+  ],
+  "runtime_full_gates": [
+    {
+      "runtime": "default",
+      "tests": 98,
+      "public_consumers": 3,
+      "negative_compiler_controls": 7,
+      "nghttpd_scenarios": 7,
+      "load_scenarios": 11,
+      "record_replay_exchanges": 256,
+      "record_replay_bytes": 8388608,
+      "log": "runtimes/default.log",
+      "exit": 0
+    },
+    {
+      "runtime": "otp28",
+      "tests": 98,
+      "public_consumers": 3,
+      "negative_compiler_controls": 7,
+      "nghttpd_scenarios": 7,
+      "load_scenarios": 11,
+      "record_replay_exchanges": 256,
+      "record_replay_bytes": 8388608,
+      "log": "runtimes/otp28.log",
+      "exit": 0
+    },
+    {
+      "runtime": "otp27",
+      "tests": 98,
+      "public_consumers": 3,
+      "negative_compiler_controls": 7,
+      "nghttpd_scenarios": 7,
+      "load_scenarios": 11,
+      "record_replay_exchanges": 256,
+      "record_replay_bytes": 8388608,
+      "log": "runtimes/otp27.log",
+      "exit": 0
+    }
+  ],
+  "observations": {
+    "disabled_by_default": true,
+    "blocked_handler_capacity": 1,
+    "batch_requests": 1000,
+    "batch_workers": 16,
+    "forwarder_mailbox_while_blocked": 1,
+    "dropped_observations_min": 3999,
+    "synchronous_mutation_expected_failure": true
+  },
+  "ffi": {
+    "http_gun_lines": 92,
+    "http_gun_bytes": 4669,
+    "http_gun_bindings": 13,
+    "http_gun_changed": false,
+    "sinal_forwarder_lines_before": 118,
+    "sinal_forwarder_lines_after": 114,
+    "sinal_total_lines": 304,
+    "sinal_total_bytes": 10196,
+    "sinal_changes": "two narrow ETS primitives, removed named-send exception helper; orchestration stays in Gleam"
+  },
+  "inputs_file": "inputs.json",
+  "skipped": [
+    "Linux/hosted CI",
+    "new Dream comparison",
+    "sustained soak",
+    "comparative enabled-telemetry overhead benchmark"
+  ],
+  "limitations": [
+    "Best-effort observations can be dropped/lost; not correctness or remote-submission evidence",
+    "No observation history or downstream-export queue bound",
+    "Unpublished Sinal uses one canonical local source and hash-verified archive for standalone gates",
+    "Other documented HTTP limits remain unchanged"
+  ],
+  "scope": "No Gun/Cowlib patches, LLM Wire or oversight edits, provider traffic, commits, pushes or publication",
+  "current_downstream": {
+    "revision": "1c0ad614149b6ba286a6f778e223bd294f403b30",
+    "tests": 223,
+    "public_boundary": "passed",
+    "local_h2_scenarios": 5,
+    "runtime": "OTP 29 ERTS 17.1",
+    "receipt": "current-downstream/receipt.json",
+    "originals_unchanged": true,
+    "command": "./dev/env python3 dev/check_downstream.py --http-gun /code/gleam-dream/http_gun --llm-wire /code/gleam-dream/llm_wire --output /private/tmp/http-gun-sinal-bn2b5vph/current-downstream-final",
+    "exit": 0
+  },
+  "executable_inputs_unchanged": true,
+  "executable_input_count": 97,
+  "artifacts": {
+    "README.md": "ff3b3bc4b2d462762c3e7a01687efc31bd2b72087a0ab939cf2b28c7605ba7c9",
+    "current-downstream/boundary.log": "122cf769bfe8253e29c1b618625e98632639082f0d959723201eaa2407b06178",
+    "current-downstream/build.log": "516ca382c0d8f645042bb43c419a61fcf374ea6bdebe6b10eccd9af3f67d132c",
+    "current-downstream/check.log": "ae2aeb806e435d00c2d74c9a40716ab0f0d36c8b05cf177d4f812aa4a7c86614",
+    "current-downstream/gleam.log": "c23d3f3ed905649b201ddb97ef6f60fcf83da84bc446817e9b38ec375a26aafc",
+    "current-downstream/local-http/local-http.json": "2b43c984d9206c1457662f527cf5a61463e8634f13cc69d4b108d6e23d71946f",
+    "current-downstream/local-http/nghttpd-prefix.log": "1998a1110035f2e20641804042cfdbdd0d62ed5f84760ee5360f435a7036561d",
+    "current-downstream/local-http.log": "77588c7827fa58e81abc2a7a9bfd1f1fe59d137162ded4b39d866729129f4e37",
+    "current-downstream/nghttpd.log": "d964f8cf4f6d0a20b2eafdf2f0b7dc5aeccde083edbc6d03602674295514c146",
+    "current-downstream/receipt.json": "db6cdb2abe8d9e16f797742511a11716f273fa072d500a845cf6fbe3b0f61ee6",
+    "current-downstream/runtime.log": "e9b07abc82d4c7af4dad01b3aa97b2e52acc1c80fb7d3562b99126b7ae1ed214",
+    "current-downstream/tests.log": "894a138db20b57359e5f1c6e94b3856c7bf1b1f33707b0ee1f606bd4573b14b3",
+    "inputs.json": "287a4c46afed3953808eaa40041d0f7f8c97c57b9196eb3e8731237505bfbbff",
+    "rate-limit-attempt/downstream/boundary.log": "c239ba6cbbd1f82da1ffbf2c1665657a0475213ceda217aa869d1e8bab1208ae",
+    "rate-limit-attempt/downstream/build.log": "d1b164f2567e194e066d833637aee2de5a1977727675da374fea3e2c4030de61",
+    "rate-limit-attempt/downstream/check.log": "9b4c099f2934a2e041b32c34d12328f9bcd90c752d925d164d72af4a4aae7245",
+    "rate-limit-attempt/downstream/gleam.log": "c23d3f3ed905649b201ddb97ef6f60fcf83da84bc446817e9b38ec375a26aafc",
+    "rate-limit-attempt/downstream/nghttpd.log": "d964f8cf4f6d0a20b2eafdf2f0b7dc5aeccde083edbc6d03602674295514c146",
+    "rate-limit-attempt/downstream/receipt.json": "89764155489f2c5050519aa44ede896176e8a9b2e1ba75379040c1c337f04c0b",
+    "rate-limit-attempt/downstream/runtime.log": "e9b07abc82d4c7af4dad01b3aa97b2e52acc1c80fb7d3562b99126b7ae1ed214",
+    "rate-limit-attempt/downstream/tests.log": "d719ee2e886e1261f2c61a4df7c7b088e4da821cb737408ae83707a8d55bcbd0",
+    "rate-limit-attempt/otp28.log": "e477e7d3f9a7446fbee6919aa61c1e140a0de27b0d354bd15f8d3372c6d9d4af",
+    "representative-load.json": "6334dd823897230cf7ac1b88e9450d14f67046a5822f6d5bb32009e1a419b869",
+    "resume-matrix.sh": "7648ef7e3a7f121c62fe3cfca1b19b0857d1b652ace39418c8a8c8bfaeca99c0",
+    "runtimes/default-batch.jsonl": "7a4b1bdfa8642b0201a66163df838612e65e92969ae828f9b99c205c1bb5df44",
+    "runtimes/default-load.jsonl": "469258e6b0cec855b21db561c7907cf546b8871238f7db7c63e412e80c244dc9",
+    "runtimes/default-nghttpd/http-gun.jsonl": "a17dbf9588748d77cc9bc5f76e6aa0eed425be8914e74b29000f15a6333c8551",
+    "runtimes/default-nghttpd/receipt.json": "029bdb154676a7555a98447dca3df3e051d1017497ac3f039aa1249f05371226",
+    "runtimes/default-recording.jsonl": "5aa4edce9de59933e7b6726ea44feed124c3964d1ccd94440c4221d715b24337",
+    "runtimes/default.log": "26718c552cee7fdd443da86f83deb8f91d6f9f83fbeb7812805f3f565a634454",
+    "runtimes/otp27-batch.jsonl": "5fe4e7ea1a91bfec3cf2dffe287b3551d1ae49bd973d9287f1a02ca558696de5",
+    "runtimes/otp27-load.jsonl": "00095a6f9515de2e7dd0a3cfb0457db8fd1b86938e1816a1481ab27abdf4f561",
+    "runtimes/otp27-nghttpd/http-gun.jsonl": "ac5c06b4c342f5c328cac4c2517da35a531e0e3ea9757c1759e916c1c721cced",
+    "runtimes/otp27-nghttpd/receipt.json": "a1e02dece89b80a5dcb2d15b5a92e4abc655a0ea54d70876fff1e9ef681596e3",
+    "runtimes/otp27-recording.jsonl": "cbf12f47b5da9b5fb139b653b667c8390c8068cdf20d036d8eedda4b706a419a",
+    "runtimes/otp27.log": "49694b53c7a4d41fded39ffee1b3ebdcfeb600b937652a886c848a5c3e0d60ff",
+    "runtimes/otp28-batch.jsonl": "a0b2b4cd0bedc4f24ac47d1195c9929e2a5f2009e73434ee52e611ebb0dee631",
+    "runtimes/otp28-load.jsonl": "d492bece0f86ceba45ba3ccaa01b0b3ea110cac11c6c8585508b699f821be06d",
+    "runtimes/otp28-nghttpd/http-gun.jsonl": "cb5ef4760d534c78e2e7b915920ac78f54adebef89b7e004a7d448b3b25ae95a",
+    "runtimes/otp28-nghttpd/receipt.json": "bb7416657c95e4a573a1ce6b73f1c678f1deaf74eb94313cfaf43dbb925530a7",
+    "runtimes/otp28-recording.jsonl": "e5100af4404857ccc665abfe1c28bd4fbc6d9b3c4c698970e17b25d588641b3e",
+    "runtimes/otp28.log": "3253d6ec12601fb494d0171188df3a64c2150cbf4ac22f06137184f6b335cac3"
+  }
+}

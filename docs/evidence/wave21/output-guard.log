@@ -1,0 +1,3 @@
+usage: check_downstream.py [-h] --http-gun HTTP_GUN --llm-wire LLM_WIRE
+                           --output OUTPUT
+check_downstream.py: error: --output must be outside all input checkouts

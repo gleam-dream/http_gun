@@ -1,0 +1,14 @@
+{
+  "revision": "098a2d5df70ed7dfff71151a865e986fb44987eb",
+  "files": {
+    "src/sinal_ffi.erl": "b0608e77b2317fe23d34b3b818a6378656b956e1cb4db40d8999b00d6dec1916",
+    "src/sinal_forwarder_ffi.erl": "70e2f6a5a200fcea5ef09cb4df864f94f165152a506eaec23c11be66317bd57c",
+    "src/sinal.gleam": "7281c47d83898aca4499552e0c7e164aab0a314f839e86f4dabb271eeb7bacde",
+    "src/sinal_scope_ffi.erl": "4c584450eee7bcaefbf9875521980b2327e842154fe623946cc2150a392a9093",
+    "src/sinal/forwarder.gleam": "9a54991454cee0a1f6ad7db3c69c469d8351e1b5b0e9873d1c6796c183468f40",
+    "src/sinal/fields.gleam": "b97427f86a3aced8d4eb8961ff42a8d17138a3657a0ba07c72d33422b1565552",
+    "src/sinal/span.gleam": "dcde6307478257b7d334a95cca4b96a888d3922db86b9034d4eb2b51df70eed3",
+    "src/sinal/exception.gleam": "5473e8895019eefc2c499ddb2d05e976bd7c0d3094baf58878e3ab2e30043c8b",
+    "src/sinal/internal/ffi.gleam": "66a7563d964462a460f016a9498a21ee370f8ad85ebec7abf98bee27c5cefecf"
+  }
+}

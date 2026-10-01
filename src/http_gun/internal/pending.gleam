@@ -12,6 +12,7 @@ import http_gun/body
 import http_gun/cancellation
 import http_gun/error.{type Failure}
 import http_gun/recording
+import http_gun/telemetry
 
 pub type Origin {
   Origin(host: String, port: Int, tls: Bool)
@@ -36,6 +37,7 @@ pub type Pending {
     capture: Option(recording.Capture),
     cancellation: Option(cancellation.Token),
     cancel_monitor: Option(process.Monitor),
+    observation: Option(telemetry.Context),
   )
 }
 

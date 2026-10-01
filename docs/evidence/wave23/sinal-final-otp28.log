@@ -1,0 +1,41 @@
++ gleam --version
+gleam 1.18.1
++ erl -noshell -eval io:format("OTP ~s ERTS ~s~n",[erlang:system_info(otp_release),erlang:system_info(version)]),halt().
+OTP 28 ERTS 16.4.0.6
++ gleam format --check src test
++ gleam check
+Downloading packages
+ Downloaded 5 packages in 0.03s
+  Compiling gleam_stdlib
+  Compiling gleam_erlang
+  Compiling gleam_otp
+  Compiling gleeunit
+  Compiling telemetry
+===> Analyzing applications...
+===> Compiling telemetry
+   Checking sinal
+   Compiled in 0.94s
++ gleam build --warnings-as-errors
+  Compiling sinal
+   Compiled in 0.55s
++ gleam test
+   Compiled in 0.22s
+    Running sinal_test.main
+[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m
+93 passed, no failures[39m
++ erlc -Werror -o /tmp/nix-shell.oRDeio/sinal-final-gate-cmun7_cj/ffi-check /tmp/nix-shell.oRDeio/sinal-final-gate-cmun7_cj/src/sinal_ffi.erl /tmp/nix-shell.oRDeio/sinal-final-gate-cmun7_cj/src/sinal_forwarder_ffi.erl /tmp/nix-shell.oRDeio/sinal-final-gate-cmun7_cj/src/sinal_scope_ffi.erl /tmp/nix-shell.oRDeio/sinal-final-gate-cmun7_cj/test/scope_test_ffi.erl /tmp/nix-shell.oRDeio/sinal-final-gate-cmun7_cj/test/forwarder_test_ffi.erl
++ python3 dev/check_forwarder.py
+  Compiling gleam_stdlib
+  Compiling gleam_erlang
+  Compiling gleam_otp
+  Compiling gleeunit
+  Compiling telemetry
+===> Analyzing applications...
+===> Compiling telemetry
+  Compiling sinal
+   Compiled in 1.00s
+    Running restart_probe.main
+Startup capacity=1: first=Error(ForwarderUnavailable), second=Error(CapacityExceeded)
+Delayed sender across restart: mailbox before=0, after=0
+Delayed drop notice across restart: mailbox before=0, after=0
+FINAL SINAL GATE PASSED

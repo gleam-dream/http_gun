@@ -43,6 +43,19 @@ pub fn with_token(run: fn(Token) -> value) -> Result(value, error.Failure) {
   Ok(bridge.scoped(fn() { run(token) }, fn() { cancel(token) }))
 }
 
+/// Run a fallible callback within a cancellation scope without nested Results.
+/// Only token startup failures pass through on_start_error; callback errors keep
+/// their own type and value. Return, error and exception cancel associated work
+/// exactly as with_token does. Exceptions propagate after scope cleanup.
+pub fn try_with_token(
+  on_start_error: fn(error.Failure) -> app_error,
+  run: fn(Token) -> Result(value, app_error),
+) -> Result(value, app_error) {
+  with_token(run)
+  |> result.map_error(on_start_error)
+  |> result.flatten
+}
+
 /// Latch cancellation and notify existing owners. Idempotent, including after
 /// scope exit. Owners release resources asynchronously; remote execution is unknown.
 pub fn cancel(token: Token) -> Nil {

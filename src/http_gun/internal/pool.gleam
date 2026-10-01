@@ -23,13 +23,18 @@ import http_gun/internal/observation as obs
 import http_gun/internal/pending.{type Origin, type Pending, Origin, Pending}
 import http_gun/recording
 import http_gun/request_options
+import http_gun/telemetry
 
 pub type Stats {
   Stats(connections: Int, bodies: Int, waiting: Int)
 }
 
 pub opaque type Client {
-  Client(subject: process.Subject(Message), config: config.Config)
+  Client(
+    subject: process.Subject(Message),
+    config: config.Config,
+    correlation: Option(telemetry.Id),
+  )
 }
 
 type Status {
@@ -64,6 +69,7 @@ type State {
     connections: List(Connection),
     pending: pending.Queue,
     owners: Dict(process.Pid, Owned),
+    observations: Option(telemetry.Emitter),
   )
 }
 
@@ -72,6 +78,7 @@ type Message {
   Open(
     request.Request(BitArray),
     Origin,
+    Option(telemetry.Id),
     Option(cancellation.Token),
     process.Pid,
     Int,
@@ -127,7 +134,15 @@ pub fn open_with_options(
   use origin <- result.try(validate(req, client.config.limits))
   call.with_failure(
     client.subject,
-    Open(req, origin, options.cancellation, process.self(), until, _),
+    Open(
+      req,
+      origin,
+      client.correlation,
+      options.cancellation,
+      process.self(),
+      until,
+      _,
+    ),
     Failure(error.ClientClosed, error.MayHaveBeenSent),
   )
 }
@@ -170,9 +185,10 @@ pub fn start_mode(
         [],
         pending.new(),
         dict.new(),
+        telemetry.prepare(settings.observations),
       ))
       |> actor.selecting(selector)
-      |> actor.returning(Client(subject, settings)),
+      |> actor.returning(Client(subject, settings, None)),
     )
   })
   |> actor.on_message(handle)
@@ -220,8 +236,17 @@ fn handle(state: State, message: Message) -> actor.Next(State, Message) {
       process.send(reply, Ok(Nil))
       actor.stop()
     }
-    Open(req, origin, token, owner, deadline, reply) ->
-      open_request(state, req, origin, token, owner, deadline, reply)
+    Open(req, origin, correlation, token, owner, deadline, reply) ->
+      open_request(
+        state,
+        req,
+        origin,
+        correlation,
+        token,
+        owner,
+        deadline,
+        reply,
+      )
     Expire(id) -> {
       let #(expired, queue) = pending.remove(state.pending, id)
       case expired {
@@ -299,6 +324,7 @@ fn reject(p: Pending, reason: error.Reason) -> Nil {
 }
 
 fn reject_with(p: Pending, failure: Failure) -> Nil {
+  telemetry.emit(p.observation, telemetry.termination(Error(failure)))
   case p.capture {
     Some(cap) -> recording.write(cap, obs.Failed(failure), fn(_) { Nil })
     None -> Nil
@@ -403,6 +429,7 @@ fn admit_live(state: State, p: Pending) -> Admission {
 }
 
 fn launch(state: State, p: Pending, connection: Connection) -> State {
+  telemetry.emit(p.observation, telemetry.AdmissionGranted)
   let protocol = case connection.status {
     Ready(protocol, _) -> protocol
     Connecting -> config.H1
@@ -426,6 +453,7 @@ fn launch(state: State, p: Pending, connection: Connection) -> State {
       release,
       p.capture,
       p.cancellation,
+      p.observation,
     )
   {
     Error(_) -> {
@@ -572,6 +600,7 @@ fn admit_playback(
           state
         }
         True -> {
+          telemetry.emit(p.observation, telemetry.AdmissionGranted)
           let subject = state.subject
           let release = fn(clean) {
             process.send(subject, Release(process.self(), None, clean))
@@ -588,6 +617,7 @@ fn admit_playback(
               release,
               None,
               p.cancellation,
+              p.observation,
             )
           {
             Error(_) -> {
@@ -675,13 +705,21 @@ fn open_request(
   state: State,
   req: request.Request(BitArray),
   origin: Origin,
+  correlation: Option(telemetry.Id),
   token: Option(cancellation.Token),
   owner: process.Pid,
   deadline: Int,
   reply: process.Subject(Result(response.Response(body.Body), Failure)),
 ) -> actor.Next(State, Message) {
+  let observation =
+    telemetry.begin(state.observations, correlation, case state.mode {
+      Live -> telemetry.Live
+      Record(_) -> telemetry.Recorded
+      Playback(_, _) -> telemetry.Offline
+    })
   case reserve_capture(state.mode, req) {
     Error(failure) -> {
+      telemetry.emit(observation, telemetry.termination(Error(failure)))
       process.send(reply, Error(failure))
       actor.continue(state)
     }
@@ -707,6 +745,7 @@ fn open_request(
           capture,
           token,
           option.map(token, cancellation.monitor),
+          observation,
         )
       let group = group(state, p)
       // Never let a new arrival overtake an existing head in its lane.
@@ -725,10 +764,12 @@ fn open_request(
               reject(p, error.AdmissionFull)
               actor.continue(next)
             }
-            False ->
+            False -> {
+              telemetry.emit(p.observation, telemetry.AdmissionWaiting)
               actor.continue(
                 State(..next, pending: pending.push(next.pending, group, p)),
               )
+            }
           }
       }
     }
@@ -845,4 +886,8 @@ fn discard_reservation(state: State, p: Pending) -> State {
       State(..state, connections: keep)
     }
   }
+}
+
+pub fn with_correlation(client: Client, id: telemetry.Id) -> Client {
+  Client(..client, correlation: Some(id))
 }

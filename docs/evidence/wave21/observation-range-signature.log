@@ -1,0 +1,28 @@
+  Compiling observation_probe
+error: Incorrect arity
+    ┌─ /private/tmp/http-gun-observation-wave21/src/observation_probe.gleam:144:3
+    │  
+144 │ ╭   int.range(0, count - 1, fn(id) {
+145 │ │     list.each(marks(), fn(mark) { process.send(subject, Notice(id, mark)) })
+146 │ │   })
+    │ ╰────^ Expected 4 arguments, got 3
+
+This call accepts these additional labelled arguments:
+
+  - run
+
+error: Incorrect arity
+    ┌─ /private/tmp/http-gun-observation-wave21/src/observation_probe.gleam:167:3
+    │  
+167 │ ╭   int.range(0, count - 1, fn(id) {
+168 │ │     put(table, id % 64, Snapshot(id, Live, []))
+169 │ │     list.each(marks(), fn(mark) {
+170 │ │       let assert Saved = observe(table, id, mark)
+171 │ │     })
+172 │ │   })
+    │ ╰────^ Expected 4 arguments, got 3
+
+This call accepts these additional labelled arguments:
+
+  - run
+

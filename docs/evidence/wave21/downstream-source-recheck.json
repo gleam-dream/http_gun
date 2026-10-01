@@ -1,0 +1,27 @@
+{
+  "http_gun": {
+    "production_and_dependency_inputs_match": true
+  },
+  "llm_wire": {
+    "revision_during_gate": "1c0ad614149b6ba286a6f778e223bd294f403b30",
+    "revision_after_gate": "1c0ad614149b6ba286a6f778e223bd294f403b30",
+    "status_during_gate": "",
+    "status_after_gate": "",
+    "complete_selected_file_set_unchanged": true
+  },
+  "json_blueprint": {
+    "revision_during_gate": "129c9637add479f424882a1dfa528d80704d2607",
+    "revision_after_gate": "129c9637add479f424882a1dfa528d80704d2607",
+    "status_during_gate": "",
+    "status_after_gate": "",
+    "complete_selected_file_set_unchanged": true
+  },
+  "sinal": {
+    "revision_during_gate": "77fcbef12859d5223fd9b44e3240f2160bef700b",
+    "revision_after_gate": "098a2d5df70ed7dfff71151a865e986fb44987eb",
+    "status_during_gate": " M manifest.toml\n",
+    "status_after_gate": "",
+    "complete_selected_file_set_unchanged": true
+  },
+  "note": "Sinal Git metadata advanced after the passing isolated gate. All selected source files, including manifests, are byte-identical. This task did not modify sibling checkouts."
+}

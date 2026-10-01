@@ -1,0 +1,49 @@
+  Resolving versions
+Downloading packages
+ Downloaded 2 packages in 0.01s
+    Removed cowlib
+    Removed file_streams
+    Removed filepath
+    Removed gleam_http
+    Removed gleam_json
+    Removed gleam_otp
+    Removed gun
+    Removed http_gun
+    Removed simplifile
+  Compiling gleam_stdlib
+/private/tmp/http-gun-observation-wave21/build/dev/erlang/gleam_stdlib/_gleam_artefacts/gleam_stdlib.erl:75:10: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%   75|     case catch binary_to_integer(String, Base) of
+%     |          ^
+
+/private/tmp/http-gun-observation-wave21/build/dev/erlang/gleam_stdlib/_gleam_artefacts/gleam_stdlib.erl:81:10: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%   81|     case catch binary_to_integer(String) of
+%     |          ^
+
+/private/tmp/http-gun-observation-wave21/build/dev/erlang/gleam_stdlib/_gleam_artefacts/gleam_stdlib.erl:87:10: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%   87|     case catch binary_to_float(String) of
+%     |          ^
+
+  Compiling gleam_erlang
+  Compiling observation_probe
+error: Unknown module value
+    ┌─ /private/tmp/http-gun-observation-wave21/src/observation_probe.gleam:144:18
+    │
+144 │   list.each(list.range(0, count - 1), fn(id) {
+    │                  ^^^^^
+
+The module `gleam/list` does not have a `range` value.
+
+error: Unknown module value
+    ┌─ /private/tmp/http-gun-observation-wave21/src/observation_probe.gleam:167:18
+    │
+167 │   list.each(list.range(0, count - 1), fn(id) {
+    │                  ^^^^^
+
+The module `gleam/list` does not have a `range` value.
+

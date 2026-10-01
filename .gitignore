@@ -4,3 +4,4 @@
 /.env
 /dev/results/
 /.archive/
+__pycache__/

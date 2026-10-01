@@ -11,6 +11,7 @@ import http_gun/internal/batch
 import http_gun/internal/bridge
 import http_gun/internal/pool
 import http_gun/request_options
+import http_gun/telemetry
 
 pub type Client =
   pool.Client
@@ -57,6 +58,15 @@ pub fn child(
 /// Does not stop the shared Gun/SSL applications or guarantee remote cancellation.
 pub fn stop(client: Client) -> Result(Nil, Failure) {
   pool.stop(client)
+}
+
+/// Inspect this capability's immutable startup request ceiling in milliseconds.
+/// Pure: also returns the original policy for a stopped or stale capability;
+/// it does not check liveness. A supervisor restart supplies a new capability.
+/// Each request uses the earlier of this ceiling from call entry and its
+/// supplied absolute monotonic deadline. Read waits do not change that budget.
+pub fn request_ceiling_ms(client: Client) -> Int {
+  pool.config(client).deadline_ms
 }
 
 /// Open an explicitly owned response. The calling process owns body consumption.
@@ -181,4 +191,12 @@ pub type Stats =
 /// Read current pool counters without retaining request history.
 pub fn snapshot(client: Client) -> Result(Stats, Failure) {
   pool.snapshot(client)
+}
+
+/// Create a client view carrying an opaque observation correlation for subsequent
+/// calls, including a batch. It shares the same pool, policy and lifetime: stopping
+/// either view stops that client. Every invocation still gets its own request_id.
+/// This is pure and does not enable observations or alter HTTP/cassette matching.
+pub fn with_correlation(client: Client, id: telemetry.Id) -> Client {
+  pool.with_correlation(client, id)
 }
