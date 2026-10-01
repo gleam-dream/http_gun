@@ -62,3 +62,23 @@ Local integration: the generic Sinal correction is committed as `8acec4507f23daa
 
 
 Destination policy (waves25–28) uses Warden230c6bb4171a782d5b4f4f795bbdc108cad49964 as read-only behavioral evidence. Transport source SHA2560fd3b160ecb50575a7185b4927b7010c684a218a3ba4e8fc46471d3d1de568cc; tests SHA256f079d5ee5edc04b403d281c973a203080d3328cd7291a86d0e848d5c1c0f4c36, recorded before implementation and unchanged afterward. No Warden source was copied. New IP-SAN fixtures are generated locally by dev/ip-fixture; existing certificate/server attribution is retained. Gun2.6.0/Cowlib2.20.0 and Gleam OTP/Erlang1.3.0 sources were inspected and remain unmodified. The [receipt](evidence/wave28/receipt.json) records scope, source hashes, runtime checks and the separate downstream setup experiment.
+
+Warden feedback (waves29–31) starts from HTTP Gun b517725. The Warden230c6bb4
+working source and retained adoption experiment are hashed before copying into
+disposable workspaces, with its existing license and notices preserved.
+[Final adapter receipt](evidence/wave31/warden-final/receipt.json) includes dirty
+state, per-file hashes, the unchanged transport-test check and original-input
+rechecks. Only the isolated adapter changes to direct DER anchors and the typed
+header-limit mapping; no Warden production source is retained in HTTP Gun.
+[Selected dependency/reference hashes](evidence/wave31/reference-hashes.json)
+identify the released APIs used for the fix. The new controlled TLS close server
+uses this package's existing attributed fixtures and was written for the public
+regression. Gun/Cowlib and the selected Sinal archive remain unchanged.
+
+The stdlib upper bound is widened without changing the ordinary0.71 lock;
+independent disposable resolution and tests qualify1.0.5. The final LLM check
+records1c0ad614 and its local dependency closure, with only explicit loopback
+test/example settings adapted. All original selected sources remain unchanged.
+FFI grows by8 lines/315 bytes and one `gun:info/1` binding, totaling121 lines,
+5900 bytes and16 bindings. Worker lifetimes, queue reservations and close policy
+are implemented in Gleam. No commit, publication or sibling change is included.

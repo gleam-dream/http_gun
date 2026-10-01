@@ -1,0 +1,7 @@
+gleam: exit 0
+check: exit 0
+build: exit 0
+tests: exit 0
+boundary: exit 0
+local-http: exit 0
+Isolated downstream setup adaptation passed; original checkouts unchanged.

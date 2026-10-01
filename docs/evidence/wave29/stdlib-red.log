@@ -1,0 +1,16 @@
+  Resolving versions
+error: Dependency resolution failed
+
+There's no compatible version of `gleam_stdlib`:
+  - You require http_gun 0.1.0
+    - http_gun requires gleam_stdlib >= 0.71.0 and < 1.0.0
+  - You require gleam_stdlib 1.0.5
+
+Traceback (most recent call last):
+  File "/code/gleam-dream/http_gun/dev/check_stdlib.py", line 37, in <module>
+    subprocess.run(["gleam", "run"], cwd=consumer, check=True)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/nix/store/4l8r0s2r5fna7src82b5fc2hixdvfyw0-python3-3.14.7/lib/python3.14/subprocess.py", line 578, in run
+    raise CalledProcessError(retcode, process.args,
+                             output=stdout, stderr=stderr)
+subprocess.CalledProcessError: Command '['gleam', 'run']' returned non-zero exit status 1.

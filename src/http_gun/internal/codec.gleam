@@ -340,6 +340,7 @@ fn cause_tag(cause: error.TransportCause) -> String {
     error.PeerClosed -> "peer_closed"
     error.PeerDraining -> "peer_draining"
     error.ProtocolError -> "protocol_error"
+    error.HeaderLimitReached -> "header_limit_reached"
     error.TransportTimeout -> "transport_timeout"
     error.UnexpectedProtocol -> "unexpected_protocol"
     error.UnknownTransport -> "unknown_transport"
@@ -356,6 +357,7 @@ fn parse_cause(tag: String) -> Result(error.TransportCause, Nil) {
     "peer_closed" -> Ok(error.PeerClosed)
     "peer_draining" -> Ok(error.PeerDraining)
     "protocol_error" -> Ok(error.ProtocolError)
+    "header_limit_reached" -> Ok(error.HeaderLimitReached)
     "transport_timeout" -> Ok(error.TransportTimeout)
     "unexpected_protocol" -> Ok(error.UnexpectedProtocol)
     "unknown_transport" -> Ok(error.UnknownTransport)

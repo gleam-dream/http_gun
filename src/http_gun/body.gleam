@@ -78,6 +78,7 @@ type State {
     source: Source,
     capture: CaptureState,
     protocol: config.Negotiated,
+    persistent: Bool,
     deadline: Int,
     deadline_timer: process.Timer,
     cancellation_monitor: Option(process.Monitor),
@@ -239,6 +240,7 @@ pub fn start(
           None -> NoCapture
         },
         protocol,
+        !wants_close(req.headers),
         deadline,
         deadline_timer,
         option.map(token, cancellation.monitor),
@@ -273,6 +275,17 @@ fn wire_headers(req: request.Request(a)) -> List(#(String, String)) {
     Ok(_) -> req.headers
     Error(_) -> [#("host", authority(req)), ..req.headers]
   }
+}
+
+// Connection persistence is application policy over already parsed headers.
+// A close token wins even when mixed with other comma-separated tokens.
+fn wants_close(headers: List(#(String, String))) -> Bool {
+  list.any(headers, fn(header) {
+    string.lowercase(header.0) == "connection"
+    && list.any(string.split(header.1, ","), fn(token) {
+      string.lowercase(string.trim(token)) == "close"
+    })
+  })
 }
 
 @internal
@@ -464,9 +477,19 @@ fn deliver_ready(state: State) -> State {
 fn wire(state: State, event: bridge.Event) -> State {
   case state.source {
     Scripted(_) -> state
-    Gun(_, expected) ->
+    Gun(connection, expected) ->
       case event {
+        bridge.Down(pid, cause) if pid == connection ->
+          observe(
+            state,
+            obs.Failed(Failure(error.RequestFailed(cause), MayHaveBeenSent)),
+          )
         bridge.Head(ref, fin, status, headers) if ref == expected -> {
+          let state =
+            State(
+              ..state,
+              persistent: state.persistent && !wants_close(headers),
+            )
           let state = observe(state, obs.Head(status, headers))
           case fin {
             True -> observe(state, obs.Complete([]))
@@ -651,7 +674,7 @@ fn release(state: State, outcome: Result(a, Failure)) -> Nil {
     Error(_), Gun(connection, stream) -> bridge.cancel(connection, stream)
     _, _ -> Nil
   }
-  state.release(result.is_ok(outcome))
+  state.release(result.is_ok(outcome) && state.persistent)
 }
 
 @internal

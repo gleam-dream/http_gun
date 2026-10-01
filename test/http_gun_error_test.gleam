@@ -74,6 +74,7 @@ pub fn typed_failures_roundtrip_all_categories_test() {
     error.PeerClosed,
     error.PeerDraining,
     error.ProtocolError,
+    error.HeaderLimitReached,
     error.TransportTimeout,
     error.UnexpectedProtocol,
     error.UnknownTransport,

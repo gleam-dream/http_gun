@@ -3,16 +3,16 @@
 ## Current state
 
 - Tracker path: docs/implementation/gleam-first/wave-tracker.md
-- Updated: 2026-09-30; API ergonomics and pre-release cleanup waves13–17 accepted.
-- Target: docs/DESIGN.md and the owner's restart prompt; plan revision 7 (pre-release cleanup authorized).
+- Updated: 2026-10-01; Warden feedback waves29–31 qualified locally.
+- Target: docs/DESIGN.md and the owner's restart prompt; plan revision 11 (Warden feedback).
 - Approved first milestone: standard binary Request -> real local Gun HTTP -> buffered Response with trailers, using Gleam ownership. Final acceptance includes all six waves; the first milestone is not completion.
 - Approval: the original prompt explicitly supplied and authorized the complete six-slice program, directed continuation without another broad approval cycle, and selected Gun/OTP/Gleam. Follow-up explicitly requested progressive implementation. This records that existing authorization, not inferred approval from silence.
-- Last closed wave: 17 accepted. Active: none.
-- Open material decisions: none. Reversible implementation details follow the contract.
+- Last closed wave: 31. Active: none.
+- Open material decisions: Warden must reconcile its two remaining transport tables and qualify a released dependency before adoption. No parser patch or invented failure precision is proposed here.
 - Temporary production substitutes: none. Loopback H1/H2 servers are test infrastructure, never production paths.
-- Gate: fast passes86 tests. Final full gates pass on Darwin ARM64 and Linux ARM64 for OTP29/28/27, with both consumers, six rejection fixtures,1196 LLM split points, public batch scaling, nghttpd interoperability, concurrent recording/replay and eleven original load scenarios. Exact receipts: docs/VALIDATION.md and docs/evidence/wave17/receipt.json.
-- Commit: owner authorized a local commit of waves13–17 after acceptance; frozen inputs and six current gate receipts reverified.
-- Next action: controlled consumer adoption; a full sibling LLM session-runtime migration is separate work. Optional client features remain deferred.
+- Gate: full Darwin ARM64 gates pass on OTP29/28/27, each with128 tests on stdlib0.71.0 and1.0.5, three consumers, seven intended type rejections,1196 LLM split points, batch scaling, nghttpd H2, recording/replay and eleven load scenarios. Current isolated LLM Wire passes223 tests with explicit loopback setup. Warden security probes9/9 pass, but unchanged transport tests remain17/19. Exact receipts: docs/VALIDATION.md and docs/evidence/wave31/receipt.json. Linux receipts are historical; no current Linux run is claimed.
+- Commit: the owner authorized local integration of waves29–31 after qualification; all111 frozen executable/dependency inputs reverified, with the normal fast pre-commit gate enabled. No push/publication or sibling edit is included.
+- Next action: Warden adoption/release remains separate, with its two failing transport tables explicitly recorded. Optional client features remain deferred.
 - Recovery: archives and hashes in docs/PROGRESS.md. No old production runtime was retained. All six retained waves pass the completed gates.
 
 ## Technology and boundary decision register
@@ -397,3 +397,72 @@ Accepted,2026-10-01. All three full Darwin ARM64 gates pass on Gleam1.18.1/OTP29
 Unmodified migrated LLM Wire1c0ad614 passes check/build but needs explicit loopback permission in its local setup (175 passes/48 failures). An isolated adaptation of eight test/example startup files passes223 tests, public boundary and five local H2 scenarios through1000 callers, with production code and all original checkouts unchanged. The normal downstream gate does not silently adapt sources. Warden is unchanged read-only evidence; migration/release and its future adapter gate remain separate work, not claims of this acceptance.
 
 Current FFI is113 lines/5585 bytes/15 bindings. New native responsibilities are IP parse/tuple conversion and one-family DNS lookup; supported Gun TLS/send options are adapted in the existing bridge. All policy, resolution coordination, lifetime and pool changes are Gleam. No dependency patch, second transport runtime, commit, push, publication, provider credentials or sibling/oversight write occurred. Accepted boundaries: unexposed reason phrases, close-delimited TLS ambiguity, connection-lifetime DNS trust, inherited allocations and scheduling races; optional redaction/durability remain separate. Linux/hosted CI, new Dream comparison and sustained soak were not executed. No required implementation remains under the owner's accepted reason-phrase exception. Receipt: docs/evidence/wave28/receipt.json.
+
+### Warden feedback — plan revision 11
+
+The owner's G1–G4 feedback continues the authorized generic adoption work from b517725. Keep siblings read-only; no dependency patches, retries, publication or automatic replay. Design anchors: DESIGN.md configuration/transport ownership, pool reuse and truthful errors; BOUNDS.md post-parse limits and closing races.
+
+- Wave29: resolve an independent stdlib1.0.5 consumer without changing its requirements; retain0.71 qualification; add `Trust.Anchors(List(BitArray))` mapping only to OTP cacerts, with verified local TLS, no filesystem conversion, and empty/malformed-input failure checks.
+- Wave30: reproduce request/response close retirement and already-closed idle TLS reuse; prevent avoidable admission through supported Gun behavior, preserving live siblings, finite work and the original deadline. A readiness observation is not an atomic remote liveness guarantee; no submitted request may replay.
+- Wave31: classify only facts established by released dependency events, retain ambiguous failures honestly, qualify complete gates/isolated downstream probes and document remaining Warden differences. No promise to invent five distinct error classes from indistinguishable dependency signals.
+
+Each wave starts with an observable failing case and finishes with focused green evidence, followed by the complete final gate. Existing dependency/library roles remain unchanged. The production Warden switch/release and mTLS stay outside this task.
+
+
+### Waves29–30 — focused acceptance
+
+The independent stdlib1.0.5 consumer first failed dependency resolution, then
+resolved and passed the original120 tests after widening only the bound. The
+normal lock retains0.71. Direct `Anchors` first failed to compile, then passed
+verified local TLS plus wrong-name/untrusted/invalid-only negative controls.
+No anchor-file conversion exists in production.
+
+A controlled acknowledged peer close reproduced G3 as
+`ConnectionFailed(PeerClosed), MayHaveBeenSent`100ms later. The bounded supported
+Gun readiness check makes the same request succeed on connection2, sequence1,
+without replay. Repeated request/response close-token cases and a10ms deadline
+during readiness pass. Mixed-case close-token retirement required its own
+correction. A complete gate on stdlib1.0.5 exposed check-order contention; checks
+now reserve active capacity, and readiness is not retained across admission
+passes. The128-test suite passes after that correction. Wave31 is qualifying
+the final complete tree; initial failures remain in the evidence.
+
+G4's header-limit row now retains `HeaderLimitReached`; four malformed/truncated
+rows retain coarse failures because released Gun events do not prove finer
+categories. Warden's nine retained security probes pass, including both G3
+cases, with in-memory trust in its isolated adapter. Its unchanged transport
+suite remains17/19 and its fast suite124/126 because two tables still demand
+unavailable precision and strict rejection of the accepted reason-phrase case.
+No original checkout changed during that experiment. This is not a Warden
+release/adoption acceptance. Final matrix/downstream qualification is pending.
+
+### Wave31 — final qualification
+
+Complete locally,2026-10-01. Three full Darwin ARM64 gates pass on
+Gleam1.18.1/OTP29,28,27, each with128 tests on both stdlib0.71.0 and1.0.5.
+The independent consumer resolves the actual public bounds. Public consumers,
+seven intended type rejections with positive control, async ownership controls,
+verified TLS/H2 and sibling cancellation, nghttpd, recording/replay and bounded
+batch/load checks pass. All111 frozen executable inputs match. Public docs build.
+
+The final isolated Warden adapter uses direct anchors and retains the new
+header-limit cause. All9 security probes pass, including the formerly failing
+idle-close and request-close cases. Its unchanged transport tests remain17/19;
+the fast suite is124/126, boundary controls pass, and its independent consumer
+passes8 tests. The two failing tables and skipped live IPv6:443 subcase are
+explicit in the receipt; strict reason-phrase rejection and unavailable error
+precision are not falsely marked passing. Warden adoption/release is separate.
+
+Current LLM Wire passes223 tests, its public boundary and five local H2 scenarios
+through1000 callers, with only eight isolated loopback test/example settings
+adapted and production source unchanged. All selected original checkouts match
+after both consumer checks. A Hex rate limit interrupted the initial OTP27 and
+LLM attempts; their sequential retries pass without runtime changes. Earlier
+mixed-case close-token and admission-order failures are retained with fixes.
+
+FFI is121 lines/5900 bytes/16 bindings. The only new binding wraps supported
+Gun info; anchor conversion and structured error mapping extend existing
+bindings. Gleam owns all preparation, admission and lifetime changes. No
+dependency patch, commit, publication, provider traffic or sibling write.
+No current Linux/hosted CI, comparative benchmark or sustained soak was run.
+Evidence: docs/evidence/wave31/receipt.json and README.md in that directory.

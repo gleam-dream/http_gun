@@ -1,0 +1,9 @@
+  Compiling http_gun
+error: Unknown module value
+   ┌─ /code/gleam-dream/http_gun/test/http_gun_trust_test.gleam:29:36
+   │
+29 │     http_gun.start(settings(config.Anchors(anchors("ca"))))
+   │                                    ^^^^^^^
+
+The module `http_gun/config` does not have a `Anchors` value.
+

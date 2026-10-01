@@ -1,0 +1,221 @@
+{
+  "date": "2026-10-01",
+  "base_revision": "b517725d998e4f1e25fef3e49e3cea27ad3a5241",
+  "scope": "Uncommitted HTTP Gun fixes for Warden G1-G4; no sibling implementation changes",
+  "platform": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+  "gleam": "1.18.1",
+  "dependencies": {
+    "gun": "2.6.0",
+    "cowlib": "2.20.0",
+    "normal_stdlib": "0.71.0",
+    "additional_stdlib": "1.0.5"
+  },
+  "runtime_inputs": {
+    "file": "inputs.json",
+    "count": 111,
+    "all_match": true
+  },
+  "commands": [
+    {
+      "command": "./dev/env sh dev/gate fast",
+      "exit": 0,
+      "log": "fast-corrected.log",
+      "note": "Before final fairness correction; final fast checks are included in all full gates"
+    },
+    {
+      "command": "./dev/env gleam test",
+      "exit": 0,
+      "log": "../wave30/fairness-green.log",
+      "note": "128 tests after final runtime correction"
+    },
+    {
+      "command": "./dev/env sh dev/matrix",
+      "exit": 1,
+      "log": "matrix-final.log",
+      "note": "OTP29/28 pass; OTP27 passes128 tests then Hex dependency resolution rate-limited"
+    },
+    {
+      "command": "sh docs/evidence/wave31/resume-validation.sh",
+      "exit": 0,
+      "log": "resume.log",
+      "note": "Sequential OTP27 full gate and isolated LLM Wire retry"
+    },
+    {
+      "command": "./dev/env python3 docs/evidence/wave31/check_warden.py",
+      "exit": 0,
+      "log": "warden-final-driver.log",
+      "note": "Evidence driver records expected failing tables; NOT a passing adoption gate"
+    },
+    {
+      "command": "./dev/env gleam docs build",
+      "exit": 0,
+      "log": "docs.log"
+    }
+  ],
+  "runtimes": {
+    "default": {
+      "versions": [
+        "gleam 1.18.1",
+        "OTP 29 ERTS 17.1"
+      ],
+      "full_gate_exit": 0,
+      "tests": {
+        "0.71.0": 128,
+        "1.0.5": 128
+      },
+      "nghttpd": {
+        "server": "nghttpd nghttp2/1.70.0",
+        "server_stream_limit": 8,
+        "client_connection_limit": 1,
+        "observed_request_connections": 1,
+        "resets": 2,
+        "log_bytes": 2662061,
+        "log_sha256": "7a2fa3147dbdb59f8e10c8c4fd7441820edab84e25f484cca13872c864601f85",
+        "soak_seconds": 0,
+        "scenarios": 7,
+        "result": "passed"
+      },
+      "load_scenarios": 11,
+      "log": "runtimes/default/full.log"
+    },
+    "otp28": {
+      "versions": [
+        "gleam 1.18.1",
+        "OTP 28 ERTS 16.4.0.6"
+      ],
+      "full_gate_exit": 0,
+      "tests": {
+        "0.71.0": 128,
+        "1.0.5": 128
+      },
+      "nghttpd": {
+        "server": "nghttpd nghttp2/1.70.0",
+        "server_stream_limit": 8,
+        "client_connection_limit": 1,
+        "observed_request_connections": 1,
+        "resets": 2,
+        "log_bytes": 2662021,
+        "log_sha256": "fec8d6b745592457de75b87120212fdbf60e26d059089e501e750c0d86a745b9",
+        "soak_seconds": 0,
+        "scenarios": 7,
+        "result": "passed"
+      },
+      "load_scenarios": 11,
+      "log": "runtimes/otp28/full.log"
+    },
+    "otp27": {
+      "versions": [
+        "gleam 1.18.1",
+        "OTP 27 ERTS 15.2.7.13"
+      ],
+      "full_gate_exit": 0,
+      "tests": {
+        "0.71.0": 128,
+        "1.0.5": 128
+      },
+      "nghttpd": {
+        "server": "nghttpd nghttp2/1.70.0",
+        "server_stream_limit": 8,
+        "client_connection_limit": 1,
+        "observed_request_connections": 1,
+        "resets": 2,
+        "log_bytes": 2662260,
+        "log_sha256": "dbcebc1ae38576f83d41d0493bdfce652e7a0c0b1c28bdf7b3e0c626ffbbe5d5",
+        "soak_seconds": 0,
+        "scenarios": 7,
+        "result": "passed"
+      },
+      "load_scenarios": 11,
+      "log": "runtimes/otp27/full.log"
+    }
+  },
+  "warden": {
+    "reference": "warden-final/receipt.json",
+    "transport": {
+      "passed": 17,
+      "failed": 2,
+      "tests_unchanged": true
+    },
+    "security": {
+      "passed": 9,
+      "skipped_subcase": "live IPv6 literal on privileged port443 could not bind"
+    },
+    "fast_suite": {
+      "passed": 124,
+      "failed": 2
+    },
+    "boundary": {
+      "intended_rejections": 13,
+      "positive_control": "passed"
+    },
+    "consumer_tests": 8,
+    "adoption_gate_passed": false
+  },
+  "llm_wire": {
+    "reference": "downstream-final/receipt.json",
+    "tests": 223,
+    "public_boundary": "passed",
+    "local_h2_scenarios": 5,
+    "adapted_test_example_files": 8,
+    "production_unchanged": true
+  },
+  "siblings": {
+    "llm_wire": {
+      "revision": "1c0ad614149b6ba286a6f778e223bd294f403b30",
+      "files": 101,
+      "unchanged": true
+    },
+    "json_blueprint": {
+      "revision": "129c9637add479f424882a1dfa528d80704d2607",
+      "files": 77,
+      "unchanged": true
+    },
+    "sinal": {
+      "revision": "8acec4507f23daa7f49c40cc7d39816a5a4c3d1d",
+      "files": 41,
+      "unchanged": true
+    },
+    "warden": {
+      "revision": "230c6bb4171a782d5b4f4f795bbdc108cad49964",
+      "files": 121,
+      "unchanged": true
+    }
+  },
+  "ffi": {
+    "files": {
+      "src/http_gun_ffi.erl": {
+        "lines": 113,
+        "bytes": 5469
+      },
+      "src/http_gun_file_ffi.erl": {
+        "lines": 8,
+        "bytes": 431
+      }
+    },
+    "total_lines": 121,
+    "total_bytes": 5900,
+    "external_bindings": 16
+  },
+  "remaining": [
+    "Readiness can race with subsequent peer close; no submitted request is replayed",
+    "Four malformed/truncated Warden rows retain coarse errors",
+    "Owner-accepted discarded reason phrase includes mixed-LF case; unchanged Warden framing table fails",
+    "No release or Warden production migration"
+  ],
+  "not_run": [
+    "Current Linux/hosted CI",
+    "New comparative performance benchmark",
+    "Sustained soak",
+    "Provider endpoints"
+  ],
+  "retained_failures": [
+    "../wave29/stdlib-red.log",
+    "../wave29/anchors-red.log",
+    "../wave30/idle-red.log",
+    "fast.log",
+    "full-first.log",
+    "header-event-red.log",
+    "otp27-rate-limit.log",
+    "downstream-adapted/receipt.json"
+  ]
+}

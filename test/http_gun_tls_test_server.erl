@@ -1,5 +1,8 @@
 -module(http_gun_tls_test_server).
--export([start/0, ip/0]).
+-export([start/0, ip/0, anchors/1]).
+anchors(Name) ->
+    {ok, Pem} = file:read_file("test/fixtures/" ++ binary_to_list(Name) ++ ".crt"),
+    [Der || {'Certificate', Der, not_encrypted} <- public_key:pem_decode(Pem)].
 start() -> start("localhost").
 ip() -> start("ip").
 start(Name) ->

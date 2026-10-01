@@ -1,0 +1,11 @@
+pki 0
+ipv6-key 0
+ipv6-cert 0
+format 0
+build 0
+transport 1
+security 0
+table 0
+fast-suite 1
+boundary 0
+consumer 0

@@ -1,4 +1,6 @@
 /// Pure startup policy. All limits are checked before starting a client.
+import gleam/bit_array
+import gleam/list
 import gleam/option.{type Option, None}
 import gleam/result
 import http_gun/destination
@@ -13,6 +15,9 @@ pub type Protocol {
 pub type Trust {
   SystemTrust
   CustomCa(path: String)
+  /// DER-encoded CA certificates, replacing system trust without file IO.
+  /// OTP validates certificate contents when opening a TLS connection.
+  Anchors(certificates: List(BitArray))
 }
 
 pub type Limits {
@@ -72,6 +77,20 @@ pub fn default() -> Config {
 /// Check supported policies and positive capacities without starting processes.
 /// Returns the unchanged settings or a diagnostic for invalid configuration.
 pub fn validate(config: Config) -> Result(Config, String) {
+  use Nil <- result.try(case config.trust {
+    Anchors(certificates) ->
+      case
+        certificates != []
+        && list.all(certificates, fn(cert) {
+          bit_array.bit_size(cert) > 0 && bit_array.bit_size(cert) % 8 == 0
+        })
+      {
+        True -> Ok(Nil)
+        False ->
+          Error("trust anchors must contain nonempty whole-byte certificates")
+      }
+    SystemTrust | CustomCa(_) -> Ok(Nil)
+  })
   use Nil <- result.try(case destination.valid(config.destination) {
     True -> Ok(Nil)
     False -> Error("destination allowlist entries must be nonempty host names")

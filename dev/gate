@@ -14,6 +14,7 @@ trap 'rm -rf "$out"' EXIT HUP INT TERM
 erlc -Werror -o "$out" src/*.erl test/*.erl
 python3 dev/boundaries.py
 if [ "$mode" = full ]; then
+  python3 dev/check_stdlib.py
   sh dev/consumers
   python3 dev/check_batch.py
   python3 dev/nghttpd.py

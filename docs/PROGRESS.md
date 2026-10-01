@@ -1,5 +1,32 @@
 # Restart progress
 
+Warden feedback follow-up complete locally,2026-10-01 (waves29–31). G1's public
+bound now admits stdlib1.x; the full gate qualifies both0.71.0 and1.0.5. G2 adds
+in-memory DER trust anchors directly through OTP cacerts. G3's reproduced idle
+TLS/Connection:close reuse failures are corrected before submission with bounded
+Gleam readiness jobs and explicit H1 retirement. Checks reserve admission
+capacity and retain the original deadline. A close after inspection remains a
+race with conservative evidence and no replay. G4 preserves the available
+header-limit cause; four ambiguous malformed/truncated cases remain coarse.
+
+All three full Darwin ARM64 gates pass on Gleam1.18.1/OTP29,28,27, each with128
+tests on both stdlib pins, external consumers, TLS/H2, recording/replay and load
+checks. All111 frozen inputs match. The adapted isolated LLM Wire check passes
+223 tests plus boundary/local H2 checks. Warden's unchanged transport suite is
+17/19, its security probes9/9, fast suite124/126, boundary controls and consumer
+8/8 pass. Its two remaining tables require finer failure classes and strict
+reason-phrase rejection unavailable through Gun's public API. Warden adoption
+and release are not claimed. Exact failures, retries and skipped subcase are in
+[validation](VALIDATION.md) and [receipt](evidence/wave31/receipt.json).
+FFI totals121 lines/5900 bytes/16 bindings; orchestration stays in Gleam. No
+dependency patch, commit, push, publication or sibling write occurred.
+
+Local integration: the owner subsequently requested committing these fixes.
+All111 frozen executable/dependency inputs still match the completed gates.
+The local commit containing this update retains the tests, exact evidence and
+remaining Warden differences; the normal fast pre-commit gate remains enabled.
+No push, publication or sibling change is included.
+
 Destination-policy follow-up complete, 2026-10-01. The client now defaults to public addresses only, resolves/checks complete A/AAAA answers in bounded Gleam workers, and pins Gun to the checked IP while preserving TLS identity and HTTP authority. Explicit loopback/private permissions, exact host allowlists and injectable resolvers are public pure configuration. Refusals and DNS failures are typed NotSubmitted results. TCP/TLS send bounds, deadline/cancellation cleanup, IP SANs, caller-mailbox isolation and delivered-header validation are tested. The owner accepted Gun's unobservable reason-phrase limitation; close-delimited TLS ambiguity is documented.
 
 Fast passes 120 tests. All three full Darwin ARM64 gates pass on Gleam1.18.1/OTP29,28,27, including external consumers, verified H1/TLS/H2, nghttpd, actual recording/replay and load scenarios. All106 frozen runtime inputs match. Unmodified LLM Wire still compiles but its local suite has175 passes/48 expected loopback-policy failures; an isolated test/example configuration adaptation passes all223 tests, boundary checks and local H2 through1000 callers. Its production source and sibling checkout remain unchanged. Warden is read-only behavioral evidence, not migrated or released. HTTP Gun FFI totals113 lines/5585 bytes/15 bindings. See [validation](VALIDATION.md), [receipt](evidence/wave28/receipt.json) and waves25–28 in the tracker. The owner subsequently authorized the local commit containing this update. No push, publication, provider credentials or sibling/oversight changes occurred. Linux/hosted CI and Warden's future adapter gate were not run.

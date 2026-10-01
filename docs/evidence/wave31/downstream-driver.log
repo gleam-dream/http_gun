@@ -1,0 +1,10 @@
+gleam: exit 0
+check: exit 0
+build: exit 1
+Traceback (most recent call last):
+  File "/code/gleam-dream/http_gun/docs/evidence/wave31/adapted_downstream.py", line 56, in <module>
+    gate.run(command, consumer, output, label, receipt)
+    ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/code/gleam-dream/http_gun/dev/check_downstream.py", line 111, in run
+    raise RuntimeError(f"{label} failed; see {output / (label + '.log')}")
+RuntimeError: build failed; see /code/gleam-dream/http_gun/docs/evidence/wave31/downstream-adapted/build.log

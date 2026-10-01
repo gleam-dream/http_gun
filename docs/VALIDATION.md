@@ -1,6 +1,74 @@
 # Local acceptance evidence
 
-## Destination policy and DNS pinning: waves25–28
+## Warden feedback: waves29–31
+
+The corrected working tree passes **128 tests on both stdlib0.71.0 and1.0.5**
+in each full Darwin ARM64 gate: Gleam1.18.1, OTP29/ERTS17.1,
+OTP28/ERTS16.4.0.6 and OTP27/ERTS15.2.7.13. The public dependency bound now
+admits1.x while the normal lock retains0.71. All111 frozen executable/dependency
+inputs match the final source. Public API documentation builds.
+[Receipt](evidence/wave31/receipt.json), [input hashes](evidence/wave31/inputs.json),
+[commands and retained failures](evidence/wave31/README.md),
+[runtime logs](evidence/wave31/runtimes/).
+
+New public tests prove in-memory DER CA trust with wrong-name/untrusted controls;
+empty/non-byte configuration rejection and invalid-only DER refusal; fresh
+connections after acknowledged idle TLS close; request/response close-token
+retirement; the original deadline during readiness inspection; and preservation
+of Gun's structured header-limit error. H1 readiness runs in bounded Gleam jobs,
+reserves admission capacity and is not cached across dispatch passes. It is an
+observation before submission, not an atomic remote-liveness guarantee. No
+submitted request is replayed. Gun/Cowlib remain unmodified.
+
+Every full gate also passes three public consumers, seven intended type
+rejections with positive control,1196 archived LLM split points, async ownership
+and startup-failure checks, real TLS/H2 and sibling cancellation, seven nghttpd
+scenarios,256 actual recorded/replayed exchanges totaling8MiB, batch trials
+through10000 and eleven load scenarios including32MiB streams and slow readers.
+
+| OTP | nghttpd1000 elapsed ms | p95 ms | Peak sampled VM bytes | Largest mailbox | Connections |
+| --- | ---: | ---: | ---: | ---: | ---: |
+|29|81.321|74.456|71239164|275|1|
+|28|87.398|78.268|71205153|148|1|
+|27|89.137|80.798|70110881|167|1|
+
+These are individual local samples with nghttpd1.70.0, peer stream limit8,
+client active128/waiting1024, a60-second budget and256-byte replies. The sampler
+can miss peaks and excludes the C server. Complete H1/H2 counts1/10/100/1000,
+mixed consumers, sockets, processes and latency measurements are retained.
+No new comparative benchmark, Linux/hosted CI or sustained soak is claimed.
+
+Warden's retained experiment was rerun in temporary copies, using direct
+`config.Anchors` and the new `HeaderLimitReached` mapping. Its transport tests
+were unchanged: **17 pass,2 fail**. All9 security probes pass, including G3 at
+100/1000/3000ms after close, Connection:close retirement, mailbox0→0 and bounded
+shutdown. The fast suite including probes is124 pass/2 fail;13 intended public
+type rejections plus positive control and8 consumer tests pass. Its live IPv6
+port443 subcase could not bind and was skipped; the non-default-port exchange
+and HTTP Gun's authority formatting test pass.
+[Exact adapter and receipt](evidence/wave31/warden-final/receipt.json).
+
+The remaining transport tables require distinctions Gun does not expose for
+four malformed/truncated cases, and strict rejection of the accepted discarded
+reason-phrase/mixed-LF case. Header-limit precision is corrected; the other
+four cases remain failures with coarse causes. No assertion was waived or
+changed. Warden's release/migration acceptance is **not complete**.
+
+Current LLM Wire1c0ad614 separately passes223 tests, its public boundary and five
+local TLS/H2 scenarios through1000 callers. As in wave28, only eight test/example
+files in disposable copies opt into loopback; production source is unchanged.
+All selected originals match after both isolated consumer checks.
+[LLM receipt and setup patch](evidence/wave31/downstream-final/receipt.json).
+
+The first complete run found an eligible-origin ordering regression on1.0.5;
+active reservations fixed it before the final matrix. The final matrix passed
+OTP29/28, then Hex rate limiting interrupted OTP27 dependency resolution. A
+concurrent LLM attempt hit the same limit after check passed. Sequential retries
+of those two incomplete gates pass without further runtime changes. Initial
+failures are retained. Nothing was committed, published or changed in sibling
+checkouts during this follow-up.
+
+## Historical destination policy and DNS pinning: waves25–28
 
 The final source passes **120 tests** in the fast gate and full gates on Darwin
 ARM64, Gleam1.18.1, OTP29/ERTS17.1, OTP28/ERTS16.4.0.6 and
@@ -120,7 +188,7 @@ Run `./dev/env sh dev/gate fast` for the fast gate and `./dev/env sh dev/gate fu
 
 ## Covered contracts
 
-The fast gate runs formatting, Gleam check, build with warnings as errors, 120 observable tests, `erlc -Werror` over handwritten production/test FFI, and dependency/public-import/Dynamic boundary checks.
+The fast gate runs formatting, Gleam check, build with warnings as errors, 128 observable tests, `erlc -Werror` over handwritten production/test FFI, and dependency/public-import/Dynamic boundary checks. The full gate repeats that suite on stdlib1.0.5 after resolving an independent public consumer against the actual package bounds.
 
 | Area | Executed observations |
 | --- | --- |
@@ -257,11 +325,11 @@ All requested exchanges/bytes completed without retries. Both large-stream rows 
 
 | File | Physical lines | Bytes | Responsibilities |
 | --- | ---: | ---: | --- |
-| `src/http_gun_ffi.erl` | 105 | 5,154 | Native IP parsing/lookup and tuple conversion; Gun application/open/request/flow/cancel/close calls, original TLS identity and finite send options, event/cause conversion, clock and exception-safe cleanup |
+| `src/http_gun_ffi.erl` | 113 | 5,469 | Native IP parsing/lookup and tuple conversion; Gun application/open/request/flow/cancel/close and advisory info calls, TLS trust/identity and finite send options, event/cause conversion, clock and exception-safe cleanup |
 | `src/http_gun_file_ffi.erl` | 8 | 431 | Unique temporary-directory candidate name and empty-directory removal |
-| Total | 113 | 5,585 | Fifteen external bindings; no pool, body, batch or cassette server |
+| Total | 121 | 5,900 | Sixteen external bindings; no pool, body, batch or cassette server |
 
-These are the wave28 counts. The previous wave24 source had92 lines/4669 bytes/13 bindings; the two new bindings are native address parsing and one-family DNS lookup. file_streams and simplifile now supply ordinary filesystem IO; their released code is a dependency, not counted as handwritten HTTP Gun FFI. Counts include blank/comment lines. Test-only loopback servers and instrumentation are excluded from production FFI. Gleam owns admission policy, states, deadlines, demand, monitoring, batch scheduling, matching, JSON codec, recorder coordination and finalization ordering. Internal typed bridge declarations live in Gleam; raw Dynamic is confined to event/JSON boundaries.
+These are the wave31 counts. Wave28 had113 lines/5585 bytes/15 bindings. This follow-up adds one small exception-safe `gun:info/1` binding, one cacerts option variant and one structured error mapping. All preparation workers and admission decisions remain in Gleam. file_streams and simplifile supply ordinary filesystem IO; their released code is a dependency, not counted as handwritten HTTP Gun FFI. Counts include blank/comment lines. Test-only loopback servers and instrumentation are excluded from production FFI. Gleam owns admission policy, states, deadlines, demand, monitoring, batch scheduling, matching, JSON codec, recorder coordination and finalization ordering. Internal typed bridge declarations live in Gleam; raw Dynamic is confined to event/JSON boundaries.
 
 ## Optional features and inherited behavior
 

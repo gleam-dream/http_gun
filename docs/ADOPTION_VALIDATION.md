@@ -1,5 +1,16 @@
 # Adoption validation follow-up
 
+Warden-feedback update (2026-10-01): stdlib1.x compatibility, direct in-memory
+trust and the reproduced H1 closing-connection reuse cases are corrected.
+Gun's header-limit cause is retained; unavailable parser detail remains coarse.
+All three full Darwin ARM64 gates pass128 tests on both selected stdlibs.
+Isolated LLM Wire passes223 tests after local test/example loopback opt-in.
+Warden's retained isolated adapter passes9 security probes and8 consumer tests,
+but its unchanged transport suite remains17/19 (coarse errors and the accepted
+reason-phrase exception). Release and actual Warden migration remain separate;
+the unchanged adoption gate is not passing. See [current validation](VALIDATION.md)
+and [exact Warden results](evidence/wave31/README.md).
+
 Destination-policy update (2026-10-01): the full HTTP Gun gate passes120 tests and all consumers on Darwin ARM64/OTP29,28,27. The migrated LLM Wire source still compiles, but its local live tests must explicitly permit loopback under the new default. Unmodified:175 passes/48 failures. Isolated test/example setup adaptation:223 passes, public boundary and local H2 through1000 callers. No production LLM Wire or sibling source changed. Warden remains unmigrated; its release/adapter acceptance is separate. See [current validation](VALIDATION.md) and [downstream notes](DOWNSTREAM.md).
 
 Historical adoption: LLM Wire migrated at `1c0ad614149b6ba286a6f778e223bd294f403b30`, with HTTP Gun `ebf2b479761e8c932b0c85a8f83cf8460c014d4f` unchanged. Wave18 reran223 tests, the actual public consumer and six negative compilation controls, live recording/offline playback, and independent verified TLS/H2 at1/10/100/1000 callers on Darwin ARM64/OTP29. These are specific receipts, not universal readiness. See [current downstream validation](DOWNSTREAM.md) and [receipt](evidence/wave18/current-downstream/receipt.json).

@@ -1,0 +1,155 @@
+  Resolving versions
+   Compiled in 0.22s
+    Running warden_test.main
+warden suite fast: 27 modules
+PROBE DeclaredOversize | adapter Failure(Sent, BodyTooLarge) | http_gun Failure(DeadlineExceeded, MayHaveBeenSent)
+PROBE EndlessChunked | adapter Failure(Sent, BodyTooLarge) | http_gun Failure(LimitExceeded(CollectedBodyBytes, 4096, 7000), MayHaveBeenSent)
+PROBE CloseDelimitedOversize | adapter Failure(Sent, BodyTooLarge) | http_gun Failure(LimitExceeded(CollectedBodyBytes, 4096, 10000), MayHaveBeenSent)
+PROBE ManyHeaders | adapter Failure(Sent, HeadersTooLarge) | http_gun Failure(RequestFailed(HeaderLimitReached), MayHaveBeenSent)
+PROBE BigHeaderLine | adapter Failure(Sent, HeadersTooLarge) | http_gun Failure(LimitExceeded(ResponseHeaderBytes, 16384, 40020), MayHaveBeenSent)
+PROBE Gzip | adapter Failure(Sent, UnsupportedContentEncoding) | http_gun Ok(200)
+PROBE Truncated | adapter Failure(Sent, ReceiveFailed) | http_gun Failure(RequestFailed(PeerClosed), MayHaveBeenSent)
+
+14:34:36.277 [error] :gen_statem #PID<0.366.0> terminating
+** (FunctionClauseError) no function clause matching in :cow_http1.parse_status_line/1
+    (cowlib 2.20.0) /private/tmp/nix-shell.RzvnYm/http-gun-warden-t2crbcv3/warden/build/dev/erlang/cowlib/src/cow_http1.erl:88: :cow_http1.parse_status_line("NOT HTTP\r\n\r\n")
+    (gun 2.6.0) /private/tmp/nix-shell.RzvnYm/http-gun-warden-t2crbcv3/warden/build/dev/erlang/gun/src/gun_http.erl:347: :gun_http.handle_head/5
+    (gun 2.6.0) /private/tmp/nix-shell.RzvnYm/http-gun-warden-t2crbcv3/warden/build/dev/erlang/gun/src/gun.erl:1641: :gun.handle_common_connected_no_input/4
+    (stdlib 8.1) gen_statem.erl:3741: :gen_statem.loop_state_callback/11
+    (stdlib 8.1) proc_lib.erl:333: :proc_lib.init_p_do_apply/3
+Process Label: {:gun, {127, 0, 0, 1}, 60150}
+Queue: [info: {:ssl, {:sslsocket, #Port<0.46>, #PID<0.369.0>, #PID<0.368.0>, :gen_tcp, :tls_gen_connection, #Reference<0.2828496345.2569404427.193711>, :undefined}, "NOT HTTP\r\n\r\n"}]
+Postponed: []
+State: {:connected, {:state, #PID<0.363.0>, {:up, #Reference<0.2828496345.2569273355.193700>}, {127, 0, 0, 1}, 60150, "https", {127, 0, 0, 1}, 60150, [], %{protocols: [:http], retry: 0, connect_timeout: 2000, domain_lookup_timeout: 2000, http2_opts: %{flow: 1, max_headers: 101, initial_connection_window_size: 65535, initial_stream_window_size: 16384, notify_settings_changed: true}, http_opts: %{flow: 1, max_headers: 100}, tcp_opts: [send_timeout: 2000, send_timeout_close: true], tls_handshake_timeout: 2000, tls_opts: [cacerts: [<<48, 130, 3, 35, 48, 130, 2, 11, 160, 3, 2, 1, 2, 2, 20, 34, 190, 170, 164, 4, 220, 53, 125, 198, 55, 156, 176, ...>>], verify: :verify_peer, send_timeout: 2000, send_timeout_close: true, customize_hostname_check: [match_fun: #Function<6.41508611/2 in :public_key.pkix_verify_hostname_match_fun/1>], server_name_indication: ~c"localhost"], transport: :tls}, :undefined, {:sslsocket, #Port<0.46>, #PID<0.369.0>, #PID<0.368.0>, :gen_tcp, :tls_gen_connection, #Reference<0.2828496345.2569404427.193711>, :undefined}, :gun_tls, true, {:ssl, :ssl_closed, :ssl_error}, :gun_http, {:http_state, {:sslsocket, #Port<0.46>, #PID<0.369.0>, #PID<0.368.0>, :gen_tcp, :tls_gen_connection, #Reference<0.2828496345.2569404427.193711>, :undefined}, :gun_tls, %{flow: 1, max_headers: 100}, :"HTTP/1.1", :keepalive, "", :undefined, [{:stream, #Reference<0.2828496345.2569273355.193776>, #PID<0.374.0>, 1, "GET", "localhost:60150", "/x", [], true, :undefined}], :head, {0, 0}, :head}, :undefined, :gun_default_event_h, :undefined}}
+Callback mode: :state_functions, state_enter: false
+
+14:34:36.314 [error] :gen_statem #PID<0.381.0> terminating
+** (FunctionClauseError) no function clause matching in :cow_http1.parse_status_line/1
+    (cowlib 2.20.0) /private/tmp/nix-shell.RzvnYm/http-gun-warden-t2crbcv3/warden/build/dev/erlang/cowlib/src/cow_http1.erl:88: :cow_http1.parse_status_line("NOT HTTP\r\n\r\n")
+    (gun 2.6.0) /private/tmp/nix-shell.RzvnYm/http-gun-warden-t2crbcv3/warden/build/dev/erlang/gun/src/gun_http.erl:347: :gun_http.handle_head/5
+    (gun 2.6.0) /private/tmp/nix-shell.RzvnYm/http-gun-warden-t2crbcv3/warden/build/dev/erlang/gun/src/gun.erl:1641: :gun.handle_common_connected_no_input/4
+    (stdlib 8.1) gen_statem.erl:3741: :gen_statem.loop_state_callback/11
+    (stdlib 8.1) proc_lib.erl:333: :proc_lib.init_p_do_apply/3
+Process Label: {:gun, {127, 0, 0, 1}, 60152}
+Queue: [info: {:ssl, {:sslsocket, #Port<0.49>, #PID<0.388.0>, #PID<0.386.0>, :gen_tcp, :tls_gen_connection, #Reference<0.2828496345.2569404427.193931>, :undefined}, "NOT HTTP\r\n\r\n"}]
+Postponed: []
+State: {:connected, {:state, #PID<0.378.0>, {:up, #Reference<0.2828496345.2569273346.196371>}, {127, 0, 0, 1}, 60152, "https", {127, 0, 0, 1}, 60152, [], %{protocols: [:http], retry: 0, connect_timeout: 1999, domain_lookup_timeout: 1999, http2_opts: %{flow: 1, max_headers: 101, initial_connection_window_size: 65535, initial_stream_window_size: 16384, notify_settings_changed: true}, http_opts: %{flow: 1, max_headers: 100}, tcp_opts: [send_timeout: 1999, send_timeout_close: true], tls_handshake_timeout: 1999, tls_opts: [cacertfile: ~c"build/test-pki/ca.pem", verify: :verify_peer, send_timeout: 1999, send_timeout_close: true, customize_hostname_check: [match_fun: #Function<6.41508611/2 in :public_key.pkix_verify_hostname_match_fun/1>], server_name_indication: ~c"localhost"], transport: :tls}, :undefined, {:sslsocket, #Port<0.49>, #PID<0.388.0>, #PID<0.386.0>, :gen_tcp, :tls_gen_connection, #Reference<0.2828496345.2569404427.193931>, :undefined}, :gun_tls, true, {:ssl, :ssl_closed, :ssl_error}, :gun_http, {:http_state, {:sslsocket, #Port<0.49>, #PID<0.388.0>, #PID<0.386.0>, :gen_tcp, :tls_gen_connection, #Reference<0.2828496345.2569404427.193931>, :undefined}, :gun_tls, %{flow: 1, max_headers: 100}, :"HTTP/1.1", :keepalive, "", :undefined, [{:stream, #Reference<0.2828496345.2569273355.193987>, #PID<0.389.0>, 1, "GET", "localhost:60152", "/x", [], true, :undefined}], :head, {0, 0}, :head}, :undefined, :gun_default_event_h, :undefined}}
+Callback mode: :state_functions, state_enter: false
+PROBE BadStatus | adapter Failure(Sent, ReceiveFailed) | http_gun Failure(ConnectionFailed(UnknownTransport), MayHaveBeenSent)
+PROBE BareLfHead | adapter Ok(200, headers 0, body "ok") | http_gun Ok(200)
+
+14:34:36.730 [error] :gen_statem #PID<0.426.0> terminating
+** (ArgumentError) errors were found at the given arguments:
+
+  * 1st argument: not a textual representation of an integer
+
+    :erlang.binary_to_integer("")
+    (cowlib 2.20.0) /private/tmp/nix-shell.RzvnYm/http-gun-warden-t2crbcv3/warden/build/dev/erlang/cowlib/src/cow_http_hd.erl:3721: :cow_http_hd.digits/3
+    (cowlib 2.20.0) /private/tmp/nix-shell.RzvnYm/http-gun-warden-t2crbcv3/warden/build/dev/erlang/cowlib/src/cow_http_hd.erl:1667: :cow_http_hd.parse_content_length/1
+    (gun 2.6.0) /private/tmp/nix-shell.RzvnYm/http-gun-warden-t2crbcv3/warden/build/dev/erlang/gun/src/gun_http.erl:1020: :gun_http.response_io_from_headers/4
+    (gun 2.6.0) /private/tmp/nix-shell.RzvnYm/http-gun-warden-t2crbcv3/warden/build/dev/erlang/gun/src/gun_http.erl:474: :gun_http.handle_response/8
+    (gun 2.6.0) /private/tmp/nix-shell.RzvnYm/http-gun-warden-t2crbcv3/warden/build/dev/erlang/gun/src/gun.erl:1641: :gun.handle_common_connected_no_input/4
+    (stdlib 8.1) gen_statem.erl:3741: :gen_statem.loop_state_callback/11
+    (stdlib 8.1) proc_lib.erl:333: :proc_lib.init_p_do_apply/3
+Process Label: {:gun, {127, 0, 0, 1}, 60158}
+Queue: [info: {:ssl, {:sslsocket, #Port<0.58>, #PID<0.429.0>, #PID<0.428.0>, :gen_tcp, :tls_gen_connection, #Reference<0.2828496345.2569404418.196810>, :undefined}, "HTTP/1.1 200 OK\r\ncontent-length: +2\r\n\r\nok"}]
+Postponed: []
+State: {:connected, {:state, #PID<0.423.0>, {:up, #Reference<0.2828496345.2569273346.196796>}, {127, 0, 0, 1}, 60158, "https", {127, 0, 0, 1}, 60158, [], %{protocols: [:http], retry: 0, connect_timeout: 2000, domain_lookup_timeout: 2000, http2_opts: %{flow: 1, max_headers: 101, initial_connection_window_size: 65535, initial_stream_window_size: 16384, notify_settings_changed: true}, http_opts: %{flow: 1, max_headers: 100}, tcp_opts: [send_timeout: 2000, send_timeout_close: true], tls_handshake_timeout: 2000, tls_opts: [cacerts: [<<48, 130, 3, 35, 48, 130, 2, 11, 160, 3, 2, 1, 2, 2, 20, 34, 190, 170, 164, 4, 220, 53, 125, 198, 55, 156, 176, ...>>], verify: :verify_peer, send_timeout: 2000, send_timeout_close: true, customize_hostname_check: [match_fun: #Function<6.41508611/2 in :public_key.pkix_verify_hostname_match_fun/1>], server_name_indication: ~c"localhost"], transport: :tls}, :undefined, {:sslsocket, #Port<0.58>, #PID<0.429.0>, #PID<0.428.0>, :gen_tcp, :tls_gen_connection, #Reference<0.2828496345.2569404418.196810>, :undefined}, :gun_tls, true, {:ssl, :ssl_closed, :ssl_error}, :gun_http, {:http_state, {:sslsocket, #Port<0.58>, #PID<0.429.0>, #PID<0.428.0>, :gen_tcp, :tls_gen_connection, #Reference<0.2828496345.2569404418.196810>, :undefined}, :gun_tls, %{flow: 1, max_headers: 100}, :"HTTP/1.1", :keepalive, "", :undefined, [{:stream, #Reference<0.2828496345.2569273345.193956>, #PID<0.434.0>, 1, "GET", "localhost:60158", "/x", [], true, :undefined}], :head, {0, 0}, :head}, :undefined, :gun_default_event_h, :undefined}}
+Callback mode: :state_functions, state_enter: false
+
+14:34:36.740 [error] :gen_statem #PID<0.441.0> terminating
+** (ArgumentError) errors were found at the given arguments:
+
+  * 1st argument: not a textual representation of an integer
+
+    :erlang.binary_to_integer("")
+    (cowlib 2.20.0) /private/tmp/nix-shell.RzvnYm/http-gun-warden-t2crbcv3/warden/build/dev/erlang/cowlib/src/cow_http_hd.erl:3721: :cow_http_hd.digits/3
+    (cowlib 2.20.0) /private/tmp/nix-shell.RzvnYm/http-gun-warden-t2crbcv3/warden/build/dev/erlang/cowlib/src/cow_http_hd.erl:1667: :cow_http_hd.parse_content_length/1
+    (gun 2.6.0) /private/tmp/nix-shell.RzvnYm/http-gun-warden-t2crbcv3/warden/build/dev/erlang/gun/src/gun_http.erl:1020: :gun_http.response_io_from_headers/4
+    (gun 2.6.0) /private/tmp/nix-shell.RzvnYm/http-gun-warden-t2crbcv3/warden/build/dev/erlang/gun/src/gun_http.erl:474: :gun_http.handle_response/8
+    (gun 2.6.0) /private/tmp/nix-shell.RzvnYm/http-gun-warden-t2crbcv3/warden/build/dev/erlang/gun/src/gun.erl:1641: :gun.handle_common_connected_no_input/4
+    (stdlib 8.1) gen_statem.erl:3741: :gen_statem.loop_state_callback/11
+    (stdlib 8.1) proc_lib.erl:333: :proc_lib.init_p_do_apply/3
+Process Label: {:gun, {127, 0, 0, 1}, 60160}
+Queue: [info: {:ssl, {:sslsocket, #Port<0.61>, #PID<0.448.0>, #PID<0.447.0>, :gen_tcp, :tls_gen_connection, #Reference<0.2828496345.2569404418.196946>, :undefined}, "HTTP/1.1 200 OK\r\ncontent-length: +2\r\n\r\nok"}]
+Postponed: []
+State: {:connected, {:state, #PID<0.438.0>, {:up, #Reference<0.2828496345.2569273346.196926>}, {127, 0, 0, 1}, 60160, "https", {127, 0, 0, 1}, 60160, [], %{protocols: [:http], retry: 0, connect_timeout: 2000, domain_lookup_timeout: 2000, http2_opts: %{flow: 1, max_headers: 101, initial_connection_window_size: 65535, initial_stream_window_size: 16384, notify_settings_changed: true}, http_opts: %{flow: 1, max_headers: 100}, tcp_opts: [send_timeout: 2000, send_timeout_close: true], tls_handshake_timeout: 2000, tls_opts: [cacertfile: ~c"build/test-pki/ca.pem", verify: :verify_peer, send_timeout: 2000, send_timeout_close: true, customize_hostname_check: [match_fun: #Function<6.41508611/2 in :public_key.pkix_verify_hostname_match_fun/1>], server_name_indication: ~c"localhost"], transport: :tls}, :undefined, {:sslsocket, #Port<0.61>, #PID<0.448.0>, #PID<0.447.0>, :gen_tcp, :tls_gen_connection, #Reference<0.2828496345.2569404418.196946>, :undefined}, :gun_tls, true, {:ssl, :ssl_closed, :ssl_error}, :gun_http, {:http_state, {:sslsocket, #Port<0.61>, #PID<0.448.0>, #PID<0.447.0>, :gen_tcp, :tls_gen_connection, #Reference<0.2828496345.2569404418.196946>, :undefined}, :gun_tls, %{flow: 1, max_headers: 100}, :"HTTP/1.1", :keepalive, "", :undefined, [{:stream, #Reference<0.2828496345.2569273346.197001>, #PID<0.449.0>, 1, "GET", "localhost:60160", "/x", [], true, :undefined}], :head, {0, 0}, :head}, :undefined, :gun_default_event_h, :undefined}}
+Callback mode: :state_functions, state_enter: false
+PROBE SignedContentLength | adapter Failure(Sent, ReceiveFailed) | http_gun Failure(ConnectionFailed(UnknownTransport), MayHaveBeenSent)
+PROBE ControlInHeader | adapter Failure(Sent, MalformedResponse) | http_gun Failure(RequestFailed(ProtocolError), MayHaveBeenSent)
+PROBE SignedChunkSize | adapter Failure(Sent, ReceiveFailed) | http_gun Failure(RequestFailed(PeerClosed), MayHaveBeenSent)
+PROBE HeaderOvershoot | adapter Failure(Sent, HeadersTooLarge) | http_gun Failure(LimitExceeded(ResponseHeaderBytes, 16384, 25021), MayHaveBeenSent)
+[32m.[39mEVIDENCE ipv6 non-default port heads: ["get /x http/1.1\r\ncontent-length: 0\r\nhost: [::1]:60174\r\nuser-agent: warden"]
+EVIDENCE ipv6 port 443: cannot bind [::1]:443 here; not probed
+[32m.[39m[32m.[39mEVIDENCE stalled 64 KiB POST: Error(Failure(Sent, Timeout)) after 501 ms (deadline 500)
+[32m.[39mEVIDENCE reuse: resolutions 1, connections 1
+EVIDENCE replacement: resolutions 2, connections 2
+[32m.[39mEVIDENCE after caller death: Stats(0, 0, 0)
+[32m.[39mEVIDENCE stop took 0 ms; in-flight request: Error(Failure(Closed, MayHaveBeenSent))
+[32m.[39mEVIDENCE mailbox before 0, after 0
+[32m.[39mEVIDENCE after peer close + 100 ms: Ok(200), connections 2
+EVIDENCE after peer close + 1000 ms: Ok(200), connections 2
+EVIDENCE after peer close + 3000 ms: Ok(200), connections 2
+[32m.[39mEVIDENCE connection: close twice: #("Ok(200)", "Ok(200)"), server connections 2, pool Stats(0, 0, 0)
+[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m
+14:34:48.201 [info] The function passed as a handler with ID {:scoped_handler_id, -576460752303423487} is a local function.
+This means that it is either an anonymous function or a capture of a function without a module specified. That may cause a performance penalty when calling that handler. For more details see the note in `telemetry:attach/4` documentation.
+
+https://hexdocs.pm/telemetry/telemetry.html#attach/4
+
+14:34:48.209 [info] The function passed as a handler with ID {:scoped_handler_id, -576460752303420862} is a local function.
+This means that it is either an anonymous function or a capture of a function without a module specified. That may cause a performance penalty when calling that handler. For more details see the note in `telemetry:attach/4` documentation.
+
+https://hexdocs.pm/telemetry/telemetry.html#attach/4
+[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m
+14:35:05.480 [notice] TLS :client: In state :wait_cert_cr at ssl_handshake.erl:2262 generated CLIENT ALERT: Fatal - Bad Certificate
+ - {:bad_cert,
+ {:hostname_check_failed, {:requested, ~c"localhost"},
+  {:received, [dNSName: ~c"wrong.example"]}}}
+
+14:35:05.480 [notice] TLS :server: In state :wait_finished received CLIENT ALERT: Fatal - Bad Certificate
+
+
+14:35:05.496 [notice] TLS :client: In state :wait_cert_cr at ssl_handshake.erl:2254 generated CLIENT ALERT: Fatal - Unknown CA
+
+
+14:35:05.496 [notice] TLS :server: In state :wait_finished received CLIENT ALERT: Fatal - Unknown CA
+
+
+14:35:05.501 [notice] TLS :client: In state :wait_cert_cr at ssl_handshake.erl:2234 generated CLIENT ALERT: Fatal - Certificate Expired
+
+
+14:35:05.502 [notice] TLS :server: In state :wait_finished received CLIENT ALERT: Fatal - Certificate Expired
+
+[32m.[39m
+14:35:05.522 [notice] TLS :client: In state :wait_cert_cr at ssl_handshake.erl:2262 generated CLIENT ALERT: Fatal - Bad Certificate
+ - {:bad_cert,
+ {:hostname_check_failed, {:requested, {127, 0, 0, 1}},
+  {:received, [dNSName: ~c"wrong.example"]}}}
+
+14:35:05.522 [notice] TLS :server: In state :wait_finished received CLIENT ALERT: Fatal - Bad Certificate
+
+[32m.[39m
+14:35:05.572 [notice] TLS :client: In state :wait_cert_cr at ssl_handshake.erl:2254 generated CLIENT ALERT: Fatal - Unknown CA
+
+
+14:35:05.574 [notice] TLS :server: In state :wait_finished received CLIENT ALERT: Fatal - Unknown CA
+
+[32m.[39m[32m.[39m
+[1m[31massert[39m[22m [90mtest/warden/transport_test.gleam:119[39m
+[36m test[39m: warden@transport_test.response_bounds_test
+[36m code[39m: assert #(c.0, get(policy(), support.server_url(s, "/x")))
+      == #(c.0, Error(Failure(Sent, c.1)))
+[36m left[39m: Truncated(Error(Failure(Sent, ReceiveFailed)))
+[36mright[39m: Truncated(Error(Failure(Sent, TruncatedBody)))
+[36m info[39m: Assertion failed.
+[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m
+[1m[31massert[39m[22m [90mtest/warden/transport_test.gleam:329[39m
+[36m test[39m: warden@transport_test.lenient_framing_is_refused_test
+[36m code[39m: assert #(kind, get(policy(), support.server_url(s, "/x")))
+        == #(kind, Error(Failure(Sent, transport.MalformedResponse)))
+[36m left[39m: BareLfHead(Ok(Response(200, [], "ok")))
+[36mright[39m: BareLfHead(Error(Failure(Sent, MalformedResponse)))
+[36m info[39m: Assertion failed.
+[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[31m
+124 passed, 2 failures[39m

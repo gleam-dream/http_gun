@@ -1,0 +1,337 @@
+  Compiling http_gun
+   Compiled in 0.48s
+    Running http_gun_test.main
+[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m=CRASH REPORT==== 1-Oct-2026::14:29:00.667212 ===
+  crasher:
+    initial call: http_gun@internal@preparation:'-start/5-anonymous-0-'/0
+    pid: <0.253.0>
+    registered_name: []
+    exception error: #{function =>
+                           <<"throwing_resolver_is_typed_and_does_not_kill_pool_test">>,
+                       line => 536,message => <<"injected resolver failure">>,
+                       module => <<"http_gun_destination_test">>,
+                       file => <<"test/http_gun_destination_test.gleam">>,
+                       gleam_error => panic}
+      in function  http_gun_destination_test:'-throwing_resolver_is_typed_and_does_not_kill_pool_test/0-anonymous-0-'/2 (test/http_gun_destination_test.gleam:535)
+      in call from http_gun@internal@resolution:'-resolve/3-anonymous-4-'/4 (src/http_gun/internal/resolution.gleam:50)
+      in call from http_gun@internal@preparation:'-start/5-anonymous-0-'/2 (src/http_gun/internal/preparation.gleam:22)
+    ancestors: [<0.252.0>,<0.251.0>,<0.120.0>]
+    message_queue_len: 0
+    messages: []
+    links: [<0.252.0>]
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 233
+    stack_size: 29
+    reductions: 60
+  neighbours:
+
+[32m.[39m[32m.[39m[32m.[39m=NOTICE REPORT==== 1-Oct-2026::14:29:00.945392 ===
+TLS client: In state wait_cert_cr at ssl_handshake.erl:2262 generated CLIENT ALERT: Fatal - Bad Certificate
+ - {bad_cert,{hostname_check_failed,{requested,{127,0,0,1}},
+                                    {received,[{dNSName,"localhost"}]}}}
+=NOTICE REPORT==== 1-Oct-2026::14:29:00.945528 ===
+TLS server: In state wait_finished received CLIENT ALERT: Fatal - Bad Certificate
+
+[32m.[39m=NOTICE REPORT==== 1-Oct-2026::14:29:00.968041 ===
+TLS client: In state wait_cert_cr at ssl_handshake.erl:2262 generated CLIENT ALERT: Fatal - Bad Certificate
+ - {bad_cert,{hostname_check_failed,{requested,"wrong.invalid"},
+                                    {received,[{dNSName,"localhost"}]}}}
+=NOTICE REPORT==== 1-Oct-2026::14:29:00.968140 ===
+TLS server: In state wait_finished received CLIENT ALERT: Fatal - Bad Certificate
+
+[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m=ERROR REPORT==== 1-Oct-2026::14:29:01.016576 ===
+** State machine <0.470.0> terminating
+** Process label = {gun,{127,0,0,1},54516}
+** Last event = {info,{tcp,#Port<0.75>,
+                           <<"HTTP/1.1 200 OK\r\nContent-Length: +1\r\n\r\nx">>}}
+** When server state  = {connected,
+                         {state,<0.461.0>,
+                          {up,#Ref<0.4142211527.3373793283.112002>},
+                          {127,0,0,1},
+                          54516,<<"http">>,
+                          {127,0,0,1},
+                          54516,[],
+                          #{protocols => [http],
+                            retry => 0,connect_timeout => 1000,
+                            domain_lookup_timeout => 1000,
+                            http2_opts =>
+                             #{flow => 1,max_headers => 101,
+                               initial_connection_window_size => 65535,
+                               initial_stream_window_size => 16384,
+                               notify_settings_changed => true},
+                            http_opts => #{flow => 1,max_headers => 100},
+                            tcp_opts =>
+                             [{send_timeout,1000},{send_timeout_close,true}],
+                            tls_handshake_timeout => 1000,transport => tcp},
+                          undefined,#Port<0.75>,gun_tcp,true,
+                          {tcp,tcp_closed,tcp_error},
+                          gun_http,
+                          {http_state,#Port<0.75>,gun_tcp,
+                           #{flow => 1,max_headers => 100},
+                           'HTTP/1.1',keepalive,<<>>,undefined,
+                           [{stream,#Ref<0.4142211527.3373793283.112018>,
+                             <0.471.0>,1,<<"GET">>,<<"127.0.0.1:54516">>,
+                             <<"/">>,[],true,undefined}],
+                           head,
+                           {0,0},
+                           head},
+                          undefined,gun_default_event_h,undefined}}
+** Reason for termination = error:badarg
+** Callback modules = [gun]
+** Callback mode = state_functions
+** Stacktrace =
+**  [{erlang,binary_to_integer,
+             [<<>>],
+             [{error_info,#{module => erl_erts_errors}}]},
+     {cow_http_hd,digits,3,
+                  [{file,"/code/gleam-dream/http_gun/build/dev/erlang/cowlib/src/cow_http_hd.erl"},
+                   {line,3721}]},
+     {cow_http_hd,parse_content_length,1,
+                  [{file,"/code/gleam-dream/http_gun/build/dev/erlang/cowlib/src/cow_http_hd.erl"},
+                   {line,1667}]},
+     {gun_http,response_io_from_headers,4,
+               [{file,"/code/gleam-dream/http_gun/build/dev/erlang/gun/src/gun_http.erl"},
+                {line,1020}]},
+     {gun_http,handle_response,8,
+               [{file,"/code/gleam-dream/http_gun/build/dev/erlang/gun/src/gun_http.erl"},
+                {line,474}]},
+     {gun,handle_common_connected_no_input,4,
+          [{file,"/code/gleam-dream/http_gun/build/dev/erlang/gun/src/gun.erl"},
+           {line,1641}]},
+     {gen_statem,loop_state_callback,11,[{file,"gen_statem.erl"},{line,3741}]},
+     {proc_lib,init_p_do_apply,3,[{file,"proc_lib.erl"},{line,333}]}]
+
+=CRASH REPORT==== 1-Oct-2026::14:29:01.016798 ===
+  crasher:
+    initial call: gun:init/1
+    pid: <0.470.0>
+    registered_name: []
+    process_label: {gun,{127,0,0,1},54516}
+    exception error: bad argument
+      in function  binary_to_integer/1
+         called as binary_to_integer(<<>>)
+         *** argument 1: not a textual representation of an integer
+      in call from cow_http_hd:digits/3 (/code/gleam-dream/http_gun/build/dev/erlang/cowlib/src/cow_http_hd.erl:3721)
+      in call from cow_http_hd:parse_content_length/1 (/code/gleam-dream/http_gun/build/dev/erlang/cowlib/src/cow_http_hd.erl:1667)
+      in call from gun_http:response_io_from_headers/4 (/code/gleam-dream/http_gun/build/dev/erlang/gun/src/gun_http.erl:1020)
+      in call from gun_http:handle_response/8 (/code/gleam-dream/http_gun/build/dev/erlang/gun/src/gun_http.erl:474)
+      in call from gun:handle_common_connected_no_input/4 (/code/gleam-dream/http_gun/build/dev/erlang/gun/src/gun.erl:1641)
+      in call from gen_statem:loop_state_callback/11 (gen_statem.erl:3741)
+    ancestors: [gun_conns_sup,gun_sup,<0.107.0>]
+    message_queue_len: 0
+    messages: []
+    links: [<0.109.0>,#Port<0.75>]
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 17731
+    stack_size: 29
+    reductions: 21453
+  neighbours:
+
+=SUPERVISOR REPORT==== 1-Oct-2026::14:29:01.018737 ===
+    supervisor: {local,gun_conns_sup}
+    errorContext: child_terminated
+    reason: {badarg,
+                [{erlang,binary_to_integer,
+                     [<<>>],
+                     [{error_info,#{module => erl_erts_errors}}]},
+                 {cow_http_hd,digits,3,
+                     [{file,
+                          "/code/gleam-dream/http_gun/build/dev/erlang/cowlib/src/cow_http_hd.erl"},
+                      {line,3721}]},
+                 {cow_http_hd,parse_content_length,1,
+                     [{file,
+                          "/code/gleam-dream/http_gun/build/dev/erlang/cowlib/src/cow_http_hd.erl"},
+                      {line,1667}]},
+                 {gun_http,response_io_from_headers,4,
+                     [{file,
+                          "/code/gleam-dream/http_gun/build/dev/erlang/gun/src/gun_http.erl"},
+                      {line,1020}]},
+                 {gun_http,handle_response,8,
+                     [{file,
+                          "/code/gleam-dream/http_gun/build/dev/erlang/gun/src/gun_http.erl"},
+                      {line,474}]},
+                 {gun,handle_common_connected_no_input,4,
+                     [{file,
+                          "/code/gleam-dream/http_gun/build/dev/erlang/gun/src/gun.erl"},
+                      {line,1641}]},
+                 {gen_statem,loop_state_callback,11,
+                     [{file,"gen_statem.erl"},{line,3741}]},
+                 {proc_lib,init_p_do_apply,3,
+                     [{file,"proc_lib.erl"},{line,333}]}]}
+    offender: [{pid,<0.470.0>},
+               {id,gun},
+               {mfargs,{gun,start_link,undefined}},
+               {restart_type,temporary},
+               {significant,false},
+               {shutdown,5000},
+               {child_type,worker}]
+
+=ERROR REPORT==== 1-Oct-2026::14:29:01.019299 ===
+** State machine <0.475.0> terminating
+** Process label = {gun,{127,0,0,1},54518}
+** Last event = {info,{tcp,#Port<0.78>,
+                           <<"HTTP/1.1 200 OK\r\nContent-Length: -1\r\n\r\nx">>}}
+** When server state  = {connected,
+                         {state,<0.461.0>,
+                          {up,#Ref<0.4142211527.3373793282.112981>},
+                          {127,0,0,1},
+                          54518,<<"http">>,
+                          {127,0,0,1},
+                          54518,[],
+                          #{protocols => [http],
+                            retry => 0,connect_timeout => 1000,
+                            domain_lookup_timeout => 1000,
+                            http2_opts =>
+                             #{flow => 1,max_headers => 101,
+                               initial_connection_window_size => 65535,
+                               initial_stream_window_size => 16384,
+                               notify_settings_changed => true},
+                            http_opts => #{flow => 1,max_headers => 100},
+                            tcp_opts =>
+                             [{send_timeout,1000},{send_timeout_close,true}],
+                            tls_handshake_timeout => 1000,transport => tcp},
+                          undefined,#Port<0.78>,gun_tcp,true,
+                          {tcp,tcp_closed,tcp_error},
+                          gun_http,
+                          {http_state,#Port<0.78>,gun_tcp,
+                           #{flow => 1,max_headers => 100},
+                           'HTTP/1.1',keepalive,<<>>,undefined,
+                           [{stream,#Ref<0.4142211527.3373793282.112996>,
+                             <0.476.0>,1,<<"GET">>,<<"127.0.0.1:54518">>,
+                             <<"/">>,[],true,undefined}],
+                           head,
+                           {0,0},
+                           head},
+                          undefined,gun_default_event_h,undefined}}
+** Reason for termination = error:badarg
+** Callback modules = [gun]
+** Callback mode = state_functions
+** Stacktrace =
+**  [{erlang,binary_to_integer,
+             [<<>>],
+             [{error_info,#{module => erl_erts_errors}}]},
+     {cow_http_hd,digits,3,
+                  [{file,"/code/gleam-dream/http_gun/build/dev/erlang/cowlib/src/cow_http_hd.erl"},
+                   {line,3721}]},
+     {cow_http_hd,parse_content_length,1,
+                  [{file,"/code/gleam-dream/http_gun/build/dev/erlang/cowlib/src/cow_http_hd.erl"},
+                   {line,1667}]},
+     {gun_http,response_io_from_headers,4,
+               [{file,"/code/gleam-dream/http_gun/build/dev/erlang/gun/src/gun_http.erl"},
+                {line,1020}]},
+     {gun_http,handle_response,8,
+               [{file,"/code/gleam-dream/http_gun/build/dev/erlang/gun/src/gun_http.erl"},
+                {line,474}]},
+     {gun,handle_common_connected_no_input,4,
+          [{file,"/code/gleam-dream/http_gun/build/dev/erlang/gun/src/gun.erl"},
+           {line,1641}]},
+     {gen_statem,loop_state_callback,11,[{file,"gen_statem.erl"},{line,3741}]},
+     {proc_lib,init_p_do_apply,3,[{file,"proc_lib.erl"},{line,333}]}]
+
+=CRASH REPORT==== 1-Oct-2026::14:29:01.019501 ===
+  crasher:
+    initial call: gun:init/1
+    pid: <0.475.0>
+    registered_name: []
+    process_label: {gun,{127,0,0,1},54518}
+    exception error: bad argument
+      in function  binary_to_integer/1
+         called as binary_to_integer(<<>>)
+         *** argument 1: not a textual representation of an integer
+      in call from cow_http_hd:digits/3 (/code/gleam-dream/http_gun/build/dev/erlang/cowlib/src/cow_http_hd.erl:3721)
+      in call from cow_http_hd:parse_content_length/1 (/code/gleam-dream/http_gun/build/dev/erlang/cowlib/src/cow_http_hd.erl:1667)
+      in call from gun_http:response_io_from_headers/4 (/code/gleam-dream/http_gun/build/dev/erlang/gun/src/gun_http.erl:1020)
+      in call from gun_http:handle_response/8 (/code/gleam-dream/http_gun/build/dev/erlang/gun/src/gun_http.erl:474)
+      in call from gun:handle_common_connected_no_input/4 (/code/gleam-dream/http_gun/build/dev/erlang/gun/src/gun.erl:1641)
+      in call from gen_statem:loop_state_callback/11 (gen_statem.erl:3741)
+    ancestors: [gun_conns_sup,gun_sup,<0.107.0>]
+    message_queue_len: 0
+    messages: []
+    links: [<0.109.0>,#Port<0.78>]
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 17731
+    stack_size: 29
+    reductions: 21395
+  neighbours:
+
+=SUPERVISOR REPORT==== 1-Oct-2026::14:29:01.019665 ===
+    supervisor: {local,gun_conns_sup}
+    errorContext: child_terminated
+    reason: {badarg,
+                [{erlang,binary_to_integer,
+                     [<<>>],
+                     [{error_info,#{module => erl_erts_errors}}]},
+                 {cow_http_hd,digits,3,
+                     [{file,
+                          "/code/gleam-dream/http_gun/build/dev/erlang/cowlib/src/cow_http_hd.erl"},
+                      {line,3721}]},
+                 {cow_http_hd,parse_content_length,1,
+                     [{file,
+                          "/code/gleam-dream/http_gun/build/dev/erlang/cowlib/src/cow_http_hd.erl"},
+                      {line,1667}]},
+                 {gun_http,response_io_from_headers,4,
+                     [{file,
+                          "/code/gleam-dream/http_gun/build/dev/erlang/gun/src/gun_http.erl"},
+                      {line,1020}]},
+                 {gun_http,handle_response,8,
+                     [{file,
+                          "/code/gleam-dream/http_gun/build/dev/erlang/gun/src/gun_http.erl"},
+                      {line,474}]},
+                 {gun,handle_common_connected_no_input,4,
+                     [{file,
+                          "/code/gleam-dream/http_gun/build/dev/erlang/gun/src/gun.erl"},
+                      {line,1641}]},
+                 {gen_statem,loop_state_callback,11,
+                     [{file,"gen_statem.erl"},{line,3741}]},
+                 {proc_lib,init_p_do_apply,3,
+                     [{file,"proc_lib.erl"},{line,333}]}]}
+    offender: [{pid,<0.475.0>},
+               {id,gun},
+               {mfargs,{gun,start_link,undefined}},
+               {restart_type,temporary},
+               {significant,false},
+               {shutdown,5000},
+               {child_type,worker}]
+
+[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m=NOTICE REPORT==== 1-Oct-2026::14:29:03.301301 ===
+TLS client: In state wait_cert_cr at ssl_handshake.erl:2254 generated CLIENT ALERT: Fatal - Unknown CA
+
+=NOTICE REPORT==== 1-Oct-2026::14:29:03.301386 ===
+TLS server: In state wait_finished received CLIENT ALERT: Fatal - Unknown CA
+
+[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m=NOTICE REPORT==== 1-Oct-2026::14:29:03.340260 ===
+TLS client: In state wait_cert_cr at ssl_handshake.erl:2262 generated CLIENT ALERT: Fatal - Bad Certificate
+ - {bad_cert,{hostname_check_failed,{requested,{127,0,0,1}},
+                                    {received,[{dNSName,"localhost"}]}}}
+=NOTICE REPORT==== 1-Oct-2026::14:29:03.340337 ===
+TLS server: In state wait_finished received CLIENT ALERT: Fatal - Bad Certificate
+
+[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m=NOTICE REPORT==== 1-Oct-2026::14:29:06.160219 ===
+SSL WARNING: Ignoring a CA cert as it could not be correctly decoded.~n
+=NOTICE REPORT==== 1-Oct-2026::14:29:06.172461 ===
+TLS client: In state wait_cert_cr at ssl_handshake.erl:2254 generated CLIENT ALERT: Fatal - Unknown CA
+
+=NOTICE REPORT==== 1-Oct-2026::14:29:06.172539 ===
+TLS server: In state wait_finished received CLIENT ALERT: Fatal - Unknown CA
+
+[32m.[39m=NOTICE REPORT==== 1-Oct-2026::14:29:06.182768 ===
+TLS client: In state wait_cert_cr at ssl_handshake.erl:2262 generated CLIENT ALERT: Fatal - Bad Certificate
+ - {bad_cert,{hostname_check_failed,{requested,"wrong.invalid"},
+                                    {received,[{dNSName,"localhost"}]}}}
+=NOTICE REPORT==== 1-Oct-2026::14:29:06.182864 ===
+TLS server: In state wait_finished received CLIENT ALERT: Fatal - Bad Certificate
+
+=NOTICE REPORT==== 1-Oct-2026::14:29:06.191643 ===
+TLS client: In state wait_cert_cr at ssl_handshake.erl:2254 generated CLIENT ALERT: Fatal - Unknown CA
+
+=NOTICE REPORT==== 1-Oct-2026::14:29:06.191735 ===
+TLS server: In state wait_finished received CLIENT ALERT: Fatal - Unknown CA
+
+[32m.[39m[32m.[39m[32m
+128 passed, no failures[39m

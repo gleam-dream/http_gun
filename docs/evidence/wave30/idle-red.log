@@ -1,0 +1,13 @@
+  Compiling http_gun
+   Compiled in 0.29s
+    Running http_gun_reuse_test.main
+[31;1mruntime error[39m: let assert[0m
+
+Pattern match failed, no pattern matched the value.
+
+unmatched value:
+  Error(Failure(ConnectionFailed(PeerClosed), MayHaveBeenSent))
+
+stacktrace:
+  http_gun_reuse_test.closed_idle_tls_connection_is_not_submitted_to_test[90m test/http_gun_reuse_test.gleam:47[0m
+

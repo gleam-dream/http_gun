@@ -53,5 +53,28 @@ Consumers with exhaustive error matches add DestinationRejected and
 ResolutionFailed; both precede live HTTP submission. Keep public-only policy
 for public endpoints and opt into private/loopback destinations deliberately.
 A changed policy requires a new client, including after supervision restart.
-Warden's own transport migration and unchanged-through-adapter tests have not
-been performed here; neither a release nor adoption is claimed.
+Wave28 did not run Warden's own unchanged-through-adapter tests. The subsequent
+feedback check below records their actual outcomes; neither a release nor
+production migration is claimed.
+
+## Warden feedback qualification (2026-10-01)
+
+The public stdlib range now includes1.x, and `config.Anchors(List(BitArray))`
+accepts DER CA certificates directly in memory. Exhaustive Trust matches add
+Anchors; exhaustive TransportCause matches add HeaderLimitReached. The latter
+uses Gun's structured header/trailer-limit event without inventing a measured
+size. Generic fallback mappings may retain their existing conservative handling.
+
+The final isolated LLM check passes223 tests, public boundary checks and local
+TLS/H2 through1000 callers with the same eight-file loopback setup adaptation.
+Its production source is unchanged. [Receipt](evidence/wave31/downstream-final/receipt.json).
+
+The retained Warden experiment uses direct anchors and a HeaderLimitReached
+mapping in a temporary adapter. All9 security probes pass, including the two
+previous closing-connection failures; public boundary and8 consumer tests pass.
+The unchanged transport suite is17/19, and the full fast suite including probes
+is124/126. The two failing tables require finer malformed/truncated categories
+and strict reason-phrase rejection. HTTP Gun records these limits without
+changing Warden's tests. [Commands, adapter patch, outcomes and skipped subcase](evidence/wave31/README.md).
+Warden must reconcile those expectations and separately qualify a released
+package before adopting it. No release or completed migration is implied.

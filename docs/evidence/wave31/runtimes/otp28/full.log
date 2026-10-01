@@ -1,0 +1,958 @@
+gleam 1.18.1
+OTP 28 ERTS 16.4.0.6
+  Resolving versions
+Downloading packages
+ Downloaded 12 packages in 0.05s
+  Compiling cowlib
+===> Analyzing applications...
+===> Compiling cowlib
+  Compiling gleam_stdlib
+  Compiling file_streams
+  Compiling filepath
+  Compiling gleam_erlang
+  Compiling gleam_http
+  Compiling gleam_json
+  Compiling gleam_otp
+  Compiling gleeunit
+  Compiling gun
+===> Analyzing applications...
+===> Compiling gun
+  Compiling simplifile
+  Compiling telemetry
+===> Analyzing applications...
+===> Compiling telemetry
+  Compiling sinal
+   Checking http_gun
+   Compiled in 14.35s
+  Compiling http_gun
+   Compiled in 0.54s
+   Compiled in 0.22s
+    Running http_gun_test.main
+[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m=CRASH REPORT==== 1-Oct-2026::14:33:26.444538 ===
+  crasher:
+    initial call: http_gun@internal@preparation:'-start/5-anonymous-0-'/0
+    pid: <0.253.0>
+    registered_name: []
+    exception error: #{function =>
+                           <<"throwing_resolver_is_typed_and_does_not_kill_pool_test">>,
+                       line => 536,message => <<"injected resolver failure">>,
+                       module => <<"http_gun_destination_test">>,
+                       file => <<"test/http_gun_destination_test.gleam">>,
+                       gleam_error => panic}
+      in function  http_gun_destination_test:'-throwing_resolver_is_typed_and_does_not_kill_pool_test/0-anonymous-0-'/2 (test/http_gun_destination_test.gleam:535)
+      in call from http_gun@internal@resolution:'-resolve/3-anonymous-4-'/4 (src/http_gun/internal/resolution.gleam:50)
+      in call from http_gun@internal@preparation:'-start/5-anonymous-0-'/2 (src/http_gun/internal/preparation.gleam:22)
+    ancestors: [<0.252.0>,<0.251.0>,<0.120.0>]
+    message_queue_len: 0
+    messages: []
+    links: [<0.252.0>]
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 233
+    stack_size: 29
+    reductions: 60
+  neighbours:
+
+[32m.[39m[32m.[39m[32m.[39m=NOTICE REPORT==== 1-Oct-2026::14:33:26.742758 ===
+TLS client: In state wait_cert_cr at ssl_handshake.erl:2226 generated CLIENT ALERT: Fatal - Bad Certificate
+ - {bad_cert,{hostname_check_failed,{requested,{127,0,0,1}},
+                                    {received,[{dNSName,"localhost"}]}}}
+=NOTICE REPORT==== 1-Oct-2026::14:33:26.742878 ===
+TLS server: In state wait_finished received CLIENT ALERT: Fatal - Bad Certificate
+
+[32m.[39m=NOTICE REPORT==== 1-Oct-2026::14:33:26.760489 ===
+TLS client: In state wait_cert_cr at ssl_handshake.erl:2226 generated CLIENT ALERT: Fatal - Bad Certificate
+ - {bad_cert,{hostname_check_failed,{requested,"wrong.invalid"},
+                                    {received,[{dNSName,"localhost"}]}}}
+=NOTICE REPORT==== 1-Oct-2026::14:33:26.760591 ===
+TLS server: In state wait_finished received CLIENT ALERT: Fatal - Bad Certificate
+
+[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m=ERROR REPORT==== 1-Oct-2026::14:33:26.809828 ===
+** State machine <0.470.0> terminating
+** Process label = {gun,{127,0,0,1},59277}
+** Last event = {info,{tcp,#Port<0.75>,
+                           <<"HTTP/1.1 200 OK\r\nContent-Length: +1\r\n\r\nx">>}}
+** When server state  = {connected,
+                         {state,<0.461.0>,
+                          {up,#Ref<0.2147286917.1763704843.22055>},
+                          {127,0,0,1},
+                          59277,<<"http">>,
+                          {127,0,0,1},
+                          59277,[],
+                          #{protocols => [http],
+                            retry => 0,connect_timeout => 1000,
+                            domain_lookup_timeout => 1000,
+                            http2_opts =>
+                             #{flow => 1,max_headers => 101,
+                               initial_connection_window_size => 65535,
+                               initial_stream_window_size => 16384,
+                               notify_settings_changed => true},
+                            http_opts => #{flow => 1,max_headers => 100},
+                            tcp_opts =>
+                             [{send_timeout,1000},{send_timeout_close,true}],
+                            tls_handshake_timeout => 1000,transport => tcp},
+                          undefined,#Port<0.75>,gun_tcp,true,
+                          {tcp,tcp_closed,tcp_error},
+                          gun_http,
+                          {http_state,#Port<0.75>,gun_tcp,
+                           #{flow => 1,max_headers => 100},
+                           'HTTP/1.1',keepalive,<<>>,undefined,
+                           [{stream,#Ref<0.2147286917.1763704843.22071>,
+                             <0.471.0>,1,<<"GET">>,<<"127.0.0.1:59277">>,
+                             <<"/">>,[],true,undefined}],
+                           head,
+                           {0,0},
+                           head},
+                          undefined,gun_default_event_h,undefined}}
+** Reason for termination = error:badarg
+** Callback modules = [gun]
+** Callback mode = state_functions
+** Stacktrace =
+**  [{erlang,binary_to_integer,
+             [<<>>],
+             [{error_info,#{module => erl_erts_errors}}]},
+     {cow_http_hd,digits,3,
+                  [{file,"/private/tmp/nix-shell.Vl4hgN/nix-shell.BOyMoG/http-gun-gate-m7t_3ccs/http_gun/build/dev/erlang/cowlib/src/cow_http_hd.erl"},
+                   {line,3721}]},
+     {cow_http_hd,parse_content_length,1,
+                  [{file,"/private/tmp/nix-shell.Vl4hgN/nix-shell.BOyMoG/http-gun-gate-m7t_3ccs/http_gun/build/dev/erlang/cowlib/src/cow_http_hd.erl"},
+                   {line,1667}]},
+     {gun_http,response_io_from_headers,4,
+               [{file,"/private/tmp/nix-shell.Vl4hgN/nix-shell.BOyMoG/http-gun-gate-m7t_3ccs/http_gun/build/dev/erlang/gun/src/gun_http.erl"},
+                {line,1020}]},
+     {gun_http,handle_response,8,
+               [{file,"/private/tmp/nix-shell.Vl4hgN/nix-shell.BOyMoG/http-gun-gate-m7t_3ccs/http_gun/build/dev/erlang/gun/src/gun_http.erl"},
+                {line,474}]},
+     {gun,handle_common_connected_no_input,4,
+          [{file,"/private/tmp/nix-shell.Vl4hgN/nix-shell.BOyMoG/http-gun-gate-m7t_3ccs/http_gun/build/dev/erlang/gun/src/gun.erl"},
+           {line,1641}]},
+     {gen_statem,loop_state_callback,11,[{file,"gen_statem.erl"},{line,3741}]},
+     {proc_lib,init_p_do_apply,3,[{file,"proc_lib.erl"},{line,333}]}]
+
+=CRASH REPORT==== 1-Oct-2026::14:33:26.810043 ===
+  crasher:
+    initial call: gun:init/1
+    pid: <0.470.0>
+    registered_name: []
+    process_label: {gun,{127,0,0,1},59277}
+    exception error: bad argument
+      in function  binary_to_integer/1
+         called as binary_to_integer(<<>>)
+         *** argument 1: not a textual representation of an integer
+      in call from cow_http_hd:digits/3 (/private/tmp/nix-shell.Vl4hgN/nix-shell.BOyMoG/http-gun-gate-m7t_3ccs/http_gun/build/dev/erlang/cowlib/src/cow_http_hd.erl:3721)
+      in call from cow_http_hd:parse_content_length/1 (/private/tmp/nix-shell.Vl4hgN/nix-shell.BOyMoG/http-gun-gate-m7t_3ccs/http_gun/build/dev/erlang/cowlib/src/cow_http_hd.erl:1667)
+      in call from gun_http:response_io_from_headers/4 (/private/tmp/nix-shell.Vl4hgN/nix-shell.BOyMoG/http-gun-gate-m7t_3ccs/http_gun/build/dev/erlang/gun/src/gun_http.erl:1020)
+      in call from gun_http:handle_response/8 (/private/tmp/nix-shell.Vl4hgN/nix-shell.BOyMoG/http-gun-gate-m7t_3ccs/http_gun/build/dev/erlang/gun/src/gun_http.erl:474)
+      in call from gun:handle_common_connected_no_input/4 (/private/tmp/nix-shell.Vl4hgN/nix-shell.BOyMoG/http-gun-gate-m7t_3ccs/http_gun/build/dev/erlang/gun/src/gun.erl:1641)
+      in call from gen_statem:loop_state_callback/11 (gen_statem.erl:3741)
+    ancestors: [gun_conns_sup,gun_sup,<0.107.0>]
+    message_queue_len: 0
+    messages: []
+    links: [<0.109.0>,#Port<0.75>]
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 17731
+    stack_size: 29
+    reductions: 23243
+  neighbours:
+
+=SUPERVISOR REPORT==== 1-Oct-2026::14:33:26.812011 ===
+    supervisor: {local,gun_conns_sup}
+    errorContext: child_terminated
+    reason: {badarg,
+                [{erlang,binary_to_integer,
+                     [<<>>],
+                     [{error_info,#{module => erl_erts_errors}}]},
+                 {cow_http_hd,digits,3,
+                     [{file,
+                          "/private/tmp/nix-shell.Vl4hgN/nix-shell.BOyMoG/http-gun-gate-m7t_3ccs/http_gun/build/dev/erlang/cowlib/src/cow_http_hd.erl"},
+                      {line,3721}]},
+                 {cow_http_hd,parse_content_length,1,
+                     [{file,
+                          "/private/tmp/nix-shell.Vl4hgN/nix-shell.BOyMoG/http-gun-gate-m7t_3ccs/http_gun/build/dev/erlang/cowlib/src/cow_http_hd.erl"},
+                      {line,1667}]},
+                 {gun_http,response_io_from_headers,4,
+                     [{file,
+                          "/private/tmp/nix-shell.Vl4hgN/nix-shell.BOyMoG/http-gun-gate-m7t_3ccs/http_gun/build/dev/erlang/gun/src/gun_http.erl"},
+                      {line,1020}]},
+                 {gun_http,handle_response,8,
+                     [{file,
+                          "/private/tmp/nix-shell.Vl4hgN/nix-shell.BOyMoG/http-gun-gate-m7t_3ccs/http_gun/build/dev/erlang/gun/src/gun_http.erl"},
+                      {line,474}]},
+                 {gun,handle_common_connected_no_input,4,
+                     [{file,
+                          "/private/tmp/nix-shell.Vl4hgN/nix-shell.BOyMoG/http-gun-gate-m7t_3ccs/http_gun/build/dev/erlang/gun/src/gun.erl"},
+                      {line,1641}]},
+                 {gen_statem,loop_state_callback,11,
+                     [{file,"gen_statem.erl"},{line,3741}]},
+                 {proc_lib,init_p_do_apply,3,
+                     [{file,"proc_lib.erl"},{line,333}]}]}
+    offender: [{pid,<0.470.0>},
+               {id,gun},
+               {mfargs,{gun,start_link,undefined}},
+               {restart_type,temporary},
+               {significant,false},
+               {shutdown,5000},
+               {child_type,worker}]
+
+=ERROR REPORT==== 1-Oct-2026::14:33:26.812397 ===
+** State machine <0.475.0> terminating
+** Process label = {gun,{127,0,0,1},59279}
+** Last event = {info,{tcp,#Port<0.78>,
+                           <<"HTTP/1.1 200 OK\r\nContent-Length: -1\r\n\r\nx">>}}
+** When server state  = {connected,
+                         {state,<0.461.0>,
+                          {up,#Ref<0.2147286917.1763704843.22101>},
+                          {127,0,0,1},
+                          59279,<<"http">>,
+                          {127,0,0,1},
+                          59279,[],
+                          #{protocols => [http],
+                            retry => 0,connect_timeout => 1000,
+                            domain_lookup_timeout => 1000,
+                            http2_opts =>
+                             #{flow => 1,max_headers => 101,
+                               initial_connection_window_size => 65535,
+                               initial_stream_window_size => 16384,
+                               notify_settings_changed => true},
+                            http_opts => #{flow => 1,max_headers => 100},
+                            tcp_opts =>
+                             [{send_timeout,1000},{send_timeout_close,true}],
+                            tls_handshake_timeout => 1000,transport => tcp},
+                          undefined,#Port<0.78>,gun_tcp,true,
+                          {tcp,tcp_closed,tcp_error},
+                          gun_http,
+                          {http_state,#Port<0.78>,gun_tcp,
+                           #{flow => 1,max_headers => 100},
+                           'HTTP/1.1',keepalive,<<>>,undefined,
+                           [{stream,#Ref<0.2147286917.1763704843.22116>,
+                             <0.476.0>,1,<<"GET">>,<<"127.0.0.1:59279">>,
+                             <<"/">>,[],true,undefined}],
+                           head,
+                           {0,0},
+                           head},
+                          undefined,gun_default_event_h,undefined}}
+** Reason for termination = error:badarg
+** Callback modules = [gun]
+** Callback mode = state_functions
+** Stacktrace =
+**  [{erlang,binary_to_integer,
+             [<<>>],
+             [{error_info,#{module => erl_erts_errors}}]},
+     {cow_http_hd,digits,3,
+                  [{file,"/private/tmp/nix-shell.Vl4hgN/nix-shell.BOyMoG/http-gun-gate-m7t_3ccs/http_gun/build/dev/erlang/cowlib/src/cow_http_hd.erl"},
+                   {line,3721}]},
+     {cow_http_hd,parse_content_length,1,
+                  [{file,"/private/tmp/nix-shell.Vl4hgN/nix-shell.BOyMoG/http-gun-gate-m7t_3ccs/http_gun/build/dev/erlang/cowlib/src/cow_http_hd.erl"},
+                   {line,1667}]},
+     {gun_http,response_io_from_headers,4,
+               [{file,"/private/tmp/nix-shell.Vl4hgN/nix-shell.BOyMoG/http-gun-gate-m7t_3ccs/http_gun/build/dev/erlang/gun/src/gun_http.erl"},
+                {line,1020}]},
+     {gun_http,handle_response,8,
+               [{file,"/private/tmp/nix-shell.Vl4hgN/nix-shell.BOyMoG/http-gun-gate-m7t_3ccs/http_gun/build/dev/erlang/gun/src/gun_http.erl"},
+                {line,474}]},
+     {gun,handle_common_connected_no_input,4,
+          [{file,"/private/tmp/nix-shell.Vl4hgN/nix-shell.BOyMoG/http-gun-gate-m7t_3ccs/http_gun/build/dev/erlang/gun/src/gun.erl"},
+           {line,1641}]},
+     {gen_statem,loop_state_callback,11,[{file,"gen_statem.erl"},{line,3741}]},
+     {proc_lib,init_p_do_apply,3,[{file,"proc_lib.erl"},{line,333}]}]
+
+=CRASH REPORT==== 1-Oct-2026::14:33:26.812594 ===
+  crasher:
+    initial call: gun:init/1
+    pid: <0.475.0>
+    registered_name: []
+    process_label: {gun,{127,0,0,1},59279}
+    exception error: bad argument
+      in function  binary_to_integer/1
+         called as binary_to_integer(<<>>)
+         *** argument 1: not a textual representation of an integer
+      in call from cow_http_hd:digits/3 (/private/tmp/nix-shell.Vl4hgN/nix-shell.BOyMoG/http-gun-gate-m7t_3ccs/http_gun/build/dev/erlang/cowlib/src/cow_http_hd.erl:3721)
+      in call from cow_http_hd:parse_content_length/1 (/private/tmp/nix-shell.Vl4hgN/nix-shell.BOyMoG/http-gun-gate-m7t_3ccs/http_gun/build/dev/erlang/cowlib/src/cow_http_hd.erl:1667)
+      in call from gun_http:response_io_from_headers/4 (/private/tmp/nix-shell.Vl4hgN/nix-shell.BOyMoG/http-gun-gate-m7t_3ccs/http_gun/build/dev/erlang/gun/src/gun_http.erl:1020)
+      in call from gun_http:handle_response/8 (/private/tmp/nix-shell.Vl4hgN/nix-shell.BOyMoG/http-gun-gate-m7t_3ccs/http_gun/build/dev/erlang/gun/src/gun_http.erl:474)
+      in call from gun:handle_common_connected_no_input/4 (/private/tmp/nix-shell.Vl4hgN/nix-shell.BOyMoG/http-gun-gate-m7t_3ccs/http_gun/build/dev/erlang/gun/src/gun.erl:1641)
+      in call from gen_statem:loop_state_callback/11 (gen_statem.erl:3741)
+    ancestors: [gun_conns_sup,gun_sup,<0.107.0>]
+    message_queue_len: 0
+    messages: []
+    links: [<0.109.0>,#Port<0.78>]
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 17731
+    stack_size: 29
+    reductions: 23193
+  neighbours:
+
+=SUPERVISOR REPORT==== 1-Oct-2026::14:33:26.812745 ===
+    supervisor: {local,gun_conns_sup}
+    errorContext: child_terminated
+    reason: {badarg,
+                [{erlang,binary_to_integer,
+                     [<<>>],
+                     [{error_info,#{module => erl_erts_errors}}]},
+                 {cow_http_hd,digits,3,
+                     [{file,
+                          "/private/tmp/nix-shell.Vl4hgN/nix-shell.BOyMoG/http-gun-gate-m7t_3ccs/http_gun/build/dev/erlang/cowlib/src/cow_http_hd.erl"},
+                      {line,3721}]},
+                 {cow_http_hd,parse_content_length,1,
+                     [{file,
+                          "/private/tmp/nix-shell.Vl4hgN/nix-shell.BOyMoG/http-gun-gate-m7t_3ccs/http_gun/build/dev/erlang/cowlib/src/cow_http_hd.erl"},
+                      {line,1667}]},
+                 {gun_http,response_io_from_headers,4,
+                     [{file,
+                          "/private/tmp/nix-shell.Vl4hgN/nix-shell.BOyMoG/http-gun-gate-m7t_3ccs/http_gun/build/dev/erlang/gun/src/gun_http.erl"},
+                      {line,1020}]},
+                 {gun_http,handle_response,8,
+                     [{file,
+                          "/private/tmp/nix-shell.Vl4hgN/nix-shell.BOyMoG/http-gun-gate-m7t_3ccs/http_gun/build/dev/erlang/gun/src/gun_http.erl"},
+                      {line,474}]},
+                 {gun,handle_common_connected_no_input,4,
+                     [{file,
+                          "/private/tmp/nix-shell.Vl4hgN/nix-shell.BOyMoG/http-gun-gate-m7t_3ccs/http_gun/build/dev/erlang/gun/src/gun.erl"},
+                      {line,1641}]},
+                 {gen_statem,loop_state_callback,11,
+                     [{file,"gen_statem.erl"},{line,3741}]},
+                 {proc_lib,init_p_do_apply,3,
+                     [{file,"proc_lib.erl"},{line,333}]}]}
+    offender: [{pid,<0.475.0>},
+               {id,gun},
+               {mfargs,{gun,start_link,undefined}},
+               {restart_type,temporary},
+               {significant,false},
+               {shutdown,5000},
+               {child_type,worker}]
+
+[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m=NOTICE REPORT==== 1-Oct-2026::14:33:29.099724 ===
+TLS client: In state wait_cert_cr at ssl_handshake.erl:2218 generated CLIENT ALERT: Fatal - Unknown CA
+
+=NOTICE REPORT==== 1-Oct-2026::14:33:29.099809 ===
+TLS server: In state wait_finished received CLIENT ALERT: Fatal - Unknown CA
+
+[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m=NOTICE REPORT==== 1-Oct-2026::14:33:29.146047 ===
+TLS client: In state wait_cert_cr at ssl_handshake.erl:2226 generated CLIENT ALERT: Fatal - Bad Certificate
+ - {bad_cert,{hostname_check_failed,{requested,{127,0,0,1}},
+                                    {received,[{dNSName,"localhost"}]}}}
+=NOTICE REPORT==== 1-Oct-2026::14:33:29.146147 ===
+TLS server: In state wait_finished received CLIENT ALERT: Fatal - Bad Certificate
+
+[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m=NOTICE REPORT==== 1-Oct-2026::14:33:31.970252 ===
+SSL WARNING: Ignoring a CA cert as it could not be correctly decoded.~n
+=NOTICE REPORT==== 1-Oct-2026::14:33:31.973493 ===
+TLS client: In state wait_cert_cr at ssl_handshake.erl:2218 generated CLIENT ALERT: Fatal - Unknown CA
+
+=NOTICE REPORT==== 1-Oct-2026::14:33:31.973631 ===
+TLS server: In state wait_finished received CLIENT ALERT: Fatal - Unknown CA
+
+[32m.[39m=NOTICE REPORT==== 1-Oct-2026::14:33:31.989625 ===
+TLS client: In state wait_cert_cr at ssl_handshake.erl:2226 generated CLIENT ALERT: Fatal - Bad Certificate
+ - {bad_cert,{hostname_check_failed,{requested,"wrong.invalid"},
+                                    {received,[{dNSName,"localhost"}]}}}
+=NOTICE REPORT==== 1-Oct-2026::14:33:31.989727 ===
+TLS server: In state wait_finished received CLIENT ALERT: Fatal - Bad Certificate
+
+=NOTICE REPORT==== 1-Oct-2026::14:33:31.995591 ===
+TLS client: In state wait_cert_cr at ssl_handshake.erl:2218 generated CLIENT ALERT: Fatal - Unknown CA
+
+=NOTICE REPORT==== 1-Oct-2026::14:33:31.995672 ===
+TLS server: In state wait_finished received CLIENT ALERT: Fatal - Unknown CA
+
+[32m.[39m[32m.[39m[32m
+128 passed, no failures[39m
+Production dependency, Dynamic and public-consumer boundaries passed.
+  Resolving versions
+Downloading packages
+ Downloaded 11 packages in 0.08s
+      Added cowlib v2.20.0
+      Added file_streams v1.7.0
+      Added filepath v1.1.2
+      Added gleam_erlang v1.3.0
+      Added gleam_http v4.4.0
+      Added gleam_json v3.1.0
+      Added gleam_otp v1.3.0
+      Added gleam_stdlib v1.0.5
+      Added gun v2.6.0
+      Added http_gun v0.1.0
+      Added simplifile v2.7.0
+      Added sinal v0.1.0
+      Added telemetry v1.4.2
+  Compiling cowlib
+===> Analyzing applications...
+===> Compiling cowlib
+  Compiling gleam_stdlib
+  Compiling file_streams
+  Compiling filepath
+  Compiling gleam_erlang
+  Compiling gleam_http
+  Compiling gleam_json
+  Compiling gleam_otp
+  Compiling gun
+===> Analyzing applications...
+===> Compiling gun
+  Compiling simplifile
+  Compiling telemetry
+===> Analyzing applications...
+===> Compiling telemetry
+  Compiling sinal
+  Compiling http_gun
+  Compiling stdlib_consumer
+   Compiled in 13.45s
+    Running stdlib_consumer.main
+  Resolving versions
+Downloading packages
+ Downloaded 12 packages in 0.07s
+      Added cowlib v2.20.0
+      Added file_streams v1.7.0
+      Added filepath v1.1.2
+      Added gleam_erlang v1.3.0
+      Added gleam_http v4.4.0
+      Added gleam_json v3.1.0
+      Added gleam_otp v1.3.0
+      Added gleam_stdlib v1.0.5
+      Added gleeunit v1.11.0
+      Added gun v2.6.0
+      Added simplifile v2.7.0
+      Added sinal v0.1.0
+      Added telemetry v1.4.2
+  Compiling cowlib
+===> Analyzing applications...
+===> Compiling cowlib
+  Compiling gleam_stdlib
+  Compiling file_streams
+  Compiling filepath
+  Compiling gleam_erlang
+  Compiling gleam_http
+  Compiling gleam_json
+  Compiling gleam_otp
+  Compiling gleeunit
+  Compiling gun
+===> Analyzing applications...
+===> Compiling gun
+  Compiling simplifile
+  Compiling telemetry
+===> Analyzing applications...
+===> Compiling telemetry
+  Compiling sinal
+   Checking http_gun
+   Compiled in 14.20s
+  Resolving versions
+  Compiling http_gun
+   Compiled in 0.60s
+   Compiled in 0.21s
+    Running http_gun_test.main
+[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m=CRASH REPORT==== 1-Oct-2026::14:34:03.904089 ===
+  crasher:
+    initial call: http_gun@internal@preparation:'-start/5-anonymous-0-'/0
+    pid: <0.253.0>
+    registered_name: []
+    exception error: #{function =>
+                           <<"throwing_resolver_is_typed_and_does_not_kill_pool_test">>,
+                       line => 536,message => <<"injected resolver failure">>,
+                       module => <<"http_gun_destination_test">>,
+                       file => <<"test/http_gun_destination_test.gleam">>,
+                       gleam_error => panic}
+      in function  http_gun_destination_test:'-throwing_resolver_is_typed_and_does_not_kill_pool_test/0-anonymous-0-'/2 (test/http_gun_destination_test.gleam:535)
+      in call from http_gun@internal@resolution:'-resolve/3-anonymous-4-'/4 (src/http_gun/internal/resolution.gleam:50)
+      in call from http_gun@internal@preparation:'-start/5-anonymous-0-'/2 (src/http_gun/internal/preparation.gleam:22)
+    ancestors: [<0.252.0>,<0.251.0>,<0.120.0>]
+    message_queue_len: 0
+    messages: []
+    links: [<0.252.0>]
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 233
+    stack_size: 29
+    reductions: 60
+  neighbours:
+
+[32m.[39m[32m.[39m[32m.[39m=NOTICE REPORT==== 1-Oct-2026::14:34:04.190424 ===
+TLS client: In state wait_cert_cr at ssl_handshake.erl:2226 generated CLIENT ALERT: Fatal - Bad Certificate
+ - {bad_cert,{hostname_check_failed,{requested,{127,0,0,1}},
+                                    {received,[{dNSName,"localhost"}]}}}
+=NOTICE REPORT==== 1-Oct-2026::14:34:04.190551 ===
+TLS server: In state wait_finished received CLIENT ALERT: Fatal - Bad Certificate
+
+[32m.[39m=NOTICE REPORT==== 1-Oct-2026::14:34:04.208491 ===
+TLS client: In state wait_cert_cr at ssl_handshake.erl:2226 generated CLIENT ALERT: Fatal - Bad Certificate
+ - {bad_cert,{hostname_check_failed,{requested,"wrong.invalid"},
+                                    {received,[{dNSName,"localhost"}]}}}
+=NOTICE REPORT==== 1-Oct-2026::14:34:04.208582 ===
+TLS server: In state wait_finished received CLIENT ALERT: Fatal - Bad Certificate
+
+[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m=ERROR REPORT==== 1-Oct-2026::14:34:04.255558 ===
+** State machine <0.470.0> terminating
+** Process label = {gun,{127,0,0,1},59659}
+** Last event = {info,{tcp,#Port<0.75>,
+                           <<"HTTP/1.1 200 OK\r\nContent-Length: +1\r\n\r\nx">>}}
+** When server state  = {connected,
+                         {state,<0.461.0>,
+                          {up,#Ref<0.1424950038.3106406409.37890>},
+                          {127,0,0,1},
+                          59659,<<"http">>,
+                          {127,0,0,1},
+                          59659,[],
+                          #{protocols => [http],
+                            retry => 0,connect_timeout => 1000,
+                            domain_lookup_timeout => 1000,
+                            http2_opts =>
+                             #{flow => 1,max_headers => 101,
+                               initial_connection_window_size => 65535,
+                               initial_stream_window_size => 16384,
+                               notify_settings_changed => true},
+                            http_opts => #{flow => 1,max_headers => 100},
+                            tcp_opts =>
+                             [{send_timeout,1000},{send_timeout_close,true}],
+                            tls_handshake_timeout => 1000,transport => tcp},
+                          undefined,#Port<0.75>,gun_tcp,true,
+                          {tcp,tcp_closed,tcp_error},
+                          gun_http,
+                          {http_state,#Port<0.75>,gun_tcp,
+                           #{flow => 1,max_headers => 100},
+                           'HTTP/1.1',keepalive,<<>>,undefined,
+                           [{stream,#Ref<0.1424950038.3106406409.37906>,
+                             <0.471.0>,1,<<"GET">>,<<"127.0.0.1:59659">>,
+                             <<"/">>,[],true,undefined}],
+                           head,
+                           {0,0},
+                           head},
+                          undefined,gun_default_event_h,undefined}}
+** Reason for termination = error:badarg
+** Callback modules = [gun]
+** Callback mode = state_functions
+** Stacktrace =
+**  [{erlang,binary_to_integer,
+             [<<>>],
+             [{error_info,#{module => erl_erts_errors}}]},
+     {cow_http_hd,digits,3,
+                  [{file,"/private/tmp/nix-shell.Vl4hgN/nix-shell.BOyMoG/http-gun-stdlib-l35rnfpx/http_gun/build/dev/erlang/cowlib/src/cow_http_hd.erl"},
+                   {line,3721}]},
+     {cow_http_hd,parse_content_length,1,
+                  [{file,"/private/tmp/nix-shell.Vl4hgN/nix-shell.BOyMoG/http-gun-stdlib-l35rnfpx/http_gun/build/dev/erlang/cowlib/src/cow_http_hd.erl"},
+                   {line,1667}]},
+     {gun_http,response_io_from_headers,4,
+               [{file,"/private/tmp/nix-shell.Vl4hgN/nix-shell.BOyMoG/http-gun-stdlib-l35rnfpx/http_gun/build/dev/erlang/gun/src/gun_http.erl"},
+                {line,1020}]},
+     {gun_http,handle_response,8,
+               [{file,"/private/tmp/nix-shell.Vl4hgN/nix-shell.BOyMoG/http-gun-stdlib-l35rnfpx/http_gun/build/dev/erlang/gun/src/gun_http.erl"},
+                {line,474}]},
+     {gun,handle_common_connected_no_input,4,
+          [{file,"/private/tmp/nix-shell.Vl4hgN/nix-shell.BOyMoG/http-gun-stdlib-l35rnfpx/http_gun/build/dev/erlang/gun/src/gun.erl"},
+           {line,1641}]},
+     {gen_statem,loop_state_callback,11,[{file,"gen_statem.erl"},{line,3741}]},
+     {proc_lib,init_p_do_apply,3,[{file,"proc_lib.erl"},{line,333}]}]
+
+=CRASH REPORT==== 1-Oct-2026::14:34:04.255801 ===
+  crasher:
+    initial call: gun:init/1
+    pid: <0.470.0>
+    registered_name: []
+    process_label: {gun,{127,0,0,1},59659}
+    exception error: bad argument
+      in function  binary_to_integer/1
+         called as binary_to_integer(<<>>)
+         *** argument 1: not a textual representation of an integer
+      in call from cow_http_hd:digits/3 (/private/tmp/nix-shell.Vl4hgN/nix-shell.BOyMoG/http-gun-stdlib-l35rnfpx/http_gun/build/dev/erlang/cowlib/src/cow_http_hd.erl:3721)
+      in call from cow_http_hd:parse_content_length/1 (/private/tmp/nix-shell.Vl4hgN/nix-shell.BOyMoG/http-gun-stdlib-l35rnfpx/http_gun/build/dev/erlang/cowlib/src/cow_http_hd.erl:1667)
+      in call from gun_http:response_io_from_headers/4 (/private/tmp/nix-shell.Vl4hgN/nix-shell.BOyMoG/http-gun-stdlib-l35rnfpx/http_gun/build/dev/erlang/gun/src/gun_http.erl:1020)
+      in call from gun_http:handle_response/8 (/private/tmp/nix-shell.Vl4hgN/nix-shell.BOyMoG/http-gun-stdlib-l35rnfpx/http_gun/build/dev/erlang/gun/src/gun_http.erl:474)
+      in call from gun:handle_common_connected_no_input/4 (/private/tmp/nix-shell.Vl4hgN/nix-shell.BOyMoG/http-gun-stdlib-l35rnfpx/http_gun/build/dev/erlang/gun/src/gun.erl:1641)
+      in call from gen_statem:loop_state_callback/11 (gen_statem.erl:3741)
+    ancestors: [gun_conns_sup,gun_sup,<0.107.0>]
+    message_queue_len: 0
+    messages: []
+    links: [<0.109.0>,#Port<0.75>]
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 17731
+    stack_size: 29
+    reductions: 23307
+  neighbours:
+
+=SUPERVISOR REPORT==== 1-Oct-2026::14:34:04.257816 ===
+    supervisor: {local,gun_conns_sup}
+    errorContext: child_terminated
+    reason: {badarg,
+                [{erlang,binary_to_integer,
+                     [<<>>],
+                     [{error_info,#{module => erl_erts_errors}}]},
+                 {cow_http_hd,digits,3,
+                     [{file,
+                          "/private/tmp/nix-shell.Vl4hgN/nix-shell.BOyMoG/http-gun-stdlib-l35rnfpx/http_gun/build/dev/erlang/cowlib/src/cow_http_hd.erl"},
+                      {line,3721}]},
+                 {cow_http_hd,parse_content_length,1,
+                     [{file,
+                          "/private/tmp/nix-shell.Vl4hgN/nix-shell.BOyMoG/http-gun-stdlib-l35rnfpx/http_gun/build/dev/erlang/cowlib/src/cow_http_hd.erl"},
+                      {line,1667}]},
+                 {gun_http,response_io_from_headers,4,
+                     [{file,
+                          "/private/tmp/nix-shell.Vl4hgN/nix-shell.BOyMoG/http-gun-stdlib-l35rnfpx/http_gun/build/dev/erlang/gun/src/gun_http.erl"},
+                      {line,1020}]},
+                 {gun_http,handle_response,8,
+                     [{file,
+                          "/private/tmp/nix-shell.Vl4hgN/nix-shell.BOyMoG/http-gun-stdlib-l35rnfpx/http_gun/build/dev/erlang/gun/src/gun_http.erl"},
+                      {line,474}]},
+                 {gun,handle_common_connected_no_input,4,
+                     [{file,
+                          "/private/tmp/nix-shell.Vl4hgN/nix-shell.BOyMoG/http-gun-stdlib-l35rnfpx/http_gun/build/dev/erlang/gun/src/gun.erl"},
+                      {line,1641}]},
+                 {gen_statem,loop_state_callback,11,
+                     [{file,"gen_statem.erl"},{line,3741}]},
+                 {proc_lib,init_p_do_apply,3,
+                     [{file,"proc_lib.erl"},{line,333}]}]}
+    offender: [{pid,<0.470.0>},
+               {id,gun},
+               {mfargs,{gun,start_link,undefined}},
+               {restart_type,temporary},
+               {significant,false},
+               {shutdown,5000},
+               {child_type,worker}]
+
+=ERROR REPORT==== 1-Oct-2026::14:34:04.258422 ===
+** State machine <0.475.0> terminating
+** Process label = {gun,{127,0,0,1},59661}
+** Last event = {info,{tcp,#Port<0.78>,
+                           <<"HTTP/1.1 200 OK\r\nContent-Length: -1\r\n\r\nx">>}}
+** When server state  = {connected,
+                         {state,<0.461.0>,
+                          {up,#Ref<0.1424950038.3106406409.37952>},
+                          {127,0,0,1},
+                          59661,<<"http">>,
+                          {127,0,0,1},
+                          59661,[],
+                          #{protocols => [http],
+                            retry => 0,connect_timeout => 1000,
+                            domain_lookup_timeout => 1000,
+                            http2_opts =>
+                             #{flow => 1,max_headers => 101,
+                               initial_connection_window_size => 65535,
+                               initial_stream_window_size => 16384,
+                               notify_settings_changed => true},
+                            http_opts => #{flow => 1,max_headers => 100},
+                            tcp_opts =>
+                             [{send_timeout,1000},{send_timeout_close,true}],
+                            tls_handshake_timeout => 1000,transport => tcp},
+                          undefined,#Port<0.78>,gun_tcp,true,
+                          {tcp,tcp_closed,tcp_error},
+                          gun_http,
+                          {http_state,#Port<0.78>,gun_tcp,
+                           #{flow => 1,max_headers => 100},
+                           'HTTP/1.1',keepalive,<<>>,undefined,
+                           [{stream,#Ref<0.1424950038.3106406408.37163>,
+                             <0.476.0>,1,<<"GET">>,<<"127.0.0.1:59661">>,
+                             <<"/">>,[],true,undefined}],
+                           head,
+                           {0,0},
+                           head},
+                          undefined,gun_default_event_h,undefined}}
+** Reason for termination = error:badarg
+** Callback modules = [gun]
+** Callback mode = state_functions
+** Stacktrace =
+**  [{erlang,binary_to_integer,
+             [<<>>],
+             [{error_info,#{module => erl_erts_errors}}]},
+     {cow_http_hd,digits,3,
+                  [{file,"/private/tmp/nix-shell.Vl4hgN/nix-shell.BOyMoG/http-gun-stdlib-l35rnfpx/http_gun/build/dev/erlang/cowlib/src/cow_http_hd.erl"},
+                   {line,3721}]},
+     {cow_http_hd,parse_content_length,1,
+                  [{file,"/private/tmp/nix-shell.Vl4hgN/nix-shell.BOyMoG/http-gun-stdlib-l35rnfpx/http_gun/build/dev/erlang/cowlib/src/cow_http_hd.erl"},
+                   {line,1667}]},
+     {gun_http,response_io_from_headers,4,
+               [{file,"/private/tmp/nix-shell.Vl4hgN/nix-shell.BOyMoG/http-gun-stdlib-l35rnfpx/http_gun/build/dev/erlang/gun/src/gun_http.erl"},
+                {line,1020}]},
+     {gun_http,handle_response,8,
+               [{file,"/private/tmp/nix-shell.Vl4hgN/nix-shell.BOyMoG/http-gun-stdlib-l35rnfpx/http_gun/build/dev/erlang/gun/src/gun_http.erl"},
+                {line,474}]},
+     {gun,handle_common_connected_no_input,4,
+          [{file,"/private/tmp/nix-shell.Vl4hgN/nix-shell.BOyMoG/http-gun-stdlib-l35rnfpx/http_gun/build/dev/erlang/gun/src/gun.erl"},
+           {line,1641}]},
+     {gen_statem,loop_state_callback,11,[{file,"gen_statem.erl"},{line,3741}]},
+     {proc_lib,init_p_do_apply,3,[{file,"proc_lib.erl"},{line,333}]}]
+
+=CRASH REPORT==== 1-Oct-2026::14:34:04.258622 ===
+  crasher:
+    initial call: gun:init/1
+    pid: <0.475.0>
+    registered_name: []
+    process_label: {gun,{127,0,0,1},59661}
+    exception error: bad argument
+      in function  binary_to_integer/1
+         called as binary_to_integer(<<>>)
+         *** argument 1: not a textual representation of an integer
+      in call from cow_http_hd:digits/3 (/private/tmp/nix-shell.Vl4hgN/nix-shell.BOyMoG/http-gun-stdlib-l35rnfpx/http_gun/build/dev/erlang/cowlib/src/cow_http_hd.erl:3721)
+      in call from cow_http_hd:parse_content_length/1 (/private/tmp/nix-shell.Vl4hgN/nix-shell.BOyMoG/http-gun-stdlib-l35rnfpx/http_gun/build/dev/erlang/cowlib/src/cow_http_hd.erl:1667)
+      in call from gun_http:response_io_from_headers/4 (/private/tmp/nix-shell.Vl4hgN/nix-shell.BOyMoG/http-gun-stdlib-l35rnfpx/http_gun/build/dev/erlang/gun/src/gun_http.erl:1020)
+      in call from gun_http:handle_response/8 (/private/tmp/nix-shell.Vl4hgN/nix-shell.BOyMoG/http-gun-stdlib-l35rnfpx/http_gun/build/dev/erlang/gun/src/gun_http.erl:474)
+      in call from gun:handle_common_connected_no_input/4 (/private/tmp/nix-shell.Vl4hgN/nix-shell.BOyMoG/http-gun-stdlib-l35rnfpx/http_gun/build/dev/erlang/gun/src/gun.erl:1641)
+      in call from gen_statem:loop_state_callback/11 (gen_statem.erl:3741)
+    ancestors: [gun_conns_sup,gun_sup,<0.107.0>]
+    message_queue_len: 0
+    messages: []
+    links: [<0.109.0>,#Port<0.78>]
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 17731
+    stack_size: 29
+    reductions: 23212
+  neighbours:
+
+=SUPERVISOR REPORT==== 1-Oct-2026::14:34:04.258785 ===
+    supervisor: {local,gun_conns_sup}
+    errorContext: child_terminated
+    reason: {badarg,
+                [{erlang,binary_to_integer,
+                     [<<>>],
+                     [{error_info,#{module => erl_erts_errors}}]},
+                 {cow_http_hd,digits,3,
+                     [{file,
+                          "/private/tmp/nix-shell.Vl4hgN/nix-shell.BOyMoG/http-gun-stdlib-l35rnfpx/http_gun/build/dev/erlang/cowlib/src/cow_http_hd.erl"},
+                      {line,3721}]},
+                 {cow_http_hd,parse_content_length,1,
+                     [{file,
+                          "/private/tmp/nix-shell.Vl4hgN/nix-shell.BOyMoG/http-gun-stdlib-l35rnfpx/http_gun/build/dev/erlang/cowlib/src/cow_http_hd.erl"},
+                      {line,1667}]},
+                 {gun_http,response_io_from_headers,4,
+                     [{file,
+                          "/private/tmp/nix-shell.Vl4hgN/nix-shell.BOyMoG/http-gun-stdlib-l35rnfpx/http_gun/build/dev/erlang/gun/src/gun_http.erl"},
+                      {line,1020}]},
+                 {gun_http,handle_response,8,
+                     [{file,
+                          "/private/tmp/nix-shell.Vl4hgN/nix-shell.BOyMoG/http-gun-stdlib-l35rnfpx/http_gun/build/dev/erlang/gun/src/gun_http.erl"},
+                      {line,474}]},
+                 {gun,handle_common_connected_no_input,4,
+                     [{file,
+                          "/private/tmp/nix-shell.Vl4hgN/nix-shell.BOyMoG/http-gun-stdlib-l35rnfpx/http_gun/build/dev/erlang/gun/src/gun.erl"},
+                      {line,1641}]},
+                 {gen_statem,loop_state_callback,11,
+                     [{file,"gen_statem.erl"},{line,3741}]},
+                 {proc_lib,init_p_do_apply,3,
+                     [{file,"proc_lib.erl"},{line,333}]}]}
+    offender: [{pid,<0.475.0>},
+               {id,gun},
+               {mfargs,{gun,start_link,undefined}},
+               {restart_type,temporary},
+               {significant,false},
+               {shutdown,5000},
+               {child_type,worker}]
+
+[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m=NOTICE REPORT==== 1-Oct-2026::14:34:06.555519 ===
+TLS client: In state wait_cert_cr at ssl_handshake.erl:2218 generated CLIENT ALERT: Fatal - Unknown CA
+
+=NOTICE REPORT==== 1-Oct-2026::14:34:06.555697 ===
+TLS server: In state wait_finished received CLIENT ALERT: Fatal - Unknown CA
+
+[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m=NOTICE REPORT==== 1-Oct-2026::14:34:06.596138 ===
+TLS client: In state wait_cert_cr at ssl_handshake.erl:2226 generated CLIENT ALERT: Fatal - Bad Certificate
+ - {bad_cert,{hostname_check_failed,{requested,{127,0,0,1}},
+                                    {received,[{dNSName,"localhost"}]}}}
+=NOTICE REPORT==== 1-Oct-2026::14:34:06.596226 ===
+TLS server: In state wait_finished received CLIENT ALERT: Fatal - Bad Certificate
+
+[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m=NOTICE REPORT==== 1-Oct-2026::14:34:09.457777 ===
+SSL WARNING: Ignoring a CA cert as it could not be correctly decoded.~n
+=NOTICE REPORT==== 1-Oct-2026::14:34:09.469354 ===
+TLS client: In state wait_cert_cr at ssl_handshake.erl:2218 generated CLIENT ALERT: Fatal - Unknown CA
+
+=NOTICE REPORT==== 1-Oct-2026::14:34:09.469462 ===
+TLS server: In state wait_finished received CLIENT ALERT: Fatal - Unknown CA
+
+[32m.[39m=NOTICE REPORT==== 1-Oct-2026::14:34:09.482356 ===
+TLS client: In state wait_cert_cr at ssl_handshake.erl:2226 generated CLIENT ALERT: Fatal - Bad Certificate
+ - {bad_cert,{hostname_check_failed,{requested,"wrong.invalid"},
+                                    {received,[{dNSName,"localhost"}]}}}
+=NOTICE REPORT==== 1-Oct-2026::14:34:09.482425 ===
+TLS server: In state wait_finished received CLIENT ALERT: Fatal - Bad Certificate
+
+=NOTICE REPORT==== 1-Oct-2026::14:34:09.497197 ===
+TLS client: In state wait_cert_cr at ssl_handshake.erl:2218 generated CLIENT ALERT: Fatal - Unknown CA
+
+=NOTICE REPORT==== 1-Oct-2026::14:34:09.497309 ===
+TLS server: In state wait_finished received CLIENT ALERT: Fatal - Unknown CA
+
+[32m.[39m[32m.[39m[32m
+128 passed, no failures[39m
+Production dependency, Dynamic and public-consumer boundaries passed.
+Public stdlib 1.0.5 consumer and HTTP Gun fast gate passed.
+  Resolving versions
+Downloading packages
+ Downloaded 11 packages in 0.05s
+  Compiling cowlib
+===> Analyzing applications...
+===> Compiling cowlib
+  Compiling gleam_stdlib
+  Compiling file_streams
+  Compiling filepath
+  Compiling gleam_erlang
+  Compiling gleam_http
+  Compiling gleam_json
+  Compiling gleam_otp
+  Compiling gun
+===> Analyzing applications...
+===> Compiling gun
+  Compiling simplifile
+  Compiling telemetry
+===> Analyzing applications...
+===> Compiling telemetry
+  Compiling sinal
+  Compiling http_gun
+  Compiling http_gun_consumer
+   Compiled in 14.06s
+  Resolving versions
+   Compiled in 0.23s
+    Running http_gun_consumer.main
+Confirmed public type rejection: client
+Confirmed public type rejection: body
+Confirmed public type rejection: wrong_body
+Confirmed public type rejection: recording
+Confirmed public type rejection: deadline
+Confirmed public type rejection: cancellation
+Confirmed public type rejection: observation_id
+  Resolving versions
+Downloading packages
+ Downloaded 12 packages in 0.06s
+  Compiling cowlib
+===> Analyzing applications...
+===> Compiling cowlib
+  Compiling gleam_stdlib
+  Compiling file_streams
+  Compiling filepath
+  Compiling gleam_crypto
+  Compiling gleam_erlang
+  Compiling gleam_http
+  Compiling gleam_json
+  Compiling gleam_otp
+  Compiling gun
+===> Analyzing applications...
+===> Compiling gun
+  Compiling simplifile
+  Compiling telemetry
+===> Analyzing applications...
+===> Compiling telemetry
+  Compiling sinal
+  Compiling http_gun
+  Compiling json_blueprint
+  Compiling llm_wire
+  Compiling http_gun_llm_consumer
+   Compiled in 14.39s
+  Resolving versions
+   Compiled in 0.22s
+    Running http_gun_llm_consumer.main
+   Compiled in 0.22s
+    Running http_gun_llm_integration.main
+Provider stream split points checked: 382
+Provider stream split points checked: 671
+Provider stream split points checked: 143
+LLM streaming: live progress, cancellation, provider terminal, fragmentation and real record/replay passed.
+  Resolving versions
+Downloading packages
+ Downloaded 11 packages in 0.07s
+  Compiling cowlib
+===> Analyzing applications...
+===> Compiling cowlib
+  Compiling gleam_stdlib
+  Compiling file_streams
+  Compiling filepath
+  Compiling gleam_erlang
+  Compiling gleam_http
+  Compiling gleam_json
+  Compiling gleam_otp
+  Compiling gun
+===> Analyzing applications...
+===> Compiling gun
+  Compiling simplifile
+  Compiling telemetry
+===> Analyzing applications...
+===> Compiling telemetry
+  Compiling sinal
+  Compiling http_gun
+  Compiling http_gun_async
+   Compiled in 14.31s
+   Compiled in 0.22s
+    Running http_gun_async.main
+Two application-owned jobs completed on one shared client.
+   Compiled in 0.22s
+    Running http_gun_async_test.main
+PASS head gap, header/body cancellation, shared-client reuse
+PASS admission and TLS-connection cancellation
+Ceiling probe: supplied 5000 ms, client 100 ms, supplied budget still has 4899 ms
+PASS ceiling, queued expiry, expired budget, read wait
+=CRASH REPORT==== 1-Oct-2026::14:35:02.776523 ===
+  crasher:
+    initial call: http_gun_async@feed_job:'-start/4-anonymous-4-'/0
+    pid: <0.196.0>
+    registered_name: []
+    exception error: #{function => <<"early_error_and_exception">>,
+                       line => 227,message => <<"controlled sink exception">>,
+                       module => <<"http_gun_async_test">>,
+                       file => <<"test/http_gun_async_test.gleam">>,
+                       gleam_error => panic}
+      in function  http_gun_async_test:'-early_error_and_exception/0-anonymous-2-'/1 (test/http_gun_async_test.gleam:237)
+      in call from http_gun_async@feed_job:read/3 (src/http_gun_async/feed_job.gleam:137)
+      in call from http_gun_ffi:scoped/2 (/private/tmp/nix-shell.Vl4hgN/nix-shell.BOyMoG/tmp.3uJHfr7JKB/async/build/dev/erlang/http_gun/_gleam_artefacts/http_gun_ffi.erl:77)
+      in call from http_gun:'-with_response_with_options/4-anonymous-2-'/2 (src/http_gun.gleam:109)
+      in call from http_gun:try_with_response_with_options/5 (src/http_gun.gleam:138)
+      in call from http_gun_ffi:scoped/2 (/private/tmp/nix-shell.Vl4hgN/nix-shell.BOyMoG/tmp.3uJHfr7JKB/async/build/dev/erlang/http_gun/_gleam_artefacts/http_gun_ffi.erl:77)
+      in call from http_gun@cancellation:'-with_token/1-anonymous-6-'/2 (src/http_gun/cancellation.gleam:52)
+      in call from http_gun_async@feed_job:'-start/4-anonymous-4-'/7 (src/http_gun_async/feed_job.gleam:76)
+    ancestors: [<0.82.0>]
+    message_queue_len: 0
+    messages: []
+    links: []
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 987
+    stack_size: 29
+    reductions: 734
+  neighbours:
+
+PASS early stop, sink error, exception cleanup
+PASS consumer death, copied job, bounded worker shutdown
+PASS shared body cursor, wrong owner, conflicting read, idempotent close
+=SUPERVISOR REPORT==== 1-Oct-2026::14:35:02.797369 ===
+    supervisor: {<0.230.0>,gleam@otp@static_supervisor}
+    errorContext: child_terminated
+    reason: normal
+    offender: [{pid,<0.231.0>},
+               {id,0},
+               {mfargs,
+                   {gleam@otp@static_supervisor,start_child_callback,
+                       [#Fun<gleam@otp@supervision.0.78234568>]}},
+               {restart_type,permanent},
+               {significant,false},
+               {shutdown,5000},
+               {child_type,worker}]
+
+PASS supervision restart, new capability, stale capability
+PASS same async consumer live/script/record/replay, strict matching, two fallible-scope use cases
+PASS verified H2, one connection, cancelled job and unfinished healthy sibling
+PASS synchronous sink backpressure and shared-client shutdown
+PASS live prefix recording/offline replay and independent capture failure
+  Compiling http_gun
+  Compiling http_gun_async
+   Compiled in 0.78s
+    Running http_gun_async_startup_test.main
+PASS token startup maps Failure; callback skipped; 64 failed job starts leave no completion messages
+Public async consumer: 11 synchronized lifecycle groups and startup-failure control passed.
+Ordinary, async and archived LLM consumers; seven rejection fixtures passed.
+   Compiled in 0.21s
+    Running http_gun_batch_benchmark.main
+   Compiled in 0.22s
+    Running http_gun_batch_benchmark.main
+   Compiled in 0.21s
+    Running http_gun_batch_benchmark.main
+{"median_us": {"100": 36518, "1000": 70003, "5000": 347252, "2000": 140312, "10000": 893896, "500": 34409}, "evidence": "build/evidence/batch.jsonl"}
+   Compiled in 0.22s
+    Running http_gun_interop.main
+{"server": "nghttpd nghttp2/1.70.0", "server_stream_limit": 8, "client_connection_limit": 1, "observed_request_connections": 1, "resets": 2, "log_bytes": 2662021, "log_sha256": "fec8d6b745592457de75b87120212fdbf60e26d059089e501e750c0d86a745b9", "soak_seconds": 0, "scenarios": 7, "result": "passed"}
+   Compiled in 0.22s
+    Running http_gun_recording_benchmark.main
+   Compiled in 0.23s
+    Running http_gun_benchmark.main
+All 11 load scenarios passed; measurements: build/evidence/load.jsonl

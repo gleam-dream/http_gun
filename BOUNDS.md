@@ -6,7 +6,7 @@ HTTP Gun enforces application admission and storage limits. These are not a boun
 | --- | ---: | --- |
 | Open connections | 16 total, 4/origin | Before resolution/Gun open; resolving and connecting reservations occupy slots |
 | H2 streams/connection | 100 | Before submission, reduced by peer SETTINGS; no H2 streams before initial SETTINGS |
-| Active body handles | 128 | Before body-owner creation; finished explicit handles count until closed/dead |
+| Active body handles | 128 | Before body-owner creation; finished explicit handles count until closed/dead; an H1 readiness job reserves an active slot until admission/refusal |
 | Waiting requests | 128 | Client admission; connecting reservations have separate connection-bounded slots |
 | Request body | 1 MiB | Before admission |
 | Header names + values | 16 KiB, 100 pairs | Request validation; response informational/final headers and trailers **after parsing** |
@@ -137,3 +137,41 @@ When a peer closes without `close_notify`, a body accepted as EOF can be
 indistinguishable from truncation. Consumers needing completeness should use
 HTTP framing with a declared length/chunk terminator and validate their payload.
 No extra draining, parser or TLS implementation is added here.
+
+
+## H1 readiness and error precision
+
+Before reusing an H1 connection, a bounded Gleam preparation job calls the
+supported `gun:info/1` API and accepts only its connected HTTP state. This keeps
+Gun's TLS-alert wait (currently up to200ms before `gun_down`) off the pool actor
+and prevents submission to connections already observed closing or dead. At
+most one check exists per H1 connection; it also reserves active capacity,
+preserving admission order when capacity is one. The request's original
+absolute budget and cancellation/owner lifetime govern the job. Readiness is
+valid only for the immediate admission pass, never a cached liveness promise.
+DNS and readiness jobs share only a small Gleam worker-lifetime function.
+
+An unused failed connection can be discarded and replaced before `gun:request`.
+This is preparation of the original queued request, not replay. The peer can
+still close after inspection; such a submitted request keeps conservative
+`MayHaveBeenSent` evidence and never retries. H2 continues to use supported
+capacity/down events, with the existing non-atomic draining boundary.
+Case-insensitive comma-separated `Connection: close` tokens in an H1 request
+or response prevent reuse after HTTP completion. Early cancellation still
+closes H1 and preserves healthy H2 siblings.
+
+Gun's structured `{connection_error, limit_reached, _}` response-header/trailer
+rejection becomes `HeaderLimitReached`. It does not expose the measured size
+or distinguish count from block bytes; `LimitExceeded` remains reserved for
+values HTTP Gun actually measured. Raw explanations never enter public errors.
+Invalid status and signed content lengths can surface only as dependency
+process crashes; truncated fixed-length bodies and invalid chunk sizes can
+both surface as `PeerClosed`. These remain failures without invented precision.
+No stack-trace matching, custom wire parser or dependency patch is used.
+
+The accepted reason-phrase limitation also covers a mixed-terminator response
+such as `HTTP/1.1 200 OK\nContent-Length: 2\r\n\r\nok`: Gun can interpret
+the LF-containing text as the reason phrase, discard it and deliver a
+close-delimited response. Therefore the client does not claim universal
+bare-LF/status-line rejection. Warden's unchanged strict framing table still
+fails this row; accepting the limitation does not make that test pass.

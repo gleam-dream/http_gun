@@ -112,3 +112,24 @@ Gun/Cowlib own wire framing. The owner accepted the experimentally verified
 reason-phrase exception because Gun discards that text. See BOUNDS.md for exact
 enforcement points and close-delimited TLS ambiguity. Warden remains read-only
 behavioral evidence; adoption/release is a separate downstream decision.
+
+
+## Warden feedback corrections (2026-10-01)
+
+The public stdlib bound admits0.71 and1.x, with both selected versions tested.
+`Trust.Anchors(List(BitArray))` passes DER CA values directly to OTP cacerts,
+replacing system trust; it does not configure mTLS identity or use disk files.
+
+H1 Ready → Checking → Checked → leased transitions are owned by the pool.
+Checking reserves both connection and active admission capacity; Checked is a
+single admission-pass observation, reset if no body can be launched. An
+unusable connection is discarded before request submission, preserving the
+original queue position, cancellation and deadline. Preparation workers never
+run synchronous inspection on the pool; pool/deadline death kills them. The
+small worker-lifetime function is also used by existing DNS jobs. H2 leases and
+application retry ownership remain unchanged. Body completion retires an H1
+lease when either request or response carries a close token.
+
+Body owners retain structured connection errors sent to their reply address,
+including Gun's header/trailer limit category. Unavailable parser detail stays
+unknown or closed; no inference from internal crash stacks changes evidence.

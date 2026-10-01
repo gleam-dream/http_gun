@@ -1,0 +1,166 @@
+  Resolving versions
+Downloading packages
+ Downloaded 30 packages in 0.12s
+      Added cowlib v2.20.0
+      Added file_streams v1.7.0
+      Added gun v2.6.0
+      Added http_gun v0.1.0
+    Removed jose
+    Removed oidcc
+    Removed telemetry_registry
+  Compiling gleam_stdlib
+  Compiling bigi
+  Compiling cowlib
+===> Analyzing applications...
+===> Compiling cowlib
+  Compiling envoy
+  Compiling platform
+  Compiling filepath
+  Compiling simplifile
+  Compiling directories
+  Compiling exception
+  Compiling file_streams
+  Compiling gleam_crypto
+  Compiling gleam_erlang
+  Compiling gleam_http
+  Compiling gleam_json
+  Compiling gleam_otp
+  Compiling gleam_time
+  Compiling gleeunit
+  Compiling logging
+  Compiling glisten
+  Compiling splitter
+  Compiling kryptos
+  Compiling gose
+  Compiling gramps
+warning: Deprecated type used
+    ┌─ /private/tmp/nix-shell.sfDrGT/http-gun-warden-j4ie37sp/warden/consumer/build/packages/gramps/src/gramps/http.gleam:132:52
+    │
+132 │ pub fn response_builder(status: Int, headers: List(Header)) -> BytesTree {
+    │                                                    ^^^^^^ This type has been deprecated
+
+It was deprecated with this message: Use #(String, String) instead
+
+warning: Deprecated type used
+    ┌─ /private/tmp/nix-shell.sfDrGT/http-gun-warden-j4ie37sp/warden/consumer/build/packages/gramps/src/gramps/http.gleam:209:37
+    │
+209 │ pub fn encode_headers(headers: List(Header)) -> BytesTree {
+    │                                     ^^^^^^ This type has been deprecated
+
+It was deprecated with this message: Use #(String, String) instead
+
+  Compiling gun
+===> Analyzing applications...
+===> Compiling gun
+  Compiling houdini
+  Compiling hpack_erl
+===> Analyzing applications...
+===> Compiling hpack
+  Compiling telemetry
+===> Analyzing applications...
+===> Compiling telemetry
+  Compiling sinal
+  Compiling http_gun
+  Compiling marceau
+  Compiling mist
+warning: Deprecated type used
+   ┌─ /private/tmp/nix-shell.sfDrGT/http-gun-warden-j4ie37sp/warden/consumer/build/packages/mist/src/mist/internal/encoder.gleam:16:17
+   │
+16 │   headers: List(Header),
+   │                 ^^^^^^ This type has been deprecated
+
+It was deprecated with this message: Use #(String, String) instead
+
+warning: Deprecated type used
+   ┌─ /private/tmp/nix-shell.sfDrGT/http-gun-warden-j4ie37sp/warden/consumer/build/packages/mist/src/mist/internal/encoder.gleam:95:37
+   │
+95 │ pub fn encode_headers(headers: List(Header)) -> BytesTree {
+   │                                     ^^^^^^ This type has been deprecated
+
+It was deprecated with this message: Use #(String, String) instead
+
+warning: Deprecated type used
+   ┌─ /private/tmp/nix-shell.sfDrGT/http-gun-warden-j4ie37sp/warden/consumer/build/packages/mist/src/mist/internal/http2.gleam:63:17
+   │
+63 │   headers: List(Header),
+   │                 ^^^^^^ This type has been deprecated
+
+It was deprecated with this message: Use #(String, String) instead
+
+warning: Deprecated type used
+    ┌─ /private/tmp/nix-shell.sfDrGT/http-gun-warden-j4ie37sp/warden/consumer/build/packages/mist/src/mist/internal/http2.gleam:169:20
+    │
+169 │ ) -> Result(#(List(Header), HpackContext), HpackError)
+    │                    ^^^^^^ This type has been deprecated
+
+It was deprecated with this message: Use #(String, String) instead
+
+warning: Deprecated type used
+    ┌─ /private/tmp/nix-shell.sfDrGT/http-gun-warden-j4ie37sp/warden/consumer/build/packages/mist/src/mist/internal/http2.gleam:174:17
+    │
+174 │   headers: List(Header),
+    │                 ^^^^^^ This type has been deprecated
+
+It was deprecated with this message: Use #(String, String) instead
+
+warning: Deprecated type used
+   ┌─ /private/tmp/nix-shell.sfDrGT/http-gun-warden-j4ie37sp/warden/consumer/build/packages/mist/src/mist/internal/http2/stream.gleam:60:17
+   │
+60 │   headers: List(Header),
+   │                 ^^^^^^ This type has been deprecated
+
+It was deprecated with this message: Use #(String, String) instead
+
+warning: Deprecated type used
+    ┌─ /private/tmp/nix-shell.sfDrGT/http-gun-warden-j4ie37sp/warden/consumer/build/packages/mist/src/mist/internal/http2/stream.gleam:143:17
+    │
+143 │   headers: List(Header),
+    │                 ^^^^^^ This type has been deprecated
+
+It was deprecated with this message: Use #(String, String) instead
+
+  Compiling warden
+/private/tmp/nix-shell.sfDrGT/http-gun-warden-j4ie37sp/warden/consumer/build/dev/erlang/warden/_gleam_artefacts/warden_test_server.erl:49:5: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%   49|     catch ssl:close(Listen),
+%     |     ^
+
+/private/tmp/nix-shell.sfDrGT/http-gun-warden-j4ie37sp/warden/consumer/build/dev/erlang/warden/_gleam_artefacts/warden_test_server.erl:91:13: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%   91|             catch ssl:close(Socket);
+%     |             ^
+
+/private/tmp/nix-shell.sfDrGT/http-gun-warden-j4ie37sp/warden/consumer/build/dev/erlang/warden/_gleam_artefacts/warden@internal@transaction_store.erl:9:2: Warning: local redefinition of built-in type: record()
+%    9| -type record() :: {pending, material(), integer()} | {consumed_record, integer(), integer()} | {expired_record, integer(), integer()}.
+%     |  ^
+
+/private/tmp/nix-shell.sfDrGT/http-gun-warden-j4ie37sp/warden/consumer/build/dev/erlang/warden/_gleam_artefacts/integration/node/node_raw_ffi.erl:57:10: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%   57|     case catch oidcc_provider_configuration_worker:get_jwks(Name) of
+%     |          ^
+
+  Compiling wisp
+warning: Deprecated type used
+     ┌─ /private/tmp/nix-shell.sfDrGT/http-gun-warden-j4ie37sp/warden/consumer/build/packages/wisp/src/wisp.gleam:1195:17
+     │
+1195 │   headers: List(http.Header),
+     │                 ^^^^^^^^^^^ This type has been deprecated
+
+It was deprecated with this message: Use #(String, String) instead
+
+warning: Deprecated type used
+     ┌─ /private/tmp/nix-shell.sfDrGT/http-gun-warden-j4ie37sp/warden/consumer/build/packages/wisp/src/wisp.gleam:1227:20
+     │
+1227 │ ) -> Result(#(List(http.Header), BufferedReader, Quotas), Response) {
+     │                    ^^^^^^^^^^^ This type has been deprecated
+
+It was deprecated with this message: Use #(String, String) instead
+
+  Compiling warden_reference
+   Compiled in 16.48s
+    Running warden_reference_test.main
+[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m
+8 passed, no failures[39m

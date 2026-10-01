@@ -78,6 +78,11 @@ pub fn cancel(connection: Pid, stream: Stream) -> Nil
 @external(erlang, "http_gun_ffi", "close")
 pub fn close(connection: Pid) -> Nil
 
+// Advisory only: the connection can close after this observation. Always run
+// this synchronous Gun API inside a bounded preparation worker, not the pool.
+@external(erlang, "http_gun_ffi", "reusable")
+pub fn reusable(connection: Pid) -> Bool
+
 @external(erlang, "http_gun_ffi", "now")
 pub fn now() -> Int
 

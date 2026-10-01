@@ -30,6 +30,9 @@ pub type TransportCause {
   PeerClosed
   PeerDraining
   ProtocolError
+  /// Gun rejected a response header/trailer limit before delivering its values.
+  /// The dependency does not report the measured byte/count value.
+  HeaderLimitReached
   TransportTimeout
   UnexpectedProtocol
   UnknownTransport
@@ -152,6 +155,7 @@ fn transport_description(cause: TransportCause) -> String {
     PeerClosed -> "peer closed"
     PeerDraining -> "peer draining"
     ProtocolError -> "protocol error"
+    HeaderLimitReached -> "response header limit reached"
     TransportTimeout -> "transport timeout"
     UnexpectedProtocol -> "unexpected negotiated protocol"
     UnknownTransport -> "cause unavailable"

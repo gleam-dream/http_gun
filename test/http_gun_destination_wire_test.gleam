@@ -5,6 +5,7 @@ import gleam/http/request
 import gleam/int
 import gleam/list
 import gleam/option.{Some}
+import gleam/string
 import gleeunit/should
 import http_gun
 import http_gun/body
@@ -36,8 +37,24 @@ fn req(port: Int) -> request.Request(BitArray) {
 }
 
 pub fn main() {
-  let _ = response_controls_are_rejected_test()
-  let _ = stalled_sends_end_and_leave_no_caller_messages_test()
+  let _ = dependency_header_limit_remains_typed_test()
+}
+
+pub fn dependency_header_limit_remains_typed_test() {
+  let assert Ok(client) = http_gun.start(settings())
+  let bytes =
+    "HTTP/1.1 200 OK\r\n"
+    <> string.repeat("X-Test: a\r\n", 200)
+    <> "Content-Length: 0\r\n\r\n"
+  let outcome = http_gun.send(client, req(serve(bit_array.from_string(bytes))))
+  let _ = http_gun.stop(client)
+  outcome
+  |> should.equal(
+    Error(error.Failure(
+      error.RequestFailed(error.HeaderLimitReached),
+      error.MayHaveBeenSent,
+    )),
+  )
 }
 
 pub fn response_controls_are_rejected_test() {

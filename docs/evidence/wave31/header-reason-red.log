@@ -1,0 +1,17 @@
+  Compiling http_gun
+error: Unknown module value
+   ┌─ /code/gleam-dream/http_gun/test/http_gun_destination_wire_test.gleam:54:33
+   │
+54 │       error.RequestFailed(error.HeaderLimitReached),
+   │                                 ^^^^^^^^^^^^^^^^^^
+
+The module `http_gun/error` does not have a `HeaderLimitReached` value.
+
+error: Unknown module value
+   ┌─ /code/gleam-dream/http_gun/test/http_gun_reuse_test.gleam:76:18
+   │
+76 │   list.each(list.range(1, 8), fn(index) {
+   │                  ^^^^^
+
+The module `gleam/list` does not have a `range` value.
+

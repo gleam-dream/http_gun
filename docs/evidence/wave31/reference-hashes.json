@@ -1,0 +1,15 @@
+{
+  "use": "Released dependency APIs and read-only Warden behavior; no production donor source copied",
+  "files": {
+    "build/packages/gun/src/gun.erl": "b052b36cd073943e9f1236a2741d56a8189136eefdaa9e20382e8f3bcf7a8466",
+    "build/packages/gun/src/gun_http.erl": "e5c8c9231eb03b94fdb523b697b5532060546e4f7347a8649f51d3505c46d4ff",
+    "build/packages/gun/src/gun_tls.erl": "f92b83b0b60667c7b4914462207092ab02962fcdf499c985e548636f37155799",
+    "build/packages/cowlib/src/cow_http.erl": "cba1db8e6aace87f3f8772ea778b8088eedf8f7d54d84d767b46fcc02ea0e594",
+    "build/packages/cowlib/src/cow_http_hd.erl": "af8028340f58b2cf0a7bbaa734d6e1e9c61d48993454119e0df6c6cba6b82c2c",
+    "build/packages/gleam_otp/src/gleam/otp/actor.gleam": "997e4ac65208ca829bb5b18bd90c40c3c125448f058c421dbbd228f40d1c174f",
+    "build/packages/gleam_erlang/src/gleam/erlang/process.gleam": "90695e122ddb2b2a8e191179cf61fa1a7069d4a0358ffffb2cc7aef04c19ac9d",
+    "/code/gleam-dream/warden/docs/evidence/http-gun-adoption/README.md": "306dfc7daf6b7844eb3c24d5158168509911d8099accd1f69dde914a905970a2",
+    "/code/gleam-dream/warden/docs/evidence/http-gun-adoption/run-experiment.sh": "17d4a8086afccc8eb333eb716d85b593abdae6df19ab73d63685915524d089ae",
+    "build/packages/cowlib/src/cow_http1.erl": "e5851d0ad97a639458416d26f3b9d23ddfd09afe0dda8a356f33627ccc5b377c"
+  }
+}

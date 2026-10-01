@@ -3,6 +3,12 @@
 -export([start/0, open/8, request/5, credit/3, cancel/2, close/1, now/0, scoped/2, decode/1]).
 -export([on_exception/2, cause/1]).
 -export([parse_address/1, lookup/3]).
+-export([reusable/1]).
+reusable(Pid) ->
+    try gun:info(Pid) of
+        #{state_name := connected, protocol := http} -> true;
+        _ -> false
+    catch _:_ -> false end.
 parse_address(Host) ->
     case inet:parse_strict_address(binary_to_list(Host)) of
         {ok, Address} -> {ok, address(Address)};
@@ -45,7 +51,8 @@ open(Address, ServerName, Port, Tls, Protocol, Trust, Timeout, HeaderCount) ->
             true ->
                 Ca = case Trust of
                     system_trust -> {cacerts, public_key:cacerts_get()};
-                    {custom_ca, Path} -> {cacertfile, binary_to_list(Path)}
+                    {custom_ca, Path} -> {cacertfile, binary_to_list(Path)};
+                    {anchors, Certificates} -> {cacerts, Certificates}
                 end,
                 Name = case ServerName of
                     none -> [];
@@ -101,5 +108,6 @@ cause({tls_alert, {Alert, _}}) when Alert =:= unknown_ca; Alert =:= bad_certific
 cause({tls_alert, _}) -> tls_failed;
 cause({bad_cert, _}) -> certificate_rejected;
 cause({stream_error, _, _}) -> protocol_error;
+cause({connection_error, limit_reached, _}) -> header_limit_reached;
 cause({connection_error, _, _}) -> protocol_error;
 cause(_) -> unknown_transport.

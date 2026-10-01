@@ -1,0 +1,8 @@
+  Resolving versions
+error: HTTP error
+
+A HTTP request failed.
+The error from the HTTP client was:
+
+    error sending request for url (https://hex.pm/api/packages/gleam_erlang/releases/1.3.0)
+

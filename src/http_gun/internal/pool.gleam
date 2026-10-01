@@ -22,6 +22,7 @@ import http_gun/internal/bridge
 import http_gun/internal/call
 import http_gun/internal/observation as obs
 import http_gun/internal/pending.{type Origin, type Pending, Origin, Pending}
+import http_gun/internal/preparation
 import http_gun/internal/resolution
 import http_gun/recording
 import http_gun/request_options
@@ -43,6 +44,8 @@ type Status {
   Resolving
   Connecting
   Ready(config.Negotiated, Int)
+  Checking(process.Pid)
+  Checked
 }
 
 type Connection {
@@ -78,6 +81,7 @@ type State {
 
 type Message {
   Resolved(process.Pid, Result(resolution.Resolved, error.Reason))
+  CheckedConnection(process.Pid, process.Pid, Result(Bool, error.Reason))
   Inspect(process.Subject(Result(Stats, Failure)))
   Open(
     request.Request(BitArray),
@@ -221,6 +225,8 @@ fn option_port(req: request.Request(a), tls: Bool) -> Int {
 
 fn handle(state: State, message: Message) -> actor.Next(State, Message) {
   case message {
+    CheckedConnection(connection, worker, result) ->
+      actor.continue(dispatch(checked(state, connection, worker, result)))
     Resolved(pid, result) ->
       actor.continue(dispatch(resolved(state, pid, result)))
     Inspect(reply) -> {
@@ -299,7 +305,11 @@ fn handle(state: State, message: Message) -> actor.Next(State, Message) {
           let connections =
             list.map(state.connections, fn(c) {
               case c.pid == pid {
-                True -> Connection(..c, status: Ready(protocol, capacity))
+                True ->
+                  Connection(..c, status: case protocol {
+                    config.H1 -> Checked
+                    config.H2 | config.Offline -> Ready(protocol, capacity)
+                  })
                 False -> c
               }
             })
@@ -362,7 +372,18 @@ fn group(state: State, p: Pending) -> pending.Group {
 }
 
 fn dispatch(state: State) -> State {
-  list.fold(pending.groups(state.pending), state, dispatch_group)
+  let state = list.fold(pending.groups(state.pending), state, dispatch_group)
+  // Readiness is usable only by this admission pass. If body capacity or a
+  // cancelled waiter prevents launch, do not cache an old liveness observation.
+  State(
+    ..state,
+    connections: list.map(state.connections, fn(c) {
+      case c.status {
+        Checked -> Connection(..c, status: Ready(config.H1, 1))
+        _ -> c
+      }
+    }),
+  )
 }
 
 fn dispatch_group(state: State, group: pending.Group) -> State {
@@ -403,11 +424,39 @@ fn admit_connection(state: State, p: Pending) -> Admission {
     list.find(state.connections, fn(c) {
       c.origin == p.origin
       && case c.status {
-        Resolving | Connecting -> False
+        Resolving | Connecting | Checking(_) -> False
+        Checked -> True
         Ready(_, capacity) -> c.used < capacity
       }
     })
   case eligible {
+    Ok(Connection(status: Ready(config.H1, _), ..) as connection) -> {
+      let subject = state.subject
+      let pid = connection.pid
+      let worker =
+        preparation.start(
+          process.self(),
+          p.deadline,
+          error.ConnectionFailed(error.UnknownTransport),
+          fn() { Ok(bridge.reusable(pid)) },
+          fn(worker, result) {
+            process.send(subject, CheckedConnection(pid, worker, result))
+          },
+        )
+      let _ = process.monitor(worker)
+      Deferred(
+        State(
+          ..state,
+          connections: list.map(state.connections, fn(c) {
+            case c.pid == pid {
+              True -> Connection(..c, status: Checking(worker))
+              False -> c
+            }
+          }),
+        ),
+        Pending(..p, reservation: Some(pid)),
+      )
+    }
     Ok(connection) -> Taken(launch(state, p, connection))
     Error(Nil) -> {
       let state = make_room(state, p.origin)
@@ -446,7 +495,7 @@ fn launch(state: State, p: Pending, connection: Connection) -> State {
   telemetry.emit(p.observation, telemetry.AdmissionGranted)
   let protocol = case connection.status {
     Ready(protocol, _) -> protocol
-    Resolving | Connecting -> config.H1
+    Resolving | Connecting | Checking(_) | Checked -> config.H1
   }
   // This callback crosses a process boundary. Capture only its destinations,
   // never the pool state (which also contains every queued request).
@@ -504,7 +553,11 @@ fn launch(state: State, p: Pending, connection: Connection) -> State {
         ),
         connections: list.map(state.connections, fn(c) {
           case c.pid == connection.pid {
-            True -> Connection(..c, used: c.used + 1)
+            True ->
+              Connection(..c, used: c.used + 1, status: case c.status {
+                Checked -> Ready(config.H1, 1)
+                other -> other
+              })
             False -> c
           }
         }),
@@ -584,7 +637,10 @@ fn admit(state: State, p: Pending) -> Admission {
       Taken(state)
     }
     False, False ->
-      case dict.size(state.owners) >= state.config.limits.active {
+      case
+        dict.size(state.owners) + checking_count(state)
+        >= state.config.limits.active
+      {
         True -> Deferred(state, p)
         False ->
           case state.mode {
@@ -594,6 +650,17 @@ fn admit(state: State, p: Pending) -> Admission {
           }
       }
   }
+}
+
+// Reserve admission capacity while checking an H1 lease. Concurrent checks
+// cannot overtake one another when only one active slot is available.
+fn checking_count(state: State) -> Int {
+  list.count(state.connections, fn(c) {
+    case c.status {
+      Checking(_) -> True
+      _ -> False
+    }
+  })
 }
 
 fn admit_playback(
@@ -855,7 +922,7 @@ fn connection_lost(
           )
         Connecting ->
           fail_group(state, pending.ForOrigin(connection.origin), cause)
-        Ready(_, _) -> state
+        Ready(_, _) | Checking(_) | Checked -> state
       }
     }
   }
@@ -866,7 +933,13 @@ fn process_lost(
   pid: process.Pid,
   cause: error.TransportCause,
 ) -> actor.Next(State, Message) {
-  let state = connection_lost(state, pid, cause)
+  let lost = case
+    list.find(state.connections, fn(c) { c.status == Checking(pid) })
+  {
+    Ok(connection) -> connection.pid
+    Error(_) -> pid
+  }
+  let state = connection_lost(state, lost, cause)
   let #(cancelled, queue) = pending.remove_owner(state.pending, pid)
   case cancelled {
     Some(p) -> reject(p, error.Closed)
@@ -907,15 +980,19 @@ pub fn with_correlation(client: Client, id: telemetry.Id) -> Client {
 
 fn preparing(status: Status) -> Bool {
   case status {
-    Resolving | Connecting -> True
-    Ready(_, _) -> False
+    Resolving | Connecting | Checking(_) -> True
+    Ready(_, _) | Checked -> False
   }
 }
 
 fn close_connection(connection: Connection) -> Nil {
   case connection.status {
     Resolving -> process.kill(connection.pid)
-    Connecting | Ready(_, _) -> bridge.close(connection.pid)
+    Checking(worker) -> {
+      process.kill(worker)
+      bridge.close(connection.pid)
+    }
+    Connecting | Ready(_, _) | Checked -> bridge.close(connection.pid)
   }
 }
 
@@ -984,5 +1061,42 @@ fn resolved(
         }
       }
     }
+  }
+}
+
+// A readiness refusal precedes gun:request. It discards only an unused socket;
+// the original queued request keeps its budget, ownership and FIFO position.
+fn checked(
+  state: State,
+  pid: process.Pid,
+  worker: process.Pid,
+  result: Result(Bool, error.Reason),
+) -> State {
+  case
+    list.find(state.connections, fn(c) {
+      c.pid == pid && c.status == Checking(worker)
+    })
+  {
+    Error(_) -> state
+    Ok(connection) ->
+      case result {
+        Ok(True) ->
+          State(
+            ..state,
+            connections: list.map(state.connections, fn(c) {
+              case c.pid == pid {
+                True -> Connection(..c, status: Checked)
+                False -> c
+              }
+            }),
+          )
+        Ok(False) | Error(_) -> {
+          close_connection(connection)
+          State(
+            ..state,
+            connections: list.filter(state.connections, fn(c) { c.pid != pid }),
+          )
+        }
+      }
   }
 }

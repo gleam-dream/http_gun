@@ -1,0 +1,697 @@
+======================== EUnit ========================
+gun_probe_test: framing_and_bounds_table_test...PROBE DeclaredOversize | adapter Failure(Sent, BodyTooLarge) | http_gun Failure(DeadlineExceeded, MayHaveBeenSent)
+PROBE EndlessChunked | adapter Failure(Sent, BodyTooLarge) | http_gun Failure(LimitExceeded(CollectedBodyBytes, 4096, 5000), MayHaveBeenSent)
+PROBE CloseDelimitedOversize | adapter Failure(Sent, BodyTooLarge) | http_gun Failure(LimitExceeded(CollectedBodyBytes, 4096, 10000), MayHaveBeenSent)
+PROBE ManyHeaders | adapter Failure(Sent, HeadersTooLarge) | http_gun Failure(RequestFailed(HeaderLimitReached), MayHaveBeenSent)
+PROBE BigHeaderLine | adapter Failure(Sent, HeadersTooLarge) | http_gun Failure(LimitExceeded(ResponseHeaderBytes, 16384, 40020), MayHaveBeenSent)
+PROBE Gzip | adapter Failure(Sent, UnsupportedContentEncoding) | http_gun Ok(200)
+PROBE Truncated | adapter Failure(Sent, ReceiveFailed) | http_gun Failure(RequestFailed(PeerClosed), MayHaveBeenSent)
+=ERROR REPORT==== 1-Oct-2026::14:26:09.148778 ===
+** State machine <0.336.0> terminating
+** Process label = {gun,{127,0,0,1},52926}
+** Last event = {info,{ssl,{sslsocket,#Port<0.46>,<0.339.0>,<0.338.0>,gen_tcp,
+                                      tls_gen_connection,
+                                      #Ref<0.1942191995.3910270977.62014>,
+                                      undefined},
+                           <<"NOT HTTP\r\n\r\n">>}}
+** When server state  = {connected,
+                         {state,<0.333.0>,
+                          {up,#Ref<0.1942191995.3910139905.61989>},
+                          {127,0,0,1},
+                          52926,<<"https">>,
+                          {127,0,0,1},
+                          52926,[],
+                          #{protocols => [http],
+                            retry => 0,connect_timeout => 2000,
+                            domain_lookup_timeout => 2000,
+                            http2_opts =>
+                             #{flow => 1,max_headers => 101,
+                               initial_connection_window_size => 65535,
+                               initial_stream_window_size => 16384,
+                               notify_settings_changed => true},
+                            http_opts => #{flow => 1,max_headers => 100},
+                            tcp_opts =>
+                             [{send_timeout,2000},{send_timeout_close,true}],
+                            tls_handshake_timeout => 2000,
+                            tls_opts =>
+                             [{cacerts,
+                               [<<48,130,3,35,48,130,2,11,160,3,2,1,2,2,20,
+                                  21,35,75,93,230,193,8,48,254,196,47,19,180,
+                                  71,140,216,70,59,248,15,48,13,6,9,42,134,
+                                  72,134,247,13,1,1,11,5,0,48,25,49,23,48,21,
+                                  6,3,85,4,3,12,14,87,97,114,100,101,110,32,
+                                  84,101,115,116,32,67,65,48,30,23,13,50,54,
+                                  49,48,48,49,49,55,50,53,51,51,90,23,13,51,
+                                  54,48,57,50,56,49,55,50,53,51,51,90,48,25,
+                                  49,23,48,21,6,3,85,4,3,12,14,87,97,114,100,
+                                  101,110,32,84,101,115,116,32,67,65,48,130,
+                                  1,34,48,13,6,9,42,134,72,134,247,13,1,1,1,
+                                  5,0,3,130,1,15,0,48,130,1,10,2,130,1,1,0,
+                                  166,1,83,166,211,95,60,201,249,252,173,143,
+                                  85,171,252,71,225,224,162,52,230,4,141,154,
+                                  90,1,36,9,94,20,98,247,155,62,53,67,133,
+                                  241,169,76,246,158,126,15,70,102,102,125,
+                                  80,8,100,107,181,55,60,220,242,239,216,3,
+                                  210,200,83,193,213,59,201,222,229,103,168,
+                                  33,218,177,143,26,48,158,31,158,135,54,190,
+                                  167,224,201,23,6,252,94,214,116,105,41,44,
+                                  238,113,182,37,65,206,103,215,209,18,157,
+                                  180,207,3,120,107,217,169,117,69,205,51,
+                                  196,41,4,213,185,103,3,147,240,227,253,64,
+                                  195,192,248,6,240,226,31,45,85,162,85,233,
+                                  7,228,65,220,20,19,94,59,227,247,47,235,81,
+                                  169,67,159,193,56,52,81,164,87,174,132,155,
+                                  127,160,44,126,133,62,140,76,222,69,202,
+                                  100,51,174,4,49,119,47,45,22,111,197,235,
+                                  14,155,172,104,29,14,214,148,31,142,247,12,
+                                  101,233,238,88,136,140,62,95,81,84,170,204,
+                                  127,96,170,111,193,250,142,58,48,242,134,
+                                  93,67,40,64,188,180,120,53,1,255,216,170,
+                                  84,62,55,145,70,123,7,160,245,28,36,24,100,
+                                  105,154,75,113,216,1,67,2,3,1,0,1,163,99,
+                                  48,97,48,29,6,3,85,29,14,4,22,4,20,233,34,
+                                  155,193,131,223,4,229,145,170,176,216,106,
+                                  166,113,20,169,200,136,242,48,31,6,3,85,29,
+                                  35,4,24,48,22,128,20,233,34,155,193,131,
+                                  223,4,229,145,170,176,216,106,166,113,20,
+                                  169,200,136,242,48,15,6,3,85,29,19,1,1,255,
+                                  4,5,48,3,1,1,255,48,14,6,3,85,29,15,1,1,
+                                  255,4,4,3,2,1,6,48,13,6,9,42,134,72,134,
+                                  247,13,1,1,11,5,0,3,130,1,1,0,148,8,0,149,
+                                  10,111,106,23,249,190,232,202,27,162,130,
+                                  191,80,31,23,63,186,224,87,252,116,218,43,
+                                  133,229,198,20,194,188,249,12,249,124,115,
+                                  19,220,180,74,80,34,193,243,70,244,209,239,
+                                  232,157,133,174,42,9,54,186,127,64,107,167,
+                                  145,83,153,217,163,161,211,63,192,142,98,2,
+                                  182,193,222,50,229,245,59,199,20,131,101,
+                                  191,57,186,5,73,11,85,110,0,140,0,92,31,
+                                  205,144,121,220,132,67,198,227,224,54,247,
+                                  64,97,190,98,8,121,109,146,247,85,211,171,
+                                  172,103,46,231,175,45,104,237,248,181,130,
+                                  223,200,228,202,109,186,155,221,169,209,76,
+                                  198,241,74,169,208,112,78,22,136,7,141,249,
+                                  232,138,39,72,57,88,66,42,80,55,179,124,
+                                  247,95,187,236,204,16,120,57,114,36,11,179,
+                                  230,71,230,50,47,23,80,136,89,247,103,212,
+                                  96,186,95,30,252,131,252,82,230,137,24,90,
+                                  235,129,150,135,82,205,40,161,119,209,142,
+                                  176,82,95,165,91,31,173,187,33,156,29,54,
+                                  242,34,45,54,244,235,149,225,13,102,46,72,
+                                  51,166,80,91,142,110,116,103,227,122,218,
+                                  104,167,86,20,243,230,4>>]},
+                              {verify,verify_peer},
+                              {send_timeout,2000},
+                              {send_timeout_close,true},
+                              {customize_hostname_check,
+                               [{match_fun,#Fun<public_key.6.41508611>}]},
+                              {server_name_indication,"localhost"}],
+                            transport => tls},
+                          undefined,
+                          {sslsocket,#Port<0.46>,<0.339.0>,<0.338.0>,gen_tcp,
+                           tls_gen_connection,
+                           #Ref<0.1942191995.3910270977.62014>,undefined},
+                          gun_tls,true,
+                          {ssl,ssl_closed,ssl_error},
+                          gun_http,
+                          {http_state,
+                           {sslsocket,#Port<0.46>,<0.339.0>,<0.338.0>,
+                            gen_tcp,tls_gen_connection,
+                            #Ref<0.1942191995.3910270977.62014>,undefined},
+                           gun_tls,
+                           #{flow => 1,max_headers => 100},
+                           'HTTP/1.1',keepalive,<<>>,undefined,
+                           [{stream,#Ref<0.1942191995.3910139905.62102>,
+                             <0.344.0>,1,<<"GET">>,<<"localhost:52926">>,
+                             <<"/x">>,[],true,undefined}],
+                           head,
+                           {0,0},
+                           head},
+                          undefined,gun_default_event_h,undefined}}
+** Reason for termination = error:function_clause
+** Callback modules = [gun]
+** Callback mode = state_functions
+** Stacktrace =
+**  [{cow_http1,parse_status_line,
+                [<<"NOT HTTP\r\n\r\n">>],
+                [{file,"/private/tmp/nix-shell.sfDrGT/http-gun-warden-j4ie37sp/warden/build/dev/erlang/cowlib/src/cow_http1.erl"},
+                 {line,88}]},
+     {gun_http,handle_head,5,
+               [{file,"/private/tmp/nix-shell.sfDrGT/http-gun-warden-j4ie37sp/warden/build/dev/erlang/gun/src/gun_http.erl"},
+                {line,347}]},
+     {gun,handle_common_connected_no_input,4,
+          [{file,"/private/tmp/nix-shell.sfDrGT/http-gun-warden-j4ie37sp/warden/build/dev/erlang/gun/src/gun.erl"},
+           {line,1641}]},
+     {gen_statem,loop_state_callback,11,[{file,"gen_statem.erl"},{line,3741}]},
+     {proc_lib,init_p_do_apply,3,[{file,"proc_lib.erl"},{line,333}]}]
+
+=CRASH REPORT==== 1-Oct-2026::14:26:09.152799 ===
+  crasher:
+    initial call: gun:init/1
+    pid: <0.336.0>
+    registered_name: []
+    process_label: {gun,{127,0,0,1},52926}
+    exception error: no function clause matching 
+                     cow_http1:parse_status_line(<<"NOT HTTP\r\n\r\n">>) (/private/tmp/nix-shell.sfDrGT/http-gun-warden-j4ie37sp/warden/build/dev/erlang/cowlib/src/cow_http1.erl:88)
+      in function  gun_http:handle_head/5 (/private/tmp/nix-shell.sfDrGT/http-gun-warden-j4ie37sp/warden/build/dev/erlang/gun/src/gun_http.erl:347)
+      in call from gun:handle_common_connected_no_input/4 (/private/tmp/nix-shell.sfDrGT/http-gun-warden-j4ie37sp/warden/build/dev/erlang/gun/src/gun.erl:1641)
+      in call from gen_statem:loop_state_callback/11 (gen_statem.erl:3741)
+    ancestors: [gun_conns_sup,gun_sup,<0.117.0>]
+    message_queue_len: 0
+    messages: []
+    links: [<0.119.0>]
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 28690
+    stack_size: 29
+    reductions: 54275
+  neighbours:
+
+=SUPERVISOR REPORT==== 1-Oct-2026::14:26:09.154348 ===
+    supervisor: {local,gun_conns_sup}
+    errorContext: child_terminated
+    reason: {function_clause,
+                [{cow_http1,parse_status_line,
+                     [<<"NOT HTTP\r\n\r\n">>],
+                     [{file,
+                          "/private/tmp/nix-shell.sfDrGT/http-gun-warden-j4ie37sp/warden/build/dev/erlang/cowlib/src/cow_http1.erl"},
+                      {line,88}]},
+                 {gun_http,handle_head,5,
+                     [{file,
+                          "/private/tmp/nix-shell.sfDrGT/http-gun-warden-j4ie37sp/warden/build/dev/erlang/gun/src/gun_http.erl"},
+                      {line,347}]},
+                 {gun,handle_common_connected_no_input,4,
+                     [{file,
+                          "/private/tmp/nix-shell.sfDrGT/http-gun-warden-j4ie37sp/warden/build/dev/erlang/gun/src/gun.erl"},
+                      {line,1641}]},
+                 {gen_statem,loop_state_callback,11,
+                     [{file,"gen_statem.erl"},{line,3741}]},
+                 {proc_lib,init_p_do_apply,3,
+                     [{file,"proc_lib.erl"},{line,333}]}]}
+    offender: [{pid,<0.336.0>},
+               {id,gun},
+               {mfargs,{gun,start_link,undefined}},
+               {restart_type,temporary},
+               {significant,false},
+               {shutdown,5000},
+               {child_type,worker}]
+
+=ERROR REPORT==== 1-Oct-2026::14:26:09.158484 ===
+** State machine <0.351.0> terminating
+** Process label = {gun,{127,0,0,1},52928}
+** Last event = {info,{ssl,{sslsocket,#Port<0.49>,<0.358.0>,<0.356.0>,gen_tcp,
+                                      tls_gen_connection,
+                                      #Ref<0.1942191995.3910270977.62250>,
+                                      undefined},
+                           <<"NOT HTTP\r\n\r\n">>}}
+** When server state  = {connected,
+                         {state,<0.348.0>,
+                          {up,#Ref<0.1942191995.3910139905.62207>},
+                          {127,0,0,1},
+                          52928,<<"https">>,
+                          {127,0,0,1},
+                          52928,[],
+                          #{protocols => [http],
+                            retry => 0,connect_timeout => 2000,
+                            domain_lookup_timeout => 2000,
+                            http2_opts =>
+                             #{flow => 1,max_headers => 101,
+                               initial_connection_window_size => 65535,
+                               initial_stream_window_size => 16384,
+                               notify_settings_changed => true},
+                            http_opts => #{flow => 1,max_headers => 100},
+                            tcp_opts =>
+                             [{send_timeout,2000},{send_timeout_close,true}],
+                            tls_handshake_timeout => 2000,
+                            tls_opts =>
+                             [{cacertfile,"build/test-pki/ca.pem"},
+                              {verify,verify_peer},
+                              {send_timeout,2000},
+                              {send_timeout_close,true},
+                              {customize_hostname_check,
+                               [{match_fun,#Fun<public_key.6.41508611>}]},
+                              {server_name_indication,"localhost"}],
+                            transport => tls},
+                          undefined,
+                          {sslsocket,#Port<0.49>,<0.358.0>,<0.356.0>,gen_tcp,
+                           tls_gen_connection,
+                           #Ref<0.1942191995.3910270977.62250>,undefined},
+                          gun_tls,true,
+                          {ssl,ssl_closed,ssl_error},
+                          gun_http,
+                          {http_state,
+                           {sslsocket,#Port<0.49>,<0.358.0>,<0.356.0>,
+                            gen_tcp,tls_gen_connection,
+                            #Ref<0.1942191995.3910270977.62250>,undefined},
+                           gun_tls,
+                           #{flow => 1,max_headers => 100},
+                           'HTTP/1.1',keepalive,<<>>,undefined,
+                           [{stream,#Ref<0.1942191995.3910139915.59871>,
+                             <0.359.0>,1,<<"GET">>,<<"localhost:52928">>,
+                             <<"/x">>,[],true,undefined}],
+                           head,
+                           {0,0},
+                           head},
+                          undefined,gun_default_event_h,undefined}}
+** Reason for termination = error:function_clause
+** Callback modules = [gun]
+** Callback mode = state_functions
+** Stacktrace =
+**  [{cow_http1,parse_status_line,
+                [<<"NOT HTTP\r\n\r\n">>],
+                [{file,"/private/tmp/nix-shell.sfDrGT/http-gun-warden-j4ie37sp/warden/build/dev/erlang/cowlib/src/cow_http1.erl"},
+                 {line,88}]},
+     {gun_http,handle_head,5,
+               [{file,"/private/tmp/nix-shell.sfDrGT/http-gun-warden-j4ie37sp/warden/build/dev/erlang/gun/src/gun_http.erl"},
+                {line,347}]},
+     {gun,handle_common_connected_no_input,4,
+          [{file,"/private/tmp/nix-shell.sfDrGT/http-gun-warden-j4ie37sp/warden/build/dev/erlang/gun/src/gun.erl"},
+           {line,1641}]},
+     {gen_statem,loop_state_callback,11,[{file,"gen_statem.erl"},{line,3741}]},
+     {proc_lib,init_p_do_apply,3,[{file,"proc_lib.erl"},{line,333}]}]
+
+=CRASH REPORT==== 1-Oct-2026::14:26:09.158785 ===
+  crasher:
+    initial call: gun:init/1
+    pid: <0.351.0>
+    registered_name: []
+    process_label: {gun,{127,0,0,1},52928}
+    exception error: no function clause matching 
+                     cow_http1:parse_status_line(<<"NOT HTTP\r\n\r\n">>) (/private/tmp/nix-shell.sfDrGT/http-gun-warden-j4ie37sp/warden/build/dev/erlang/cowlib/src/cow_http1.erl:88)
+      in function  gun_http:handle_head/5 (/private/tmp/nix-shell.sfDrGT/http-gun-warden-j4ie37sp/warden/build/dev/erlang/gun/src/gun_http.erl:347)
+      in call from gun:handle_common_connected_no_input/4 (/private/tmp/nix-shell.sfDrGT/http-gun-warden-j4ie37sp/warden/build/dev/erlang/gun/src/gun.erl:1641)
+      in call from gen_statem:loop_state_callback/11 (gen_statem.erl:3741)
+    ancestors: [gun_conns_sup,gun_sup,<0.117.0>]
+    message_queue_len: 0
+    messages: []
+    links: [<0.119.0>]
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 17731
+    stack_size: 29
+    reductions: 34119
+  neighbours:
+
+=SUPERVISOR REPORT==== 1-Oct-2026::14:26:09.158950 ===
+    supervisor: {local,gun_conns_sup}
+    errorContext: child_terminated
+    reason: {function_clause,
+                [{cow_http1,parse_status_line,
+                     [<<"NOT HTTP\r\n\r\n">>],
+                     [{file,
+                          "/private/tmp/nix-shell.sfDrGT/http-gun-warden-j4ie37sp/warden/build/dev/erlang/cowlib/src/cow_http1.erl"},
+                      {line,88}]},
+                 {gun_http,handle_head,5,
+                     [{file,
+                          "/private/tmp/nix-shell.sfDrGT/http-gun-warden-j4ie37sp/warden/build/dev/erlang/gun/src/gun_http.erl"},
+                      {line,347}]},
+                 {gun,handle_common_connected_no_input,4,
+                     [{file,
+                          "/private/tmp/nix-shell.sfDrGT/http-gun-warden-j4ie37sp/warden/build/dev/erlang/gun/src/gun.erl"},
+                      {line,1641}]},
+                 {gen_statem,loop_state_callback,11,
+                     [{file,"gen_statem.erl"},{line,3741}]},
+                 {proc_lib,init_p_do_apply,3,
+                     [{file,"proc_lib.erl"},{line,333}]}]}
+    offender: [{pid,<0.351.0>},
+               {id,gun},
+               {mfargs,{gun,start_link,undefined}},
+               {restart_type,temporary},
+               {significant,false},
+               {shutdown,5000},
+               {child_type,worker}]
+
+PROBE BadStatus | adapter Failure(Sent, ReceiveFailed) | http_gun Failure(ConnectionFailed(UnknownTransport), MayHaveBeenSent)
+PROBE BareLfHead | adapter Ok(200, headers 0, body "ok") | http_gun Ok(200)
+=ERROR REPORT==== 1-Oct-2026::14:26:09.572721 ===
+** State machine <0.396.0> terminating
+** Process label = {gun,{127,0,0,1},52935}
+** Last event = {info,{ssl,{sslsocket,#Port<0.58>,<0.399.0>,<0.398.0>,gen_tcp,
+                                      tls_gen_connection,
+                                      #Ref<0.1942191995.3910270977.62742>,
+                                      undefined},
+                           <<"HTTP/1.1 200 OK\r\ncontent-length: +2\r\n\r\nok">>}}
+** When server state  = {connected,
+                         {state,<0.393.0>,
+                          {up,#Ref<0.1942191995.3910139905.62717>},
+                          {127,0,0,1},
+                          52935,<<"https">>,
+                          {127,0,0,1},
+                          52935,[],
+                          #{protocols => [http],
+                            retry => 0,connect_timeout => 2000,
+                            domain_lookup_timeout => 2000,
+                            http2_opts =>
+                             #{flow => 1,max_headers => 101,
+                               initial_connection_window_size => 65535,
+                               initial_stream_window_size => 16384,
+                               notify_settings_changed => true},
+                            http_opts => #{flow => 1,max_headers => 100},
+                            tcp_opts =>
+                             [{send_timeout,2000},{send_timeout_close,true}],
+                            tls_handshake_timeout => 2000,
+                            tls_opts =>
+                             [{cacerts,
+                               [<<48,130,3,35,48,130,2,11,160,3,2,1,2,2,20,
+                                  21,35,75,93,230,193,8,48,254,196,47,19,180,
+                                  71,140,216,70,59,248,15,48,13,6,9,42,134,
+                                  72,134,247,13,1,1,11,5,0,48,25,49,23,48,21,
+                                  6,3,85,4,3,12,14,87,97,114,100,101,110,32,
+                                  84,101,115,116,32,67,65,48,30,23,13,50,54,
+                                  49,48,48,49,49,55,50,53,51,51,90,23,13,51,
+                                  54,48,57,50,56,49,55,50,53,51,51,90,48,25,
+                                  49,23,48,21,6,3,85,4,3,12,14,87,97,114,100,
+                                  101,110,32,84,101,115,116,32,67,65,48,130,
+                                  1,34,48,13,6,9,42,134,72,134,247,13,1,1,1,
+                                  5,0,3,130,1,15,0,48,130,1,10,2,130,1,1,0,
+                                  166,1,83,166,211,95,60,201,249,252,173,143,
+                                  85,171,252,71,225,224,162,52,230,4,141,154,
+                                  90,1,36,9,94,20,98,247,155,62,53,67,133,
+                                  241,169,76,246,158,126,15,70,102,102,125,
+                                  80,8,100,107,181,55,60,220,242,239,216,3,
+                                  210,200,83,193,213,59,201,222,229,103,168,
+                                  33,218,177,143,26,48,158,31,158,135,54,190,
+                                  167,224,201,23,6,252,94,214,116,105,41,44,
+                                  238,113,182,37,65,206,103,215,209,18,157,
+                                  180,207,3,120,107,217,169,117,69,205,51,
+                                  196,41,4,213,185,103,3,147,240,227,253,64,
+                                  195,192,248,6,240,226,31,45,85,162,85,233,
+                                  7,228,65,220,20,19,94,59,227,247,47,235,81,
+                                  169,67,159,193,56,52,81,164,87,174,132,155,
+                                  127,160,44,126,133,62,140,76,222,69,202,
+                                  100,51,174,4,49,119,47,45,22,111,197,235,
+                                  14,155,172,104,29,14,214,148,31,142,247,12,
+                                  101,233,238,88,136,140,62,95,81,84,170,204,
+                                  127,96,170,111,193,250,142,58,48,242,134,
+                                  93,67,40,64,188,180,120,53,1,255,216,170,
+                                  84,62,55,145,70,123,7,160,245,28,36,24,100,
+                                  105,154,75,113,216,1,67,2,3,1,0,1,163,99,
+                                  48,97,48,29,6,3,85,29,14,4,22,4,20,233,34,
+                                  155,193,131,223,4,229,145,170,176,216,106,
+                                  166,113,20,169,200,136,242,48,31,6,3,85,29,
+                                  35,4,24,48,22,128,20,233,34,155,193,131,
+                                  223,4,229,145,170,176,216,106,166,113,20,
+                                  169,200,136,242,48,15,6,3,85,29,19,1,1,255,
+                                  4,5,48,3,1,1,255,48,14,6,3,85,29,15,1,1,
+                                  255,4,4,3,2,1,6,48,13,6,9,42,134,72,134,
+                                  247,13,1,1,11,5,0,3,130,1,1,0,148,8,0,149,
+                                  10,111,106,23,249,190,232,202,27,162,130,
+                                  191,80,31,23,63,186,224,87,252,116,218,43,
+                                  133,229,198,20,194,188,249,12,249,124,115,
+                                  19,220,180,74,80,34,193,243,70,244,209,239,
+                                  232,157,133,174,42,9,54,186,127,64,107,167,
+                                  145,83,153,217,163,161,211,63,192,142,98,2,
+                                  182,193,222,50,229,245,59,199,20,131,101,
+                                  191,57,186,5,73,11,85,110,0,140,0,92,31,
+                                  205,144,121,220,132,67,198,227,224,54,247,
+                                  64,97,190,98,8,121,109,146,247,85,211,171,
+                                  172,103,46,231,175,45,104,237,248,181,130,
+                                  223,200,228,202,109,186,155,221,169,209,76,
+                                  198,241,74,169,208,112,78,22,136,7,141,249,
+                                  232,138,39,72,57,88,66,42,80,55,179,124,
+                                  247,95,187,236,204,16,120,57,114,36,11,179,
+                                  230,71,230,50,47,23,80,136,89,247,103,212,
+                                  96,186,95,30,252,131,252,82,230,137,24,90,
+                                  235,129,150,135,82,205,40,161,119,209,142,
+                                  176,82,95,165,91,31,173,187,33,156,29,54,
+                                  242,34,45,54,244,235,149,225,13,102,46,72,
+                                  51,166,80,91,142,110,116,103,227,122,218,
+                                  104,167,86,20,243,230,4>>]},
+                              {verify,verify_peer},
+                              {send_timeout,2000},
+                              {send_timeout_close,true},
+                              {customize_hostname_check,
+                               [{match_fun,#Fun<public_key.6.41508611>}]},
+                              {server_name_indication,"localhost"}],
+                            transport => tls},
+                          undefined,
+                          {sslsocket,#Port<0.58>,<0.399.0>,<0.398.0>,gen_tcp,
+                           tls_gen_connection,
+                           #Ref<0.1942191995.3910270977.62742>,undefined},
+                          gun_tls,true,
+                          {ssl,ssl_closed,ssl_error},
+                          gun_http,
+                          {http_state,
+                           {sslsocket,#Port<0.58>,<0.399.0>,<0.398.0>,
+                            gen_tcp,tls_gen_connection,
+                            #Ref<0.1942191995.3910270977.62742>,undefined},
+                           gun_tls,
+                           #{flow => 1,max_headers => 100},
+                           'HTTP/1.1',keepalive,<<>>,undefined,
+                           [{stream,#Ref<0.1942191995.3910139905.62823>,
+                             <0.404.0>,1,<<"GET">>,<<"localhost:52935">>,
+                             <<"/x">>,[],true,undefined}],
+                           head,
+                           {0,0},
+                           head},
+                          undefined,gun_default_event_h,undefined}}
+** Reason for termination = error:badarg
+** Callback modules = [gun]
+** Callback mode = state_functions
+** Stacktrace =
+**  [{erlang,binary_to_integer,
+             [<<>>],
+             [{error_info,#{module => erl_erts_errors}}]},
+     {cow_http_hd,digits,3,
+                  [{file,"/private/tmp/nix-shell.sfDrGT/http-gun-warden-j4ie37sp/warden/build/dev/erlang/cowlib/src/cow_http_hd.erl"},
+                   {line,3721}]},
+     {cow_http_hd,parse_content_length,1,
+                  [{file,"/private/tmp/nix-shell.sfDrGT/http-gun-warden-j4ie37sp/warden/build/dev/erlang/cowlib/src/cow_http_hd.erl"},
+                   {line,1667}]},
+     {gun_http,response_io_from_headers,4,
+               [{file,"/private/tmp/nix-shell.sfDrGT/http-gun-warden-j4ie37sp/warden/build/dev/erlang/gun/src/gun_http.erl"},
+                {line,1020}]},
+     {gun_http,handle_response,8,
+               [{file,"/private/tmp/nix-shell.sfDrGT/http-gun-warden-j4ie37sp/warden/build/dev/erlang/gun/src/gun_http.erl"},
+                {line,474}]},
+     {gun,handle_common_connected_no_input,4,
+          [{file,"/private/tmp/nix-shell.sfDrGT/http-gun-warden-j4ie37sp/warden/build/dev/erlang/gun/src/gun.erl"},
+           {line,1641}]},
+     {gen_statem,loop_state_callback,11,[{file,"gen_statem.erl"},{line,3741}]},
+     {proc_lib,init_p_do_apply,3,[{file,"proc_lib.erl"},{line,333}]}]
+
+=CRASH REPORT==== 1-Oct-2026::14:26:09.573280 ===
+  crasher:
+    initial call: gun:init/1
+    pid: <0.396.0>
+    registered_name: []
+    process_label: {gun,{127,0,0,1},52935}
+    exception error: bad argument
+      in function  binary_to_integer/1
+         called as binary_to_integer(<<>>)
+         *** argument 1: not a textual representation of an integer
+      in call from cow_http_hd:digits/3 (/private/tmp/nix-shell.sfDrGT/http-gun-warden-j4ie37sp/warden/build/dev/erlang/cowlib/src/cow_http_hd.erl:3721)
+      in call from cow_http_hd:parse_content_length/1 (/private/tmp/nix-shell.sfDrGT/http-gun-warden-j4ie37sp/warden/build/dev/erlang/cowlib/src/cow_http_hd.erl:1667)
+      in call from gun_http:response_io_from_headers/4 (/private/tmp/nix-shell.sfDrGT/http-gun-warden-j4ie37sp/warden/build/dev/erlang/gun/src/gun_http.erl:1020)
+      in call from gun_http:handle_response/8 (/private/tmp/nix-shell.sfDrGT/http-gun-warden-j4ie37sp/warden/build/dev/erlang/gun/src/gun_http.erl:474)
+      in call from gun:handle_common_connected_no_input/4 (/private/tmp/nix-shell.sfDrGT/http-gun-warden-j4ie37sp/warden/build/dev/erlang/gun/src/gun.erl:1641)
+      in call from gen_statem:loop_state_callback/11 (gen_statem.erl:3741)
+    ancestors: [gun_conns_sup,gun_sup,<0.117.0>]
+    message_queue_len: 0
+    messages: []
+    links: [<0.119.0>]
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 28690
+    stack_size: 29
+    reductions: 55716
+  neighbours:
+
+=SUPERVISOR REPORT==== 1-Oct-2026::14:26:09.576752 ===
+    supervisor: {local,gun_conns_sup}
+    errorContext: child_terminated
+    reason: {badarg,
+                [{erlang,binary_to_integer,
+                     [<<>>],
+                     [{error_info,#{module => erl_erts_errors}}]},
+                 {cow_http_hd,digits,3,
+                     [{file,
+                          "/private/tmp/nix-shell.sfDrGT/http-gun-warden-j4ie37sp/warden/build/dev/erlang/cowlib/src/cow_http_hd.erl"},
+                      {line,3721}]},
+                 {cow_http_hd,parse_content_length,1,
+                     [{file,
+                          "/private/tmp/nix-shell.sfDrGT/http-gun-warden-j4ie37sp/warden/build/dev/erlang/cowlib/src/cow_http_hd.erl"},
+                      {line,1667}]},
+                 {gun_http,response_io_from_headers,4,
+                     [{file,
+                          "/private/tmp/nix-shell.sfDrGT/http-gun-warden-j4ie37sp/warden/build/dev/erlang/gun/src/gun_http.erl"},
+                      {line,1020}]},
+                 {gun_http,handle_response,8,
+                     [{file,
+                          "/private/tmp/nix-shell.sfDrGT/http-gun-warden-j4ie37sp/warden/build/dev/erlang/gun/src/gun_http.erl"},
+                      {line,474}]},
+                 {gun,handle_common_connected_no_input,4,
+                     [{file,
+                          "/private/tmp/nix-shell.sfDrGT/http-gun-warden-j4ie37sp/warden/build/dev/erlang/gun/src/gun.erl"},
+                      {line,1641}]},
+                 {gen_statem,loop_state_callback,11,
+                     [{file,"gen_statem.erl"},{line,3741}]},
+                 {proc_lib,init_p_do_apply,3,
+                     [{file,"proc_lib.erl"},{line,333}]}]}
+    offender: [{pid,<0.396.0>},
+               {id,gun},
+               {mfargs,{gun,start_link,undefined}},
+               {restart_type,temporary},
+               {significant,false},
+               {shutdown,5000},
+               {child_type,worker}]
+
+=ERROR REPORT==== 1-Oct-2026::14:26:09.580628 ===
+** State machine <0.411.0> terminating
+** Process label = {gun,{127,0,0,1},52937}
+** Last event = {info,{ssl,{sslsocket,#Port<0.61>,<0.418.0>,<0.417.0>,gen_tcp,
+                                      tls_gen_connection,
+                                      #Ref<0.1942191995.3910270987.60080>,
+                                      undefined},
+                           <<"HTTP/1.1 200 OK\r\ncontent-length: +2\r\n\r\nok">>}}
+** When server state  = {connected,
+                         {state,<0.408.0>,
+                          {up,#Ref<0.1942191995.3910139905.62919>},
+                          {127,0,0,1},
+                          52937,<<"https">>,
+                          {127,0,0,1},
+                          52937,[],
+                          #{protocols => [http],
+                            retry => 0,connect_timeout => 2000,
+                            domain_lookup_timeout => 2000,
+                            http2_opts =>
+                             #{flow => 1,max_headers => 101,
+                               initial_connection_window_size => 65535,
+                               initial_stream_window_size => 16384,
+                               notify_settings_changed => true},
+                            http_opts => #{flow => 1,max_headers => 100},
+                            tcp_opts =>
+                             [{send_timeout,2000},{send_timeout_close,true}],
+                            tls_handshake_timeout => 2000,
+                            tls_opts =>
+                             [{cacertfile,"build/test-pki/ca.pem"},
+                              {verify,verify_peer},
+                              {send_timeout,2000},
+                              {send_timeout_close,true},
+                              {customize_hostname_check,
+                               [{match_fun,#Fun<public_key.6.41508611>}]},
+                              {server_name_indication,"localhost"}],
+                            transport => tls},
+                          undefined,
+                          {sslsocket,#Port<0.61>,<0.418.0>,<0.417.0>,gen_tcp,
+                           tls_gen_connection,
+                           #Ref<0.1942191995.3910270987.60080>,undefined},
+                          gun_tls,true,
+                          {ssl,ssl_closed,ssl_error},
+                          gun_http,
+                          {http_state,
+                           {sslsocket,#Port<0.61>,<0.418.0>,<0.417.0>,
+                            gen_tcp,tls_gen_connection,
+                            #Ref<0.1942191995.3910270987.60080>,undefined},
+                           gun_tls,
+                           #{flow => 1,max_headers => 100},
+                           'HTTP/1.1',keepalive,<<>>,undefined,
+                           [{stream,#Ref<0.1942191995.3910139905.63005>,
+                             <0.419.0>,1,<<"GET">>,<<"localhost:52937">>,
+                             <<"/x">>,[],true,undefined}],
+                           head,
+                           {0,0},
+                           head},
+                          undefined,gun_default_event_h,undefined}}
+** Reason for termination = error:badarg
+** Callback modules = [gun]
+** Callback mode = state_functions
+** Stacktrace =
+**  [{erlang,binary_to_integer,
+             [<<>>],
+             [{error_info,#{module => erl_erts_errors}}]},
+     {cow_http_hd,digits,3,
+                  [{file,"/private/tmp/nix-shell.sfDrGT/http-gun-warden-j4ie37sp/warden/build/dev/erlang/cowlib/src/cow_http_hd.erl"},
+                   {line,3721}]},
+     {cow_http_hd,parse_content_length,1,
+                  [{file,"/private/tmp/nix-shell.sfDrGT/http-gun-warden-j4ie37sp/warden/build/dev/erlang/cowlib/src/cow_http_hd.erl"},
+                   {line,1667}]},
+     {gun_http,response_io_from_headers,4,
+               [{file,"/private/tmp/nix-shell.sfDrGT/http-gun-warden-j4ie37sp/warden/build/dev/erlang/gun/src/gun_http.erl"},
+                {line,1020}]},
+     {gun_http,handle_response,8,
+               [{file,"/private/tmp/nix-shell.sfDrGT/http-gun-warden-j4ie37sp/warden/build/dev/erlang/gun/src/gun_http.erl"},
+                {line,474}]},
+     {gun,handle_common_connected_no_input,4,
+          [{file,"/private/tmp/nix-shell.sfDrGT/http-gun-warden-j4ie37sp/warden/build/dev/erlang/gun/src/gun.erl"},
+           {line,1641}]},
+     {gen_statem,loop_state_callback,11,[{file,"gen_statem.erl"},{line,3741}]},
+     {proc_lib,init_p_do_apply,3,[{file,"proc_lib.erl"},{line,333}]}]
+
+=CRASH REPORT==== 1-Oct-2026::14:26:09.580950 ===
+  crasher:
+    initial call: gun:init/1
+    pid: <0.411.0>
+    registered_name: []
+    process_label: {gun,{127,0,0,1},52937}
+    exception error: bad argument
+      in function  binary_to_integer/1
+         called as binary_to_integer(<<>>)
+         *** argument 1: not a textual representation of an integer
+      in call from cow_http_hd:digits/3 (/private/tmp/nix-shell.sfDrGT/http-gun-warden-j4ie37sp/warden/build/dev/erlang/cowlib/src/cow_http_hd.erl:3721)
+      in call from cow_http_hd:parse_content_length/1 (/private/tmp/nix-shell.sfDrGT/http-gun-warden-j4ie37sp/warden/build/dev/erlang/cowlib/src/cow_http_hd.erl:1667)
+      in call from gun_http:response_io_from_headers/4 (/private/tmp/nix-shell.sfDrGT/http-gun-warden-j4ie37sp/warden/build/dev/erlang/gun/src/gun_http.erl:1020)
+      in call from gun_http:handle_response/8 (/private/tmp/nix-shell.sfDrGT/http-gun-warden-j4ie37sp/warden/build/dev/erlang/gun/src/gun_http.erl:474)
+      in call from gun:handle_common_connected_no_input/4 (/private/tmp/nix-shell.sfDrGT/http-gun-warden-j4ie37sp/warden/build/dev/erlang/gun/src/gun.erl:1641)
+      in call from gen_statem:loop_state_callback/11 (gen_statem.erl:3741)
+    ancestors: [gun_conns_sup,gun_sup,<0.117.0>]
+    message_queue_len: 0
+    messages: []
+    links: [<0.119.0>]
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 17731
+    stack_size: 29
+    reductions: 37256
+  neighbours:
+
+=SUPERVISOR REPORT==== 1-Oct-2026::14:26:09.581148 ===
+    supervisor: {local,gun_conns_sup}
+    errorContext: child_terminated
+    reason: {badarg,
+                [{erlang,binary_to_integer,
+                     [<<>>],
+                     [{error_info,#{module => erl_erts_errors}}]},
+                 {cow_http_hd,digits,3,
+                     [{file,
+                          "/private/tmp/nix-shell.sfDrGT/http-gun-warden-j4ie37sp/warden/build/dev/erlang/cowlib/src/cow_http_hd.erl"},
+                      {line,3721}]},
+                 {cow_http_hd,parse_content_length,1,
+                     [{file,
+                          "/private/tmp/nix-shell.sfDrGT/http-gun-warden-j4ie37sp/warden/build/dev/erlang/cowlib/src/cow_http_hd.erl"},
+                      {line,1667}]},
+                 {gun_http,response_io_from_headers,4,
+                     [{file,
+                          "/private/tmp/nix-shell.sfDrGT/http-gun-warden-j4ie37sp/warden/build/dev/erlang/gun/src/gun_http.erl"},
+                      {line,1020}]},
+                 {gun_http,handle_response,8,
+                     [{file,
+                          "/private/tmp/nix-shell.sfDrGT/http-gun-warden-j4ie37sp/warden/build/dev/erlang/gun/src/gun_http.erl"},
+                      {line,474}]},
+                 {gun,handle_common_connected_no_input,4,
+                     [{file,
+                          "/private/tmp/nix-shell.sfDrGT/http-gun-warden-j4ie37sp/warden/build/dev/erlang/gun/src/gun.erl"},
+                      {line,1641}]},
+                 {gen_statem,loop_state_callback,11,
+                     [{file,"gen_statem.erl"},{line,3741}]},
+                 {proc_lib,init_p_do_apply,3,
+                     [{file,"proc_lib.erl"},{line,333}]}]}
+    offender: [{pid,<0.411.0>},
+               {id,gun},
+               {mfargs,{gun,start_link,undefined}},
+               {restart_type,temporary},
+               {significant,false},
+               {shutdown,5000},
+               {child_type,worker}]
+
+PROBE SignedContentLength | adapter Failure(Sent, ReceiveFailed) | http_gun Failure(ConnectionFailed(UnknownTransport), MayHaveBeenSent)
+PROBE ControlInHeader | adapter Failure(Sent, MalformedResponse) | http_gun Failure(RequestFailed(ProtocolError), MayHaveBeenSent)
+PROBE SignedChunkSize | adapter Failure(Sent, ReceiveFailed) | http_gun Failure(RequestFailed(PeerClosed), MayHaveBeenSent)
+PROBE HeaderOvershoot | adapter Failure(Sent, HeadersTooLarge) | http_gun Failure(LimitExceeded(ResponseHeaderBytes, 16384, 25021), MayHaveBeenSent)
+[3.537 s] ok
+=======================================================
+  Test passed.

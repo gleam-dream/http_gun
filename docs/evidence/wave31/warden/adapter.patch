@@ -1,0 +1,98 @@
+--- reference/transport.gleam
++++ isolated/transport.gleam
+@@ -10,16 +10,11 @@
+ //// submission evidence, caller-mailbox hygiene.
+ ////
+ //// NOT FOR PRODUCTION: one HTTP Gun client per request (no pooling), and
+-//// in-memory trust anchors are written to a temporary PEM file because
+-//// HTTP Gun only accepts a CA file path (gap G2).
++//// trust anchors use the public config.Anchors variant directly.
+ 
+ import exception
+ import gleam/bit_array
+-import gleam/crypto
+-import gleam/dynamic.{type Dynamic}
+-import gleam/dynamic/decode
+ import gleam/erlang/atom.{type Atom}
+-import gleam/erlang/charlist
+ import gleam/http
+ import gleam/http/request as http_request
+ import gleam/int
+@@ -348,6 +343,7 @@
+         error.CertificateRejected | error.TlsFailed -> TlsRejected
+         error.TransportTimeout -> Timeout
+         error.ProtocolError | error.UnexpectedProtocol -> MalformedResponse
++        error.HeaderLimitReached -> HeadersTooLarge
+         error.ConnectionReset | error.PeerClosed | error.PeerDraining ->
+           case stage {
+             NotSent -> ConnectionFailed
+@@ -393,64 +389,15 @@
+ }
+ 
+ // ---------------------------------------------------------------------------
+-// Trust (EXPERIMENT: temporary PEM file; see gap G2)
+-
++// Trust: pass DER anchors directly, without a temporary file.
+ fn trust_of(trust: Trust) -> Result(config.Trust, Failure) {
+   case trust {
+     SystemTrust -> Ok(config.SystemTrust)
+     Anchors([]) -> not_sent(NoTrustAnchors)
+-    Anchors(ders) -> {
+-      let pem =
+-        pem_encode(
+-          list.map(ders, fn(der) {
+-            #(a("Certificate"), der, a("not_encrypted"))
+-          }),
+-        )
+-      let digest =
+-        crypto.hash(crypto.Sha256, pem)
+-        |> bit_array.base16_encode
+-        |> string.lowercase
+-      let path = temp_dir() <> "/warden-anchors-" <> digest <> ".pem"
+-      case write_file(path, pem) == a("ok") {
+-        True -> Ok(config.CustomCa(path))
+-        False -> not_sent(InvalidTlsConfiguration)
+-      }
+-    }
+-  }
+-}
+-
+-fn temp_dir() -> String {
+-  case getenv("TMPDIR") {
+-    Ok(dir) ->
+-      string.drop_end(dir, case string.ends_with(dir, "/") {
+-        True -> 1
+-        False -> 0
+-      })
+-    Error(Nil) -> "/tmp"
+-  }
+-}
+-
+-@external(erlang, "public_key", "pem_encode")
+-fn pem_encode(entries: List(#(Atom, BitArray, Atom))) -> BitArray
+-
+-@external(erlang, "file", "write_file")
+-fn write_file(path: String, data: BitArray) -> Atom
+-
+-fn getenv(name: String) -> Result(String, Nil) {
+-  os_getenv(charlist.from_string(name))
+-  |> decode.run(decode.list(decode.int))
+-  |> result.replace_error(Nil)
+-  |> result.map(fn(codes) {
+-    codes
+-    |> list.filter_map(string.utf_codepoint)
+-    |> string.from_utf_codepoints
+-  })
+-}
+-
+-@external(erlang, "os", "getenv")
+-fn os_getenv(name: charlist.Charlist) -> Dynamic
+-
+-// ---------------------------------------------------------------------------
++    Anchors(ders) -> Ok(config.Anchors(ders))
++  }
++}
++
+ // Destination classification (delegated to HTTP Gun)
+ 
+ pub fn classify(address: Address) -> AddressClass {

@@ -1,0 +1,13 @@
+  Compiling http_gun
+   Compiled in 0.62s
+    Running http_gun_destination_wire_test.main
+[31;1mruntime error[39m: panic[0m
+
+
+Error(Failure(RequestFailed(UnknownTransport), MayHaveBeenSent))
+should equal
+Error(Failure(RequestFailed(HeaderLimitReached), MayHaveBeenSent))
+
+stacktrace:
+  gleeunit/should.equal[90m src/gleeunit/should.gleam:10[0m
+
