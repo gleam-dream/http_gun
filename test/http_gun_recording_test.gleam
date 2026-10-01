@@ -10,6 +10,7 @@ import http_gun/body
 import http_gun/cancellation
 import http_gun/cassette
 import http_gun/config
+import http_gun/destination
 import http_gun/error
 import http_gun/recording
 import http_gun/request_options
@@ -36,14 +37,14 @@ pub fn real_record_finish_and_offline_replay_test() {
   let port = server()
   let destination = path()
   let assert Ok(recorded) =
-    cassette.record(config.default(), destination, recording.default())
+    cassette.record(local_config(), destination, recording.default())
   private_directory(destination) |> should.be_true
   let assert Ok(live) = http_gun.send(recorded.client, req(port))
   cassette.finish(recorded.recording) |> should.equal(Ok(destination))
   cassette.finish(recorded.recording) |> should.equal(Ok(destination))
   let _ = http_gun.stop(recorded.client)
   let assert Ok(value) = cassette.load(destination, 10_000)
-  let assert Ok(playback) = cassette.playback(value, config.default())
+  let assert Ok(playback) = cassette.playback(value, local_config())
   let assert Ok(replayed) = http_gun.send(playback, req(port))
   replayed.response |> should.equal(live.response)
   replayed.trailers |> should.equal(live.trailers)
@@ -67,7 +68,7 @@ pub fn early_cancel_records_without_draining_test() {
   let #(port, server) = controlled()
   let destination = path()
   let assert Ok(recorded) =
-    cassette.record(config.default(), destination, recording.default())
+    cassette.record(local_config(), destination, recording.default())
   let assert Ok(response) = http_gun.open(recorded.client, req(port))
   cassette.finish(recorded.recording) |> should.equal(Error(recording.Busy))
   emit(server, <<"3\r\nabc\r\n":utf8>>)
@@ -78,7 +79,7 @@ pub fn early_cancel_records_without_draining_test() {
   |> should.equal(Ok(destination))
   let _ = http_gun.stop(recorded.client)
   let assert Ok(cassette) = cassette.load(destination, 10_000)
-  let assert Ok(client) = cassette.playback(cassette, config.default())
+  let assert Ok(client) = cassette.playback(cassette, local_config())
   let assert Ok(response) = http_gun.open(client, req(port))
   body.next(response.body, 1000) |> should.equal(Ok(body.Chunk(<<"abc":utf8>>)))
   let assert Error(failure) = body.next(response.body, 1000)
@@ -93,7 +94,7 @@ pub fn capture_budget_failure_preserves_http_outcome_test() {
   let destination = path()
   let assert Ok(recorded) =
     cassette.record(
-      config.default(),
+      local_config(),
       destination,
       recording.Options(1, recording.RefuseExisting),
     )
@@ -110,7 +111,7 @@ pub fn existing_destination_refusal_is_deterministic_test() {
   let port = server()
   let destination = store("existing bytes")
   let assert Ok(recorded) =
-    cassette.record(config.default(), destination, recording.default())
+    cassette.record(local_config(), destination, recording.default())
   let assert Ok(_) = http_gun.send(recorded.client, req(port))
   cassette.finish(recorded.recording)
   |> should.equal(Error(recording.CaptureFailed(recording.DestinationExists)))
@@ -124,7 +125,7 @@ pub fn interrupted_capture_never_publishes_test() {
   let #(port, server) = controlled()
   let destination = path()
   let assert Ok(recorded) =
-    cassette.record(config.default(), destination, recording.default())
+    cassette.record(local_config(), destination, recording.default())
   let assert Ok(response) = http_gun.open(recorded.client, req(port))
   recording.abort(recorded.recording) |> should.equal(Ok(Nil))
   emit(server, <<"3\r\nabc\r\n0\r\n\r\n":utf8>>)
@@ -151,7 +152,7 @@ pub fn actual_write_failure_does_not_replace_http_result_test() {
   let #(port, server) = controlled()
   let destination = path()
   let assert Ok(recorded) =
-    cassette.record(config.default(), destination, recording.default())
+    cassette.record(local_config(), destination, recording.default())
   let assert Ok(response) = http_gun.open(recorded.client, req(port))
   emit(server, <<"1\r\na\r\n":utf8>>)
   body.next(response.body, 1000) |> should.equal(Ok(body.Chunk(<<"a":utf8>>)))
@@ -177,7 +178,7 @@ pub fn actual_write_failure_does_not_replace_http_result_test() {
 pub fn stalled_writer_keeps_control_and_completed_http_test() {
   let #(port, server) = controlled()
   let destination = path()
-  let c = config.default()
+  let c = local_config()
   let assert Ok(recorded) =
     cassette.record(
       config.Config(..c, deadline_ms: 300),
@@ -205,7 +206,7 @@ pub fn explicit_replacement_and_finalized_refusal_test() {
   let options = recording.default()
   let assert Ok(recorded) =
     cassette.record(
-      config.default(),
+      local_config(),
       destination,
       recording.Options(..options, replacement: recording.ReplaceExisting),
     )
@@ -228,7 +229,7 @@ pub fn cancelled_before_headers_records_without_inventing_response_test() {
   let #(port, server) = gated()
   let destination = path()
   let assert Ok(recorded) =
-    cassette.record(config.default(), destination, recording.default())
+    cassette.record(local_config(), destination, recording.default())
   let reply = process.new_subject()
   let _ =
     process.spawn_unlinked(fn() {
@@ -241,7 +242,7 @@ pub fn cancelled_before_headers_records_without_inventing_response_test() {
   recording.finish_wait(recorded.recording, 1000)
   |> should.equal(Ok(destination))
   let assert Ok(value) = cassette.load(destination, 10_000)
-  let assert Ok(client) = cassette.playback(value, config.default())
+  let assert Ok(client) = cassette.playback(value, local_config())
   let assert Error(replayed) = http_gun.open(client, req(port))
   replayed |> should.equal(live)
   let _ = http_gun.stop(client)
@@ -256,13 +257,13 @@ pub fn concurrent_recording_and_replay_test() {
   let destination = path()
   let requests = list.repeat(req(port), 30)
   let assert Ok(recorded) =
-    cassette.record(config.default(), destination, recording.default())
+    cassette.record(local_config(), destination, recording.default())
   let assert Ok(live) = http_gun.batch(recorded.client, requests, 10)
   list.all(live, result.is_ok) |> should.be_true
   cassette.finish(recorded.recording) |> should.equal(Ok(destination))
   let _ = http_gun.stop(recorded.client)
   let assert Ok(value) = cassette.load(destination, 100_000)
-  let assert Ok(client) = cassette.playback(value, config.default())
+  let assert Ok(client) = cassette.playback(value, local_config())
   let assert Ok(replayed) = http_gun.batch(client, requests, 10)
   list.all(replayed, result.is_ok) |> should.be_true
   let _ = http_gun.stop(client)
@@ -276,7 +277,7 @@ pub fn recorded_failure_retains_observed_prefix_test() {
   let #(port, server) = controlled()
   let destination = path()
   let assert Ok(recorded) =
-    cassette.record(config.default(), destination, recording.default())
+    cassette.record(local_config(), destination, recording.default())
   let assert Ok(reply) = http_gun.open(recorded.client, req(port))
   emit(server, <<"3\r\nabc\r\n":utf8>>)
   body.next(reply.body, 1000) |> should.equal(Ok(body.Chunk(<<"abc":utf8>>)))
@@ -288,7 +289,7 @@ pub fn recorded_failure_retains_observed_prefix_test() {
   |> should.equal(Ok(destination))
   let _ = http_gun.stop(recorded.client)
   let assert Ok(tape) = cassette.load(destination, 10_000)
-  let assert Ok(client) = cassette.playback(tape, config.default())
+  let assert Ok(client) = cassette.playback(tape, local_config())
   let assert Ok(replay) = http_gun.open(client, req(port))
   body.next(replay.body, 1000) |> should.equal(Ok(body.Chunk(<<"abc":utf8>>)))
   body.next(replay.body, 1000) |> should.equal(Error(failure))
@@ -302,7 +303,7 @@ pub fn finish_wait_timeout_then_cancel_and_publish_test() {
   let #(port, server) = controlled()
   let destination = path()
   let assert Ok(recorded) =
-    cassette.record(config.default(), destination, recording.default())
+    cassette.record(local_config(), destination, recording.default())
   let assert Ok(response) = http_gun.open(recorded.client, req(port))
   recording.finish_wait(recorded.recording, 0)
   |> should.equal(Error(recording.WaitTimeout))
@@ -317,7 +318,7 @@ pub fn finish_wait_timeout_then_cancel_and_publish_test() {
   recording.finish_wait(recorded.recording, 0) |> should.equal(Ok(destination))
   let _ = http_gun.stop(recorded.client)
   let assert Ok(tape) = cassette.load(destination, 10_000)
-  let assert Ok(client) = cassette.playback(tape, config.default())
+  let assert Ok(client) = cassette.playback(tape, local_config())
   let assert Ok(replay) = http_gun.open(client, req(port))
   body.next(replay.body, 1000) |> should.equal(Ok(body.Chunk(<<"abc":utf8>>)))
   let assert Error(failure) = body.next(replay.body, 1000)
@@ -331,7 +332,7 @@ pub fn finish_wait_contention_death_and_abort_test() {
   let #(port, server) = controlled()
   let destination = path()
   let assert Ok(recorded) =
-    cassette.record(config.default(), destination, recording.default())
+    cassette.record(local_config(), destination, recording.default())
   let assert Ok(response) = http_gun.open(recorded.client, req(port))
   let waiter =
     process.spawn_unlinked(fn() {
@@ -378,7 +379,7 @@ pub fn token_cancellation_preserves_typed_outcome_on_replay_test() {
   let #(port, server) = controlled()
   let destination = path()
   let assert Ok(recorded) =
-    cassette.record(config.default(), destination, recording.default())
+    cassette.record(local_config(), destination, recording.default())
   let assert Ok(failure) =
     cancellation.with_token(fn(token) {
       let options =
@@ -402,11 +403,23 @@ pub fn token_cancellation_preserves_typed_outcome_on_replay_test() {
   |> should.equal(Ok(destination))
   let _ = http_gun.stop(recorded.client)
   let assert Ok(tape) = cassette.load(destination, 100_000)
-  let assert Ok(client) = cassette.playback(tape, config.default())
+  let assert Ok(client) = cassette.playback(tape, local_config())
   let assert Ok(response) = http_gun.open(client, req(port))
   body.next(response.body, 1000) |> should.equal(Ok(body.Chunk(<<"abc":utf8>>)))
   body.next(response.body, 1000) |> should.equal(Error(failure))
   let _ = body.close(response.body)
   let _ = http_gun.stop(client)
   remove(destination)
+}
+
+// These exercises connect only to explicitly permitted local test servers.
+fn local_config() -> config.Config {
+  let defaults = config.default()
+  config.Config(
+    ..defaults,
+    destination: destination.Policy(
+      ..defaults.destination,
+      allow_loopback: True,
+    ),
+  )
 }

@@ -11,6 +11,7 @@ import http_gun/cancellation
 import http_gun/cassette
 import http_gun/config
 import http_gun/deadline
+import http_gun/destination
 import http_gun/error
 import http_gun/fixture
 import http_gun/recording
@@ -40,7 +41,7 @@ pub fn scripted_lifecycle_has_correlation_without_network_submission_test() {
         fixture.Complete([]),
       ),
     )
-  let settings = config.Config(..config.default(), observations: Some(fwd))
+  let settings = config.Config(..local_config(), observations: Some(fwd))
   let assert Ok(shared) = testing.start(settings, [exchange])
   let correlation = telemetry.new_id()
   let client = http_gun.with_correlation(shared, correlation)
@@ -123,7 +124,7 @@ pub fn blocked_observer_drops_without_stalling_bounded_batch_test() {
       fixture.Respond(response.Response(204, [], []), fixture.Complete([])),
     )
   let requests = list.repeat(req, 1000)
-  let settings = config.Config(..config.default(), observations: Some(fwd))
+  let settings = config.Config(..local_config(), observations: Some(fwd))
   let assert Ok(client) = testing.start(settings, list.repeat(exchange, 1000))
   let _ =
     process.spawn_unlinked(fn() {
@@ -204,7 +205,7 @@ fn local_request(port: Int) -> request.Request(BitArray) {
 pub fn gun_return_is_observed_before_headers_and_local_cancellation_test() {
   let observer = observer("http-gun-submission-observer")
   let settings =
-    config.Config(..config.default(), observations: Some(observer.target))
+    config.Config(..local_config(), observations: Some(observer.target))
   let assert Ok(client) = http_gun.start(settings)
   let #(port, server) = gated()
   let result = process.new_subject()
@@ -252,7 +253,7 @@ fn controlled() -> #(Int, process.Pid)
 
 pub fn queued_deadline_terminates_without_grant_or_gun_return_test() {
   let observer = observer("http-gun-queue-observer")
-  let defaults = config.default()
+  let defaults = local_config()
   let settings =
     config.Config(
       ..defaults,
@@ -310,7 +311,7 @@ fn remove_fixture(path: String) -> Nil
 pub fn recording_and_strict_playback_keep_telemetry_out_of_matching_test() {
   let observer = observer("http-gun-cassette-observer")
   let settings =
-    config.Config(..config.default(), observations: Some(observer.target))
+    config.Config(..local_config(), observations: Some(observer.target))
   let req = local_request(server())
   let path = temp_path()
   let assert Ok(recorded) = cassette.record(settings, path, recording.default())
@@ -369,7 +370,7 @@ pub fn recording_and_strict_playback_keep_telemetry_out_of_matching_test() {
 pub fn unavailable_dead_and_throwing_observers_preserve_http_test() {
   let assert Ok(target) =
     forwarder.new(process.new_name("http-gun-fault-observer"), 16)
-  let settings = config.Config(..config.default(), observations: Some(target))
+  let settings = config.Config(..local_config(), observations: Some(target))
   let req = request.new() |> request.set_body(<<>>)
   let exchange =
     fixture.Exchange(
@@ -406,7 +407,7 @@ fn h2_server() -> Int
 
 pub fn observed_h2_cancellation_preserves_sibling_and_one_connection_test() {
   let observer = observer("http-gun-h2-observer")
-  let defaults = config.default()
+  let defaults = local_config()
   let settings =
     config.Config(
       ..defaults,
@@ -478,4 +479,16 @@ fn terminations(
       }
     }
   }
+}
+
+// These exercises connect only to explicitly permitted local test servers.
+fn local_config() -> config.Config {
+  let defaults = config.default()
+  config.Config(
+    ..defaults,
+    destination: destination.Policy(
+      ..defaults.destination,
+      allow_loopback: True,
+    ),
+  )
 }

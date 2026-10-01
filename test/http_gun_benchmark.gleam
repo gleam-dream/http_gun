@@ -11,6 +11,7 @@ import gleam/result
 import http_gun
 import http_gun/body
 import http_gun/config
+import http_gun/destination
 
 @external(erlang, "http_gun_measure_ffi", "now")
 fn now() -> Int
@@ -46,7 +47,7 @@ fn req(port: Int, tls: Bool, path: String) -> request.Request(BitArray) {
 }
 
 fn settings(tls: Bool) -> config.Config {
-  let c = config.default()
+  let c = local_config()
   config.Config(
     ..c,
     deadline_ms: 60_000,
@@ -244,4 +245,16 @@ pub fn main() {
   large_stream(False)
   large_stream(True)
   mixed()
+}
+
+// These exercises connect only to explicitly permitted local test servers.
+fn local_config() -> config.Config {
+  let defaults = config.default()
+  config.Config(
+    ..defaults,
+    destination: destination.Policy(
+      ..defaults.destination,
+      allow_loopback: True,
+    ),
+  )
 }

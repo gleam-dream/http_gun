@@ -1,0 +1,1375 @@
+  Resolving versions
+   Compiled in 0.20s
+    Running llm_wire_test.main
+[32m.[39m[32m.[39m
+[1m[31mlet assert[39m[22m [90mtest/external_provider_test.gleam:94[39m
+[36m test[39m: external_provider_test.external_provider_text_over_real_http_test
+[36m code[39m: let assert Ok(session.RunText("Hello fourth!", None)) =
+    session.run(owned_http, prepared)
+[36mvalue[39m: Error(RunFailure(HttpFailure(DestinationRejected), RetryEvidence(NoRequestSent, False, False)))
+[36m info[39m: Pattern match failed, no pattern matched the value.
+
+[1m[31mlet assert[39m[22m [90mtest/external_provider_test.gleam:137[39m
+[36m test[39m: external_provider_test.external_provider_data_preserves_text_and_exact_tool_results_test
+[36m code[39m: let assert Ok(session.RunToolCalls(turn, None)) =
+    session.run(owned_http, prepared)
+[36mvalue[39m: Error(RunFailure(HttpFailure(DestinationRejected), RetryEvidence(NoRequestSent, False, False)))
+[36m info[39m: Pattern match failed, no pattern matched the value.
+=CRASH REPORT==== 1-Oct-2026::07:45:54.987682 ===
+  crasher:
+    initial call: external_provider_test:'-run_bounded_event/3-anonymous-0-'/0
+    pid: <0.153.0>
+    registered_name: []
+    exception error: #{function => <<"run_bounded_event">>,line => 171,
+                       message =>
+                           <<"Pattern match failed, no pattern matched the value.">>,
+                       module => <<"external_provider_test">>,start => 5389,
+                       value => {error,<<"closed">>},
+                       file => <<"test/external_provider_test.gleam">>,
+                       'end' => 5456,gleam_error => let_assert,
+                       pattern_end => 5410,pattern_start => 5400}
+      in function  external_provider_test:'-run_bounded_event/3-anonymous-0-'/2 (test/external_provider_test.gleam:194)
+    ancestors: [<0.131.0>]
+    message_queue_len: 0
+    messages: []
+    links: []
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 233
+    stack_size: 29
+    reductions: 94
+  neighbours:
+
+
+[1m[31mpanic[39m[22m [90msrc/gleeunit/should.gleam:10[39m
+[36m test[39m: external_provider_test.external_provider_cannot_bypass_progress_or_terminal_limits_test
+[36m info[39m: 
+False
+should equal
+True
+[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m
+[1m[31mlet assert[39m[22m [90mtest/llm_wire_google_test.gleam:457[39m
+[36m test[39m: llm_wire_google_test.google_loopback_integration_text_stream_test
+[36m code[39m: let assert Ok(api.RunText(text, usage)) =
+    runtime.run(
+      owned_http,
+      prepared,
+      types.default_limits(),
+      types.default_deadlines(),
+    )
+[36mvalue[39m: Error(HttpFailure(DestinationRejected))
+[36m info[39m: Pattern match failed, no pattern matched the value.
+
+[1m[31mlet assert[39m[22m [90mtest/llm_wire_google_test.gleam:530[39m
+[36m test[39m: llm_wire_google_test.google_loopback_integration_caller_owned_tool_round_test
+[36m code[39m: let assert Ok(api.RunToolCalls(turn, _)) =
+    runtime.run(
+      owned_http,
+      prepared,
+      types.default_limits(),
+      types.default_deadlines(),
+    )
+[36mvalue[39m: Error(HttpFailure(DestinationRejected))
+[36m info[39m: Pattern match failed, no pattern matched the value.
+
+[1m[31mlet assert[39m[22m [90mtest/llm_wire_google_test.gleam:603[39m
+[36m test[39m: llm_wire_google_test.google_loopback_integration_refusal_test
+[36m code[39m: let assert Ok(api.RunRefusal(reason, _)) =
+    runtime.run(
+      owned_http,
+      prepared,
+      types.default_limits(),
+      types.default_deadlines(),
+    )
+[36mvalue[39m: Error(HttpFailure(DestinationRejected))
+[36m info[39m: Pattern match failed, no pattern matched the value.
+
+[1m[31mlet assert[39m[22m [90mtest/llm_wire_google_test.gleam:676[39m
+[36m test[39m: llm_wire_google_test.google_missing_provider_id_is_omitted_from_next_request_test
+[36m code[39m: let assert Ok(api.RunToolCalls(turn, _)) =
+    runtime.run(
+      owned_http,
+      prepared,
+      types.default_limits(),
+      types.default_deadlines(),
+    )
+[36mvalue[39m: Error(HttpFailure(DestinationRejected))
+[36m info[39m: Pattern match failed, no pattern matched the value.
+[32m.[39m[32m.[39m[32m.[39m[32m.[39m=CRASH REPORT==== 1-Oct-2026::07:45:56.972928 ===
+  crasher:
+    initial call: external_provider_test:'-external_provider_text_over_real_http_test/0-anonymous-0-'/0
+    pid: <0.137.0>
+    registered_name: []
+    exception error: #{function =>
+                           <<"external_provider_text_over_real_http_test">>,
+                       line => 75,
+                       message =>
+                           <<"Pattern match failed, no pattern matched the value.">>,
+                       module => <<"external_provider_test">>,start => 2363,
+                       value => {error,<<"timeout">>},
+                       file => <<"test/external_provider_test.gleam">>,
+                       'end' => 2430,gleam_error => let_assert,
+                       pattern_end => 2384,pattern_start => 2374}
+      in function  external_provider_test:'-external_provider_text_over_real_http_test/0-anonymous-0-'/1 (test/external_provider_test.gleam:102)
+    ancestors: [<0.131.0>]
+    message_queue_len: 0
+    messages: []
+    links: []
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 233
+    stack_size: 29
+    reductions: 88
+  neighbours:
+
+=CRASH REPORT==== 1-Oct-2026::07:45:56.981917 ===
+  crasher:
+    initial call: external_provider_test:'-external_provider_data_preserves_text_and_exact_tool_results_test/0-anonymous-0-'/0
+    pid: <0.145.0>
+    registered_name: []
+    exception error: #{function =>
+                           <<"external_provider_data_preserves_text_and_exact_tool_results_test">>,
+                       line => 103,
+                       message =>
+                           <<"Pattern match failed, no pattern matched the value.">>,
+                       module => <<"external_provider_test">>,start => 3235,
+                       value => {error,<<"timeout">>},
+                       file => <<"test/external_provider_test.gleam">>,
+                       'end' => 3301,gleam_error => let_assert,
+                       pattern_end => 3255,pattern_start => 3246}
+      in function  external_provider_test:'-external_provider_data_preserves_text_and_exact_tool_results_test/0-anonymous-0-'/1 (test/external_provider_test.gleam:167)
+    ancestors: [<0.131.0>]
+    message_queue_len: 0
+    messages: []
+    links: []
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 233
+    stack_size: 29
+    reductions: 88
+  neighbours:
+
+=CRASH REPORT==== 1-Oct-2026::07:45:57.175592 ===
+  crasher:
+    initial call: llm_wire_google_test:'-google_loopback_integration_text_stream_test/0-anonymous-0-'/0
+    pid: <0.270.0>
+    registered_name: []
+    exception error: #{function =>
+                           <<"google_loopback_integration_text_stream_test">>,
+                       line => 422,
+                       message =>
+                           <<"Pattern match failed, no pattern matched the value.">>,
+                       module => <<"llm_wire_google_test">>,start => 14443,
+                       value => {error,<<"timeout">>},
+                       file => <<"test/llm_wire_google_test.gleam">>,
+                       'end' => 14510,gleam_error => let_assert,
+                       pattern_end => 14464,pattern_start => 14454}
+      in function  llm_wire_google_test:'-google_loopback_integration_text_stream_test/0-anonymous-0-'/1 (test/llm_wire_google_test.gleam:450)
+    ancestors: [<0.131.0>]
+    message_queue_len: 0
+    messages: []
+    links: []
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 233
+    stack_size: 29
+    reductions: 88
+  neighbours:
+
+=CRASH REPORT==== 1-Oct-2026::07:45:57.177863 ===
+  crasher:
+    initial call: llm_wire_google_test:'-google_loopback_integration_caller_owned_tool_round_test/0-anonymous-0-'/0
+    pid: <0.278.0>
+    registered_name: []
+    exception error: #{function =>
+                           <<"google_loopback_integration_caller_owned_tool_round_test">>,
+                       line => 476,
+                       message =>
+                           <<"Pattern match failed, no pattern matched the value.">>,
+                       module => <<"llm_wire_google_test">>,start => 16314,
+                       value => {error,<<"timeout">>},
+                       file => <<"test/llm_wire_google_test.gleam">>,
+                       'end' => 16382,gleam_error => let_assert,
+                       pattern_end => 16336,pattern_start => 16325}
+      in function  llm_wire_google_test:'-google_loopback_integration_caller_owned_tool_round_test/0-anonymous-0-'/1 (test/llm_wire_google_test.gleam:541)
+    ancestors: [<0.131.0>]
+    message_queue_len: 0
+    messages: []
+    links: []
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 233
+    stack_size: 29
+    reductions: 88
+  neighbours:
+
+=CRASH REPORT==== 1-Oct-2026::07:45:57.180884 ===
+  crasher:
+    initial call: llm_wire_google_test:'-google_loopback_integration_refusal_test/0-anonymous-0-'/0
+    pid: <0.286.0>
+    registered_name: []
+    exception error: #{function =>
+                           <<"google_loopback_integration_refusal_test">>,
+                       line => 580,
+                       message =>
+                           <<"Pattern match failed, no pattern matched the value.">>,
+                       module => <<"llm_wire_google_test">>,start => 19905,
+                       value => {error,<<"timeout">>},
+                       file => <<"test/llm_wire_google_test.gleam">>,
+                       'end' => 19972,gleam_error => let_assert,
+                       pattern_end => 19926,pattern_start => 19916}
+      in function  llm_wire_google_test:'-google_loopback_integration_refusal_test/0-anonymous-0-'/1 (test/llm_wire_google_test.gleam:608)
+    ancestors: [<0.131.0>]
+    message_queue_len: 0
+    messages: []
+    links: []
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 233
+    stack_size: 29
+    reductions: 88
+  neighbours:
+
+=CRASH REPORT==== 1-Oct-2026::07:45:57.184203 ===
+  crasher:
+    initial call: llm_wire_google_test:'-google_missing_provider_id_is_omitted_from_next_request_test/0-anonymous-0-'/0
+    pid: <0.294.0>
+    registered_name: []
+    exception error: #{function =>
+                           <<"google_missing_provider_id_is_omitted_from_next_request_test">>,
+                       line => 619,
+                       message =>
+                           <<"Pattern match failed, no pattern matched the value.">>,
+                       module => <<"llm_wire_google_test">>,start => 21194,
+                       value => {error,<<"timeout">>},
+                       file => <<"test/llm_wire_google_test.gleam">>,
+                       'end' => 21262,gleam_error => let_assert,
+                       pattern_end => 21216,pattern_start => 21205}
+      in function  llm_wire_google_test:'-google_missing_provider_id_is_omitted_from_next_request_test/0-anonymous-0-'/1 (test/llm_wire_google_test.gleam:692)
+    ancestors: [<0.131.0>]
+    message_queue_len: 0
+    messages: []
+    links: []
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 233
+    stack_size: 29
+    reductions: 88
+  neighbours:
+
+
+[1m[31mlet assert[39m[22m [90mtest/llm_wire_http_gun_test.gleam:85[39m
+[36m test[39m: llm_wire_http_gun_test.reducer_exception_releases_http_and_preserves_shared_client_test
+[36m code[39m: let assert Ok(Error(_)) = process.receive(closed, 3000)
+[36mvalue[39m: Error(Nil)
+[36m info[39m: Pattern match failed, no pattern matched the value.
+
+[1m[31mpanic[39m[22m [90msrc/gleeunit/should.gleam:10[39m
+[36m test[39m: llm_wire_http_gun_test.prepared_buffered_http_gun_test
+[36m info[39m: 
+Error(RunFailure(HttpFailure(DestinationRejected), RetryEvidence(NoRequestSent, False, False)))
+should equal
+Ok(RunText("hello", None))
+[32m.[39m[32m.[39m=CRASH REPORT==== 1-Oct-2026::07:46:00.201588 ===
+  crasher:
+    initial call: llm_wire_http_gun_test:'-reducer_exception_releases_http_and_preserves_shared_client_test/0-anonymous-0-'/0
+    pid: <0.305.0>
+    registered_name: []
+    exception error: #{function =>
+                           <<"reducer_exception_releases_http_and_preserves_shared_client_test">>,
+                       line => 25,
+                       message =>
+                           <<"Pattern match failed, no pattern matched the value.">>,
+                       module => <<"llm_wire_http_gun_test">>,start => 658,
+                       value => {error,<<"timeout">>},
+                       file => <<"test/llm_wire_http_gun_test.gleam">>,
+                       'end' => 725,gleam_error => let_assert,
+                       pattern_end => 679,pattern_start => 669}
+      in function  llm_wire_http_gun_test:'-reducer_exception_releases_http_and_preserves_shared_client_test/0-anonymous-0-'/2 (test/llm_wire_http_gun_test.gleam:70)
+    ancestors: [<0.131.0>]
+    message_queue_len: 0
+    messages: []
+    links: []
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 233
+    stack_size: 29
+    reductions: 88
+  neighbours:
+
+
+[1m[31mlet assert[39m[22m [90mtest/llm_wire_http_gun_test.gleam:201[39m
+[36m test[39m: llm_wire_http_gun_test.pre_header_close_releases_shared_admission_test
+[36m code[39m: let assert Ok(Nil) = process.receive(accepted, 2000)
+[36mvalue[39m: Error(Nil)
+[36m info[39m: Pattern match failed, no pattern matched the value.
+
+[1m[31mlet assert[39m[22m [90mtest/llm_wire_http_gun_test.gleam:235[39m
+[36m test[39m: llm_wire_http_gun_test.close_during_tls_connection_setup_releases_request_test
+[36m code[39m: let assert Ok(Nil) = process.receive(connecting, 2000)
+[36mvalue[39m: Error(Nil)
+[36m info[39m: Pattern match failed, no pattern matched the value.
+
+[1m[31mpanic[39m[22m [90msrc/gleeunit/should.gleam:10[39m
+[36m test[39m: llm_wire_http_gun_test.consumer_read_timeout_preserves_http_and_terminal_precedes_eof_test
+[36m info[39m: 
+Ok(StreamTerminal(Failed(HttpFailure(DestinationRejected), RetryEvidence(NoRequestSent, False, False))))
+should equal
+Error(StreamReadError(ReadTimeout))
+
+[1m[31mlet assert[39m[22m [90mtest/llm_wire_http_gun_test.gleam:325[39m
+[36m test[39m: llm_wire_http_gun_test.keepalive_bytes_do_not_extend_semantic_idle_test
+[36m code[39m: let assert Error(session.RunFailure(
+    types.DeadlineExceeded(types.IdleDeadline),
+    evidence,
+  )) = session.run(client, prepared(server.port, types.Deadlines(2000, 80, 10)))
+[36mvalue[39m: Error(RunFailure(HttpFailure(DestinationRejected), RetryEvidence(NoRequestSent, False, False)))
+[36m info[39m: Pattern match failed, no pattern matched the value.
+
+[1m[31mlet assert[39m[22m [90mtest/llm_wire_http_gun_test.gleam:350[39m
+[36m test[39m: llm_wire_http_gun_test.partial_status_body_keeps_bytes_when_semantic_idle_wins_test
+[36m code[39m: let assert Error(session.RunFailure(
+    types.DeadlineExceeded(types.IdleDeadline),
+    evidence,
+  )) =
+    session.run(client, prepared(server.port, types.Deadlines(3000, 100, 10)))
+[36mvalue[39m: Error(RunFailure(HttpFailure(DestinationRejected), RetryEvidence(NoRequestSent, False, False)))
+[36m info[39m: Pattern match failed, no pattern matched the value.
+
+[1m[31mlet assert[39m[22m [90mtest/llm_wire_http_gun_test.gleam:375[39m
+[36m test[39m: llm_wire_http_gun_test.execution_starts_budget_and_delayed_headers_spend_it_test
+[36m code[39m: let assert Error(session.RunFailure(
+    types.DeadlineExceeded(types.OverallDeadline),
+    _,
+  )) = session.run(client, call)
+[36mvalue[39m: Error(RunFailure(HttpFailure(DestinationRejected), RetryEvidence(NoRequestSent, False, False)))
+[36m info[39m: Pattern match failed, no pattern matched the value.
+
+[1m[31mpanic[39m[22m [90msrc/gleeunit/should.gleam:10[39m
+[36m test[39m: llm_wire_http_gun_test.disconnect_preserves_raw_and_semantic_evidence_test
+[36m info[39m: 
+False
+should equal
+True
+=CRASH REPORT==== 1-Oct-2026::07:46:03.207793 ===
+  crasher:
+    initial call: llm_wire_http_gun_test:'-prepared_buffered_http_gun_test/0-anonymous-0-'/0
+    pid: <0.314.0>
+    registered_name: []
+    exception error: #{function => <<"prepared_buffered_http_gun_test">>,
+                       line => 95,
+                       message =>
+                           <<"Pattern match failed, no pattern matched the value.">>,
+                       module => <<"llm_wire_http_gun_test">>,start => 3015,
+                       value => {error,<<"timeout">>},
+                       file => <<"test/llm_wire_http_gun_test.gleam">>,
+                       'end' => 3082,gleam_error => let_assert,
+                       pattern_end => 3036,pattern_start => 3026}
+      in function  llm_wire_http_gun_test:'-prepared_buffered_http_gun_test/0-anonymous-0-'/1 (test/llm_wire_http_gun_test.gleam:120)
+    ancestors: [<0.131.0>]
+    message_queue_len: 0
+    messages: []
+    links: []
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 233
+    stack_size: 29
+    reductions: 88
+  neighbours:
+
+=CRASH REPORT==== 1-Oct-2026::07:46:03.214879 ===
+  crasher:
+    initial call: llm_wire_http_gun_test:'-pre_header_close_releases_shared_admission_test/0-anonymous-0-'/0
+    pid: <0.332.0>
+    registered_name: []
+    exception error: #{function =>
+                           <<"pre_header_close_releases_shared_admission_test">>,
+                       line => 191,
+                       message =>
+                           <<"Pattern match failed, no pattern matched the value.">>,
+                       module => <<"llm_wire_http_gun_test">>,start => 6350,
+                       value => {error,<<"timeout">>},
+                       file => <<"test/llm_wire_http_gun_test.gleam">>,
+                       'end' => 6417,gleam_error => let_assert,
+                       pattern_end => 6371,pattern_start => 6361}
+      in function  llm_wire_http_gun_test:'-pre_header_close_releases_shared_admission_test/0-anonymous-0-'/3 (test/llm_wire_http_gun_test.gleam:219)
+    ancestors: [<0.131.0>]
+    message_queue_len: 0
+    messages: []
+    links: []
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 233
+    stack_size: 29
+    reductions: 88
+  neighbours:
+
+
+[1m[31mlet assert[39m[22m [90mtest/llm_wire_http_gun_test.gleam:437[39m
+[36m test[39m: llm_wire_http_gun_test.consumer_death_cancels_worker_before_headers_test
+[36m code[39m: let assert Ok(Nil) = process.receive(accepted, 1000)
+[36mvalue[39m: Error(Nil)
+[36m info[39m: Pattern match failed, no pattern matched the value.
+[32m.[39m
+[1m[31mlet assert[39m[22m [90mtest/llm_wire_integration_test.gleam:92[39m
+[36m test[39m: llm_wire_integration_test.caller_owned_assistant_turn_requires_exact_local_result_coverage_test
+[36m code[39m: let assert Ok(api.RunToolCalls(turn, _usage)) =
+    runtime.run(
+      owned_http,
+      first_prepared,
+      types.default_limits(),
+      types.default_deadlines(),
+    )
+[36mvalue[39m: Error(HttpFailure(DestinationRejected))
+[36m info[39m: Pattern match failed, no pattern matched the value.
+
+[1m[31mlet assert[39m[22m [90mtest/llm_wire_integration_test.gleam:168[39m
+[36m test[39m: llm_wire_integration_test.anthropic_assistant_turn_preserves_typed_tool_use_input_test
+[36m code[39m: let assert Ok(api.RunToolCalls(turn, _)) =
+    runtime.run(
+      owned_http,
+      prepared,
+      types.default_limits(),
+      types.default_deadlines(),
+    )
+[36mvalue[39m: Error(HttpFailure(DestinationRejected))
+[36m info[39m: Pattern match failed, no pattern matched the value.
+
+[1m[31mpanic[39m[22m [90msrc/gleeunit/should.gleam:10[39m
+[36m test[39m: llm_wire_integration_test.buffered_api_preserves_openai_refusal_outcome_test
+[36m info[39m: 
+Error(HttpFailure(DestinationRejected))
+should equal
+Ok(RunRefusal("I cannot help with that.", None))
+
+[1m[31mlet assert[39m[22m [90mtest/llm_wire_integration_test.gleam:312[39m
+[36m test[39m: llm_wire_integration_test.real_http_openai_streaming_test
+[36m code[39m: let assert Ok(stream_types.NextProgress(types.TextDelta(b1, t1))) =
+    owner.next(stream, 2000)
+[36mvalue[39m: Ok(StreamTerminal(StreamFailed(HttpFailure(DestinationRejected), RetryEvidence(NoRequestSent, False, False))))
+[36m info[39m: Pattern match failed, no pattern matched the value.
+
+[1m[31mlet assert[39m[22m [90mtest/llm_wire_integration_test.gleam:405[39m
+[36m test[39m: llm_wire_integration_test.real_http_anthropic_streaming_test
+[36m code[39m: let assert Ok(stream_types.NextProgress(types.UsageUpdate(usage))) =
+    owner.next(stream, 2000)
+[36mvalue[39m: Ok(StreamTerminal(StreamFailed(HttpFailure(DestinationRejected), RetryEvidence(NoRequestSent, False, False))))
+[36m info[39m: Pattern match failed, no pattern matched the value.
+
+[1m[31mpanic[39m[22m [90mtest/llm_wire_integration_test.gleam:467[39m
+[36m test[39m: llm_wire_integration_test.real_http_error_response_test
+[36m info[39m: expected HttpStatusError(429)
+
+[1m[31mpanic[39m[22m [90msrc/gleeunit/should.gleam:10[39m
+[36m test[39m: llm_wire_integration_test.buffered_http_status_failure_records_response_bytes_test
+[36m info[39m: 
+False
+should equal
+True
+
+[1m[31mpanic[39m[22m [90msrc/gleeunit/should.gleam:10[39m
+[36m test[39m: llm_wire_integration_test.gun_refuses_redirects_instead_of_following_them_test
+[36m info[39m: 
+False
+should equal
+True
+
+[1m[31mpanic[39m[22m [90msrc/gleeunit/should.gleam:10[39m
+[36m test[39m: llm_wire_integration_test.gun_rejects_oversized_response_header_block_test
+[36m info[39m: 
+False
+should equal
+True
+
+[1m[31mpanic[39m[22m [90msrc/gleeunit/should.gleam:10[39m
+[36m test[39m: llm_wire_integration_test.gun_enforces_total_response_body_limit_test
+[36m info[39m: 
+False
+should equal
+True
+
+[1m[31mlet assert[39m[22m [90mtest/llm_wire_integration_test.gleam:644[39m
+[36m test[39m: llm_wire_integration_test.gun_decodes_chunked_transfer_before_sse_framing_test
+[36m code[39m: let assert Ok(stream_types.NextProgress(types.TextDelta(
+    "chunked-item",
+    "chunked",
+  ))) = owner.next(stream, 2000)
+[36mvalue[39m: Ok(StreamTerminal(StreamFailed(HttpFailure(DestinationRejected), RetryEvidence(NoRequestSent, False, False))))
+[36m info[39m: Pattern match failed, no pattern matched the value.
+
+[1m[31mpanic[39m[22m [90msrc/gleeunit/should.gleam:10[39m
+[36m test[39m: llm_wire_integration_test.gun_rejects_compressed_event_streams_test
+[36m info[39m: 
+False
+should equal
+True
+
+[1m[31mpanic[39m[22m [90msrc/gleeunit/should.gleam:10[39m
+[36m test[39m: llm_wire_integration_test.gun_setup_uses_remaining_overall_deadline_test
+[36m info[39m: 
+False
+should equal
+True
+
+[1m[31mlet assert[39m[22m [90mtest/llm_wire_integration_test.gleam:770[39m
+[36m test[39m: llm_wire_integration_test.real_http_disconnect_mid_stream_test
+[36m code[39m: let assert Ok(stream_types.NextProgress(types.TextDelta(..))) =
+    owner.next(stream, 2000)
+[36mvalue[39m: Ok(StreamTerminal(StreamFailed(HttpFailure(DestinationRejected), RetryEvidence(NoRequestSent, False, False))))
+[36m info[39m: Pattern match failed, no pattern matched the value.
+
+[1m[31mlet assert[39m[22m [90mtest/llm_wire_integration_test.gleam:832[39m
+[36m test[39m: llm_wire_integration_test.gun_tls_stream_with_pinned_ca_test
+[36m code[39m: let assert Ok(session.NextProgress(types.TextDelta("tls-item", text))) =
+    session.next(stream)
+[36mvalue[39m: Ok(StreamTerminal(Failed(HttpFailure(DestinationRejected), RetryEvidence(NoRequestSent, False, False))))
+[36m info[39m: Pattern match failed, no pattern matched the value.
+[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m
+[1m[31mpanic[39m[22m [90msrc/gleeunit/should.gleam:10[39m
+[36m test[39m: llm_wire_pool_test.sequential_llm_requests_reuse_one_connection_test
+[36m info[39m: 
+Error(RunFailure(HttpFailure(DestinationRejected), RetryEvidence(NoRequestSent, False, False)))
+should equal
+Ok(RunText("hello", None))
+
+[1m[31mlet assert[39m[22m [90mtest/llm_wire_pool_test.gleam:145[39m
+[36m test[39m: llm_wire_pool_test.peer_close_reclaims_connection_for_fresh_call_test
+[36m code[39m: let assert Ok(release) = process.receive(accepted, 1000)
+[36mvalue[39m: Error(Nil)
+[36m info[39m: Pattern match failed, no pattern matched the value.
+=CRASH REPORT==== 1-Oct-2026::07:46:05.220870 ===
+  crasher:
+    initial call: llm_wire_http_gun_test:'-close_during_tls_connection_setup_releases_request_test/0-anonymous-0-'/0
+    pid: <0.340.0>
+    registered_name: []
+    exception error: #{function =>
+                           <<"close_during_tls_connection_setup_releases_request_test">>,
+                       line => 218,
+                       message =>
+                           <<"Pattern match failed, no pattern matched the value.">>,
+                       module => <<"llm_wire_http_gun_test">>,start => 7570,
+                       value => {error,<<"timeout">>},
+                       file => <<"test/llm_wire_http_gun_test.gleam">>,
+                       'end' => 7637,gleam_error => let_assert,
+                       pattern_end => 7591,pattern_start => 7581}
+      in function  llm_wire_http_gun_test:'-close_during_tls_connection_setup_releases_request_test/0-anonymous-0-'/3 (test/llm_wire_http_gun_test.gleam:243)
+    ancestors: [<0.131.0>]
+    message_queue_len: 0
+    messages: []
+    links: []
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 233
+    stack_size: 29
+    reductions: 88
+  neighbours:
+
+=CRASH REPORT==== 1-Oct-2026::07:46:05.355269 ===
+  crasher:
+    initial call: llm_wire_integration_test:'-caller_owned_assistant_turn_requires_exact_local_result_coverage_test/0-anonymous-0-'/0
+    pid: <0.399.0>
+    registered_name: []
+    exception error: #{function =>
+                           <<"caller_owned_assistant_turn_requires_exact_local_result_coverage_test">>,
+                       line => 48,
+                       message =>
+                           <<"Pattern match failed, no pattern matched the value.">>,
+                       module => <<"llm_wire_integration_test">>,
+                       start => 1601,
+                       value => {error,<<"timeout">>},
+                       file => <<"test/llm_wire_integration_test.gleam">>,
+                       'end' => 1668,gleam_error => let_assert,
+                       pattern_end => 1622,pattern_start => 1612}
+      in function  llm_wire_integration_test:'-caller_owned_assistant_turn_requires_exact_local_result_coverage_test/0-anonymous-0-'/1 (test/llm_wire_integration_test.gleam:76)
+    ancestors: [<0.131.0>]
+    message_queue_len: 0
+    messages: []
+    links: []
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 233
+    stack_size: 29
+    reductions: 88
+  neighbours:
+
+=CRASH REPORT==== 1-Oct-2026::07:46:05.358098 ===
+  crasher:
+    initial call: llm_wire_integration_test:'-anthropic_assistant_turn_preserves_typed_tool_use_input_test/0-anonymous-0-'/0
+    pid: <0.407.0>
+    registered_name: []
+    exception error: #{function =>
+                           <<"anthropic_assistant_turn_preserves_typed_tool_use_input_test">>,
+                       line => 147,
+                       message =>
+                           <<"Pattern match failed, no pattern matched the value.">>,
+                       module => <<"llm_wire_integration_test">>,
+                       start => 5537,
+                       value => {error,<<"timeout">>},
+                       file => <<"test/llm_wire_integration_test.gleam">>,
+                       'end' => 5604,gleam_error => let_assert,
+                       pattern_end => 5558,pattern_start => 5548}
+      in function  llm_wire_integration_test:'-anthropic_assistant_turn_preserves_typed_tool_use_input_test/0-anonymous-0-'/1 (test/llm_wire_integration_test.gleam:168)
+    ancestors: [<0.131.0>]
+    message_queue_len: 0
+    messages: []
+    links: []
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 233
+    stack_size: 29
+    reductions: 88
+  neighbours:
+
+=CRASH REPORT==== 1-Oct-2026::07:46:05.361065 ===
+  crasher:
+    initial call: llm_wire_integration_test:'-buffered_api_preserves_openai_refusal_outcome_test/0-anonymous-0-'/0
+    pid: <0.415.0>
+    registered_name: []
+    exception error: #{function =>
+                           <<"buffered_api_preserves_openai_refusal_outcome_test">>,
+                       line => 204,
+                       message =>
+                           <<"Pattern match failed, no pattern matched the value.">>,
+                       module => <<"llm_wire_integration_test">>,
+                       start => 7404,
+                       value => {error,<<"timeout">>},
+                       file => <<"test/llm_wire_integration_test.gleam">>,
+                       'end' => 7471,gleam_error => let_assert,
+                       pattern_end => 7425,pattern_start => 7415}
+      in function  llm_wire_integration_test:'-buffered_api_preserves_openai_refusal_outcome_test/0-anonymous-0-'/1 (test/llm_wire_integration_test.gleam:232)
+    ancestors: [<0.131.0>]
+    message_queue_len: 0
+    messages: []
+    links: []
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 233
+    stack_size: 29
+    reductions: 88
+  neighbours:
+
+=CRASH REPORT==== 1-Oct-2026::07:46:05.363901 ===
+  crasher:
+    initial call: llm_wire_integration_test:'-real_http_openai_streaming_test/0-anonymous-0-'/0
+    pid: <0.423.0>
+    registered_name: []
+    exception error: #{function => <<"real_http_openai_streaming_test">>,
+                       line => 261,
+                       message =>
+                           <<"Pattern match failed, no pattern matched the value.">>,
+                       module => <<"llm_wire_integration_test">>,
+                       start => 9337,
+                       value => {error,<<"timeout">>},
+                       file => <<"test/llm_wire_integration_test.gleam">>,
+                       'end' => 9404,gleam_error => let_assert,
+                       pattern_end => 9358,pattern_start => 9348}
+      in function  llm_wire_integration_test:'-real_http_openai_streaming_test/0-anonymous-0-'/1 (test/llm_wire_integration_test.gleam:287)
+    ancestors: [<0.131.0>]
+    message_queue_len: 0
+    messages: []
+    links: []
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 233
+    stack_size: 29
+    reductions: 88
+  neighbours:
+
+=CRASH REPORT==== 1-Oct-2026::07:46:05.367907 ===
+  crasher:
+    initial call: llm_wire_integration_test:'-real_http_anthropic_streaming_test/0-anonymous-0-'/0
+    pid: <0.431.0>
+    registered_name: []
+    exception error: #{function => <<"real_http_anthropic_streaming_test">>,
+                       line => 342,
+                       message =>
+                           <<"Pattern match failed, no pattern matched the value.">>,
+                       module => <<"llm_wire_integration_test">>,
+                       start => 11897,
+                       value => {error,<<"timeout">>},
+                       file => <<"test/llm_wire_integration_test.gleam">>,
+                       'end' => 11964,gleam_error => let_assert,
+                       pattern_end => 11918,pattern_start => 11908}
+      in function  llm_wire_integration_test:'-real_http_anthropic_streaming_test/0-anonymous-0-'/1 (test/llm_wire_integration_test.gleam:368)
+    ancestors: [<0.131.0>]
+    message_queue_len: 0
+    messages: []
+    links: []
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 233
+    stack_size: 29
+    reductions: 88
+  neighbours:
+
+=CRASH REPORT==== 1-Oct-2026::07:46:05.371260 ===
+  crasher:
+    initial call: llm_wire_integration_test:'-real_http_error_response_test/0-anonymous-0-'/0
+    pid: <0.439.0>
+    registered_name: []
+    exception error: #{function => <<"real_http_error_response_test">>,
+                       line => 434,
+                       message =>
+                           <<"Pattern match failed, no pattern matched the value.">>,
+                       module => <<"llm_wire_integration_test">>,
+                       start => 14709,
+                       value => {error,<<"timeout">>},
+                       file => <<"test/llm_wire_integration_test.gleam">>,
+                       'end' => 14776,gleam_error => let_assert,
+                       pattern_end => 14730,pattern_start => 14720}
+      in function  llm_wire_integration_test:'-real_http_error_response_test/0-anonymous-0-'/1 (test/llm_wire_integration_test.gleam:460)
+    ancestors: [<0.131.0>]
+    message_queue_len: 0
+    messages: []
+    links: []
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 233
+    stack_size: 29
+    reductions: 88
+  neighbours:
+
+=CRASH REPORT==== 1-Oct-2026::07:46:05.374120 ===
+  crasher:
+    initial call: llm_wire_integration_test:'-buffered_http_status_failure_records_response_bytes_test/0-anonymous-0-'/0
+    pid: <0.447.0>
+    registered_name: []
+    exception error: #{function =>
+                           <<"buffered_http_status_failure_records_response_bytes_test">>,
+                       line => 477,
+                       message =>
+                           <<"Pattern match failed, no pattern matched the value.">>,
+                       module => <<"llm_wire_integration_test">>,
+                       start => 15811,
+                       value => {error,<<"timeout">>},
+                       file => <<"test/llm_wire_integration_test.gleam">>,
+                       'end' => 15878,gleam_error => let_assert,
+                       pattern_end => 15832,pattern_start => 15822}
+      in function  llm_wire_integration_test:'-buffered_http_status_failure_records_response_bytes_test/0-anonymous-0-'/1 (test/llm_wire_integration_test.gleam:504)
+    ancestors: [<0.131.0>]
+    message_queue_len: 0
+    messages: []
+    links: []
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 233
+    stack_size: 29
+    reductions: 88
+  neighbours:
+
+=CRASH REPORT==== 1-Oct-2026::07:46:05.376867 ===
+  crasher:
+    initial call: llm_wire_integration_test:'-gun_refuses_redirects_instead_of_following_them_test/0-anonymous-0-'/0
+    pid: <0.455.0>
+    registered_name: []
+    exception error: #{function =>
+                           <<"gun_refuses_redirects_instead_of_following_them_test">>,
+                       line => 506,
+                       message =>
+                           <<"Pattern match failed, no pattern matched the value.">>,
+                       module => <<"llm_wire_integration_test">>,
+                       start => 17011,
+                       value => {error,<<"timeout">>},
+                       file => <<"test/llm_wire_integration_test.gleam">>,
+                       'end' => 17078,gleam_error => let_assert,
+                       pattern_end => 17032,pattern_start => 17022}
+      in function  llm_wire_integration_test:'-gun_refuses_redirects_instead_of_following_them_test/0-anonymous-0-'/1 (test/llm_wire_integration_test.gleam:533)
+    ancestors: [<0.131.0>]
+    message_queue_len: 0
+    messages: []
+    links: []
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 233
+    stack_size: 29
+    reductions: 88
+  neighbours:
+
+=CRASH REPORT==== 1-Oct-2026::07:46:05.379868 ===
+  crasher:
+    initial call: llm_wire_integration_test:'-gun_rejects_oversized_response_header_block_test/0-anonymous-0-'/0
+    pid: <0.463.0>
+    registered_name: []
+    exception error: #{function =>
+                           <<"gun_rejects_oversized_response_header_block_test">>,
+                       line => 539,
+                       message =>
+                           <<"Pattern match failed, no pattern matched the value.">>,
+                       module => <<"llm_wire_integration_test">>,
+                       start => 18001,
+                       value => {error,<<"timeout">>},
+                       file => <<"test/llm_wire_integration_test.gleam">>,
+                       'end' => 18068,gleam_error => let_assert,
+                       pattern_end => 18022,pattern_start => 18012}
+      in function  llm_wire_integration_test:'-gun_rejects_oversized_response_header_block_test/0-anonymous-0-'/1 (test/llm_wire_integration_test.gleam:567)
+    ancestors: [<0.131.0>]
+    message_queue_len: 0
+    messages: []
+    links: []
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 233
+    stack_size: 29
+    reductions: 88
+  neighbours:
+
+=CRASH REPORT==== 1-Oct-2026::07:46:05.383163 ===
+  crasher:
+    initial call: llm_wire_integration_test:'-gun_enforces_total_response_body_limit_test/0-anonymous-0-'/0
+    pid: <0.471.0>
+    registered_name: []
+    exception error: #{function =>
+                           <<"gun_enforces_total_response_body_limit_test">>,
+                       line => 578,
+                       message =>
+                           <<"Pattern match failed, no pattern matched the value.">>,
+                       module => <<"llm_wire_integration_test">>,
+                       start => 19178,
+                       value => {error,<<"timeout">>},
+                       file => <<"test/llm_wire_integration_test.gleam">>,
+                       'end' => 19245,gleam_error => let_assert,
+                       pattern_end => 19199,pattern_start => 19189}
+      in function  llm_wire_integration_test:'-gun_enforces_total_response_body_limit_test/0-anonymous-0-'/1 (test/llm_wire_integration_test.gleam:607)
+    ancestors: [<0.131.0>]
+    message_queue_len: 0
+    messages: []
+    links: []
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 233
+    stack_size: 29
+    reductions: 92
+  neighbours:
+
+=CRASH REPORT==== 1-Oct-2026::07:46:05.386176 ===
+  crasher:
+    initial call: llm_wire_integration_test:'-gun_decodes_chunked_transfer_before_sse_framing_test/0-anonymous-0-'/0
+    pid: <0.479.0>
+    registered_name: []
+    exception error: #{function =>
+                           <<"gun_decodes_chunked_transfer_before_sse_framing_test">>,
+                       line => 626,
+                       message =>
+                           <<"Pattern match failed, no pattern matched the value.">>,
+                       module => <<"llm_wire_integration_test">>,
+                       start => 20974,
+                       value => {error,<<"timeout">>},
+                       file => <<"test/llm_wire_integration_test.gleam">>,
+                       'end' => 21041,gleam_error => let_assert,
+                       pattern_end => 20995,pattern_start => 20985}
+      in function  llm_wire_integration_test:'-gun_decodes_chunked_transfer_before_sse_framing_test/0-anonymous-0-'/2 (test/llm_wire_integration_test.gleam:644)
+    ancestors: [<0.131.0>]
+    message_queue_len: 0
+    messages: []
+    links: []
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 233
+    stack_size: 29
+    reductions: 88
+  neighbours:
+
+=CRASH REPORT==== 1-Oct-2026::07:46:05.389199 ===
+  crasher:
+    initial call: llm_wire_integration_test:'-gun_rejects_compressed_event_streams_test/0-anonymous-0-'/0
+    pid: <0.487.0>
+    registered_name: []
+    exception error: #{function =>
+                           <<"gun_rejects_compressed_event_streams_test">>,
+                       line => 660,
+                       message =>
+                           <<"Pattern match failed, no pattern matched the value.">>,
+                       module => <<"llm_wire_integration_test">>,
+                       start => 22024,
+                       value => {error,<<"timeout">>},
+                       file => <<"test/llm_wire_integration_test.gleam">>,
+                       'end' => 22091,gleam_error => let_assert,
+                       pattern_end => 22045,pattern_start => 22035}
+      in function  llm_wire_integration_test:'-gun_rejects_compressed_event_streams_test/0-anonymous-0-'/1 (test/llm_wire_integration_test.gleam:687)
+    ancestors: [<0.131.0>]
+    message_queue_len: 0
+    messages: []
+    links: []
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 233
+    stack_size: 29
+    reductions: 88
+  neighbours:
+
+=CRASH REPORT==== 1-Oct-2026::07:46:05.392154 ===
+  crasher:
+    initial call: llm_wire_integration_test:'-gun_setup_uses_remaining_overall_deadline_test/0-anonymous-0-'/0
+    pid: <0.495.0>
+    registered_name: []
+    exception error: #{function =>
+                           <<"gun_setup_uses_remaining_overall_deadline_test">>,
+                       line => 693,
+                       message =>
+                           <<"Pattern match failed, no pattern matched the value.">>,
+                       module => <<"llm_wire_integration_test">>,
+                       start => 23014,
+                       value => {error,<<"timeout">>},
+                       file => <<"test/llm_wire_integration_test.gleam">>,
+                       'end' => 23081,gleam_error => let_assert,
+                       pattern_end => 23035,pattern_start => 23025}
+      in function  llm_wire_integration_test:'-gun_setup_uses_remaining_overall_deadline_test/0-anonymous-0-'/1 (test/llm_wire_integration_test.gleam:721)
+    ancestors: [<0.131.0>]
+    message_queue_len: 0
+    messages: []
+    links: []
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 233
+    stack_size: 29
+    reductions: 88
+  neighbours:
+
+=CRASH REPORT==== 1-Oct-2026::07:46:05.394874 ===
+  crasher:
+    initial call: llm_wire_integration_test:'-real_http_disconnect_mid_stream_test/0-anonymous-0-'/0
+    pid: <0.503.0>
+    registered_name: []
+    exception error: #{function => <<"real_http_disconnect_mid_stream_test">>,
+                       line => 731,
+                       message =>
+                           <<"Pattern match failed, no pattern matched the value.">>,
+                       module => <<"llm_wire_integration_test">>,
+                       start => 24001,
+                       value => {error,<<"timeout">>},
+                       file => <<"test/llm_wire_integration_test.gleam">>,
+                       'end' => 24068,gleam_error => let_assert,
+                       pattern_end => 24022,pattern_start => 24012}
+      in function  llm_wire_integration_test:'-real_http_disconnect_mid_stream_test/0-anonymous-0-'/1 (test/llm_wire_integration_test.gleam:758)
+    ancestors: [<0.131.0>]
+    message_queue_len: 0
+    messages: []
+    links: []
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 233
+    stack_size: 29
+    reductions: 88
+  neighbours:
+
+=CRASH REPORT==== 1-Oct-2026::07:46:05.480886 ===
+  crasher:
+    initial call: llm_wire_integration_test:'-real_http_disconnect_before_bytes_test/0-anonymous-0-'/0
+    pid: <0.590.0>
+    registered_name: []
+    exception error: #{function =>
+                           <<"real_http_disconnect_before_bytes_test">>,
+                       line => 939,
+                       message =>
+                           <<"Pattern match failed, no pattern matched the value.">>,
+                       module => <<"llm_wire_integration_test">>,
+                       start => 30709,
+                       value => {error,<<"timeout">>},
+                       file => <<"test/llm_wire_integration_test.gleam">>,
+                       'end' => 30776,gleam_error => let_assert,
+                       pattern_end => 30730,pattern_start => 30720}
+      in function  llm_wire_integration_test:'-real_http_disconnect_before_bytes_test/0-anonymous-0-'/1 (test/llm_wire_integration_test.gleam:948)
+    ancestors: [<0.131.0>]
+    message_queue_len: 0
+    messages: []
+    links: []
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 233
+    stack_size: 29
+    reductions: 88
+  neighbours:
+
+
+[1m[31mlet assert[39m[22m [90mtest/llm_wire_pool_test.gleam:157[39m
+[36m test[39m: llm_wire_pool_test.queue_deadline_releases_only_its_waiter_test
+[36m code[39m: let assert Ok(release) = process.receive(accepted, 1000)
+[36mvalue[39m: Error(Nil)
+[36m info[39m: Pattern match failed, no pattern matched the value.
+
+[1m[31mlet assert[39m[22m [90mtest/llm_wire_pool_test.gleam:174[39m
+[36m test[39m: llm_wire_pool_test.queued_call_runs_after_first_finishes_test
+[36m code[39m: let assert Ok(release) = process.receive(accepted, 1000)
+[36mvalue[39m: Error(Nil)
+[36m info[39m: Pattern match failed, no pattern matched the value.
+=CRASH REPORT==== 1-Oct-2026::07:46:07.227558 ===
+  crasher:
+    initial call: llm_wire_http_gun_test:'-consumer_read_timeout_preserves_http_and_terminal_precedes_eof_test/0-anonymous-0-'/0
+    pid: <0.348.0>
+    registered_name: []
+    exception error: #{function =>
+                           <<"consumer_read_timeout_preserves_http_and_terminal_precedes_eof_test">>,
+                       line => 275,
+                       message =>
+                           <<"Pattern match failed, no pattern matched the value.">>,
+                       module => <<"llm_wire_http_gun_test">>,start => 9612,
+                       value => {error,<<"timeout">>},
+                       file => <<"test/llm_wire_http_gun_test.gleam">>,
+                       'end' => 9679,gleam_error => let_assert,
+                       pattern_end => 9633,pattern_start => 9623}
+      in function  llm_wire_http_gun_test:'-consumer_read_timeout_preserves_http_and_terminal_precedes_eof_test/0-anonymous-0-'/3 (test/llm_wire_http_gun_test.gleam:356)
+    ancestors: [<0.131.0>]
+    message_queue_len: 0
+    messages: []
+    links: []
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 233
+    stack_size: 29
+    reductions: 96
+  neighbours:
+
+=CRASH REPORT==== 1-Oct-2026::07:46:07.230531 ===
+  crasher:
+    initial call: llm_wire_http_gun_test:'-keepalive_bytes_do_not_extend_semantic_idle_test/0-anonymous-0-'/0
+    pid: <0.356.0>
+    registered_name: []
+    exception error: #{function =>
+                           <<"keepalive_bytes_do_not_extend_semantic_idle_test">>,
+                       line => 315,
+                       message =>
+                           <<"Pattern match failed, no pattern matched the value.">>,
+                       module => <<"llm_wire_http_gun_test">>,start => 11175,
+                       value => {error,<<"timeout">>},
+                       file => <<"test/llm_wire_http_gun_test.gleam">>,
+                       'end' => 11242,gleam_error => let_assert,
+                       pattern_end => 11196,pattern_start => 11186}
+      in function  llm_wire_http_gun_test:'-keepalive_bytes_do_not_extend_semantic_idle_test/0-anonymous-0-'/1 (test/llm_wire_http_gun_test.gleam:340)
+    ancestors: [<0.131.0>]
+    message_queue_len: 0
+    messages: []
+    links: []
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 233
+    stack_size: 29
+    reductions: 88
+  neighbours:
+
+=CRASH REPORT==== 1-Oct-2026::07:46:07.231888 ===
+  crasher:
+    initial call: llm_wire_http_gun_test:'-partial_status_body_keeps_bytes_when_semantic_idle_wins_test/0-anonymous-0-'/0
+    pid: <0.364.0>
+    registered_name: []
+    exception error: #{function =>
+                           <<"partial_status_body_keeps_bytes_when_semantic_idle_wins_test">>,
+                       line => 340,
+                       message =>
+                           <<"Pattern match failed, no pattern matched the value.">>,
+                       module => <<"llm_wire_http_gun_test">>,start => 12124,
+                       value => {error,<<"timeout">>},
+                       file => <<"test/llm_wire_http_gun_test.gleam">>,
+                       'end' => 12191,gleam_error => let_assert,
+                       pattern_end => 12145,pattern_start => 12135}
+      in function  llm_wire_http_gun_test:'-partial_status_body_keeps_bytes_when_semantic_idle_wins_test/0-anonymous-0-'/1 (test/llm_wire_http_gun_test.gleam:384)
+    ancestors: [<0.131.0>]
+    message_queue_len: 0
+    messages: []
+    links: []
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 233
+    stack_size: 29
+    reductions: 88
+  neighbours:
+
+=CRASH REPORT==== 1-Oct-2026::07:46:07.235361 ===
+  crasher:
+    initial call: llm_wire_http_gun_test:'-execution_starts_budget_and_delayed_headers_spend_it_test/0-anonymous-0-'/0
+    pid: <0.372.0>
+    registered_name: []
+    exception error: #{function =>
+                           <<"execution_starts_budget_and_delayed_headers_spend_it_test">>,
+                       line => 366,
+                       message =>
+                           <<"Pattern match failed, no pattern matched the value.">>,
+                       module => <<"llm_wire_http_gun_test">>,start => 13175,
+                       value => {error,<<"timeout">>},
+                       file => <<"test/llm_wire_http_gun_test.gleam">>,
+                       'end' => 13242,gleam_error => let_assert,
+                       pattern_end => 13196,pattern_start => 13186}
+      in function  llm_wire_http_gun_test:'-execution_starts_budget_and_delayed_headers_spend_it_test/0-anonymous-0-'/2 (test/llm_wire_http_gun_test.gleam:393)
+    ancestors: [<0.131.0>]
+    message_queue_len: 0
+    messages: []
+    links: []
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 233
+    stack_size: 29
+    reductions: 88
+  neighbours:
+
+=CRASH REPORT==== 1-Oct-2026::07:46:07.341812 ===
+  crasher:
+    initial call: llm_wire_http_gun_test:'-disconnect_preserves_raw_and_semantic_evidence_test/0-anonymous-0-'/0
+    pid: <0.380.0>
+    registered_name: []
+    exception error: #{function =>
+                           <<"disconnect_preserves_raw_and_semantic_evidence_test">>,
+                       line => 395,
+                       message =>
+                           <<"Pattern match failed, no pattern matched the value.">>,
+                       module => <<"llm_wire_http_gun_test">>,start => 14238,
+                       value => {error,<<"timeout">>},
+                       file => <<"test/llm_wire_http_gun_test.gleam">>,
+                       'end' => 14305,gleam_error => let_assert,
+                       pattern_end => 14259,pattern_start => 14249}
+      in function  llm_wire_http_gun_test:'-disconnect_preserves_raw_and_semantic_evidence_test/0-anonymous-0-'/2 (test/llm_wire_http_gun_test.gleam:421)
+    ancestors: [<0.131.0>]
+    message_queue_len: 0
+    messages: []
+    links: []
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 233
+    stack_size: 29
+    reductions: 88
+  neighbours:
+
+=CRASH REPORT==== 1-Oct-2026::07:46:07.345374 ===
+  crasher:
+    initial call: llm_wire_http_gun_test:'-consumer_death_cancels_worker_before_headers_test/0-anonymous-0-'/0
+    pid: <0.388.0>
+    registered_name: []
+    exception error: #{function =>
+                           <<"consumer_death_cancels_worker_before_headers_test">>,
+                       line => 421,
+                       message =>
+                           <<"Pattern match failed, no pattern matched the value.">>,
+                       module => <<"llm_wire_http_gun_test">>,start => 15262,
+                       value => {error,<<"timeout">>},
+                       file => <<"test/llm_wire_http_gun_test.gleam">>,
+                       'end' => 15329,gleam_error => let_assert,
+                       pattern_end => 15283,pattern_start => 15273}
+      in function  llm_wire_http_gun_test:'-consumer_death_cancels_worker_before_headers_test/0-anonymous-0-'/3 (test/llm_wire_http_gun_test.gleam:448)
+    ancestors: [<0.131.0>]
+    message_queue_len: 0
+    messages: []
+    links: []
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 233
+    stack_size: 29
+    reductions: 88
+  neighbours:
+
+
+[1m[31mlet assert[39m[22m [90mtest/llm_wire_pool_test.gleam:191[39m
+[36m test[39m: llm_wire_pool_test.queued_cancellation_does_not_consume_connection_or_disturb_owner_test
+[36m code[39m: let assert Ok(release) = process.receive(accepted, 1000)
+[36mvalue[39m: Error(Nil)
+[36m info[39m: Pattern match failed, no pattern matched the value.
+=CRASH REPORT==== 1-Oct-2026::07:46:08.902248 ===
+  crasher:
+    initial call: llm_wire_pool_test:'-sequential_llm_requests_reuse_one_connection_test/0-anonymous-1-'/0
+    pid: <0.688.0>
+    registered_name: []
+    exception error: #{function =>
+                           <<"sequential_llm_requests_reuse_one_connection_test">>,
+                       line => 115,
+                       message =>
+                           <<"Pattern match failed, no pattern matched the value.">>,
+                       module => <<"llm_wire_pool_test">>,start => 3207,
+                       value => {error,<<"timeout">>},
+                       file => <<"test/llm_wire_pool_test.gleam">>,
+                       'end' => 3274,gleam_error => let_assert,
+                       pattern_end => 3228,pattern_start => 3218}
+      in function  llm_wire_pool_test:'-sequential_llm_requests_reuse_one_connection_test/0-anonymous-1-'/2 (test/llm_wire_pool_test.gleam:162)
+    ancestors: [<0.131.0>]
+    message_queue_len: 0
+    messages: []
+    links: []
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 233
+    stack_size: 29
+    reductions: 88
+  neighbours:
+
+=CRASH REPORT==== 1-Oct-2026::07:46:08.903829 ===
+  crasher:
+    initial call: llm_wire_pool_test:'-holding/1-anonymous-0-'/0
+    pid: <0.696.0>
+    registered_name: []
+    exception error: #{function => <<"serve_holding">>,line => 68,
+                       message =>
+                           <<"Pattern match failed, no pattern matched the value.">>,
+                       module => <<"llm_wire_pool_test">>,start => 1788,
+                       value => {error,<<"timeout">>},
+                       file => <<"test/llm_wire_pool_test.gleam">>,
+                       'end' => 1855,gleam_error => let_assert,
+                       pattern_end => 1809,pattern_start => 1799}
+      in function  llm_wire_pool_test:serve_holding/3 (test/llm_wire_pool_test.gleam:95)
+    ancestors: [<0.131.0>]
+    message_queue_len: 0
+    messages: []
+    links: []
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 233
+    stack_size: 29
+    reductions: 89
+  neighbours:
+
+
+[1m[31mlet assert[39m[22m [90mtest/llm_wire_pool_test.gleam:207[39m
+[36m test[39m: llm_wire_pool_test.admission_overflow_is_not_submitted_test
+[36m code[39m: let assert Ok(release) = process.receive(accepted, 1000)
+[36mvalue[39m: Error(Nil)
+[36m info[39m: Pattern match failed, no pattern matched the value.
+=CRASH REPORT==== 1-Oct-2026::07:46:09.908849 ===
+  crasher:
+    initial call: llm_wire_pool_test:'-holding/1-anonymous-0-'/0
+    pid: <0.704.0>
+    registered_name: []
+    exception error: #{function => <<"serve_holding">>,line => 68,
+                       message =>
+                           <<"Pattern match failed, no pattern matched the value.">>,
+                       module => <<"llm_wire_pool_test">>,start => 1788,
+                       value => {error,<<"timeout">>},
+                       file => <<"test/llm_wire_pool_test.gleam">>,
+                       'end' => 1855,gleam_error => let_assert,
+                       pattern_end => 1809,pattern_start => 1799}
+      in function  llm_wire_pool_test:serve_holding/3 (test/llm_wire_pool_test.gleam:95)
+    ancestors: [<0.131.0>]
+    message_queue_len: 0
+    messages: []
+    links: []
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 233
+    stack_size: 29
+    reductions: 89
+  neighbours:
+
+
+[1m[31mlet assert[39m[22m [90mtest/llm_wire_pool_test.gleam:227[39m
+[36m test[39m: llm_wire_pool_test.shared_client_shutdown_unblocks_active_and_waiting_calls_test
+[36m code[39m: let assert Ok(release) = process.receive(accepted, 1000)
+[36mvalue[39m: Error(Nil)
+[36m info[39m: Pattern match failed, no pattern matched the value.
+[32m.[39m
+[1m[31mpanic[39m[22m [90msrc/gleeunit/should.gleam:10[39m
+[36m test[39m: llm_wire_recording_test.live_recording_and_offline_replay_preserve_text_tools_and_structured_test
+[36m info[39m: 
+Error(RunFailure(HttpFailure(DestinationRejected), RetryEvidence(NoRequestSent, False, False)))
+should equal
+Ok(RunText("hello", None))
+=CRASH REPORT==== 1-Oct-2026::07:46:10.913870 ===
+  crasher:
+    initial call: llm_wire_pool_test:'-holding/1-anonymous-0-'/0
+    pid: <0.712.0>
+    registered_name: []
+    exception error: #{function => <<"serve_holding">>,line => 68,
+                       message =>
+                           <<"Pattern match failed, no pattern matched the value.">>,
+                       module => <<"llm_wire_pool_test">>,start => 1788,
+                       value => {error,<<"timeout">>},
+                       file => <<"test/llm_wire_pool_test.gleam">>,
+                       'end' => 1855,gleam_error => let_assert,
+                       pattern_end => 1809,pattern_start => 1799}
+      in function  llm_wire_pool_test:serve_holding/3 (test/llm_wire_pool_test.gleam:95)
+    ancestors: [<0.131.0>]
+    message_queue_len: 0
+    messages: []
+    links: []
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 233
+    stack_size: 29
+    reductions: 89
+  neighbours:
+
+
+[1m[31mlet assert[39m[22m [90mtest/llm_wire_recording_test.gleam:158[39m
+[36m test[39m: llm_wire_recording_test.concurrent_recording_keeps_admission_order_when_second_finishes_first_test
+[36m code[39m: let assert Ok(Nil) = process.receive(admitted, 1000)
+[36mvalue[39m: Error(Nil)
+[36m info[39m: Pattern match failed, no pattern matched the value.
+
+[1m[31mpanic[39m[22m [90msrc/gleeunit/should.gleam:10[39m
+[36m test[39m: llm_wire_recording_test.capture_budget_failure_does_not_change_live_semantic_outcomes_test
+[36m info[39m: 
+Error(RunFailure(HttpFailure(DestinationRejected), RetryEvidence(NoRequestSent, False, False)))
+should equal
+Ok(RunText("hello", None))
+[32m.[39m
+[1m[31mpanic[39m[22m [90msrc/gleeunit/should.gleam:10[39m
+[36m test[39m: llm_wire_recording_test.publish_io_failure_keeps_successful_live_result_test
+[36m info[39m: 
+Error(RunFailure(HttpFailure(DestinationRejected), RetryEvidence(NoRequestSent, False, False)))
+should equal
+Ok(RunText("hello", None))
+
+[1m[31mlet assert[39m[22m [90mtest/llm_wire_recording_test.gleam:283[39m
+[36m test[39m: llm_wire_recording_test.finish_wait_never_drains_and_early_cancel_replays_partial_evidence_test
+[36m code[39m: let assert Ok(session.NextProgress(types.TextDelta(_, "partial"))) =
+    session.next(stream)
+[36mvalue[39m: Ok(StreamTerminal(Failed(HttpFailure(DestinationRejected), RetryEvidence(NoRequestSent, False, False))))
+[36m info[39m: Pattern match failed, no pattern matched the value.
+[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m
+[1m[31mlet assert[39m[22m [90mtest/llm_wire_session_test.gleam:182[39m
+[36m test[39m: llm_wire_session_test.caller_owned_buffered_round_applies_configured_limits_test
+[36m code[39m: let assert Ok(session.RunToolCalls(turn, _)) =
+    session.run(owned_http, prepared)
+[36mvalue[39m: Error(RunFailure(HttpFailure(DestinationRejected), RetryEvidence(NoRequestSent, False, False)))
+[36m info[39m: Pattern match failed, no pattern matched the value.
+
+[1m[31mlet assert[39m[22m [90mtest/llm_wire_session_test.gleam:238[39m
+[36m test[39m: llm_wire_session_test.caller_owned_stream_round_applies_deadline_and_failure_evidence_test
+[36m code[39m: let assert session.Finished(session.RunToolCalls(turn, _)) = terminal(opened)
+[36mvalue[39m: Failed(HttpFailure(DestinationRejected), RetryEvidence(NoRequestSent, False, False))
+[36m info[39m: Pattern match failed, no pattern matched the value.
+
+[1m[31mpanic[39m[22m [90msrc/gleeunit/should.gleam:10[39m
+[36m test[39m: llm_wire_session_test.configured_refusal_keeps_usage_test
+[36m info[39m: 
+Error(RunFailure(HttpFailure(DestinationRejected), RetryEvidence(NoRequestSent, False, False)))
+should equal
+Ok(RunRefusal("declined", Some(Usage(3, 2, 5))))
+
+[1m[31mlet assert[39m[22m [90mtest/llm_wire_session_test.gleam:321[39m
+[36m test[39m: llm_wire_session_test.caller_supplied_structured_codec_and_correlated_calls_test
+[36m code[39m: let assert session.StructuredFinished(session.StructuredNeedsTools(turn, _)) =
+    structured_terminal(opened)
+[36mvalue[39m: StructuredFailed(HttpFailure(DestinationRejected), RetryEvidence(NoRequestSent, False, False))
+[36m info[39m: Pattern match failed, no pattern matched the value.
+[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[31m
+175 passed, 48 failures[39m

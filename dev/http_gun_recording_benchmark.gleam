@@ -11,6 +11,7 @@ import gleam/list
 import http_gun
 import http_gun/cassette
 import http_gun/config
+import http_gun/destination
 import http_gun/recording
 
 @external(erlang, "http_gun_test_server", "persistent")
@@ -52,7 +53,7 @@ pub fn main() -> Nil {
     request.to("http://localhost:" <> int.to_string(port) <> "/")
   let req = req |> request.set_method(http.Post) |> request.set_body(bytes)
   let inputs = list.repeat(req, 256)
-  let c = config.default()
+  let c = local_config()
   let settings =
     config.Config(
       ..c,
@@ -101,5 +102,17 @@ pub fn main() -> Nil {
       #("peak_ports", json.int(stats.4)),
     ])
     |> json.to_string,
+  )
+}
+
+// These exercises connect only to explicitly permitted local test servers.
+fn local_config() -> config.Config {
+  let defaults = config.default()
+  config.Config(
+    ..defaults,
+    destination: destination.Policy(
+      ..defaults.destination,
+      allow_loopback: True,
+    ),
   )
 }

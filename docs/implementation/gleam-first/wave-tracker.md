@@ -359,3 +359,41 @@ The blocked-observer test requires a capacity1 forwarder to leave HTTP's1000-req
 ### Local integration after wave 24
 
 The owner requested committing the accepted work. Sinal's generic correction is committed separately as8acec45. Its formatting hook only removed an extra README blank line; all qualified runtime source and tests remain unchanged. The HTTP Gun commit retains the accepted adoption additions, maintained async consumer, Sinal instrumentation, standalone dependency snapshot, documentation and complete validation evidence. The snapshot now identifies the clean Sinal commit. Integration recheck hashes distinguish that packaging/documentation update from the unchanged tested runtime. The normal HTTP Gun fast pre-commit gate remains enabled. No push, publication or other sibling changes are included.
+
+### Destination policy — authorized plan revision 10
+
+The owner's 2026-10-01 destination-policy prompt authorizes this complete scoped program. HTTP Gun starts at 2b3656e8. Warden is read-only behavioral evidence at 230c6bb4; transport SHA256 0fd3b160ecb50575a7185b4927b7010c684a218a3ba4e8fc46471d3d1de568cc and transport-test SHA256 f079d5ee5edc04b403d281c973a203080d3328cd7291a86d0e848d5c1c0f4c36. No donor source has been copied.
+
+| Wave | Outcome | Acceptance |
+| --- | --- | --- |
+| 25 | Pure, validated destination policy and classification; secure default | Observable default refusal before a socket opens; address table and explicit loopback permission; existing local consumers opt in |
+| 26 | Bounded resolution, pinned connections and original TLS identity | One resolution per new connection, reject every mixed answer, typed pre-submission failures, cancellation/deadline/death cleanup; hostname and IP-SAN TLS tests |
+| 27 | Send deadline, mailbox and parser-boundary qualification | Controlled blocked sender and late replies; IPv6 authority; whole admitted head; raw malformed-response tests against released dependencies |
+| 28 | Documentation and complete adoption qualification | Fast/full gates, current isolated downstream check, exact evidence, truthful dependencies and unresolved requirements |
+
+Decisions: retain Gun 2.6.0/Cowlib 2.20.0; policy, classification, resolution coordination and connection admission in Gleam; only native address parsing/lookup and Gun option conversion cross FFI. Resolution occupies finite connection admission capacity and cannot block the pool. Configuration is immutable for a client; checked connections are reused only within that client/origin, and replacement connections resolve again. Offline modes never resolve. Default policy becomes public-only; local tests explicitly permit loopback. No retries, dependency parser changes, Warden migration, release or commit is included. Strict parsing is an acceptance question to measure, not assume or silently waive.
+
+Wave25 active. No new validation is claimed yet.
+
+### Wave 25 — acceptance
+
+The focused default-policy red returned MayHaveBeenSent after connecting to loopback; green refuses before a socket opens. The injected-private-answer red returned a real200 response; green returns DestinationRejected/NotSubmitted. After explicit opt-in updates to owned loopback tests,105 tests pass, including50 address classification cases, mixed/empty/failed DNS answers, exact case-insensitive allowlists, validation purity, literal bypass and checked-answer reuse. New typed reasons round-trip through the existing strict fixture codec. Logs: evidence/wave25. No source was copied from Warden and no sibling was changed. Wave26 is active: asynchronous resolution is implemented and lifetime/TLS qualification is underway.
+
+The owner accepted the experimentally confirmed reason-phrase exception on2026-10-01: keep Gun/Cowlib unmodified and document it. The local Gun probe rejects bare LF and signed lengths/chunk sizes but accepts control bytes in header values and status reason text. HTTP Gun will reject delivered invalid header values; Gun does not expose status reason text to the client. Evidence: wave27/parser-probe.log. This is a precise exception to the requested parser acceptance, not a claim of strict wire parsing.
+
+
+### Wave 26 — acceptance
+
+Accepted: bounded Gleam resolution jobs occupy connection slots, validate complete A/AAAA answers, and supply only checked IP tuples to Gun. Original hostname TLS and IP-literal SAN verification pass with proper trusted-chain controls. Resolution cancellation, deadline, caller death, explicit stop, abnormal client death, throwing callbacks and cross-origin progress pass synchronized public probes. No resolver runs on the pool actor; no callback receives request bodies. Existing H1/H2 pool behavior remains green. Evidence is retained under docs/evidence/wave26; the initial self-signed-leaf fixture failure is disclosed and corrected without weakening verification.
+
+### Wave 27 — acceptance
+
+Accepted: complete delivered headers reject control values and enforce the final header's admitted byte contribution. Raw bare-LF/signed-length/signed-chunk cases fail through released Gun/Cowlib; the owner-approved reason-phrase exception is documented and measured. HTTP authority preserves original names and brackets IPv6, including default443. Four16MiB non-reading TCP/TLS cases (fresh/reused) terminate at the300ms request budget with bounded cleanup and unchanged caller mailbox; synchronized body cancellation/deadline callers also retain no messages after server/client cleanup. The fast gate passes120 tests. Additional100ms-connect probe passes, with no reproduced defect or production change; qualified test settings were restored. Logs: docs/evidence/wave27. The recording refusal test uses the existing bounded finish_wait because HTTP and writer acknowledgements are separate.
+
+### Wave 28 — acceptance
+
+Accepted,2026-10-01. All three full Darwin ARM64 gates pass on Gleam1.18.1/OTP29,28,27:120 tests, formatting/check/build, FFI warnings and package boundaries, three public consumers, seven intended compile rejections, async lifecycle/startup controls, independent nghttpd H2 and sibling cancellation, actual record/replay/persistence failures, batch scaling and eleven load scenarios. All106 frozen executable/dependency inputs match. Public API docs build. A temporary SNI=disable mutation is caught by the trusted wrong-certificate IP test. Initial gate failures/corrections are retained, never relabeled as passing.
+
+Unmodified migrated LLM Wire1c0ad614 passes check/build but needs explicit loopback permission in its local setup (175 passes/48 failures). An isolated adaptation of eight test/example startup files passes223 tests, public boundary and five local H2 scenarios through1000 callers, with production code and all original checkouts unchanged. The normal downstream gate does not silently adapt sources. Warden is unchanged read-only evidence; migration/release and its future adapter gate remain separate work, not claims of this acceptance.
+
+Current FFI is113 lines/5585 bytes/15 bindings. New native responsibilities are IP parse/tuple conversion and one-family DNS lookup; supported Gun TLS/send options are adapted in the existing bridge. All policy, resolution coordination, lifetime and pool changes are Gleam. No dependency patch, second transport runtime, commit, push, publication, provider credentials or sibling/oversight write occurred. Accepted boundaries: unexposed reason phrases, close-delimited TLS ambiguity, connection-lifetime DNS trust, inherited allocations and scheduling races; optional redaction/durability remain separate. Linux/hosted CI, new Dream comparison and sustained soak were not executed. No required implementation remains under the owner's accepted reason-phrase exception. Receipt: docs/evidence/wave28/receipt.json.

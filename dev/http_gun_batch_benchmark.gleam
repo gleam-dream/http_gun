@@ -4,6 +4,7 @@ import gleam/io
 import gleam/list
 import http_gun
 import http_gun/config
+import http_gun/destination
 
 @external(erlang, "http_gun_test_server", "persistent")
 fn server() -> Int
@@ -42,7 +43,7 @@ fn run(
 }
 
 pub fn main() -> Nil {
-  let defaults = config.default()
+  let defaults = local_config()
   let assert Ok(client) =
     http_gun.start(
       config.Config(
@@ -60,4 +61,16 @@ pub fn main() -> Nil {
   })
   let assert Ok(Nil) = http_gun.stop(client)
   Nil
+}
+
+// These exercises connect only to explicitly permitted local test servers.
+fn local_config() -> config.Config {
+  let defaults = config.default()
+  config.Config(
+    ..defaults,
+    destination: destination.Policy(
+      ..defaults.destination,
+      allow_loopback: True,
+    ),
+  )
 }

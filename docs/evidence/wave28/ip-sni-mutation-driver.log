@@ -1,0 +1,1 @@
+Negative control passed: IP-literal test detects SNI=disable accepting a wrong-host certificate.

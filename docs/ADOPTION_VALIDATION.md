@@ -1,6 +1,8 @@
 # Adoption validation follow-up
 
-Current adoption: LLM Wire migrated at `1c0ad614149b6ba286a6f778e223bd294f403b30`, with HTTP Gun `ebf2b479761e8c932b0c85a8f83cf8460c014d4f` unchanged. Wave18 reran223 tests, the actual public consumer and six negative compilation controls, live recording/offline playback, and independent verified TLS/H2 at1/10/100/1000 callers on Darwin ARM64/OTP29. These are specific receipts, not universal readiness. See [current downstream validation](DOWNSTREAM.md) and [receipt](evidence/wave18/current-downstream/receipt.json).
+Destination-policy update (2026-10-01): the full HTTP Gun gate passes120 tests and all consumers on Darwin ARM64/OTP29,28,27. The migrated LLM Wire source still compiles, but its local live tests must explicitly permit loopback under the new default. Unmodified:175 passes/48 failures. Isolated test/example setup adaptation:223 passes, public boundary and local H2 through1000 callers. No production LLM Wire or sibling source changed. Warden remains unmigrated; its release/adapter acceptance is separate. See [current validation](VALIDATION.md) and [downstream notes](DOWNSTREAM.md).
+
+Historical adoption: LLM Wire migrated at `1c0ad614149b6ba286a6f778e223bd294f403b30`, with HTTP Gun `ebf2b479761e8c932b0c85a8f83cf8460c014d4f` unchanged. Wave18 reran223 tests, the actual public consumer and six negative compilation controls, live recording/offline playback, and independent verified TLS/H2 at1/10/100/1000 callers on Darwin ARM64/OTP29. These are specific receipts, not universal readiness. See [current downstream validation](DOWNSTREAM.md) and [receipt](evidence/wave18/current-downstream/receipt.json).
 
 The rest of this report preserves waves10–12 and their historical migration status. The archived LLM example still supplies useful text-stream scenarios, but does not prove current downstream compatibility.
 

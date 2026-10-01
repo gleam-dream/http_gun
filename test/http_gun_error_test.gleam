@@ -8,6 +8,7 @@ import http_gun
 import http_gun/body
 import http_gun/cassette
 import http_gun/config
+import http_gun/destination
 import http_gun/error
 import http_gun/fixture
 import http_gun/testing
@@ -113,6 +114,8 @@ pub fn typed_failures_roundtrip_all_categories_test() {
             error.InvalidRequest("detail"),
             error.ClientClosed,
             error.AdmissionFull,
+            error.DestinationRejected,
+            error.ResolutionFailed,
             error.DeadlineExceeded,
             error.ReadTimeout,
             error.ReadConflict,
@@ -164,7 +167,16 @@ pub fn obsolete_fixture_errors_are_rejected_test() {
 fn unused_port() -> Int
 
 pub fn connection_refusal_is_typed_and_not_submitted_test() {
-  let assert Ok(client) = http_gun.start(config.default())
+  let assert Ok(client) =
+    http_gun.start(
+      config.Config(
+        ..config.default(),
+        destination: destination.Policy(
+          ..destination.default(),
+          allow_loopback: True,
+        ),
+      ),
+    )
   let req =
     request.new()
     |> request.set_scheme(http.Http)

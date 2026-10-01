@@ -1,0 +1,156 @@
+control_status: {response,fin,200,[{<<"content-length">>,<<"0">>}]} / none
+control_header: {response,fin,200,
+                          [{<<"content-length">>,<<"0">>},
+                           {<<"x-test">>,<<97,1,98>>}]} / none
+bare_lf: {error,{stream_error,closed}} / none
+=ERROR REPORT==== 1-Oct-2026::07:26:11.044152 ===
+** State machine <0.117.0> terminating
+** Process label = {gun,{127,0,0,1},62402}
+** Last event = {info,{tcp,#Port<0.12>,
+                           <<"HTTP/1.1 200 OK\r\nContent-Length: +1\r\n\r\nx">>}}
+** When server state  = {connected,
+                         {state,<0.10.0>,
+                          {up,#Ref<0.849309983.624427009.81651>},
+                          {127,0,0,1},
+                          62402,<<"http">>,
+                          {127,0,0,1},
+                          62402,[],
+                          #{retry => 0},
+                          undefined,#Port<0.12>,gun_tcp,true,
+                          {tcp,tcp_closed,tcp_error},
+                          gun_http,
+                          {http_state,#Port<0.12>,gun_tcp,#{},'HTTP/1.1',
+                           keepalive,<<>>,undefined,
+                           [{stream,#Ref<0.849309983.624427009.81656>,
+                             <0.10.0>,infinity,<<"GET">>,
+                             ["127.0.0.1",58,<<"62402">>],
+                             <<"/">>,[],true,undefined}],
+                           head,
+                           {0,0},
+                           head},
+                          undefined,gun_default_event_h,undefined}}
+** Reason for termination = error:badarg
+** Callback modules = [gun]
+** Callback mode = state_functions
+** Stacktrace =
+**  [{erlang,binary_to_integer,
+             [<<>>],
+             [{error_info,#{module => erl_erts_errors}}]},
+     {cow_http_hd,digits,3,
+                  [{file,"/code/gleam-dream/http_gun/build/dev/erlang/cowlib/src/cow_http_hd.erl"},
+                   {line,3721}]},
+     {cow_http_hd,parse_content_length,1,
+                  [{file,"/code/gleam-dream/http_gun/build/dev/erlang/cowlib/src/cow_http_hd.erl"},
+                   {line,1667}]},
+     {gun_http,response_io_from_headers,4,
+               [{file,"/code/gleam-dream/http_gun/build/dev/erlang/gun/src/gun_http.erl"},
+                {line,1020}]},
+     {gun_http,handle_response,8,
+               [{file,"/code/gleam-dream/http_gun/build/dev/erlang/gun/src/gun_http.erl"},
+                {line,474}]},
+     {gun,handle_common_connected_no_input,4,
+          [{file,"/code/gleam-dream/http_gun/build/dev/erlang/gun/src/gun.erl"},
+           {line,1641}]},
+     {gen_statem,loop_state_callback,11,[{file,"gen_statem.erl"},{line,3741}]},
+     {proc_lib,init_p_do_apply,3,[{file,"proc_lib.erl"},{line,333}]}]
+
+=CRASH REPORT==== 1-Oct-2026::07:26:11.057606 ===
+  crasher:
+    initial call: gun:init/1
+    pid: <0.117.0>
+    registered_name: []
+    process_label: {gun,{127,0,0,1},62402}
+    exception error: bad argument
+      in function  binary_to_integer/1
+         called as binary_to_integer(<<>>)
+         *** argument 1: not a textual representation of an integer
+      in call from cow_http_hd:digits/3 (/code/gleam-dream/http_gun/build/dev/erlang/cowlib/src/cow_http_hd.erl:3721)
+      in call from cow_http_hd:parse_content_length/1 (/code/gleam-dream/http_gun/build/dev/erlang/cowlib/src/cow_http_hd.erl:1667)
+      in call from gun_http:response_io_from_headers/4 (/code/gleam-dream/http_gun/build/dev/erlang/gun/src/gun_http.erl:1020)
+      in call from gun_http:handle_response/8 (/code/gleam-dream/http_gun/build/dev/erlang/gun/src/gun_http.erl:474)
+      in call from gun:handle_common_connected_no_input/4 (/code/gleam-dream/http_gun/build/dev/erlang/gun/src/gun.erl:1641)
+      in call from gen_statem:loop_state_callback/11 (gen_statem.erl:3741)
+    ancestors: [gun_conns_sup,gun_sup,<0.106.0>]
+    message_queue_len: 0
+    messages: []
+    links: [<0.108.0>,#Port<0.12>]
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 10958
+    stack_size: 29
+    reductions: 18399
+  neighbours:
+
+signed_length: {error,
+                   {down,
+                       {badarg,
+                           [{erlang,binary_to_integer,
+                                [<<>>],
+                                [{error_info,#{module => erl_erts_errors}}]},
+                            {cow_http_hd,digits,3,
+                                [{file,
+                                     "/code/gleam-dream/http_gun/build/dev/erlang/cowlib/src/cow_http_hd.erl"},
+                                 {line,3721}]},
+                            {cow_http_hd,parse_content_length,1,
+                                [{file,
+                                     "/code/gleam-dream/http_gun/build/dev/erlang/cowlib/src/cow_http_hd.erl"},
+                                 {line,1667}]},
+                            {gun_http,response_io_from_headers,4,
+                                [{file,
+                                     "/code/gleam-dream/http_gun/build/dev/erlang/gun/src/gun_http.erl"},
+                                 {line,1020}]},
+                            {gun_http,handle_response,8,
+                                [{file,
+                                     "/code/gleam-dream/http_gun/build/dev/erlang/gun/src/gun_http.erl"},
+                                 {line,474}]},
+                            {gun,handle_common_connected_no_input,4,
+                                [{file,
+                                     "/code/gleam-dream/http_gun/build/dev/erlang/gun/src/gun.erl"},
+                                 {line,1641}]},
+                            {gen_statem,loop_state_callback,11,
+                                [{file,"gen_statem.erl"},{line,3741}]},
+                            {proc_lib,init_p_do_apply,3,
+                                [{file,"proc_lib.erl"},{line,333}]}]}}} / none
+=SUPERVISOR REPORT==== 1-Oct-2026::07:26:11.061218 ===
+    supervisor: {local,gun_conns_sup}
+    errorContext: child_terminated
+    reason: {badarg,
+                [{erlang,binary_to_integer,
+                     [<<>>],
+                     [{error_info,#{module => erl_erts_errors}}]},
+                 {cow_http_hd,digits,3,
+                     [{file,
+                          "/code/gleam-dream/http_gun/build/dev/erlang/cowlib/src/cow_http_hd.erl"},
+                      {line,3721}]},
+                 {cow_http_hd,parse_content_length,1,
+                     [{file,
+                          "/code/gleam-dream/http_gun/build/dev/erlang/cowlib/src/cow_http_hd.erl"},
+                      {line,1667}]},
+                 {gun_http,response_io_from_headers,4,
+                     [{file,
+                          "/code/gleam-dream/http_gun/build/dev/erlang/gun/src/gun_http.erl"},
+                      {line,1020}]},
+                 {gun_http,handle_response,8,
+                     [{file,
+                          "/code/gleam-dream/http_gun/build/dev/erlang/gun/src/gun_http.erl"},
+                      {line,474}]},
+                 {gun,handle_common_connected_no_input,4,
+                     [{file,
+                          "/code/gleam-dream/http_gun/build/dev/erlang/gun/src/gun.erl"},
+                      {line,1641}]},
+                 {gen_statem,loop_state_callback,11,
+                     [{file,"gen_statem.erl"},{line,3741}]},
+                 {proc_lib,init_p_do_apply,3,
+                     [{file,"proc_lib.erl"},{line,333}]}]}
+    offender: [{pid,<0.117.0>},
+               {id,gun},
+               {mfargs,{gun,start_link,undefined}},
+               {restart_type,temporary},
+               {significant,false},
+               {shutdown,5000},
+               {child_type,worker}]
+
+signed_chunk: {response,nofin,200,[{<<"transfer-encoding">>,<<"chunked">>}]} / {error,
+                                                                                {stream_error,
+                                                                                 closed}}

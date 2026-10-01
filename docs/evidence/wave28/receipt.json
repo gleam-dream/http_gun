@@ -1,0 +1,97 @@
+{
+  "base_revision": "2b3656e8aa6cb1e64ecf0d60079ff4ac89c3cee7",
+  "date": "2026-10-01",
+  "host": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+  "compiler": "Gleam1.18.1",
+  "runtimes": {
+    "29": {
+      "command": "./dev/env sh dev/gate full",
+      "exit": 0,
+      "tests": 120,
+      "log": "docs/evidence/wave28/runtimes/default/full.log",
+      "sha256": "c30225afaa09052da1988002b6a91563fea97839a978370c315f2bde2e372dce"
+    },
+    "28": {
+      "command": "nix develop path:/code/gleam-dream/http_gun#otp28 --command sh dev/gate full",
+      "exit": 0,
+      "tests": 120,
+      "log": "docs/evidence/wave28/runtimes/otp28/full.log",
+      "sha256": "c17a26233abf53709ab2a8f69cb1f0821ffde0824754d4399a061b2af787459c"
+    },
+    "27": {
+      "command": "nix develop path:/code/gleam-dream/http_gun#otp27 --command sh dev/gate full",
+      "exit": 0,
+      "tests": 120,
+      "log": "docs/evidence/wave28/runtimes/otp27/full.log",
+      "sha256": "98d239812d5e2c5180632b25f72000a5bca1e95b3c67ae4e095dcd7a622ee064"
+    }
+  },
+  "runtime_inputs": 106,
+  "inputs_unchanged": true,
+  "fast": {
+    "command": "./dev/env sh dev/gate fast",
+    "exit": 0,
+    "tests": 120,
+    "log": "docs/evidence/wave27/fast-final-with-cancellation.log"
+  },
+  "dependencies": {
+    "gun": "2.6.0",
+    "cowlib": "2.20.0",
+    "modified": false
+  },
+  "ffi": {
+    "physical_lines": 113,
+    "bytes": 5585,
+    "bindings": 15,
+    "new_responsibilities": [
+      "native IP parsing",
+      "one-family inet:getaddrs/3 lookup",
+      "checked IP tuple and original TLS-name conversion",
+      "finite TCP/TLS send options"
+    ]
+  },
+  "warden": {
+    "revision": "230c6bb4171a782d5b4f4f795bbdc108cad49964",
+    "source_sha256": "0fd3b160ecb50575a7185b4927b7010c684a218a3ba4e8fc46471d3d1de568cc",
+    "test_sha256": "f079d5ee5edc04b403d281c973a203080d3328cd7291a86d0e848d5c1c0f4c36",
+    "copied_source": false,
+    "modified": false,
+    "migration_or_release": false
+  },
+  "downstream": {
+    "revision": "1c0ad614149b6ba286a6f778e223bd294f403b30",
+    "unmodified": {
+      "check": 0,
+      "build": 0,
+      "tests_pass": 175,
+      "tests_fail": 48,
+      "reason": "loopback test clients need explicit permission",
+      "receipt": "downstream-original/receipt.json"
+    },
+    "isolated_setup_adaptation": {
+      "tests_pass": 223,
+      "boundary": 0,
+      "local_h2": 0,
+      "production_source_unchanged": true,
+      "receipt": "downstream-adapted/receipt.json"
+    },
+    "original_checkouts_unchanged": true
+  },
+  "accepted_exception": "Gun discards status reason phrases; their control characters cannot be validated through its public API. Owner accepted documentation on2026-10-01.",
+  "not_executed": [
+    "Linux/hosted CI",
+    "Warden migration and own adapter gate",
+    "release/publication",
+    "new Dream comparison or sustained soak"
+  ],
+  "docs_build": {
+    "command": "./dev/env gleam docs build",
+    "exit": 0,
+    "log": "docs-build.log"
+  },
+  "ip_sni_negative_control": {
+    "mutation": "IP-literal SNI omitted -> disable, disposable copy only",
+    "exit": 1,
+    "failed_for_wrong_certificate_acceptance": true
+  }
+}

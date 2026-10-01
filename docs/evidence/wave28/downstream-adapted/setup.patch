@@ -1,0 +1,446 @@
+--- a/test/http_test_helpers.gleam
++++ b/test/http_test_helpers.gleam
+@@ -1,5 +1,6 @@
+ import http_gun
+ import http_gun/config
++import http_gun/destination as http_destination
+ import http_gun/fixture
+ import http_gun/testing as http_testing
+ import llm_wire/session
+@@ -7,7 +8,7 @@
+ 
+ /// Tests own this client for the complete callback, including streamed reads.
+ pub fn with_client(run: fn(http_gun.Client) -> value) -> value {
+-  with_settings(config.Config(..config.default(), deadline_ms: 60_000), run)
++  with_settings(config.Config(..destination_test_config(), deadline_ms: 60_000), run)
+ }
+ 
+ pub fn with_settings(
+@@ -26,7 +27,7 @@
+ ) -> value {
+   let assert Ok(client) =
+     http_testing.start(
+-      config.Config(..config.default(), deadline_ms: 60_000),
++      config.Config(..destination_test_config(), deadline_ms: 60_000),
+       exchanges,
+     )
+   let outcome = run(client)
+@@ -49,3 +50,9 @@
+   use client <- with_script([testing.structured_exchange(prepared, reply)])
+   session.run_structured(client, prepared)
+ }
++
++// Isolated adoption experiment: explicitly permit the local test servers.
++fn destination_test_config() -> config.Config {
++  let defaults = config.default()
++  config.Config(..defaults, destination: http_destination.Policy(..defaults.destination, allow_loopback: True))
++}
+--- a/test/llm_wire_cassette_test.gleam
++++ b/test/llm_wire_cassette_test.gleam
+@@ -11,6 +11,7 @@
+ import http_gun
+ import http_gun/cassette
+ import http_gun/config as http_config
++import http_gun/destination as http_destination
+ import http_gun/error
+ import http_gun/fixture
+ import http_test_helpers
+@@ -84,7 +85,7 @@
+ 
+ pub fn cassette_json_round_trip_drives_the_same_public_flow_test() {
+   let assert Ok(tape) = cassette.parse(encoded(), 100_000)
+-  let assert Ok(client) = cassette.playback(tape, http_config.default())
++  let assert Ok(client) = cassette.playback(tape, destination_test_config())
+   session.run(client, prepared("Hello"))
+   |> should.equal(Ok(session.RunText("loaded", None)))
+   let assert Ok(Nil) = http_gun.stop(client)
+@@ -95,7 +96,7 @@
+ pub fn disk_fixtures_replace_only_the_transport_test() {
+   let assert Ok(tape) =
+     cassette.load("test/fixtures/http-gun-text.json", 100_000)
+-  let assert Ok(client) = cassette.playback(tape, http_config.default())
++  let assert Ok(client) = cassette.playback(tape, destination_test_config())
+   session.run(client, prepared("Hello"))
+   |> should.equal(Ok(session.RunText("loaded", None)))
+   let assert Ok(Nil) = http_gun.stop(client)
+@@ -151,7 +152,7 @@
+     )
+   let assert Ok(tape) = cassette.new([exchange])
+   let assert Ok(parsed) = cassette.parse(cassette.encode(tape), 100_000)
+-  let assert Ok(client) = cassette.playback(parsed, http_config.default())
++  let assert Ok(client) = cassette.playback(parsed, destination_test_config())
+   session.run(client, call) |> should.equal(Ok(session.RunText("héllo", None)))
+   let assert Ok(Nil) = http_gun.stop(client)
+ }
+@@ -297,3 +298,9 @@
+     _ -> panic as "Fixture must contain whole bytes"
+   }
+ }
++
++// Isolated adoption experiment: explicitly permit the local test servers.
++fn destination_test_config() -> http_config.Config {
++  let defaults = http_config.default()
++  http_config.Config(..defaults, destination: http_destination.Policy(..defaults.destination, allow_loopback: True))
++}
+--- a/test/llm_wire_http_gun_test.gleam
++++ b/test/llm_wire_http_gun_test.gleam
+@@ -9,6 +9,7 @@
+ import gleeunit/should
+ import http_gun
+ import http_gun/config as http_config
++import http_gun/destination as http_destination
+ import http_gun/error as http_error
+ import llm_wire/config
+ import llm_wire/provider
+@@ -71,7 +72,7 @@
+       config.from_provider(adapter),
+       types.new_request(model, [types.UserMessage("hello")]),
+     )
+-  let assert Ok(client) = http_gun.start(http_config.default())
++  let assert Ok(client) = http_gun.start(destination_test_config())
+   let consumer =
+     process.spawn_unlinked(fn() {
+       let _ = session.run(client, call)
+@@ -114,7 +115,7 @@
+     )
+   let assert Ok(client) =
+     http_gun.start(
+-      http_config.Config(..http_config.default(), deadline_ms: 60_000),
++      http_config.Config(..destination_test_config(), deadline_ms: 60_000),
+     )
+   session.run(client, prepared)
+   |> should.equal(Ok(session.RunText("hello", None)))
+@@ -130,7 +131,7 @@
+ }
+ 
+ pub fn closed_shared_client_keeps_conservative_http_evidence_test() {
+-  let assert Ok(client) = http_gun.start(http_config.default())
++  let assert Ok(client) = http_gun.start(destination_test_config())
+   let assert Ok(Nil) = http_gun.stop(client)
+   let assert Error(session.RunFailure(
+     types.HttpFailure(http_error.ClientClosed),
+@@ -162,7 +163,7 @@
+ }
+ 
+ pub fn pre_submission_http_limit_keeps_no_request_sent_test() {
+-  let defaults = http_config.default()
++  let defaults = destination_test_config()
+   let assert Ok(client) =
+     http_gun.start(
+       http_config.Config(
+@@ -195,7 +196,7 @@
+       process.send(released, result)
+       tcp.close(socket)
+     })
+-  let assert Ok(client) = http_gun.start(http_config.default())
++  let assert Ok(client) = http_gun.start(destination_test_config())
+   let assert Ok(stream) =
+     session.stream(client, prepared(server.port, types.default_deadlines()))
+   let assert Ok(Nil) = process.receive(accepted, 2000)
+@@ -230,7 +231,7 @@
+       config.openai(openai.options(key)) |> config.with_endpoint(endpoint),
+       types.new_request(model, [types.UserMessage("hello")]),
+     )
+-  let assert Ok(client) = http_gun.start(http_config.default())
++  let assert Ok(client) = http_gun.start(destination_test_config())
+   let assert Ok(stream) = session.stream(client, call)
+   let assert Ok(Nil) = process.receive(connecting, 2000)
+   session.close(stream) |> should.equal(Ok(types.ConsumerClosed))
+@@ -295,7 +296,7 @@
+       tcp.close(socket)
+     })
+   let assert Ok(release) = process.receive(gate, 1000)
+-  let assert Ok(client) = http_gun.start(http_config.default())
++  let assert Ok(client) = http_gun.start(destination_test_config())
+   let call = prepared(server.port, types.Deadlines(3000, 1000, 10))
+   let assert Ok(stream) = session.stream(client, call)
+   session.next(stream)
+@@ -321,7 +322,7 @@
+           True,
+         )
+     })
+-  let assert Ok(client) = http_gun.start(http_config.default())
++  let assert Ok(client) = http_gun.start(destination_test_config())
+   let assert Error(session.RunFailure(
+     types.DeadlineExceeded(types.IdleDeadline),
+     evidence,
+@@ -346,7 +347,7 @@
+       let _ = tcp.recv(socket, 0, 2000)
+       tcp.close(socket)
+     })
+-  let assert Ok(client) = http_gun.start(http_config.default())
++  let assert Ok(client) = http_gun.start(destination_test_config())
+   let assert Error(session.RunFailure(
+     types.DeadlineExceeded(types.IdleDeadline),
+     evidence,
+@@ -371,7 +372,7 @@
+     })
+   let call = prepared(server.port, types.Deadlines(80, 2000, 10))
+   process.sleep(100)
+-  let assert Ok(client) = http_gun.start(http_config.default())
++  let assert Ok(client) = http_gun.start(destination_test_config())
+   let assert Error(session.RunFailure(
+     types.DeadlineExceeded(types.OverallDeadline),
+     _,
+@@ -401,7 +402,7 @@
+             True,
+           )
+       })
+-    let assert Ok(client) = http_gun.start(http_config.default())
++    let assert Ok(client) = http_gun.start(destination_test_config())
+     let assert Error(session.RunFailure(_, evidence)) =
+       session.run(client, prepared(server.port, types.default_deadlines()))
+     evidence.response_bytes_observed |> should.be_true
+@@ -424,7 +425,7 @@
+       process.send(closed, tcp.recv(socket, 0, 3000))
+       tcp.close(socket)
+     })
+-  let assert Ok(client) = http_gun.start(http_config.default())
++  let assert Ok(client) = http_gun.start(destination_test_config())
+   let ready = process.new_subject()
+   let call = prepared(server.port, types.default_deadlines())
+   let consumer =
+@@ -441,3 +442,9 @@
+   let assert Ok(Nil) = http_gun.stop(client)
+   fake_server.stop(server)
+ }
++
++// Isolated adoption experiment: explicitly permit the local test servers.
++fn destination_test_config() -> http_config.Config {
++  let defaults = http_config.default()
++  http_config.Config(..defaults, destination: http_destination.Policy(..defaults.destination, allow_loopback: True))
++}
+--- a/test/llm_wire_integration_test.gleam
++++ b/test/llm_wire_integration_test.gleam
+@@ -9,6 +9,7 @@
+ import gleam/string
+ import gleeunit/should
+ import http_gun/config as http_config
++import http_gun/destination as http_destination
+ import http_gun/error as http_error
+ import http_test_helpers
+ import llm_wire/config
+@@ -789,7 +790,7 @@
+ pub fn gun_tls_stream_with_pinned_ca_test() {
+   use owned_http <- http_test_helpers.with_settings(
+     http_config.Config(
+-      ..http_config.default(),
++      ..destination_test_config(),
+       trust: http_config.CustomCa("test/fixtures/llm-wire-test-ca.crt"),
+     ),
+   )
+@@ -844,7 +845,7 @@
+ pub fn gun_tls_rejects_hostname_mismatch_test() {
+   use owned_http <- http_test_helpers.with_settings(
+     http_config.Config(
+-      ..http_config.default(),
++      ..destination_test_config(),
+       trust: http_config.CustomCa("test/fixtures/llm-wire-test-ca.crt"),
+     ),
+   )
+@@ -979,3 +980,9 @@
+       }
+   }
+ }
++
++// Isolated adoption experiment: explicitly permit the local test servers.
++fn destination_test_config() -> http_config.Config {
++  let defaults = http_config.default()
++  http_config.Config(..defaults, destination: http_destination.Policy(..defaults.destination, allow_loopback: True))
++}
+--- a/test/llm_wire_local_gate.gleam
++++ b/test/llm_wire_local_gate.gleam
+@@ -11,6 +11,7 @@
+ import gleam/string
+ import http_gun
+ import http_gun/config as http_config
++import http_gun/destination as http_destination
+ import llm_wire/config
+ import llm_wire/provider
+ import llm_wire/session
+@@ -178,7 +179,7 @@
+   let assert Ok(port) = simplifile.read("build/http-gun-local-port")
+   let assert Ok(endpoint) =
+     types.endpoint("https://127.0.0.1:" <> string.trim(port))
+-  let defaults = http_config.default()
++  let defaults = destination_test_config()
+   let policy =
+     http_config.Config(
+       ..defaults,
+@@ -215,3 +216,9 @@
+   let assert Ok(Nil) = http_gun.stop(client)
+   Nil
+ }
++
++// Isolated adoption experiment: explicitly permit the local test servers.
++fn destination_test_config() -> http_config.Config {
++  let defaults = http_config.default()
++  http_config.Config(..defaults, destination: http_destination.Policy(..defaults.destination, allow_loopback: True))
++}
+--- a/test/llm_wire_pool_test.gleam
++++ b/test/llm_wire_pool_test.gleam
+@@ -8,6 +8,7 @@
+ import gleeunit/should
+ import http_gun
+ import http_gun/config as http_config
++import http_gun/destination as http_destination
+ import http_gun/error
+ import llm_wire/config
+ import llm_wire/provider/openai
+@@ -16,7 +17,7 @@
+ import llm_wire_http_gun_test
+ 
+ fn settings(active: Int, waiting: Int, connections: Int) -> http_config.Config {
+-  let base = http_config.default()
++  let base = destination_test_config()
+   http_config.Config(
+     ..base,
+     deadline_ms: 5000,
+@@ -233,3 +234,9 @@
+   process.send(release, Nil)
+   fake_server.stop(server)
+ }
++
++// Isolated adoption experiment: explicitly permit the local test servers.
++fn destination_test_config() -> http_config.Config {
++  let defaults = http_config.default()
++  http_config.Config(..defaults, destination: http_destination.Policy(..defaults.destination, allow_loopback: True))
++}
+--- a/test/llm_wire_recording_test.gleam
++++ b/test/llm_wire_recording_test.gleam
+@@ -9,6 +9,7 @@
+ import http_gun
+ import http_gun/cassette
+ import http_gun/config as http_config
++import http_gun/destination as http_destination
+ import http_gun/error as http_error
+ import http_gun/fixture
+ import http_gun/recording
+@@ -107,7 +108,7 @@
+   let settings = local_settings(server)
+   let assert Ok(recorded) =
+     cassette.record(
+-      http_config.default(),
++      destination_test_config(),
+       destination,
+       recording.Options(1_000_000, recording.RefuseExisting),
+     )
+@@ -120,7 +121,7 @@
+   let assert Ok(Nil) = http_gun.stop(recorded.client)
+   fake_server.stop(server)
+   let assert Ok(tape) = cassette.load(destination, 1_000_000)
+-  let assert Ok(client) = cassette.playback(tape, http_config.default())
++  let assert Ok(client) = cassette.playback(tape, destination_test_config())
+   workflow(client, settings)
+   let assert Ok(Nil) = http_gun.stop(client)
+   let assert Ok(Nil) = simplifile.delete(destination)
+@@ -146,7 +147,7 @@
+   let assert Ok(release_first) = process.receive(ready, 1000)
+   let destination = path()
+   let assert Ok(recorded) =
+-    cassette.record(http_config.default(), destination, recording.default())
++    cassette.record(destination_test_config(), destination, recording.default())
+   let assert Ok(model) = types.model_id("fixture")
+   let assert Ok(call) =
+     session.prepare(
+@@ -165,7 +166,7 @@
+   let assert Ok(Nil) = http_gun.stop(recorded.client)
+   fake_server.stop(server)
+   let assert Ok(tape) = cassette.load(destination, 1_000_000)
+-  let assert Ok(client) = cassette.playback(tape, http_config.default())
++  let assert Ok(client) = cassette.playback(tape, destination_test_config())
+   let assert Ok(first) = session.stream(client, call)
+   // First progress proves offline admission before the second semantic session.
+   let assert Ok(session.NextProgress(types.TextDelta(_, "first"))) =
+@@ -196,7 +197,7 @@
+   let destination = path()
+   let assert Ok(recorded) =
+     cassette.record(
+-      http_config.default(),
++      destination_test_config(),
+       destination,
+       recording.Options(128, recording.RefuseExisting),
+     )
+@@ -212,14 +213,14 @@
+   let destination = path()
+   let assert Ok(Nil) = simplifile.write(destination, "existing")
+   let assert Ok(recorded) =
+-    cassette.record(http_config.default(), destination, recording.default())
++    cassette.record(destination_test_config(), destination, recording.default())
+   recording.finish_wait(recorded.recording, 5000)
+   |> should.equal(Error(recording.CaptureFailed(recording.DestinationExists)))
+   simplifile.read(destination) |> should.equal(Ok("existing"))
+   let assert Ok(Nil) = http_gun.stop(recorded.client)
+   let assert Ok(replacement) =
+     cassette.record(
+-      http_config.default(),
++      destination_test_config(),
+       destination,
+       recording.Options(1000, recording.ReplaceExisting),
+     )
+@@ -238,7 +239,7 @@
+   let assert Ok(Nil) = simplifile.create_directory(destination)
+   let assert Ok(recorded) =
+     cassette.record(
+-      http_config.default(),
++      destination_test_config(),
+       destination,
+       recording.Options(1_000_000, recording.ReplaceExisting),
+     )
+@@ -272,7 +273,7 @@
+     })
+   let destination = path()
+   let assert Ok(recorded) =
+-    cassette.record(http_config.default(), destination, recording.default())
++    cassette.record(destination_test_config(), destination, recording.default())
+   let assert Ok(model) = types.model_id("synthetic-model")
+   let assert Ok(call) =
+     session.prepare(
+@@ -291,7 +292,7 @@
+   let assert Ok(Nil) = http_gun.stop(recorded.client)
+   fake_server.stop(server)
+   let assert Ok(tape) = cassette.load(destination, 1_000_000)
+-  let assert Ok(client) = cassette.playback(tape, http_config.default())
++  let assert Ok(client) = cassette.playback(tape, destination_test_config())
+   let assert Error(session.RunFailure(types.CancelledLocally, evidence)) =
+     session.run(client, call)
+   evidence.response_bytes_observed |> should.be_true
+@@ -299,3 +300,9 @@
+   let assert Ok(Nil) = http_gun.stop(client)
+   let assert Ok(Nil) = simplifile.delete(destination)
+ }
++
++// Isolated adoption experiment: explicitly permit the local test servers.
++fn destination_test_config() -> http_config.Config {
++  let defaults = http_config.default()
++  http_config.Config(..defaults, destination: http_destination.Policy(..defaults.destination, allow_loopback: True))
++}
+--- a/examples/consumer/src/llm_wire_consumer.gleam
++++ b/examples/consumer/src/llm_wire_consumer.gleam
+@@ -6,6 +6,7 @@
+ import http_gun
+ import http_gun/cassette
+ import http_gun/config as http_config
++import http_gun/destination as http_destination
+ import http_gun/recording
+ import http_gun/testing as http_testing
+ import llm_wire/config
+@@ -15,7 +16,7 @@
+ 
+ pub fn http_policy() -> http_config.Config {
+   // HTTP Gun applies this ceiling even when an LLM call has a longer budget.
+-  http_config.Config(..http_config.default(), deadline_ms: 120_000)
++  http_config.Config(..destination_test_config(), deadline_ms: 120_000)
+ }
+ 
+ /// Publish each newly supervised capability to the application's registry.
+@@ -96,3 +97,9 @@
+   let assert Ok(Nil) = http_gun.stop(client)
+   Nil
+ }
++
++// Isolated adoption experiment: explicitly permit the local test servers.
++fn destination_test_config() -> http_config.Config {
++  let defaults = http_config.default()
++  http_config.Config(..defaults, destination: http_destination.Policy(..defaults.destination, allow_loopback: True))
++}

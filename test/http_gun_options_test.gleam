@@ -9,13 +9,14 @@ import http_gun/body
 import http_gun/cancellation
 import http_gun/config
 import http_gun/deadline
+import http_gun/destination
 import http_gun/error
 import http_gun/fixture
 import http_gun/request_options
 import http_gun/testing
 
 pub fn expired_deadline_refuses_before_submission_test() {
-  let assert Ok(client) = http_gun.start(config.default())
+  let assert Ok(client) = http_gun.start(local_config())
   let assert Ok(budget) = deadline.after(0)
   let options =
     request_options.Options(..request_options.default(), deadline: Some(budget))
@@ -30,7 +31,7 @@ pub fn expired_deadline_refuses_before_submission_test() {
 }
 
 pub fn cancelled_token_refuses_fresh_work_test() {
-  let assert Ok(client) = http_gun.start(config.default())
+  let assert Ok(client) = http_gun.start(local_config())
   let assert Ok(Nil) =
     cancellation.with_token(fn(token) {
       cancellation.cancel(token)
@@ -69,7 +70,7 @@ fn req(port: Int) -> request.Request(BitArray) {
 
 pub fn token_cancels_before_headers_without_killing_caller_test() {
   let #(port, server) = gated()
-  let assert Ok(client) = http_gun.start(config.default())
+  let assert Ok(client) = http_gun.start(local_config())
   let result = process.new_subject()
   let alive = process.new_subject()
   let assert Ok(Nil) =
@@ -103,7 +104,7 @@ fn controlled() -> #(Int, process.Pid)
 
 pub fn queued_cancellation_removes_waiter_without_submission_test() {
   let #(port, server) = controlled()
-  let c = config.default()
+  let c = local_config()
   let assert Ok(client) =
     http_gun.start(
       config.Config(..c, limits: config.Limits(..c.limits, active: 1)),
@@ -147,7 +148,7 @@ fn wait_for_queue(client: http_gun.Client, size: Int, tries: Int) -> Bool {
 
 pub fn cancellation_during_tls_setup_releases_connection_reservation_test() {
   let #(port, server) = gated()
-  let c = config.default()
+  let c = local_config()
   let assert Ok(client) = http_gun.start(config.Config(..c, connect_ms: 500))
   let result = process.new_subject()
   let assert Ok(Nil) =
@@ -181,7 +182,7 @@ pub fn cancellation_during_tls_setup_releases_connection_reservation_test() {
 
 pub fn supplied_deadline_covers_body_and_client_remains_ceiling_test() {
   let #(port, server) = controlled()
-  let assert Ok(client) = http_gun.start(config.default())
+  let assert Ok(client) = http_gun.start(local_config())
   let assert Ok(budget) = deadline.after(100)
   let options =
     request_options.Options(..request_options.default(), deadline: Some(budget))
@@ -196,7 +197,7 @@ pub fn supplied_deadline_covers_body_and_client_remains_ceiling_test() {
   let _ = body.close(response.body)
   let _ = http_gun.stop(client)
   let #(port, server) = controlled()
-  let c = config.default()
+  let c = local_config()
   let assert Ok(client) = http_gun.start(config.Config(..c, deadline_ms: 100))
   let assert Ok(budget) = deadline.after(5000)
   let options = request_options.Options(..options, deadline: Some(budget))
@@ -213,7 +214,7 @@ pub fn supplied_deadline_covers_body_and_client_remains_ceiling_test() {
 
 pub fn scope_exit_cancels_stream_and_returned_token_stays_cancelled_test() {
   let #(port, server) = controlled()
-  let assert Ok(client) = http_gun.start(config.default())
+  let assert Ok(client) = http_gun.start(local_config())
   let assert Ok(#(response, token)) =
     cancellation.with_token(fn(token) {
       let options =
@@ -241,7 +242,7 @@ pub fn scope_exit_cancels_stream_and_returned_token_stays_cancelled_test() {
 
 pub fn cancellation_creator_death_unblocks_independent_consumer_test() {
   let #(port, server) = gated()
-  let assert Ok(client) = http_gun.start(config.default())
+  let assert Ok(client) = http_gun.start(local_config())
   let ready = process.new_subject()
   let result = process.new_subject()
   let creator =
@@ -284,7 +285,7 @@ pub fn completed_http_survives_later_cancellation_test() {
         fixture.Complete([#("x-end", "yes")]),
       ),
     )
-  let assert Ok(client) = testing.start(config.default(), [exchange])
+  let assert Ok(client) = testing.start(local_config(), [exchange])
   let assert Ok(Nil) =
     cancellation.with_token(fn(token) {
       let options =
@@ -306,7 +307,7 @@ pub fn completed_http_survives_later_cancellation_test() {
 
 pub fn last_queued_cancellation_releases_shared_connecting_socket_test() {
   let #(port, server) = gated()
-  let c = config.default()
+  let c = local_config()
   let assert Ok(client) = http_gun.start(config.Config(..c, connect_ms: 5000))
   let results = process.new_subject()
   let request = req(port) |> request.set_scheme(http.Https)
@@ -354,4 +355,16 @@ pub fn last_queued_cancellation_releases_shared_connecting_socket_test() {
       })
     })
   let _ = http_gun.stop(client)
+}
+
+// These exercises connect only to explicitly permitted local test servers.
+fn local_config() -> config.Config {
+  let defaults = config.default()
+  config.Config(
+    ..defaults,
+    destination: destination.Policy(
+      ..defaults.destination,
+      allow_loopback: True,
+    ),
+  )
 }

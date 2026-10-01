@@ -1,0 +1,8 @@
+{
+  "kind": "additional test-configuration experiment, not a reproduced defect",
+  "temporary_change": "stalled_sends_end_and_leave_no_caller_messages_test: connect_ms=100; request deadline remains300ms",
+  "command": "./dev/env gleam run -m http_gun_destination_wire_test",
+  "exit": 0,
+  "outcome": "fresh/reused TCP and TLS cases retained deadline failure, bounded cleanup and unchanged caller mailbox",
+  "disposition": "restored qualified test configuration after probe; production unchanged"
+}

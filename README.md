@@ -10,9 +10,14 @@ Requests use `gleam/http/request.Request(BitArray)`. Responses preserve status c
 import gleam/http/request
 import http_gun
 import http_gun/config
+import http_gun/destination
 
 pub fn main() {
-  let assert Ok(client) = http_gun.start(config.default())
+  let defaults = config.default()
+  // Explicit opt-in for this local development server.
+  let settings = config.Config(..defaults, destination:
+    destination.Policy(..defaults.destination, allow_loopback: True))
+  let assert Ok(client) = http_gun.start(settings)
   let assert Ok(req) = request.to("http://localhost:8080/data")
   let result = http_gun.send(client, request.set_body(req, <<>>))
   let _ = http_gun.stop(client)
@@ -41,7 +46,7 @@ Import `http_gun/body` for `next`, `close`, `collect` and `protocol`. `next` yie
 
 Advanced callers can use `open` to obtain `Response(Body)` and explicitly `close` its opaque body. The process that opens the response owns consumption. Copies share one cursor. A read while another is pending returns `ReadConflict`; a different consumer otherwise receives `WrongOwner`. Handles do not transfer ownership. Close is idempotent and can be requested by another holder.
 
-A read-wait timeout returns `ReadTimeout` while preserving the stream and outstanding demand. The overall request deadline covers admission, connection setup and consumption; expiry terminates unfinished HTTP work. Completed data remains readable until close or owner death. Early close, scope exit, consumer death and client shutdown release the lease once. Local cancellation says nothing about whether the server continued processing the request.
+A read-wait timeout returns `ReadTimeout` while preserving the stream and outstanding demand. The overall request deadline covers admission, DNS, connection setup, sending and consumption; expiry terminates unfinished HTTP work. Completed data remains readable until close or owner death. Early close, scope exit, consumer death and client shutdown release the lease once. Local cancellation says nothing about whether the server continued processing the request.
 
 Per-request controls use `request_options.Options`: an optional opaque monotonic `Deadline` and scoped cancellation `Token`. Use `send_with_options`, `open_with_options` or the corresponding scoped variants. The effective deadline is the earlier of the client ceiling and the supplied deadline. A shared token can cancel associated requests before headers or during consumption; scope exit and creator death also cancel them. See [usage examples](docs/API_ERGONOMICS.md) and the [maintained asynchronous feed recipe](examples/async/README.md), including supervised startup and cancellation before headers.
 
@@ -61,13 +66,51 @@ let settings = config.Config(
 
 `http_gun.request_ceiling_ms(client)` reads that capability’s immutable startup ceiling, even after stop. It does not check liveness or extend a request budget.
 
-Defaults: H1, verified system TLS trust, 30-second request ceiling, five-second connection budget, 16 connections, four per origin, 100 streams per H2 connection, 128 active body handles and 128 waiting requests. Byte defaults and their precise scope are in [BOUNDS.md](BOUNDS.md).
+Defaults: public destinations only, H1, verified system TLS trust, 30-second request ceiling, five-second connection budget, 16 connections, four per origin, 100 streams per H2 connection, 128 active body handles and 128 waiting requests. Byte defaults and their precise scope are in [BOUNDS.md](BOUNDS.md).
 
 `CustomCa(path)` replaces system trust with a CA file while retaining hostname verification. Each client owns its pool; different trust or transport policies never share connections. `PreferHttp2` negotiates H2 over TLS and otherwise uses H1. `RequireHttp2` requires H2 over TLS; explicit plaintext HTTP uses H2 prior knowledge. Eligible connections are reused before another is opened. Idle sockets yield global slots to other origins. H1 leases are exclusive; H2 leases respect configured and observed peer capacity.
 
 `http_gun.child(settings)` supplies a standard Gleam OTP supervisor child specification. The client process is linked to its starter; `stop` cancels active work and closes connections. A supervisor restart creates a new client capability; old handles remain closed. Gun application startup uses OTP. The library does not stop shared Gun/SSL applications when one client stops.
 
 `Failure(reason, evidence)` distinguishes invalid input, admission, connection, stream, ownership, deadline, limit and fixture failures. Limits carry typed categories and observed sizes; transport and filesystem errors carry bounded causes. `error.describe` omits free-form details and request content. The [API guide](docs/API_ERGONOMICS.md#typed-diagnostics-and-fixture-format) explains error matching. `NotSubmitted` describes failures known to precede submission. `MayHaveBeenSent` is conservative, including uncertain client/process races. Neither value establishes remote execution. Status interpretation and retry decisions belong to the caller. `snapshot` returns finite connection/body/waiting counters without request history.
+
+## Destination policy and pinned DNS
+
+`config.destination` is a pure `destination.Policy`. Defaults allow public
+addresses and refuse loopback, private and reserved addresses. Opt into
+`allow_loopback` for local services and `allow_private` for private networks;
+reserved ranges and cloud metadata addresses remain forbidden. `allow_public`
+can also be disabled. Optional `allowed_hosts: Some(["issuer.example"])`
+restricts exact, case-insensitive host names, **not ports**. It intersects the
+address policy. IPv6 entries use bare addresses without URL brackets.
+
+A new hostname connection resolves A and AAAA once, within the request budget.
+Every returned address must pass policy, including IPv4-mapped/NAT64 forms; a
+mixed public/forbidden answer refuses the whole origin. Gun connects to the
+first checked address, with no second DNS resolution or address fallback. TLS
+verifies the original hostname. IP literals are checked directly, omit SNI,
+and verify their certificate's IP SAN. Plain HTTP remains available. Requests
+keep their original HTTP authority, including IPv6 brackets.
+
+DNS answers are trusted for **one connection's lifetime only**. Reuse stays
+inside one immutable client policy and origin; opening a replacement connection
+resolves again. Start a new client and stop the old one to change policy—changing
+a previously supplied configuration value does not change a running client.
+`DestinationRejected` and `ResolutionFailed` carry `NotSubmitted` and no raw
+DNS/transport detail. No request is retried automatically.
+
+Tests can set `resolver: Some(fn(host, remaining_ms) { ... })`, returning one
+complete `Result(List(destination.Address), Nil)` answer per new connection.
+HTTP Gun isolates the resolver, bounds its lifetime, checks every address and
+fails closed on empty/invalid/failed answers. Treat a custom resolver as trusted
+application code: it must return the complete answer, and owns any external
+resources it creates. The default uses OTP `inet:getaddrs/3` for both families.
+Scripts and strict playback never resolve or apply a network policy; recording
+uses the live policy and records refusals as well as completed HTTP exchanges.
+
+See [BOUNDS.md](BOUNDS.md#destination-policy) for precise DNS, send and parser
+boundaries. Gun/Cowlib remain unmodified; status reason phrases are discarded by
+Gun and cannot be validated by this client. Delivered headers are validated.
 
 ## Lifecycle observations
 

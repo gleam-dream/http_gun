@@ -1,0 +1,15 @@
+  Compiling http_gun
+   Compiled in 0.26s
+    Running http_gun_destination_wire_test.main
+[31;1mruntime error[39m: panic[0m
+
+
+Ok(Buffered(Response(200, [#("content-length", "0"), #("x-test", "a\u{0000}b")], ""), [], H1))
+should equal
+Error(Failure(RequestFailed(ProtocolError), MayHaveBeenSent))
+
+stacktrace:
+  gleeunit/should.equal[90m src/gleeunit/should.gleam:10[0m
+  gleam/list.each[90m src/gleam/list.gleam:1654[0m
+  http_gun_destination_wire_test.response_controls_are_rejected_test[90m test/http_gun_destination_wire_test.gleam:43[0m
+

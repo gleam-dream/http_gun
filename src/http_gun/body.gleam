@@ -215,7 +215,7 @@ pub fn start(
             connection,
             http.method_to_string(req.method),
             target,
-            req.headers,
+            wire_headers(req),
             req.body,
           )
           |> result.map_error(fn(_) { "request submission failed" }),
@@ -264,6 +264,28 @@ pub fn start(
   })
   |> actor.on_message(handle)
   |> actor.start
+}
+
+// Gun's connection origin is the pinned IP. Keep HTTP authority bound to the
+// original request unless the caller deliberately supplied a Host header.
+fn wire_headers(req: request.Request(a)) -> List(#(String, String)) {
+  case request.get_header(req, "host") {
+    Ok(_) -> req.headers
+    Error(_) -> [#("host", authority(req)), ..req.headers]
+  }
+}
+
+@internal
+pub fn authority(req: request.Request(a)) -> String {
+  let bare = bridge.unbracket(req.host)
+  let host = case string.contains(bare, ":") {
+    True -> "[" <> bare <> "]"
+    False -> bare
+  }
+  case req.port, req.scheme {
+    None, _ | Some(443), http.Https | Some(80), http.Http -> host
+    Some(port), _ -> host <> ":" <> int.to_string(port)
+  }
 }
 
 fn handle(state: State, message: Message) -> actor.Next(State, Message) {
@@ -664,7 +686,34 @@ pub fn check_headers(
         error.LimitExceeded(count_kind, limits.header_count, count),
         MayHaveBeenSent,
       ))
-    False, False -> Ok(Nil)
+    False, False ->
+      case
+        list.all(headers, fn(pair) {
+          result.is_ok(http.parse_method(pair.0))
+          && valid_field_value(bit_array.from_string(pair.1))
+        })
+      {
+        True -> Ok(Nil)
+        False ->
+          Error(Failure(
+            case kind {
+              RequestHeaders -> error.InvalidRequest("invalid header")
+              ResponseHeaders -> error.RequestFailed(error.ProtocolError)
+            },
+            MayHaveBeenSent,
+          ))
+      }
+  }
+}
+
+// Validate values delivered by Gun, including trailers/informational headers.
+// This is application admission after parsing, not a second wire parser.
+fn valid_field_value(bytes: BitArray) -> Bool {
+  case bytes {
+    <<>> -> True
+    <<byte, rest:bits>> if byte == 9 || { byte >= 32 && byte != 127 } ->
+      valid_field_value(rest)
+    _ -> False
   }
 }
 

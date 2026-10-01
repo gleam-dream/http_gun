@@ -7,6 +7,7 @@ import http_gun
 import http_gun/body
 import http_gun/cancellation
 import http_gun/config
+import http_gun/destination
 import http_gun/error
 import http_gun/request_options
 import http_gun/testing
@@ -17,7 +18,7 @@ type AppError {
 }
 
 pub fn request_ceiling_is_immutable_policy_not_liveness_test() {
-  let settings = config.Config(..config.default(), deadline_ms: 1234)
+  let settings = config.Config(..local_config(), deadline_ms: 1234)
   let assert Ok(live) = http_gun.start(settings)
   let assert Ok(script) = testing.start(settings, [])
   http_gun.request_ceiling_ms(live) |> should.equal(1234)
@@ -26,7 +27,7 @@ pub fn request_ceiling_is_immutable_policy_not_liveness_test() {
   let _ = http_gun.stop(script)
   http_gun.request_ceiling_ms(live) |> should.equal(1234)
   http_gun.request_ceiling_ms(script) |> should.equal(1234)
-  let assert Ok(other) = http_gun.start(config.default())
+  let assert Ok(other) = http_gun.start(local_config())
   http_gun.request_ceiling_ms(other) |> should.equal(30_000)
   http_gun.request_ceiling_ms(live) |> should.equal(1234)
   let _ = http_gun.stop(other)
@@ -40,7 +41,7 @@ pub fn fallible_token_preserves_callback_errors_and_closes_success_test() {
   value |> should.equal(42)
   cancellation.cancel(token)
   cancellation.cancel(token)
-  let assert Ok(client) = http_gun.start(config.default())
+  let assert Ok(client) = http_gun.start(local_config())
   http_gun.send_with_options(
     client,
     request.new() |> request.set_body(<<>>),
@@ -70,7 +71,7 @@ fn req(port: Int) -> request.Request(BitArray) {
 pub fn fallible_scope_success_cancels_all_grouped_unfinished_bodies_test() {
   let #(port, peer) = controlled()
   let #(other_port, other_peer) = controlled()
-  let assert Ok(client) = http_gun.start(config.default())
+  let assert Ok(client) = http_gun.start(local_config())
   let assert Ok(#(one, two)) =
     cancellation.try_with_token(Startup, fn(token) {
       let options =
@@ -96,7 +97,7 @@ pub fn fallible_scope_success_cancels_all_grouped_unfinished_bodies_test() {
 
 pub fn fallible_scope_callback_failure_cancels_http_test() {
   let #(port, peer) = controlled()
-  let assert Ok(client) = http_gun.start(config.default())
+  let assert Ok(client) = http_gun.start(local_config())
   cancellation.try_with_token(Startup, fn(token) {
     let options =
       request_options.Options(
@@ -123,7 +124,7 @@ fn raise(reason: ScopeProbe) -> Nil
 
 pub fn fallible_scope_exception_propagates_after_cleanup_test() {
   let #(port, peer) = controlled()
-  let assert Ok(client) = http_gun.start(config.default())
+  let assert Ok(client) = http_gun.start(local_config())
   raised(fn() {
     cancellation.try_with_token(Startup, fn(token) {
       let options =
@@ -139,4 +140,16 @@ pub fn fallible_scope_exception_propagates_after_cleanup_test() {
   |> should.be_true
   closed(peer) |> should.be_true
   let _ = http_gun.stop(client)
+}
+
+// These exercises connect only to explicitly permitted local test servers.
+fn local_config() -> config.Config {
+  let defaults = config.default()
+  config.Config(
+    ..defaults,
+    destination: destination.Policy(
+      ..defaults.destination,
+      allow_loopback: True,
+    ),
+  )
 }

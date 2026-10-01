@@ -1,0 +1,5 @@
+{
+  "mutation": "IP-literal SNI omitted -> disable, disposable copy only",
+  "exit": 1,
+  "failed_for_wrong_certificate_acceptance": true
+}

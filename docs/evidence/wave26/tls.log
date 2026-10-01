@@ -1,0 +1,41 @@
+  Compiling http_gun
+   Compiled in 0.29s
+    Running http_gun_test.main
+[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m=NOTICE REPORT==== 1-Oct-2026::07:30:10.455688 ===
+TLS server: In state wait_finished received CLIENT ALERT: Fatal - Bad Certificate
+
+=NOTICE REPORT==== 1-Oct-2026::07:30:10.455642 ===
+TLS client: In state wait_cert_cr at ssl_handshake.erl:2262 generated CLIENT ALERT: Fatal - Bad Certificate
+ - {bad_cert,{hostname_check_failed,{requested,"wrong.invalid"},
+                                    {received,[{dNSName,"localhost"}]}}}
+[32m.[39m=NOTICE REPORT==== 1-Oct-2026::07:30:10.471719 ===
+TLS client: In state wait_cert_cr at ssl_handshake.erl:2252 generated CLIENT ALERT: Fatal - Bad Certificate
+ - selfsigned_peer
+=NOTICE REPORT==== 1-Oct-2026::07:30:10.471780 ===
+TLS server: In state wait_finished received CLIENT ALERT: Fatal - Bad Certificate
+
+
+[1m[31mlet assert[39m[22m [90mtest/http_gun_destination_test.gleam:324[39m
+[36m test[39m: http_gun_destination_test.ip_literal_tls_checks_ip_san_test
+[36m code[39m: let assert Ok(reply) =
+    http_gun.send(
+      client,
+      local_request(tls_ip(), "127.0.0.1") |> request.set_scheme(http.Https),
+    )
+[36mvalue[39m: Error(Failure(ConnectionFailed(CertificateRejected), NotSubmitted))
+[36m info[39m: Pattern match failed, no pattern matched the value.
+[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m=NOTICE REPORT==== 1-Oct-2026::07:30:10.891001 ===
+TLS client: In state wait_cert_cr at ssl_handshake.erl:2254 generated CLIENT ALERT: Fatal - Unknown CA
+
+=NOTICE REPORT==== 1-Oct-2026::07:30:10.891044 ===
+TLS server: In state wait_finished received CLIENT ALERT: Fatal - Unknown CA
+
+[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m=NOTICE REPORT==== 1-Oct-2026::07:30:10.933767 ===
+TLS client: In state wait_cert_cr at ssl_handshake.erl:2262 generated CLIENT ALERT: Fatal - Bad Certificate
+ - {bad_cert,{hostname_check_failed,{requested,{127,0,0,1}},
+                                    {received,[{dNSName,"localhost"}]}}}
+=NOTICE REPORT==== 1-Oct-2026::07:30:10.933819 ===
+TLS server: In state wait_finished received CLIENT ALERT: Fatal - Bad Certificate
+
+[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[31m
+107 passed, 1 failures[39m

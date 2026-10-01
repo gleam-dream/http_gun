@@ -113,6 +113,8 @@ pub fn failure_json(failure: Failure) -> json.Json {
     error.InvalidRequest(text) -> #("invalid_request", text, 0)
     error.ClientClosed -> #("client_closed", "", 0)
     error.AdmissionFull -> #("admission_full", "", 0)
+    error.DestinationRejected -> #("destination_rejected", "", 0)
+    error.ResolutionFailed -> #("resolution_failed", "", 0)
     error.ConnectionFailed(cause) -> #("connection_failed", cause_tag(cause), 0)
     error.RequestFailed(cause) -> #("request_failed", cause_tag(cause), 0)
     error.DeadlineExceeded -> #("deadline", "", 0)
@@ -256,6 +258,8 @@ fn failure_decoder() -> decode.Decoder(Failure) {
     "invalid_request" -> Ok(error.InvalidRequest(detail))
     "client_closed" -> Ok(error.ClientClosed)
     "admission_full" -> Ok(error.AdmissionFull)
+    "destination_rejected" -> Ok(error.DestinationRejected)
+    "resolution_failed" -> Ok(error.ResolutionFailed)
     "connection_failed" ->
       result.map(parse_cause(detail), error.ConnectionFailed)
     "request_failed" -> result.map(parse_cause(detail), error.RequestFailed)

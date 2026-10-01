@@ -59,3 +59,6 @@ The generic correction couples incarnation-owned direct destinations, admission 
 
 
 Local integration: the generic Sinal correction is committed as `8acec4507f23daa7f49c40cc7d39816a5a4c3d1d`. Its normal formatting hook removed one extra blank line from README.md; selected runtime source, manifests, tests and license are byte-identical to the validated source. The dependency snapshot was regenerated from that clean commit. [Integration recheck](evidence/local-integration-2026-10-01.json) records the two changed packaging hashes; the earlier qualification receipts retain their original inputs. No push or publication occurred.
+
+
+Destination policy (waves25–28) uses Warden230c6bb4171a782d5b4f4f795bbdc108cad49964 as read-only behavioral evidence. Transport source SHA2560fd3b160ecb50575a7185b4927b7010c684a218a3ba4e8fc46471d3d1de568cc; tests SHA256f079d5ee5edc04b403d281c973a203080d3328cd7291a86d0e848d5c1c0f4c36, recorded before implementation and unchanged afterward. No Warden source was copied. New IP-SAN fixtures are generated locally by dev/ip-fixture; existing certificate/server attribution is retained. Gun2.6.0/Cowlib2.20.0 and Gleam OTP/Erlang1.3.0 sources were inspected and remain unmodified. The [receipt](evidence/wave28/receipt.json) records scope, source hashes, runtime checks and the separate downstream setup experiment.

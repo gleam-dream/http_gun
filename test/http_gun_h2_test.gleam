@@ -8,6 +8,7 @@ import http_gun
 import http_gun/body
 import http_gun/cancellation
 import http_gun/config
+import http_gun/destination
 import http_gun/error
 import http_gun/request_options
 
@@ -15,7 +16,7 @@ import http_gun/request_options
 fn server() -> Int
 
 fn settings() -> config.Config {
-  let c = config.default()
+  let c = local_config()
   config.Config(
     ..c,
     protocol: config.RequireHttp2,
@@ -289,4 +290,16 @@ pub fn cancellation_token_preserves_h2_sibling_and_connection_test() {
       |> should.equal(response_header(slow.headers, "x-connection"))
     })
   let _ = http_gun.stop(client)
+}
+
+// These exercises connect only to explicitly permitted local test servers.
+fn local_config() -> config.Config {
+  let defaults = config.default()
+  config.Config(
+    ..defaults,
+    destination: destination.Policy(
+      ..defaults.destination,
+      allow_loopback: True,
+    ),
+  )
 }

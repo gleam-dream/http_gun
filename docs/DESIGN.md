@@ -83,3 +83,32 @@ Observation is opt-in. HTTP Gun uses an explicitly supplied forwarder and direct
 The pool remains authoritative for admission; the request/body owner remains authoritative for local Gun-call return, accepted final response headers and HTTP termination. Observations are best effort and unsuitable for correctness or retry decisions. Gun-call return establishes only return from a local asynchronous API, not transport processing, bytes written or remote receipt. Script/playback observations must identify their simulated execution and never claim network submission. Recording persistence remains separate.
 
 Implemented through `config.observations`, `telemetry.event()` and a pure correlated Client view. Request options, HTTP failures and cassette schema are unchanged. The generic Sinal correction gives each actor incarnation its own direct destination, admission slots and drop-notice flag. No HTTP-specific server is added to Sinal. Dependency source and gate isolation are described in [OBSERVATIONS.md](OBSERVATIONS.md); exact qualification is in the current wave tracker.
+
+
+## Destination policy and resolution ownership (2026-10-01)
+
+The owner's destination-policy prompt selects a public-only default and a pure
+`destination.Policy` field on Config. Address classes and policy intersections
+are Gleam values. New typed DestinationRejected/ResolutionFailed errors expose
+no raw DNS terms and precede submission. Offline modes retain their ordinary
+contract without DNS; recording retains live refusal observations.
+
+Connection preparation has explicit Resolving → Connecting → Ready states.
+Each resolving reservation owns a bounded Gleam worker/guardian pair; the pool
+never blocks on DNS or an injected resolver. All A/AAAA results are checked,
+then Gun receives an IP tuple. Original HTTP authority and TLS identity are
+preserved independently of that tuple. No retries or DNS fallback exist.
+Only checked connections enter the immutable client's origin pool; replacement
+connections resolve again. Cancellation/deadline/owner/pool death end unused
+work and late resolution results cannot open a discarded reservation.
+
+Native address parsing, one-family inet:getaddrs/3 and address/option conversion
+are the only new transport FFI responsibilities. Existing OTP process links,
+monitors and selectors own worker lifetime in Gleam. TCP/TLS send timeouts and
+per-request body-owner deadlines coexist, including pooled connections.
+
+Complete delivered header lists are bounded and checked for invalid controls;
+Gun/Cowlib own wire framing. The owner accepted the experimentally verified
+reason-phrase exception because Gun discards that text. See BOUNDS.md for exact
+enforcement points and close-delimited TLS ambiguity. Warden remains read-only
+behavioral evidence; adoption/release is a separate downstream decision.

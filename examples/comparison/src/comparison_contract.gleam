@@ -13,6 +13,7 @@ import http_gun
 import http_gun/body
 import http_gun/cassette
 import http_gun/config
+import http_gun/destination
 import http_gun/recording
 import simplifile
 
@@ -224,7 +225,7 @@ fn recording_case(name: String, client: adapter.Client, repeated: Bool) -> Nil {
   case client {
     adapter.Gun(_) -> {
       let assert Ok(rec) =
-        cassette.record(config.default(), destination, recording.default())
+        cassette.record(local_config(), destination, recording.default())
       let a = exchange(rec.client, port)
       let b = case repeated {
         True -> exchange(rec.client, port)
@@ -233,7 +234,7 @@ fn recording_case(name: String, client: adapter.Client, repeated: Bool) -> Nil {
       let assert Ok(_) = cassette.finish(rec.recording)
       let _ = http_gun.stop(rec.client)
       let assert Ok(tape) = cassette.load(destination, 100_000)
-      let assert Ok(replay) = cassette.playback(tape, config.default())
+      let assert Ok(replay) = cassette.playback(tape, local_config())
       let a2 = exchange(replay, port)
       let b2 = case repeated {
         True -> exchange(replay, port)
@@ -364,4 +365,16 @@ pub fn main() {
   recording_case(name, client, False)
   recording_case(name, client, True)
   adapter.stop(client)
+}
+
+// These exercises connect only to explicitly permitted local test servers.
+fn local_config() -> config.Config {
+  let defaults = config.default()
+  config.Config(
+    ..defaults,
+    destination: destination.Policy(
+      ..defaults.destination,
+      allow_loopback: True,
+    ),
+  )
 }

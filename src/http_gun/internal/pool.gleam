@@ -15,12 +15,14 @@ import http_gun/body
 import http_gun/cancellation
 import http_gun/config
 import http_gun/deadline
+import http_gun/destination
 import http_gun/error.{type Failure, Failure, NotSubmitted}
 import http_gun/fixture
 import http_gun/internal/bridge
 import http_gun/internal/call
 import http_gun/internal/observation as obs
 import http_gun/internal/pending.{type Origin, type Pending, Origin, Pending}
+import http_gun/internal/resolution
 import http_gun/recording
 import http_gun/request_options
 import http_gun/telemetry
@@ -38,6 +40,7 @@ pub opaque type Client {
 }
 
 type Status {
+  Resolving
   Connecting
   Ready(config.Negotiated, Int)
 }
@@ -74,6 +77,7 @@ type State {
 }
 
 type Message {
+  Resolved(process.Pid, Result(resolution.Resolved, error.Reason))
   Inspect(process.Subject(Result(Stats, Failure)))
   Open(
     request.Request(BitArray),
@@ -197,7 +201,11 @@ pub fn start_mode(
 
 fn origin(req: request.Request(a)) -> Origin {
   let tls = req.scheme == http.Https
-  Origin(string.lowercase(req.host), option_port(req, tls), tls)
+  Origin(
+    bridge.unbracket(string.lowercase(req.host)),
+    option_port(req, tls),
+    tls,
+  )
 }
 
 fn option_port(req: request.Request(a), tls: Bool) -> Int {
@@ -213,6 +221,8 @@ fn option_port(req: request.Request(a), tls: Bool) -> Int {
 
 fn handle(state: State, message: Message) -> actor.Next(State, Message) {
   case message {
+    Resolved(pid, result) ->
+      actor.continue(dispatch(resolved(state, pid, result)))
     Inspect(reply) -> {
       process.send(
         reply,
@@ -232,7 +242,7 @@ fn handle(state: State, message: Message) -> actor.Next(State, Message) {
         let _ = body.close(o.body)
         Nil
       })
-      list.each(state.connections, fn(c) { bridge.close(c.pid) })
+      list.each(state.connections, close_connection)
       process.send(reply, Ok(Nil))
       actor.stop()
     }
@@ -377,11 +387,23 @@ fn dispatch_group(state: State, group: pending.Group) -> State {
 }
 
 fn admit_live(state: State, p: Pending) -> Admission {
+  let permitted =
+    destination.permits_host(state.config.destination, p.origin.host)
+  case permitted {
+    False -> {
+      reject(p, error.DestinationRejected)
+      Taken(state)
+    }
+    True -> admit_connection(state, p)
+  }
+}
+
+fn admit_connection(state: State, p: Pending) -> Admission {
   let eligible =
     list.find(state.connections, fn(c) {
       c.origin == p.origin
       && case c.status {
-        Connecting -> False
+        Resolving | Connecting -> False
         Ready(_, capacity) -> c.used < capacity
       }
     })
@@ -393,36 +415,28 @@ fn admit_live(state: State, p: Pending) -> Admission {
       case
         list.length(state.connections) < state.config.limits.connections
         && list.length(same) < state.config.limits.per_origin
-        && !list.any(same, fn(c) { c.status == Connecting })
+        && !list.any(same, fn(c) { preparing(c.status) })
       {
         False -> Deferred(state, p)
-        True ->
-          case
-            bridge.open(
+        True -> {
+          let subject = state.subject
+          let pid =
+            resolution.start(
+              process.self(),
+              state.config.destination,
               p.origin.host,
-              p.origin.port,
-              p.origin.tls,
-              state.config.protocol,
-              state.config.trust,
-              int.min(state.config.connect_ms, p.deadline - bridge.now()),
-              state.config.limits.header_count,
+              p.deadline,
+              fn(pid, result) { process.send(subject, Resolved(pid, result)) },
             )
-          {
-            Error(cause) -> {
-              reject(p, error.ConnectionFailed(cause))
-              Taken(state)
-            }
-            Ok(pid) -> {
-              let _ = process.monitor(pid)
-              Deferred(
-                State(..state, connections: [
-                  Connection(pid, p.origin, Connecting, 0),
-                  ..state.connections
-                ]),
-                Pending(..p, reservation: Some(pid)),
-              )
-            }
-          }
+          let _ = process.monitor(pid)
+          Deferred(
+            State(..state, connections: [
+              Connection(pid, p.origin, Resolving, 0),
+              ..state.connections
+            ]),
+            Pending(..p, reservation: Some(pid)),
+          )
+        }
       }
     }
   }
@@ -432,7 +446,7 @@ fn launch(state: State, p: Pending, connection: Connection) -> State {
   telemetry.emit(p.observation, telemetry.AdmissionGranted)
   let protocol = case connection.status {
     Ready(protocol, _) -> protocol
-    Connecting -> config.H1
+    Resolving | Connecting -> config.H1
   }
   // This callback crosses a process boundary. Capture only its destinations,
   // never the pool state (which also contains every queued request).
@@ -683,7 +697,7 @@ fn make_room(state: State, wanted: Origin) -> State {
         list.find(state.connections, fn(c) {
           c.origin != wanted
           && c.used == 0
-          && c.status != Connecting
+          && !preparing(c.status)
           && !pending.has_group(state.pending, pending.ForOrigin(c.origin))
         })
       {
@@ -815,14 +829,7 @@ fn fail_group(
   group: pending.Group,
   cause: error.TransportCause,
 ) -> State {
-  case pending.first(state.pending, group) {
-    Error(_) -> state
-    Ok(p) -> {
-      reject(p, error.ConnectionFailed(cause))
-      let #(_, queue) = pending.remove(state.pending, p.id)
-      fail_group(State(..state, pending: queue), group, cause)
-    }
-  }
+  fail_reason(state, group, error.ConnectionFailed(cause))
 }
 
 fn connection_lost(
@@ -833,13 +840,19 @@ fn connection_lost(
   case list.find(state.connections, fn(c) { c.pid == pid }) {
     Error(_) -> state
     Ok(connection) -> {
-      bridge.close(pid)
+      close_connection(connection)
       let state =
         State(
           ..state,
           connections: list.filter(state.connections, fn(c) { c.pid != pid }),
         )
       case connection.status {
+        Resolving ->
+          fail_reason(
+            state,
+            pending.ForOrigin(connection.origin),
+            error.ResolutionFailed,
+          )
         Connecting ->
           fail_group(state, pending.ForOrigin(connection.origin), cause)
         Ready(_, _) -> state
@@ -880,9 +893,9 @@ fn discard_reservation(state: State, p: Pending) -> State {
     False -> {
       let #(unused, keep) =
         list.partition(state.connections, fn(connection) {
-          connection.origin == p.origin && connection.status == Connecting
+          connection.origin == p.origin && preparing(connection.status)
         })
-      list.each(unused, fn(connection) { bridge.close(connection.pid) })
+      list.each(unused, close_connection)
       State(..state, connections: keep)
     }
   }
@@ -890,4 +903,86 @@ fn discard_reservation(state: State, p: Pending) -> State {
 
 pub fn with_correlation(client: Client, id: telemetry.Id) -> Client {
   Client(..client, correlation: Some(id))
+}
+
+fn preparing(status: Status) -> Bool {
+  case status {
+    Resolving | Connecting -> True
+    Ready(_, _) -> False
+  }
+}
+
+fn close_connection(connection: Connection) -> Nil {
+  case connection.status {
+    Resolving -> process.kill(connection.pid)
+    Connecting | Ready(_, _) -> bridge.close(connection.pid)
+  }
+}
+
+fn fail_reason(
+  state: State,
+  group: pending.Group,
+  reason: error.Reason,
+) -> State {
+  case pending.first(state.pending, group) {
+    Error(_) -> state
+    Ok(p) -> {
+      reject(p, reason)
+      let #(_, queue) = pending.remove(state.pending, p.id)
+      fail_reason(State(..state, pending: queue), group, reason)
+    }
+  }
+}
+
+fn resolved(
+  state: State,
+  pid: process.Pid,
+  answer: Result(resolution.Resolved, error.Reason),
+) -> State {
+  case
+    list.find(state.connections, fn(c) { c.pid == pid && c.status == Resolving })
+  {
+    Error(_) -> state
+    Ok(connection) -> {
+      let without =
+        State(
+          ..state,
+          connections: list.filter(state.connections, fn(c) { c.pid != pid }),
+        )
+      let group = pending.ForOrigin(connection.origin)
+      case answer, pending.first(state.pending, group) {
+        _, Error(_) -> without
+        Error(error.DeadlineExceeded), _ -> without
+        Error(reason), _ -> fail_reason(without, group, reason)
+        Ok(target), Ok(p) -> {
+          case p.deadline <= bridge.now() {
+            True -> without
+            False ->
+              case
+                bridge.open(
+                  target.address,
+                  target.server_name,
+                  p.origin.port,
+                  p.origin.tls,
+                  state.config.protocol,
+                  state.config.trust,
+                  int.min(state.config.connect_ms, p.deadline - bridge.now()),
+                  state.config.limits.header_count,
+                )
+              {
+                Error(cause) ->
+                  fail_reason(without, group, error.ConnectionFailed(cause))
+                Ok(connected) -> {
+                  let _ = process.monitor(connected)
+                  State(..without, connections: [
+                    Connection(connected, connection.origin, Connecting, 0),
+                    ..without.connections
+                  ])
+                }
+              }
+          }
+        }
+      }
+    }
+  }
 }

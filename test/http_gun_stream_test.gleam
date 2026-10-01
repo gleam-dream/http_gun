@@ -6,6 +6,7 @@ import gleeunit/should
 import http_gun
 import http_gun/body
 import http_gun/config
+import http_gun/destination
 import http_gun/error
 
 @external(erlang, "http_gun_test_server", "controlled")
@@ -25,7 +26,7 @@ fn req(port: Int) -> request.Request(BitArray) {
 
 pub fn local_timeout_preserves_stream_and_copies_share_cursor_test() {
   let #(port, server) = controlled()
-  let assert Ok(client) = http_gun.start(config.default())
+  let assert Ok(client) = http_gun.start(local_config())
   let assert Ok(response) = http_gun.open(client, req(port))
   let copy = response.body
   body.next(copy, 0)
@@ -42,7 +43,7 @@ pub fn local_timeout_preserves_stream_and_copies_share_cursor_test() {
 
 pub fn scoped_early_exit_closes_socket_test() {
   let #(port, server) = controlled()
-  let assert Ok(client) = http_gun.start(config.default())
+  let assert Ok(client) = http_gun.start(local_config())
   http_gun.with_response(client, req(port), fn(_) { "caller value" })
   |> should.equal(Ok("caller value"))
   closed(server) |> should.be_true
@@ -51,7 +52,7 @@ pub fn scoped_early_exit_closes_socket_test() {
 
 pub fn overall_deadline_is_terminal_test() {
   let #(port, server) = controlled()
-  let settings = config.default()
+  let settings = local_config()
   let assert Ok(client) =
     http_gun.start(config.Config(..settings, deadline_ms: 100))
   let assert Ok(response) = http_gun.open(client, req(port))
@@ -70,7 +71,7 @@ pub fn overall_deadline_is_terminal_test() {
 
 pub fn owner_death_closes_socket_test() {
   let #(port, server) = controlled()
-  let assert Ok(client) = http_gun.start(config.default())
+  let assert Ok(client) = http_gun.start(local_config())
   let ready = process.new_subject()
   let owner =
     process.spawn_unlinked(fn() {
@@ -88,7 +89,7 @@ pub fn owner_death_closes_socket_test() {
 
 pub fn buffered_limit_closes_socket_test() {
   let #(port, server) = controlled()
-  let settings = config.default()
+  let settings = local_config()
   let settings =
     config.Config(
       ..settings,
@@ -121,7 +122,7 @@ type ScopeProbe {
 
 pub fn exception_scope_cleanup_test() {
   let #(port, server) = controlled()
-  let assert Ok(client) = http_gun.start(config.default())
+  let assert Ok(client) = http_gun.start(local_config())
   raised(fn() {
     http_gun.with_response(client, req(port), fn(_) { raise(ScopeProbe) })
   })
@@ -132,7 +133,7 @@ pub fn exception_scope_cleanup_test() {
 
 pub fn conflicting_reader_test() {
   let #(port, server) = controlled()
-  let assert Ok(client) = http_gun.start(config.default())
+  let assert Ok(client) = http_gun.start(local_config())
   let ready = process.new_subject()
   let reading = process.new_subject()
   let finished = process.new_subject()
@@ -175,7 +176,7 @@ type ConsumerError {
 
 pub fn fallible_scope_preserves_application_error_and_cleanup_test() {
   let #(port, server) = controlled()
-  let assert Ok(client) = http_gun.start(config.default())
+  let assert Ok(client) = http_gun.start(local_config())
   http_gun.try_with_response(client, req(port), Http, fn(_) {
     Error(ApplicationStopped)
   })
@@ -186,7 +187,7 @@ pub fn fallible_scope_preserves_application_error_and_cleanup_test() {
 
 pub fn fallible_scope_maps_open_and_read_failures_test() {
   let #(port, server) = controlled()
-  let assert Ok(client) = http_gun.start(config.default())
+  let assert Ok(client) = http_gun.start(local_config())
   http_gun.try_with_response(client, req(port), Http, fn(response) {
     body.next(response.body, 0) |> result.map_error(Http)
   })
@@ -202,7 +203,7 @@ pub fn fallible_scope_maps_open_and_read_failures_test() {
 
 pub fn fallible_scope_success_and_exception_cleanup_test() {
   let #(port, server) = controlled()
-  let assert Ok(client) = http_gun.start(config.default())
+  let assert Ok(client) = http_gun.start(local_config())
   http_gun.try_with_response(client, req(port), Http, fn(_) { Ok("value") })
   |> should.equal(Ok("value"))
   closed(server) |> should.be_true
@@ -216,4 +217,16 @@ pub fn fallible_scope_success_and_exception_cleanup_test() {
   |> should.be_true
   closed(server) |> should.be_true
   let _ = http_gun.stop(client)
+}
+
+// These exercises connect only to explicitly permitted local test servers.
+fn local_config() -> config.Config {
+  let defaults = config.default()
+  config.Config(
+    ..defaults,
+    destination: destination.Policy(
+      ..defaults.destination,
+      allow_loopback: True,
+    ),
+  )
 }

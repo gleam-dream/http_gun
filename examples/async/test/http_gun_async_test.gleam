@@ -11,6 +11,7 @@ import http_gun/body
 import http_gun/cassette
 import http_gun/config
 import http_gun/deadline
+import http_gun/destination
 import http_gun/error
 import http_gun/fixture
 import http_gun/recording
@@ -88,12 +89,12 @@ fn empty(client: http_gun.Client, until: deadline.Deadline) -> Nil {
 }
 
 fn one_slot() -> config.Config {
-  let c = config.default()
+  let c = local_config()
   config.Config(..c, limits: config.Limits(..c.limits, active: 1))
 }
 
 fn headers_and_body_cancellation() -> Nil {
-  let assert Ok(client) = http_gun.start(config.default())
+  let assert Ok(client) = http_gun.start(local_config())
   let #(port, peer) = gated()
   let job = start(client, req(port))
   arrived(peer)
@@ -154,7 +155,7 @@ fn budgets_and_read_waits() -> Nil {
   let _ = http_gun.stop(downloads)
   let #(port, peer) = controlled()
   let assert Ok(client) =
-    http_gun.start(config.Config(..config.default(), deadline_ms: 100))
+    http_gun.start(config.Config(..local_config(), deadline_ms: 100))
   let assert Ok(longer) = deadline.after(5000)
   let assert Ok(reply) =
     http_gun.open_with_options(
@@ -205,7 +206,7 @@ fn budgets_and_read_waits() -> Nil {
 }
 
 fn early_error_and_exception() -> Nil {
-  let assert Ok(client) = http_gun.start(config.default())
+  let assert Ok(client) = http_gun.start(local_config())
   let #(port, peer) = controlled()
   let assert Ok(job) =
     feed_job.start(client, req(port), budget(), fn(_) { Ok(feed_job.Stop) })
@@ -235,7 +236,7 @@ fn early_error_and_exception() -> Nil {
 }
 
 fn consumer_death_and_bounded_shutdown() -> Nil {
-  let assert Ok(client) = http_gun.start(config.default())
+  let assert Ok(client) = http_gun.start(local_config())
   let #(port, peer) = controlled()
   let ready = process.new_subject()
   let _ =
@@ -272,7 +273,7 @@ fn consumer_death_and_bounded_shutdown() -> Nil {
 
 fn copies_and_conflicts() -> Nil {
   let #(port, peer) = controlled()
-  let assert Ok(client) = http_gun.start(config.default())
+  let assert Ok(client) = http_gun.start(local_config())
   let assert Ok(reply) = http_gun.open(client, req(port))
   let copied = reply.body
   send(peer, <<"1\r\na\r\n":utf8>>)
@@ -313,7 +314,7 @@ fn conflict(source: body.Body, until: deadline.Deadline) -> Nil {
 
 fn supervised_restart() -> Nil {
   let ready = process.new_subject()
-  let assert Ok(supervisor) = feed_job.supervise(config.default(), ready)
+  let assert Ok(supervisor) = feed_job.supervise(local_config(), ready)
   let assert Ok(first) = process.receive(ready, 1000)
   let assert Ok(_) = http_gun.send(first, req(persistent()))
   let assert Ok(Nil) = http_gun.stop(first)
@@ -341,7 +342,7 @@ fn modes() -> Nil {
   let request =
     req(persistent())
     |> request.set_header("accept", "application/octet-stream")
-  let assert Ok(client) = http_gun.start(config.default())
+  let assert Ok(client) = http_gun.start(local_config())
   flow(client, request)
   let assert Ok(3) = workflow.download(client, request)
   let assert Ok(_) = workflow.rest_pair(client, request, request)
@@ -354,7 +355,7 @@ fn modes() -> Nil {
         fixture.Complete([]),
       ),
     )
-  let assert Ok(client) = testing.start(config.default(), [exchange, exchange])
+  let assert Ok(client) = testing.start(local_config(), [exchange, exchange])
   let assert Error(error.Failure(error.FixtureMismatch(0), _)) =
     http_gun.send(client, request |> request.set_header("accept", "text/plain"))
   flow(client, request)
@@ -364,7 +365,7 @@ fn modes() -> Nil {
   let path = "build/probe-cassette.json"
   let assert Ok(recorded) =
     cassette.record(
-      config.default(),
+      local_config(),
       path,
       recording.Options(1_000_000, recording.ReplaceExisting),
     )
@@ -372,7 +373,7 @@ fn modes() -> Nil {
   let assert Ok(_) = recording.finish_wait(recorded.recording, 1000)
   let _ = http_gun.stop(recorded.client)
   let assert Ok(tape) = cassette.load(path, 1_000_000)
-  let assert Ok(client) = cassette.playback(tape, config.default())
+  let assert Ok(client) = cassette.playback(tape, local_config())
   let assert Error(error.Failure(error.FixtureMismatch(0), _)) =
     http_gun.send(client, request |> request.set_header("accept", "text/plain"))
   flow(client, request)
@@ -384,7 +385,7 @@ fn modes() -> Nil {
 
 fn h2_jobs() -> Nil {
   let port = h2()
-  let c = config.default()
+  let c = local_config()
   let assert Ok(client) =
     http_gun.start(
       config.Config(
@@ -421,7 +422,7 @@ fn h2_jobs() -> Nil {
 }
 
 fn slow_sink_and_shutdown() -> Nil {
-  let assert Ok(client) = http_gun.start(config.default())
+  let assert Ok(client) = http_gun.start(local_config())
   let #(port, peer) = controlled()
   let seen = process.new_subject()
   let assert Ok(job) =
@@ -442,7 +443,7 @@ fn slow_sink_and_shutdown() -> Nil {
   let assert Ok(feed_job.Eof(2, [])) = feed_job.await(job, 1000)
   let _ = http_gun.stop(client)
   let assert True = closed(peer)
-  let assert Ok(client) = http_gun.start(config.default())
+  let assert Ok(client) = http_gun.start(local_config())
   let #(port, peer) = controlled()
   let job = start(client, req(port))
   arrived(peer)
@@ -458,7 +459,7 @@ fn recording_prefix_and_failure() -> Nil {
   let path = "build/early-prefix.json"
   let assert Ok(recorded) =
     cassette.record(
-      config.default(),
+      local_config(),
       path,
       recording.Options(1_000_000, recording.ReplaceExisting),
     )
@@ -473,7 +474,7 @@ fn recording_prefix_and_failure() -> Nil {
   let assert Ok(_) = recording.finish_wait(recorded.recording, 1000)
   let _ = http_gun.stop(recorded.client)
   let assert Ok(tape) = cassette.load(path, 1_000_000)
-  let assert Ok(client) = cassette.playback(tape, config.default())
+  let assert Ok(client) = cassette.playback(tape, local_config())
   let assert Ok(job) =
     feed_job.start(client, request, budget(), fn(_) { Ok(feed_job.Stop) })
   let assert Ok(feed_job.Early(1)) = feed_job.await(job, 1000)
@@ -481,7 +482,7 @@ fn recording_prefix_and_failure() -> Nil {
   let path = "build/capture-limit.json"
   let assert Ok(recorded) =
     cassette.record(
-      config.default(),
+      local_config(),
       path,
       recording.Options(1, recording.ReplaceExisting),
     )
@@ -525,5 +526,17 @@ pub fn main() -> Nil {
   recording_prefix_and_failure()
   io.println(
     "PASS live prefix recording/offline replay and independent capture failure",
+  )
+}
+
+// These exercises connect only to explicitly permitted local test servers.
+fn local_config() -> config.Config {
+  let defaults = config.default()
+  config.Config(
+    ..defaults,
+    destination: destination.Policy(
+      ..defaults.destination,
+      allow_loopback: True,
+    ),
   )
 }

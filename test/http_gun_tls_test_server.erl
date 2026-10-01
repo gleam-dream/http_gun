@@ -1,9 +1,11 @@
 -module(http_gun_tls_test_server).
--export([start/0]).
-start() ->
+-export([start/0, ip/0]).
+start() -> start("localhost").
+ip() -> start("ip").
+start(Name) ->
     application:ensure_all_started(ssl),
     {ok,L} = ssl:listen(0, [binary,{active,false},{reuseaddr,true},
-        {certfile,"test/fixtures/localhost.crt"},{keyfile,"test/fixtures/localhost.key"}]),
+        {certfile,"test/fixtures/" ++ Name ++ ".crt"},{keyfile,"test/fixtures/" ++ Name ++ ".key"}]),
     {ok,{_,Port}} = ssl:sockname(L),
     spawn(fun() ->
         case ssl:transport_accept(L,3000) of

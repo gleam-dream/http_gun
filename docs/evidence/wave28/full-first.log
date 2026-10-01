@@ -1,0 +1,616 @@
+  Resolving versions
+Downloading packages
+ Downloaded 12 packages in 0.05s
+  Compiling cowlib
+===> Analyzing applications...
+===> Compiling cowlib
+  Compiling gleam_stdlib
+/private/tmp/nix-shell.zEZA5H/http-gun-gate-veg6tmwx/http_gun/build/dev/erlang/gleam_stdlib/_gleam_artefacts/gleam_stdlib.erl:75:10: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%   75|     case catch binary_to_integer(String, Base) of
+%     |          ^
+
+/private/tmp/nix-shell.zEZA5H/http-gun-gate-veg6tmwx/http_gun/build/dev/erlang/gleam_stdlib/_gleam_artefacts/gleam_stdlib.erl:81:10: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%   81|     case catch binary_to_integer(String) of
+%     |          ^
+
+/private/tmp/nix-shell.zEZA5H/http-gun-gate-veg6tmwx/http_gun/build/dev/erlang/gleam_stdlib/_gleam_artefacts/gleam_stdlib.erl:87:10: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%   87|     case catch binary_to_float(String) of
+%     |          ^
+
+  Compiling file_streams
+  Compiling filepath
+  Compiling gleam_erlang
+  Compiling gleam_http
+  Compiling gleam_json
+  Compiling gleam_otp
+  Compiling gleeunit
+  Compiling gun
+===> Analyzing applications...
+===> Compiling gun
+  Compiling simplifile
+  Compiling telemetry
+===> Analyzing applications...
+===> Compiling telemetry
+  Compiling sinal
+   Checking http_gun
+   Compiled in 13.96s
+  Compiling http_gun
+   Compiled in 0.53s
+   Compiled in 0.21s
+    Running http_gun_test.main
+[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m=CRASH REPORT==== 1-Oct-2026::07:45:44.476882 ===
+  crasher:
+    initial call: http_gun@internal@resolution:'-start/5-anonymous-0-'/0
+    pid: <0.253.0>
+    registered_name: []
+    exception error: #{function =>
+                           <<"throwing_resolver_is_typed_and_does_not_kill_pool_test">>,
+                       line => 536,message => <<"injected resolver failure">>,
+                       module => <<"http_gun_destination_test">>,
+                       file => <<"test/http_gun_destination_test.gleam">>,
+                       gleam_error => panic}
+      in function  http_gun_destination_test:'-throwing_resolver_is_typed_and_does_not_kill_pool_test/0-anonymous-0-'/2 (test/http_gun_destination_test.gleam:535)
+      in call from http_gun@internal@resolution:'-resolve/3-anonymous-4-'/4 (src/http_gun/internal/resolution.gleam:81)
+      in call from http_gun@internal@resolution:'-start/5-anonymous-0-'/4 (src/http_gun/internal/resolution.gleam:30)
+    ancestors: [<0.252.0>,<0.251.0>,<0.120.0>]
+    message_queue_len: 0
+    messages: []
+    links: [<0.252.0>]
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 233
+    stack_size: 29
+    reductions: 57
+  neighbours:
+
+[32m.[39m[32m.[39m[32m.[39m=NOTICE REPORT==== 1-Oct-2026::07:45:44.767237 ===
+TLS client: In state wait_cert_cr at ssl_handshake.erl:2262 generated CLIENT ALERT: Fatal - Bad Certificate
+ - {bad_cert,{hostname_check_failed,{requested,{127,0,0,1}},
+                                    {received,[{dNSName,"localhost"}]}}}
+=NOTICE REPORT==== 1-Oct-2026::07:45:44.767352 ===
+TLS server: In state wait_finished received CLIENT ALERT: Fatal - Bad Certificate
+
+[32m.[39m=NOTICE REPORT==== 1-Oct-2026::07:45:44.781977 ===
+TLS client: In state wait_cert_cr at ssl_handshake.erl:2262 generated CLIENT ALERT: Fatal - Bad Certificate
+ - {bad_cert,{hostname_check_failed,{requested,"wrong.invalid"},
+                                    {received,[{dNSName,"localhost"}]}}}
+=NOTICE REPORT==== 1-Oct-2026::07:45:44.782042 ===
+TLS server: In state wait_finished received CLIENT ALERT: Fatal - Bad Certificate
+
+[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m=ERROR REPORT==== 1-Oct-2026::07:45:46.371609 ===
+** State machine <0.504.0> terminating
+** Process label = {gun,{127,0,0,1},64304}
+** Last event = {info,{tcp,#Port<0.84>,
+                           <<"HTTP/1.1 200 OK\r\nContent-Length: +1\r\n\r\nx">>}}
+** When server state  = {connected,
+                         {state,<0.495.0>,
+                          {up,#Ref<0.3033395745.2237399045.46742>},
+                          {127,0,0,1},
+                          64304,<<"http">>,
+                          {127,0,0,1},
+                          64304,[],
+                          #{protocols => [http],
+                            retry => 0,connect_timeout => 1000,
+                            domain_lookup_timeout => 1000,
+                            http2_opts =>
+                             #{flow => 1,max_headers => 101,
+                               initial_connection_window_size => 65535,
+                               initial_stream_window_size => 16384,
+                               notify_settings_changed => true},
+                            http_opts => #{flow => 1,max_headers => 100},
+                            tcp_opts =>
+                             [{send_timeout,1000},{send_timeout_close,true}],
+                            tls_handshake_timeout => 1000,transport => tcp},
+                          undefined,#Port<0.84>,gun_tcp,true,
+                          {tcp,tcp_closed,tcp_error},
+                          gun_http,
+                          {http_state,#Port<0.84>,gun_tcp,
+                           #{flow => 1,max_headers => 100},
+                           'HTTP/1.1',keepalive,<<>>,undefined,
+                           [{stream,#Ref<0.3033395745.2237399045.46758>,
+                             <0.505.0>,1,<<"GET">>,<<"127.0.0.1:64304">>,
+                             <<"/">>,[],true,undefined}],
+                           head,
+                           {0,0},
+                           head},
+                          undefined,gun_default_event_h,undefined}}
+** Reason for termination = error:badarg
+** Callback modules = [gun]
+** Callback mode = state_functions
+** Stacktrace =
+**  [{erlang,binary_to_integer,
+             [<<>>],
+             [{error_info,#{module => erl_erts_errors}}]},
+     {cow_http_hd,digits,3,
+                  [{file,"/private/tmp/nix-shell.zEZA5H/http-gun-gate-veg6tmwx/http_gun/build/dev/erlang/cowlib/src/cow_http_hd.erl"},
+                   {line,3721}]},
+     {cow_http_hd,parse_content_length,1,
+                  [{file,"/private/tmp/nix-shell.zEZA5H/http-gun-gate-veg6tmwx/http_gun/build/dev/erlang/cowlib/src/cow_http_hd.erl"},
+                   {line,1667}]},
+     {gun_http,response_io_from_headers,4,
+               [{file,"/private/tmp/nix-shell.zEZA5H/http-gun-gate-veg6tmwx/http_gun/build/dev/erlang/gun/src/gun_http.erl"},
+                {line,1020}]},
+     {gun_http,handle_response,8,
+               [{file,"/private/tmp/nix-shell.zEZA5H/http-gun-gate-veg6tmwx/http_gun/build/dev/erlang/gun/src/gun_http.erl"},
+                {line,474}]},
+     {gun,handle_common_connected_no_input,4,
+          [{file,"/private/tmp/nix-shell.zEZA5H/http-gun-gate-veg6tmwx/http_gun/build/dev/erlang/gun/src/gun.erl"},
+           {line,1641}]},
+     {gen_statem,loop_state_callback,11,[{file,"gen_statem.erl"},{line,3741}]},
+     {proc_lib,init_p_do_apply,3,[{file,"proc_lib.erl"},{line,333}]}]
+
+=CRASH REPORT==== 1-Oct-2026::07:45:46.371861 ===
+  crasher:
+    initial call: gun:init/1
+    pid: <0.504.0>
+    registered_name: []
+    process_label: {gun,{127,0,0,1},64304}
+    exception error: bad argument
+      in function  binary_to_integer/1
+         called as binary_to_integer(<<>>)
+         *** argument 1: not a textual representation of an integer
+      in call from cow_http_hd:digits/3 (/private/tmp/nix-shell.zEZA5H/http-gun-gate-veg6tmwx/http_gun/build/dev/erlang/cowlib/src/cow_http_hd.erl:3721)
+      in call from cow_http_hd:parse_content_length/1 (/private/tmp/nix-shell.zEZA5H/http-gun-gate-veg6tmwx/http_gun/build/dev/erlang/cowlib/src/cow_http_hd.erl:1667)
+      in call from gun_http:response_io_from_headers/4 (/private/tmp/nix-shell.zEZA5H/http-gun-gate-veg6tmwx/http_gun/build/dev/erlang/gun/src/gun_http.erl:1020)
+      in call from gun_http:handle_response/8 (/private/tmp/nix-shell.zEZA5H/http-gun-gate-veg6tmwx/http_gun/build/dev/erlang/gun/src/gun_http.erl:474)
+      in call from gun:handle_common_connected_no_input/4 (/private/tmp/nix-shell.zEZA5H/http-gun-gate-veg6tmwx/http_gun/build/dev/erlang/gun/src/gun.erl:1641)
+      in call from gen_statem:loop_state_callback/11 (gen_statem.erl:3741)
+    ancestors: [gun_conns_sup,gun_sup,<0.107.0>]
+    message_queue_len: 0
+    messages: []
+    links: [<0.109.0>,#Port<0.84>]
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 17731
+    stack_size: 29
+    reductions: 21548
+  neighbours:
+
+=SUPERVISOR REPORT==== 1-Oct-2026::07:45:46.374546 ===
+    supervisor: {local,gun_conns_sup}
+    errorContext: child_terminated
+    reason: {badarg,
+                [{erlang,binary_to_integer,
+                     [<<>>],
+                     [{error_info,#{module => erl_erts_errors}}]},
+                 {cow_http_hd,digits,3,
+                     [{file,
+                          "/private/tmp/nix-shell.zEZA5H/http-gun-gate-veg6tmwx/http_gun/build/dev/erlang/cowlib/src/cow_http_hd.erl"},
+                      {line,3721}]},
+                 {cow_http_hd,parse_content_length,1,
+                     [{file,
+                          "/private/tmp/nix-shell.zEZA5H/http-gun-gate-veg6tmwx/http_gun/build/dev/erlang/cowlib/src/cow_http_hd.erl"},
+                      {line,1667}]},
+                 {gun_http,response_io_from_headers,4,
+                     [{file,
+                          "/private/tmp/nix-shell.zEZA5H/http-gun-gate-veg6tmwx/http_gun/build/dev/erlang/gun/src/gun_http.erl"},
+                      {line,1020}]},
+                 {gun_http,handle_response,8,
+                     [{file,
+                          "/private/tmp/nix-shell.zEZA5H/http-gun-gate-veg6tmwx/http_gun/build/dev/erlang/gun/src/gun_http.erl"},
+                      {line,474}]},
+                 {gun,handle_common_connected_no_input,4,
+                     [{file,
+                          "/private/tmp/nix-shell.zEZA5H/http-gun-gate-veg6tmwx/http_gun/build/dev/erlang/gun/src/gun.erl"},
+                      {line,1641}]},
+                 {gen_statem,loop_state_callback,11,
+                     [{file,"gen_statem.erl"},{line,3741}]},
+                 {proc_lib,init_p_do_apply,3,
+                     [{file,"proc_lib.erl"},{line,333}]}]}
+    offender: [{pid,<0.504.0>},
+               {id,gun},
+               {mfargs,{gun,start_link,undefined}},
+               {restart_type,temporary},
+               {significant,false},
+               {shutdown,5000},
+               {child_type,worker}]
+
+=ERROR REPORT==== 1-Oct-2026::07:45:46.374988 ===
+** State machine <0.509.0> terminating
+** Process label = {gun,{127,0,0,1},64306}
+** Last event = {info,{tcp,#Port<0.87>,
+                           <<"HTTP/1.1 200 OK\r\nContent-Length: -1\r\n\r\nx">>}}
+** When server state  = {connected,
+                         {state,<0.495.0>,
+                          {up,#Ref<0.3033395745.2237399043.42810>},
+                          {127,0,0,1},
+                          64306,<<"http">>,
+                          {127,0,0,1},
+                          64306,[],
+                          #{protocols => [http],
+                            retry => 0,connect_timeout => 1000,
+                            domain_lookup_timeout => 1000,
+                            http2_opts =>
+                             #{flow => 1,max_headers => 101,
+                               initial_connection_window_size => 65535,
+                               initial_stream_window_size => 16384,
+                               notify_settings_changed => true},
+                            http_opts => #{flow => 1,max_headers => 100},
+                            tcp_opts =>
+                             [{send_timeout,1000},{send_timeout_close,true}],
+                            tls_handshake_timeout => 1000,transport => tcp},
+                          undefined,#Port<0.87>,gun_tcp,true,
+                          {tcp,tcp_closed,tcp_error},
+                          gun_http,
+                          {http_state,#Port<0.87>,gun_tcp,
+                           #{flow => 1,max_headers => 100},
+                           'HTTP/1.1',keepalive,<<>>,undefined,
+                           [{stream,#Ref<0.3033395745.2237399043.42826>,
+                             <0.510.0>,1,<<"GET">>,<<"127.0.0.1:64306">>,
+                             <<"/">>,[],true,undefined}],
+                           head,
+                           {0,0},
+                           head},
+                          undefined,gun_default_event_h,undefined}}
+** Reason for termination = error:badarg
+** Callback modules = [gun]
+** Callback mode = state_functions
+** Stacktrace =
+**  [{erlang,binary_to_integer,
+             [<<>>],
+             [{error_info,#{module => erl_erts_errors}}]},
+     {cow_http_hd,digits,3,
+                  [{file,"/private/tmp/nix-shell.zEZA5H/http-gun-gate-veg6tmwx/http_gun/build/dev/erlang/cowlib/src/cow_http_hd.erl"},
+                   {line,3721}]},
+     {cow_http_hd,parse_content_length,1,
+                  [{file,"/private/tmp/nix-shell.zEZA5H/http-gun-gate-veg6tmwx/http_gun/build/dev/erlang/cowlib/src/cow_http_hd.erl"},
+                   {line,1667}]},
+     {gun_http,response_io_from_headers,4,
+               [{file,"/private/tmp/nix-shell.zEZA5H/http-gun-gate-veg6tmwx/http_gun/build/dev/erlang/gun/src/gun_http.erl"},
+                {line,1020}]},
+     {gun_http,handle_response,8,
+               [{file,"/private/tmp/nix-shell.zEZA5H/http-gun-gate-veg6tmwx/http_gun/build/dev/erlang/gun/src/gun_http.erl"},
+                {line,474}]},
+     {gun,handle_common_connected_no_input,4,
+          [{file,"/private/tmp/nix-shell.zEZA5H/http-gun-gate-veg6tmwx/http_gun/build/dev/erlang/gun/src/gun.erl"},
+           {line,1641}]},
+     {gen_statem,loop_state_callback,11,[{file,"gen_statem.erl"},{line,3741}]},
+     {proc_lib,init_p_do_apply,3,[{file,"proc_lib.erl"},{line,333}]}]
+
+=CRASH REPORT==== 1-Oct-2026::07:45:46.375188 ===
+  crasher:
+    initial call: gun:init/1
+    pid: <0.509.0>
+    registered_name: []
+    process_label: {gun,{127,0,0,1},64306}
+    exception error: bad argument
+      in function  binary_to_integer/1
+         called as binary_to_integer(<<>>)
+         *** argument 1: not a textual representation of an integer
+      in call from cow_http_hd:digits/3 (/private/tmp/nix-shell.zEZA5H/http-gun-gate-veg6tmwx/http_gun/build/dev/erlang/cowlib/src/cow_http_hd.erl:3721)
+      in call from cow_http_hd:parse_content_length/1 (/private/tmp/nix-shell.zEZA5H/http-gun-gate-veg6tmwx/http_gun/build/dev/erlang/cowlib/src/cow_http_hd.erl:1667)
+      in call from gun_http:response_io_from_headers/4 (/private/tmp/nix-shell.zEZA5H/http-gun-gate-veg6tmwx/http_gun/build/dev/erlang/gun/src/gun_http.erl:1020)
+      in call from gun_http:handle_response/8 (/private/tmp/nix-shell.zEZA5H/http-gun-gate-veg6tmwx/http_gun/build/dev/erlang/gun/src/gun_http.erl:474)
+      in call from gun:handle_common_connected_no_input/4 (/private/tmp/nix-shell.zEZA5H/http-gun-gate-veg6tmwx/http_gun/build/dev/erlang/gun/src/gun.erl:1641)
+      in call from gen_statem:loop_state_callback/11 (gen_statem.erl:3741)
+    ancestors: [gun_conns_sup,gun_sup,<0.107.0>]
+    message_queue_len: 0
+    messages: []
+    links: [<0.109.0>,#Port<0.87>]
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 17731
+    stack_size: 29
+    reductions: 21414
+  neighbours:
+
+=SUPERVISOR REPORT==== 1-Oct-2026::07:45:46.375358 ===
+    supervisor: {local,gun_conns_sup}
+    errorContext: child_terminated
+    reason: {badarg,
+                [{erlang,binary_to_integer,
+                     [<<>>],
+                     [{error_info,#{module => erl_erts_errors}}]},
+                 {cow_http_hd,digits,3,
+                     [{file,
+                          "/private/tmp/nix-shell.zEZA5H/http-gun-gate-veg6tmwx/http_gun/build/dev/erlang/cowlib/src/cow_http_hd.erl"},
+                      {line,3721}]},
+                 {cow_http_hd,parse_content_length,1,
+                     [{file,
+                          "/private/tmp/nix-shell.zEZA5H/http-gun-gate-veg6tmwx/http_gun/build/dev/erlang/cowlib/src/cow_http_hd.erl"},
+                      {line,1667}]},
+                 {gun_http,response_io_from_headers,4,
+                     [{file,
+                          "/private/tmp/nix-shell.zEZA5H/http-gun-gate-veg6tmwx/http_gun/build/dev/erlang/gun/src/gun_http.erl"},
+                      {line,1020}]},
+                 {gun_http,handle_response,8,
+                     [{file,
+                          "/private/tmp/nix-shell.zEZA5H/http-gun-gate-veg6tmwx/http_gun/build/dev/erlang/gun/src/gun_http.erl"},
+                      {line,474}]},
+                 {gun,handle_common_connected_no_input,4,
+                     [{file,
+                          "/private/tmp/nix-shell.zEZA5H/http-gun-gate-veg6tmwx/http_gun/build/dev/erlang/gun/src/gun.erl"},
+                      {line,1641}]},
+                 {gen_statem,loop_state_callback,11,
+                     [{file,"gen_statem.erl"},{line,3741}]},
+                 {proc_lib,init_p_do_apply,3,
+                     [{file,"proc_lib.erl"},{line,333}]}]}
+    offender: [{pid,<0.509.0>},
+               {id,gun},
+               {mfargs,{gun,start_link,undefined}},
+               {restart_type,temporary},
+               {significant,false},
+               {shutdown,5000},
+               {child_type,worker}]
+
+[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m=NOTICE REPORT==== 1-Oct-2026::07:45:47.128519 ===
+TLS client: In state wait_cert_cr at ssl_handshake.erl:2254 generated CLIENT ALERT: Fatal - Unknown CA
+
+=NOTICE REPORT==== 1-Oct-2026::07:45:47.128759 ===
+TLS server: In state wait_finished received CLIENT ALERT: Fatal - Unknown CA
+
+[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m=NOTICE REPORT==== 1-Oct-2026::07:45:47.170030 ===
+TLS client: In state wait_cert_cr at ssl_handshake.erl:2262 generated CLIENT ALERT: Fatal - Bad Certificate
+ - {bad_cert,{hostname_check_failed,{requested,{127,0,0,1}},
+                                    {received,[{dNSName,"localhost"}]}}}
+=NOTICE REPORT==== 1-Oct-2026::07:45:47.170115 ===
+TLS server: In state wait_finished received CLIENT ALERT: Fatal - Bad Certificate
+
+[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m
+120 passed, no failures[39m
+Production dependency, Dynamic and public-consumer boundaries passed.
+  Resolving versions
+Downloading packages
+ Downloaded 11 packages in 0.05s
+  Compiling cowlib
+===> Analyzing applications...
+===> Compiling cowlib
+  Compiling gleam_stdlib
+/private/tmp/nix-shell.zEZA5H/tmp.vgFHXgbKru/ordinary/build/dev/erlang/gleam_stdlib/_gleam_artefacts/gleam_stdlib.erl:75:10: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%   75|     case catch binary_to_integer(String, Base) of
+%     |          ^
+
+/private/tmp/nix-shell.zEZA5H/tmp.vgFHXgbKru/ordinary/build/dev/erlang/gleam_stdlib/_gleam_artefacts/gleam_stdlib.erl:81:10: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%   81|     case catch binary_to_integer(String) of
+%     |          ^
+
+/private/tmp/nix-shell.zEZA5H/tmp.vgFHXgbKru/ordinary/build/dev/erlang/gleam_stdlib/_gleam_artefacts/gleam_stdlib.erl:87:10: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%   87|     case catch binary_to_float(String) of
+%     |          ^
+
+  Compiling file_streams
+  Compiling filepath
+  Compiling gleam_erlang
+  Compiling gleam_http
+  Compiling gleam_json
+  Compiling gleam_otp
+  Compiling gun
+===> Analyzing applications...
+===> Compiling gun
+  Compiling simplifile
+  Compiling telemetry
+===> Analyzing applications...
+===> Compiling telemetry
+  Compiling sinal
+  Compiling http_gun
+  Compiling http_gun_consumer
+   Compiled in 12.67s
+  Resolving versions
+   Compiled in 0.19s
+    Running http_gun_consumer.main
+Confirmed public type rejection: client
+Confirmed public type rejection: body
+Confirmed public type rejection: wrong_body
+Confirmed public type rejection: recording
+Confirmed public type rejection: deadline
+Confirmed public type rejection: cancellation
+Confirmed public type rejection: observation_id
+  Resolving versions
+Downloading packages
+ Downloaded 12 packages in 0.06s
+  Compiling cowlib
+===> Analyzing applications...
+===> Compiling cowlib
+  Compiling gleam_stdlib
+/private/tmp/nix-shell.zEZA5H/tmp.vgFHXgbKru/llm/build/dev/erlang/gleam_stdlib/_gleam_artefacts/gleam_stdlib.erl:75:10: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%   75|     case catch binary_to_integer(String, Base) of
+%     |          ^
+
+/private/tmp/nix-shell.zEZA5H/tmp.vgFHXgbKru/llm/build/dev/erlang/gleam_stdlib/_gleam_artefacts/gleam_stdlib.erl:81:10: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%   81|     case catch binary_to_integer(String) of
+%     |          ^
+
+/private/tmp/nix-shell.zEZA5H/tmp.vgFHXgbKru/llm/build/dev/erlang/gleam_stdlib/_gleam_artefacts/gleam_stdlib.erl:87:10: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%   87|     case catch binary_to_float(String) of
+%     |          ^
+
+  Compiling file_streams
+  Compiling filepath
+  Compiling gleam_crypto
+  Compiling gleam_erlang
+  Compiling gleam_http
+  Compiling gleam_json
+  Compiling gleam_otp
+  Compiling gun
+===> Analyzing applications...
+===> Compiling gun
+  Compiling simplifile
+  Compiling telemetry
+===> Analyzing applications...
+===> Compiling telemetry
+  Compiling sinal
+  Compiling http_gun
+  Compiling json_blueprint
+  Compiling llm_wire
+/private/tmp/nix-shell.zEZA5H/tmp.vgFHXgbKru/llm/build/dev/erlang/llm_wire/_gleam_artefacts/llm_wire_gun_ffi.erl:360:5: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%  360|     catch gun:close(Conn),
+%     |     ^
+
+/private/tmp/nix-shell.zEZA5H/tmp.vgFHXgbKru/llm/build/dev/erlang/llm_wire/_gleam_artefacts/llm_wire_gun_ffi.erl:367:13: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%  367|             catch gun:close(Conn),
+%     |             ^
+
+/private/tmp/nix-shell.zEZA5H/tmp.vgFHXgbKru/llm/build/dev/erlang/llm_wire/_gleam_artefacts/llm_wire_gun_pool.erl:323:5: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%  323|     catch erlang:cancel_timer(State#state.prune_timer),
+%     |     ^
+
+/private/tmp/nix-shell.zEZA5H/tmp.vgFHXgbKru/llm/build/dev/erlang/llm_wire/_gleam_artefacts/llm_wire_gun_pool.erl:331:9: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%  331|         catch gun:close(C#conn_entry.conn)
+%     |         ^
+
+/private/tmp/nix-shell.zEZA5H/tmp.vgFHXgbKru/llm/build/dev/erlang/llm_wire/_gleam_artefacts/llm_wire_gun_pool.erl:334:9: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%  334|         catch erlang:cancel_timer(W#waiter.timer_ref),
+%     |         ^
+
+/private/tmp/nix-shell.zEZA5H/tmp.vgFHXgbKru/llm/build/dev/erlang/llm_wire/_gleam_artefacts/llm_wire_gun_pool.erl:336:9: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%  336|         catch gen_server:reply(W#waiter.from, {error, pool_stopped})
+%     |         ^
+
+/private/tmp/nix-shell.zEZA5H/tmp.vgFHXgbKru/llm/build/dev/erlang/llm_wire/_gleam_artefacts/llm_wire_gun_pool.erl:339:9: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%  339|         catch erlang:cancel_timer(C#connecting.timer_ref),
+%     |         ^
+
+/private/tmp/nix-shell.zEZA5H/tmp.vgFHXgbKru/llm/build/dev/erlang/llm_wire/_gleam_artefacts/llm_wire_gun_pool.erl:342:9: Warning: 'catch ...' is deprecated; please use 'try ... catch ... end' instead.
+Compile directive 'nowarn_deprecated_catch' can be used to suppress
+warnings in selected modules.
+%  342|         catch exit(C#connecting.worker_pid, kill),
+%     |         ^
+
+  Compiling http_gun_llm_consumer
+warning: Unused imported module
+   ┌─ /private/tmp/nix-shell.zEZA5H/tmp.vgFHXgbKru/llm/test/http_gun_llm_integration.gleam:11:1
+   │
+11 │ import http_gun/config as http_config
+   │ ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ This imported module is never used
+
+Hint: You can safely remove it.
+
+warning: Unused private function
+    ┌─ /private/tmp/nix-shell.zEZA5H/tmp.vgFHXgbKru/llm/test/http_gun_llm_integration.gleam:309:1
+    │
+309 │ fn local_config() -> config.Config {
+    │ ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ This private function is never used
+
+Hint: You can safely remove it.
+
+warning: Unused variable
+    ┌─ /private/tmp/nix-shell.zEZA5H/tmp.vgFHXgbKru/llm/test/http_gun_llm_integration.gleam:310:7
+    │
+310 │   let defaults = config.default()
+    │       ^^^^^^^^ This variable is never used
+
+Hint: You can ignore it with an underscore: `_defaults`.
+
+error: Unknown variable
+   ┌─ /private/tmp/nix-shell.zEZA5H/tmp.vgFHXgbKru/llm/test/http_gun_llm_integration.gleam:58:42
+   │
+58 │   let assert Ok(client) = http_gun.start(http_local_config())
+   │                                          ^^^^^^^^^^^^^^^^^ Did you mean `local_config`?
+
+The name `http_local_config` is not in scope here.
+
+error: Unknown variable
+   ┌─ /private/tmp/nix-shell.zEZA5H/tmp.vgFHXgbKru/llm/test/http_gun_llm_integration.gleam:96:42
+   │
+96 │   let assert Ok(client) = http_gun.start(http_local_config())
+   │                                          ^^^^^^^^^^^^^^^^^ Did you mean `local_config`?
+
+The name `http_local_config` is not in scope here.
+
+error: Unknown variable
+    ┌─ /private/tmp/nix-shell.zEZA5H/tmp.vgFHXgbKru/llm/test/http_gun_llm_integration.gleam:151:43
+    │
+151 │     let assert Ok(client) = testing.start(http_local_config(), exchanges)
+    │                                           ^^^^^^^^^^^^^^^^^ Did you mean `local_config`?
+
+The name `http_local_config` is not in scope here.
+
+error: Unknown variable
+    ┌─ /private/tmp/nix-shell.zEZA5H/tmp.vgFHXgbKru/llm/test/http_gun_llm_integration.gleam:184:21
+    │
+184 │     cassette.record(http_local_config(), path, recording.default())
+    │                     ^^^^^^^^^^^^^^^^^ Did you mean `local_config`?
+
+The name `http_local_config` is not in scope here.
+
+error: Unknown variable
+    ┌─ /private/tmp/nix-shell.zEZA5H/tmp.vgFHXgbKru/llm/test/http_gun_llm_integration.gleam:200:53
+    │
+200 │   let assert Ok(playback) = cassette.playback(tape, http_local_config())
+    │                                                     ^^^^^^^^^^^^^^^^^ Did you mean `local_config`?
+
+The name `http_local_config` is not in scope here.
+
+error: Unknown variable
+    ┌─ /private/tmp/nix-shell.zEZA5H/tmp.vgFHXgbKru/llm/test/http_gun_llm_integration.gleam:215:19
+    │
+215 │     testing.start(http_local_config(), [
+    │                   ^^^^^^^^^^^^^^^^^ Did you mean `local_config`?
+
+The name `http_local_config` is not in scope here.
+
+error: Unknown variable
+    ┌─ /private/tmp/nix-shell.zEZA5H/tmp.vgFHXgbKru/llm/test/http_gun_llm_integration.gleam:264:42
+    │
+264 │   let assert Ok(client) = http_gun.start(http_local_config())
+    │                                          ^^^^^^^^^^^^^^^^^ Did you mean `local_config`?
+
+The name `http_local_config` is not in scope here.
+
+error: Unknown variable
+    ┌─ /private/tmp/nix-shell.zEZA5H/tmp.vgFHXgbKru/llm/test/http_gun_llm_integration.gleam:297:42
+    │
+297 │   let assert Ok(client) = http_gun.start(http_local_config())
+    │                                          ^^^^^^^^^^^^^^^^^ Did you mean `local_config`?
+
+The name `http_local_config` is not in scope here.
+
+error: Unknown module value
+    ┌─ /private/tmp/nix-shell.zEZA5H/tmp.vgFHXgbKru/llm/test/http_gun_llm_integration.gleam:310:25
+    │
+310 │   let defaults = config.default()
+    │                         ^^^^^^^
+
+The module `llm_wire/config` does not have a `default` value.
+
+error: Unknown module value
+    ┌─ /private/tmp/nix-shell.zEZA5H/tmp.vgFHXgbKru/llm/test/http_gun_llm_integration.gleam:311:10
+    │
+311 │   config.Config(
+    │          ^^^^^^
+
+llm_wire/config.Config is a type constructor, it cannot be used as a value
+
+error: Invalid record constructor
+    ┌─ /private/tmp/nix-shell.zEZA5H/tmp.vgFHXgbKru/llm/test/http_gun_llm_integration.gleam:311:10
+    │
+311 │   config.Config(
+    │          ^^^^^^ This is not a record constructor
+
+Only record constructors can be used with the update syntax.
+

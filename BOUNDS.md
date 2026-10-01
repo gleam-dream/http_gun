@@ -4,7 +4,7 @@ HTTP Gun enforces application admission and storage limits. These are not a boun
 
 | Limit | Default | Enforcement point |
 | --- | ---: | --- |
-| Open connections | 16 total, 4/origin | Before Gun open; connecting sockets occupy slots |
+| Open connections | 16 total, 4/origin | Before resolution/Gun open; resolving and connecting reservations occupy slots |
 | H2 streams/connection | 100 | Before submission, reduced by peer SETTINGS; no H2 streams before initial SETTINGS |
 | Active body handles | 128 | Before body-owner creation; finished explicit handles count until closed/dead |
 | Waiting requests | 128 | Client admission; connecting reservations have separate connection-bounded slots |
@@ -16,7 +16,7 @@ HTTP Gun enforces application admission and storage limits. These are not a boun
 | Batch | 10,000 inputs, 1–1,024 workers | Before worker creation; results retained until the batch returns |
 | Script/cassette values | 16 MiB estimated data | Before starting playback; caller supplies encoded-file read/parse limit |
 | Recording | 16 MiB encoded data, 10,000 exchanges | Before queuing each writer fragment; a smaller positive budget is configurable |
-| Request deadline | 30 s | From before admission through connection and unfinished response consumption |
+| Request deadline | 30 s | From before admission through DNS, connection, sending and unfinished response consumption |
 | Recording finish waiter | 1 | Extra concurrent waits return Busy; timeout/death removes the waiter without aborting finalization |
 | Connection timeout | 5 s | Minimum of configured connection timeout and remaining request budget |
 
@@ -50,3 +50,90 @@ Recording removes a short explicit credential-header list, not all conceivable s
 Filesystem operations use released libraries where their semantics fit: bounded raw reads and exclusive writes through file_streams, and permissions/link/rename/file removal through simplifile. The remaining bridges supply unique candidate paths, empty-directory removal and exception cleanup. See [the reviewed guarantees and choices](docs/FILESYSTEM.md).
 
 Typed transport causes report only recognized Gun/OTP reasons; unknown reasons remain UnknownTransport. The safe formatter omits free-form content. The single fixture schema preserves typed diagnostics and requires observed limit sizes; older experimental layouts are rejected. These diagnostics do not strengthen allocation, remote-execution or atomic draining guarantees. Recording wait timeout does not abort capture; an abort cannot undo an already committed atomic publication.
+
+## Destination policy
+
+Policy is fixed at client startup. Default public-only admission rejects all
+loopback/private/reserved addresses; explicit loopback/private permissions do
+not admit reserved space. Classification covers RFC1918, RFC6598 and IPv6 ULA;
+unspecified/link-local/multicast/broadcast, documentation and benchmark ranges,
+192.0.0/24, 192.88.99/24, 6to4, Teredo, ORCHID, 100::/64 and 3fff::/20 are reserved.
+Metadata addresses 100.100.100.200 and fd00:ec2::254 are reserved even under private-network
+permission. IPv4-mapped and 64:ff9b::/96 inherit the embedded IPv4 class. Invalid
+components fail closed. Outside these exceptions only 2000::/3 IPv6 global
+unicast is public; other special IPv6 space is conservatively reserved.
+
+The exact case-insensitive host allowlist is an additional restriction on the
+original host, not its resolved IP, port or URL path. It does not impose HTTPS,
+certificate revocation checking or application authorization. Applications may
+restrict schemes/ports separately. An empty allowlist refuses all live origins.
+
+A hostname resolution obtains both families exactly once for each new
+connection, then validates the entire answer before opening Gun on the selected
+IP tuple. A family with no records contributes an empty list; a failed lookup
+fails closed even if the other family succeeded. There is no alternate-address
+retry or fallback to Gun DNS. TLS uses the original hostname and HTTPS matching;
+IP literals omit the SNI option entirely, never `disable`, so OTP verifies the
+connected IP SAN. A caller-supplied Host header does not change DNS/TLS policy.
+
+**Pool rule:** only a checked connection can enter this client's pool. The pool
+is isolated by immutable client configuration and canonical origin (lowercase
+host, scheme and port). It reuses eligible connections without re-resolving;
+DNS answers are trusted for the duration of one connection only. Every new or
+replacement connection calls the configured resolver again and checks its
+complete answer. OTP may use its normal resolver cache; HTTP Gun adds no
+cross-connection DNS cache. Policy changes require a new
+client capability and stopping the old client; callbacks or configuration
+record updates cannot mutate the existing policy. DNS changes do not rewrite
+or retroactively revoke an already checked connection.
+
+Each resolving connection reservation has one Gleam worker and one short-lived
+Gleam guardian, so their count is bounded by connection capacity. They receive
+no HTTP body or pool history. The guardian can kill a blocked resolver on its
+request deadline or pool death; queued cancellation/owner death releases its
+unused reservation. Other eligible origins can progress while resolution is
+blocked. Custom resolvers are trusted code and own resources they spawn.
+No universal bound is claimed for OTP resolver allocations or user callbacks.
+
+One absolute monotonic budget covers DNS, connection/TLS and HTTP consumption.
+Both TCP and TLS sockets have finite `send_timeout` and `send_timeout_close`,
+set from the opening connection's remaining connect budget. A native write
+timeout can fail earlier than the overall request ceiling. Reuse does not
+reset these socket settings: each request's independent body-owner timer still
+enforces its earlier deadline, cancels the stream and releases its lease. H1
+failure closes its exclusive connection; H2 cancellation preserves healthy
+siblings. Buffered uploads are additionally capped before admission. Tests use
+16 MiB uploads to fresh/reused non-reading local TCP/TLS peers and verify prompt
+HTTP completion and cleanup under a 300 ms request budget. Timing bounds allow
+scheduler tolerance; this is not a real-time scheduling guarantee or proof that
+the remote application stopped processing.
+
+Gun connection notifications go to the pool; response messages go to the body
+owner. Neither uses the HTTP caller as Gun's owner/reply target. Public calls
+consume their typed result and flush their own monitor on completion. Local
+cancellation/deadline tests check that caller mailboxes gain no response data or
+monitor messages, including after connection/client cleanup.
+
+## Delivered headers and wire parsing
+
+HTTP Gun checks the complete delivered header list, including the final header,
+against its name/value byte and pair limits. Informational heads, final heads
+and trailers are each checked. This is not a raw status-line/whitespace/delimiter
+byte bound and cannot prevent prior Gun/Cowlib allocations. Delivered header
+names must be tokens; values reject control bytes except HTAB. This admission
+check is shared by live and simulated response processing.
+
+The released Gun/Cowlib parser rejects the tested bare-LF head, signed
+content-length and signed/non-hex chunk sizes. It accepts controls in header
+values; HTTP Gun now rejects those delivered values. It also accepts controls
+in status **reason phrases**, which Gun discards before sending its public
+response event. HTTP Gun therefore cannot reject them without changing or
+replacing the dependency parser. The owner explicitly accepted documenting this
+exception on 2026-10-01. The retained test records this behavior; it does not
+claim fully strict status-line parsing.
+
+A close-delimited TLS response has no independent length to prove completeness.
+When a peer closes without `close_notify`, a body accepted as EOF can be
+indistinguishable from truncation. Consumers needing completeness should use
+HTTP framing with a declared length/chunk terminator and validate their payload.
+No extra draining, parser or TLS implementation is added here.

@@ -1,0 +1,13 @@
+  Compiling http_gun
+   Compiled in 0.26s
+    Running http_gun_destination_test.main
+[31;1mruntime error[39m: panic[0m
+
+
+Ok(Buffered(Response(200, [#("content-length", "3"), #("x-connection", "<0.121.0>")], "abc"), [], H1))
+should equal
+Error(Failure(DestinationRejected, NotSubmitted))
+
+stacktrace:
+  gleeunit/should.equal[90m src/gleeunit/should.gleam:10[0m
+

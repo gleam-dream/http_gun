@@ -11,6 +11,7 @@ import gleam/yielder
 import http_gun
 import http_gun/body
 import http_gun/config
+import http_gun/destination
 
 pub type Client {
   Gun(http_gun.Client)
@@ -30,7 +31,7 @@ pub type Reply {
 pub fn start(name: String, connections: Int) -> Client {
   case name {
     "gun" -> {
-      let c = config.default()
+      let c = local_config()
       let assert Ok(client) =
         http_gun.start(
           config.Config(
@@ -195,4 +196,16 @@ fn drain(
       drain(stream, total + size, slow, first)
     }
   }
+}
+
+// These exercises connect only to explicitly permitted local test servers.
+fn local_config() -> config.Config {
+  let defaults = config.default()
+  config.Config(
+    ..defaults,
+    destination: destination.Policy(
+      ..defaults.destination,
+      allow_loopback: True,
+    ),
+  )
 }

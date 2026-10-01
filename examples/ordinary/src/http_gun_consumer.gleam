@@ -11,6 +11,7 @@ import http_gun/cancellation
 import http_gun/cassette
 import http_gun/config
 import http_gun/deadline
+import http_gun/destination
 import http_gun/recording
 import http_gun/request_options
 import http_gun/telemetry
@@ -55,18 +56,18 @@ pub fn main() {
     request.to("http://localhost:" <> int.to_string(server()))
   let req = request.set_body(req, <<>>)
   observed_request(req)
-  let assert Ok(live) = http_gun.start(config.default())
+  let assert Ok(live) = http_gun.start(local_config())
   consume(live, req)
   let assert Ok(Nil) = http_gun.stop(live)
   let path = temp_path()
   let assert Ok(recorded) =
-    cassette.record(config.default(), path, recording.default())
+    cassette.record(local_config(), path, recording.default())
   consume(recorded.client, req)
   let assert Ok(Nil) = http_gun.stop(recorded.client)
   let assert Ok(saved) = recording.finish_wait(recorded.recording, 5000)
   let assert True = path == saved
   let assert Ok(tape) = cassette.load(path, 1_000_000)
-  let assert Ok(playback) = cassette.playback(tape, config.default())
+  let assert Ok(playback) = cassette.playback(tape, local_config())
   consume(playback, req)
   let assert Ok(Nil) = http_gun.stop(playback)
   remove_fixture(path)
@@ -91,7 +92,7 @@ fn observed_request(req: request.Request(BitArray)) -> Nil {
         _ -> Nil
       }
     })
-  let settings = config.Config(..config.default(), observations: Some(target))
+  let settings = config.Config(..local_config(), observations: Some(target))
   let assert Ok(shared) = http_gun.start(settings)
   let correlation = telemetry.new_id()
   let client = http_gun.with_correlation(shared, correlation)
@@ -104,4 +105,16 @@ fn observed_request(req: request.Request(BitArray)) -> Nil {
   // The application supervisor lives until this executable exits; individual
   // request/client completion does not stop its shared observation service.
   Nil
+}
+
+// These exercises connect only to explicitly permitted local test servers.
+fn local_config() -> config.Config {
+  let defaults = config.default()
+  config.Config(
+    ..defaults,
+    destination: destination.Policy(
+      ..defaults.destination,
+      allow_loopback: True,
+    ),
+  )
 }

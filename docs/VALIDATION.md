@@ -1,6 +1,82 @@
 # Local acceptance evidence
 
-## Sinal lifecycle integration: waves22–24
+## Destination policy and DNS pinning: waves25–28
+
+The final source passes **120 tests** in the fast gate and full gates on Darwin
+ARM64, Gleam1.18.1, OTP29/ERTS17.1, OTP28/ERTS16.4.0.6 and
+OTP27/ERTS15.2.7.13. Commands: `./dev/env sh dev/gate fast`,
+`./dev/env sh dev/gate full`, and
+`sh docs/evidence/wave28/remaining-matrix.sh` for the other two pinned shells.
+All106 executable/dependency inputs remain identical to the qualified hashes.
+[Receipt](evidence/wave28/receipt.json), [inputs](evidence/wave28/inputs.json),
+[runtime logs and measurements](evidence/wave28/runtimes/).
+
+New checks cover default refusal before any connection; explicit loopback opt-in;
+private/mixed/empty/failed DNS answers; exact case-insensitive host allowlists;
+50 address-classification cases; one injected lookup and checked-connection reuse;
+original-hostname and IP-SAN TLS with trusted wrong-name negative controls;
+blocked/throwing resolvers, cancellation/deadline/caller/client death and progress
+at another origin; strict offline modes and recorded destination refusals;
+IPv6 authority, complete admitted heads and malformed framing/header values.
+
+Four non-reading-server cases use16MiB buffered uploads, fresh/reused TCP and
+TLS connections and a300ms request budget. All return DeadlineExceeded and
+complete client cleanup within1500ms test tolerance; caller mailbox size is
+unchanged. A separate synchronized test checks long-lived callers after body
+cancellation/deadline, server closure and client shutdown. A100ms connection
+budget probe also passes; it is additional coverage, not a reproduced defect.
+The public API is not a real-time scheduler or proof of remote cancellation.
+
+The full gates retain three external consumer packages, positive compilation
+control/seven intended type rejections,1196 archived LLM split points,11 async
+lifecycle groups and startup-failure control, H1/TLS/H2 and sibling-preserving
+cancellation, batch scaling through10000, seven nghttpd1.70.0 scenarios,
+256 record/replay exchanges totaling8MiB, and eleven load scenarios including
+1/10/100/1000 requests,32MiB streams and mixed slow/fast consumers. Public API
+documentation also builds. No new Linux/hosted-CI, Dream comparison or sustained
+soak execution is claimed for this change.
+
+| OTP | nghttpd1000 elapsed ms | p95 ms | Peak sampled VM bytes | Largest mailbox | Connections |
+| --- | ---: | ---: | ---: | ---: | ---: |
+|29|114.471|102.378|69530244|39|1|
+|28|82.494|74.184|68856592|149|1|
+|27|87.016|79.239|71873942|184|1|
+
+These independent-server runs use one H2 connection, peer stream limit8,
+client active128/waiting1024, a60-second budget and256-byte replies. They are
+individual local samples; sampling may miss peaks and excludes the C server.
+They are not an overhead comparison or universal allocation guarantee.
+
+Current LLM Wire1c0ad614 passes unmodified check/build; its existing test setup
+produces175 passes/48 failures because it previously used the default for local
+servers. An experiment changes only eight test/example configuration files in
+**disposable copies**, enabling loopback explicitly. All223 tests, its public
+boundary controls and five local TLS/H2 scenarios through1000 callers pass.
+Production LLM Wire source is unchanged; both original checkouts are unchanged
+during each check. [Original receipt](evidence/wave28/downstream-original/receipt.json),
+[adapted receipt and exact setup patch](evidence/wave28/downstream-adapted/receipt.json).
+This is an adoption requirement, not a claim that the untouched downstream suite
+passes. Warden230c6bb4 is read-only reference evidence: no Warden migration,
+release or execution of its own adapter gate is claimed.
+
+The owner accepted a measured parser exception: Gun/Cowlib accepts control bytes
+in status reason phrases and discards that text before exposing a response.
+HTTP Gun cannot validate it through the supported API. Delivered header values
+are now checked. [Raw local dependency probe](evidence/wave27/parser-probe.log).
+A disposable SNI=disable mutation fails the IP-literal negative control by
+accepting the trusted wrong-host certificate; the real implementation omits SNI
+and passes. [Mutation result](evidence/wave28/ip-sni-mutation.json).
+
+Retained reds are default loopback connection, ignored injected private DNS,
+and accepted header control bytes. An initial IP test certificate was rejected
+as a self-signed peer and replaced with a proper separate test CA; no TLS
+verification bypass was added. Initial gate corrections were an asynchronous
+recording test that needed finish_wait and a local example configuration alias.
+Their logs are retained with the final passing runs. Dependencies remain
+unmodified. Current FFI counts and boundaries are below; earlier sections are
+historical receipts.
+
+## Historical Sinal lifecycle integration: waves22–24
 
 All three full gates pass on Darwin ARM64 with Gleam 1.18.1 and OTP29/ERTS17.1, OTP28/ERTS16.4.0.6 and OTP27/ERTS15.2.7.13. Each includes 98 tests, format/check/build, handwritten FFI warnings as errors, three public consumers, a positive compiler control and seven intended type rejections, 1196 archived LLM stream split points, 11 async lifecycle groups and startup-failure control, batch scaling through 10000, seven independent nghttpd scenarios, 256 record/replay exchanges totaling 8 MiB and eleven controlled load scenarios. All 97 frozen executable/dependency inputs stayed unchanged. [Receipt and commands](evidence/wave24/receipt.json), [inputs](evidence/wave24/inputs.json), [runtime logs/measurements](evidence/wave24/runtimes/).
 
@@ -44,7 +120,7 @@ Run `./dev/env sh dev/gate fast` for the fast gate and `./dev/env sh dev/gate fu
 
 ## Covered contracts
 
-The fast gate runs formatting, Gleam check, build with warnings as errors, 98 observable tests, `erlc -Werror` over handwritten production/test FFI, and dependency/public-import/Dynamic boundary checks.
+The fast gate runs formatting, Gleam check, build with warnings as errors, 120 observable tests, `erlc -Werror` over handwritten production/test FFI, and dependency/public-import/Dynamic boundary checks.
 
 | Area | Executed observations |
 | --- | --- |
@@ -181,11 +257,11 @@ All requested exchanges/bytes completed without retries. Both large-stream rows 
 
 | File | Physical lines | Bytes | Responsibilities |
 | --- | ---: | ---: | --- |
-| `src/http_gun_ffi.erl` | 84 | 4,238 | Gun application/open/request/flow/cancel/close calls, supported TLS/protocol/header-count options, Gun event/cause conversion, clock, scope cleanup and exception-only cleanup |
+| `src/http_gun_ffi.erl` | 105 | 5,154 | Native IP parsing/lookup and tuple conversion; Gun application/open/request/flow/cancel/close calls, original TLS identity and finite send options, event/cause conversion, clock and exception-safe cleanup |
 | `src/http_gun_file_ffi.erl` | 8 | 431 | Unique temporary-directory candidate name and empty-directory removal |
-| Total | 92 | 4,669 | Thirteen external bindings; no pool, body, batch or cassette server |
+| Total | 113 | 5,585 | Fifteen external bindings; no pool, body, batch or cassette server |
 
-These are the wave16 counts, including the new narrow transport-cause classifier (wave12 was72 lines/3650 bytes/12 bindings). file_streams and simplifile now supply ordinary filesystem IO; their released code is a dependency, not counted as handwritten HTTP Gun FFI. Counts include blank/comment lines. Test-only loopback servers and instrumentation are excluded from production FFI. Gleam owns admission policy, states, deadlines, demand, monitoring, batch scheduling, matching, JSON codec, recorder coordination and finalization ordering. Internal typed bridge declarations live in Gleam; raw Dynamic is confined to event/JSON boundaries.
+These are the wave28 counts. The previous wave24 source had92 lines/4669 bytes/13 bindings; the two new bindings are native address parsing and one-family DNS lookup. file_streams and simplifile now supply ordinary filesystem IO; their released code is a dependency, not counted as handwritten HTTP Gun FFI. Counts include blank/comment lines. Test-only loopback servers and instrumentation are excluded from production FFI. Gleam owns admission policy, states, deadlines, demand, monitoring, batch scheduling, matching, JSON codec, recorder coordination and finalization ordering. Internal typed bridge declarations live in Gleam; raw Dynamic is confined to event/JSON boundaries.
 
 ## Optional features and inherited behavior
 

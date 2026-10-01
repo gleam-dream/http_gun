@@ -22,3 +22,36 @@ Keep three evidence layers distinct:
 3. This opt-in gate checks the actual selected LLM Wire revision. Its historical archive remains useful scenario evidence, never a substitute for this check.
 
 The normal fast/full gate remains reproducible without these checkouts. Run the downstream gate when changing public contracts, before adopting a new local HTTP Gun revision. A passing receipt applies to its recorded bytes, inputs and runtime; it is not a promise about arbitrary consumers or future revisions.
+
+
+## Destination-policy adoption (2026-10-01)
+
+HTTP Gun now defaults to public destinations only. Local test clients need:
+
+```gleam
+import http_gun/config
+import http_gun/destination
+
+fn local_settings() -> config.Config {
+  let defaults = config.default()
+  config.Config(..defaults, destination:
+    destination.Policy(..defaults.destination, allow_loopback: True))
+}
+```
+
+The actual LLM Wire1c0ad614 still passes check/build, including its existing
+failure mapping. Its unmodified suite reports175 passes/48 failures from local
+clients lacking this opt-in. In isolated copies, changing only test/example
+startup configuration yields223 passing tests, public boundary checks and local
+TLS/H2 through1000 callers. Production modules and original checkouts are
+unchanged. The [experiment receipt](evidence/wave28/downstream-adapted/receipt.json)
+and [exact setup patch](evidence/wave28/downstream-adapted/setup.patch) distinguish
+that qualified adaptation from the [unmodified result](evidence/wave28/downstream-original/receipt.json).
+The ordinary downstream gate performs no such patch automatically.
+
+Consumers with exhaustive error matches add DestinationRejected and
+ResolutionFailed; both precede live HTTP submission. Keep public-only policy
+for public endpoints and opt into private/loopback destinations deliberately.
+A changed policy requires a new client, including after supervision restart.
+Warden's own transport migration and unchanged-through-adapter tests have not
+been performed here; neither a release nor adoption is claimed.

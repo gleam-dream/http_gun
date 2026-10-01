@@ -1,5 +1,7 @@
 /// Pure startup policy. All limits are checked before starting a client.
 import gleam/option.{type Option, None}
+import gleam/result
+import http_gun/destination
 import sinal/forwarder
 
 pub type Protocol {
@@ -37,10 +39,11 @@ pub type Config {
     connect_ms: Int,
     limits: Limits,
     observations: Option(forwarder.Forwarder),
+    destination: destination.Policy,
   )
 }
 
-/// Finite H1 policy with verified system TLS trust and a 30-second request budget.
+/// Public destinations only, verified TLS, H1 and a finite 30-second budget.
 /// Compose record updates before starting a client; no processes or IO are started.
 pub fn default() -> Config {
   Config(
@@ -62,12 +65,17 @@ pub fn default() -> Config {
       8_388_608,
     ),
     None,
+    destination.default(),
   )
 }
 
 /// Check supported policies and positive capacities without starting processes.
 /// Returns the unchanged settings or a diagnostic for invalid configuration.
 pub fn validate(config: Config) -> Result(Config, String) {
+  use Nil <- result.try(case destination.valid(config.destination) {
+    True -> Ok(Nil)
+    False -> Error("destination allowlist entries must be nonempty host names")
+  })
   let l = config.limits
   case
     config.deadline_ms > 0

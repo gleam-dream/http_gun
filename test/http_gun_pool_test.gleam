@@ -7,6 +7,7 @@ import gleeunit/should
 import http_gun
 import http_gun/body
 import http_gun/config
+import http_gun/destination
 import http_gun/error
 
 @external(erlang, "http_gun_test_server", "controlled")
@@ -48,7 +49,7 @@ fn queued(client: http_gun.Client, expected: Int, tries: Int) -> Bool {
 
 pub fn origin_fairness_and_queue_limit_test() {
   let #(port, server) = controlled()
-  let c = config.default()
+  let c = local_config()
   let assert Ok(client) =
     http_gun.start(
       config.Config(
@@ -81,7 +82,7 @@ pub fn origin_fairness_and_queue_limit_test() {
 
 pub fn queued_deadline_is_not_submitted_test() {
   let #(port, _) = controlled()
-  let c = config.default()
+  let c = local_config()
   let assert Ok(client) =
     http_gun.start(
       config.Config(
@@ -99,7 +100,7 @@ pub fn queued_deadline_is_not_submitted_test() {
 }
 
 pub fn supervision_accepts_standard_child_test() {
-  let child = http_gun.child(config.default())
+  let child = http_gun.child(local_config())
   let assert Ok(supervisor) =
     static_supervisor.new(static_supervisor.OneForOne)
     |> static_supervisor.add(child)
@@ -109,7 +110,7 @@ pub fn supervision_accepts_standard_child_test() {
 }
 
 pub fn idle_connection_yields_capacity_to_other_origin_test() {
-  let c = config.default()
+  let c = local_config()
   let assert Ok(client) =
     http_gun.start(
       config.Config(
@@ -141,7 +142,7 @@ fn burst(client: http_gun.Client, port: Int, count: Int) -> Int {
 }
 
 pub fn burst_work_scales_with_requests_test() {
-  let c = config.default()
+  let c = local_config()
   let assert Ok(client) =
     http_gun.start(
       config.Config(
@@ -177,7 +178,7 @@ fn spawn_request(
 }
 
 pub fn cancelled_queue_entries_preserve_fifo_and_restore_capacity_test() {
-  let c = config.default()
+  let c = local_config()
   let assert Ok(client) =
     http_gun.start(
       config.Config(
@@ -226,7 +227,7 @@ pub fn cancelled_queue_entries_preserve_fifo_and_restore_capacity_test() {
 
 pub fn blocked_origin_backlog_allows_another_origin_test() {
   let #(port, server) = controlled()
-  let c = config.default()
+  let c = local_config()
   let assert Ok(client) =
     http_gun.start(
       config.Config(
@@ -258,7 +259,7 @@ pub fn blocked_origin_backlog_allows_another_origin_test() {
 }
 
 pub fn queued_deadlines_remove_entries_and_restore_capacity_test() {
-  let c = config.default()
+  let c = local_config()
   let assert Ok(client) =
     http_gun.start(
       config.Config(
@@ -288,7 +289,7 @@ pub fn queued_deadlines_remove_entries_and_restore_capacity_test() {
 }
 
 pub fn eligible_origins_take_turns_under_shared_body_capacity_test() {
-  let c = config.default()
+  let c = local_config()
   let assert Ok(client) =
     http_gun.start(
       config.Config(..c, limits: config.Limits(..c.limits, active: 1)),
@@ -320,4 +321,16 @@ pub fn eligible_origins_take_turns_under_shared_body_capacity_test() {
     Nil
   })
   let _ = http_gun.stop(client)
+}
+
+// These exercises connect only to explicitly permitted local test servers.
+fn local_config() -> config.Config {
+  let defaults = config.default()
+  config.Config(
+    ..defaults,
+    destination: destination.Policy(
+      ..defaults.destination,
+      allow_loopback: True,
+    ),
+  )
 }

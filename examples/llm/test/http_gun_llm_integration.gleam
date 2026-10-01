@@ -9,6 +9,7 @@ import gleam/string
 import http_gun
 import http_gun/cassette
 import http_gun/config as http_config
+import http_gun/destination
 import http_gun/error as http_error
 import http_gun/fixture
 import http_gun/recording
@@ -55,7 +56,7 @@ fn terminal_before_eof() -> Nil {
   let settings =
     config.openai(openai.options(key)) |> config.with_endpoint(endpoint)
   let assert Ok(model) = types.model_id("fixture-model")
-  let assert Ok(client) = http_gun.start(http_config.default())
+  let assert Ok(client) = http_gun.start(http_local_config())
   let done = process.new_subject()
   let _ =
     process.spawn_unlinked(fn() {
@@ -93,7 +94,7 @@ fn chunk(server: process.Pid, text: String) -> Nil {
 fn progress_before_eof_and_cancellation() -> Nil {
   let #(port, server) = server()
   let settings = settings(port)
-  let assert Ok(client) = http_gun.start(http_config.default())
+  let assert Ok(client) = http_gun.start(http_local_config())
   let progress = process.new_subject()
   let done = process.new_subject()
   let _ =
@@ -148,7 +149,7 @@ fn every_split_through_public_stream() -> Nil {
           ),
         )
       })
-    let assert Ok(client) = testing.start(http_config.default(), exchanges)
+    let assert Ok(client) = testing.start(http_local_config(), exchanges)
     list.each(exchanges, fn(_) {
       let assert Ok(provider.Text("hé🙂", _)) =
         consumer.text(client, settings, model(), "Hello")
@@ -181,7 +182,7 @@ fn live_record_replay_terminal_without_eof() -> Nil {
   let settings = settings(port)
   let path = temp_path()
   let assert Ok(recorded) =
-    cassette.record(http_config.default(), path, recording.default())
+    cassette.record(http_local_config(), path, recording.default())
   let done = process.new_subject()
   let _ =
     process.spawn_unlinked(fn() {
@@ -197,7 +198,7 @@ fn live_record_replay_terminal_without_eof() -> Nil {
   let assert Ok(_) = finish(recorded.recording, 1000)
   let assert Ok(Nil) = http_gun.stop(recorded.client)
   let assert Ok(tape) = cassette.load(path, 100_000)
-  let assert Ok(playback) = cassette.playback(tape, http_config.default())
+  let assert Ok(playback) = cassette.playback(tape, http_local_config())
   let assert Ok(provider.Text("hé🙂", _)) =
     consumer.text(playback, settings, model(), "Hello")
   let assert Ok(Nil) = http_gun.stop(playback)
@@ -212,7 +213,7 @@ fn scripted_error(
 ) -> consumer.Error {
   let assert Ok(req) = consumer.prepare(settings, model(), "Hello")
   let assert Ok(client) =
-    testing.start(http_config.default(), [
+    testing.start(http_local_config(), [
       fixture.Exchange(
         req,
         fixture.Respond(
@@ -261,7 +262,7 @@ fn disconnect(server: process.Pid) -> Nil
 fn disconnect_preserves_evidence() -> Nil {
   let #(port, server) = server()
   let settings = settings(port)
-  let assert Ok(client) = http_gun.start(http_config.default())
+  let assert Ok(client) = http_gun.start(http_local_config())
   let progress = process.new_subject()
   let done = process.new_subject()
   let _ =
@@ -294,7 +295,7 @@ fn idle_wait_closes_stream() -> Nil {
   let #(port, server) = server()
   let defaults = settings(port)
   let settings = config.with_deadlines(defaults, types.Deadlines(2000, 50, 25))
-  let assert Ok(client) = http_gun.start(http_config.default())
+  let assert Ok(client) = http_gun.start(http_local_config())
   let assert Error(consumer.Http(
     http_error.Failure(http_error.ReadTimeout, _),
     retry,
@@ -303,4 +304,16 @@ fn idle_wait_closes_stream() -> Nil {
   let assert True = closed(server)
   let assert Ok(Nil) = http_gun.stop(client)
   Nil
+}
+
+// These exercises connect only to explicitly permitted local test servers.
+fn http_local_config() -> http_config.Config {
+  let defaults = http_config.default()
+  http_config.Config(
+    ..defaults,
+    destination: destination.Policy(
+      ..defaults.destination,
+      allow_loopback: True,
+    ),
+  )
 }

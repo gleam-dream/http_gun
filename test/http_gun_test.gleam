@@ -9,6 +9,7 @@ import gleeunit
 import gleeunit/should
 import http_gun
 import http_gun/config
+import http_gun/destination
 import http_gun/error
 
 pub fn main() {
@@ -20,7 +21,7 @@ fn server() -> Int
 
 pub fn real_binary_request_test() {
   let port = server()
-  let assert Ok(client) = http_gun.start(config.default())
+  let assert Ok(client) = http_gun.start(local_config())
   let assert Ok(req) =
     request.to("http://localhost:" <> int.to_string(port) <> "/")
   let assert Ok(received) = http_gun.send(client, request.set_body(req, <<>>))
@@ -48,7 +49,7 @@ pub fn final_headers_duplicates_and_trailers_test() {
       128,
       "\r\n0\r\nX-End: yes\r\n\r\n":utf8,
     >>)
-  let assert Ok(client) = http_gun.start(config.default())
+  let assert Ok(client) = http_gun.start(local_config())
   let assert Ok(value) = http_gun.send(client, req(port))
   value.response.status |> should.equal(429)
   value.response.body |> should.equal(<<0, 255, 128>>)
@@ -63,7 +64,7 @@ pub fn final_headers_duplicates_and_trailers_test() {
 }
 
 pub fn arbitrary_methods_and_empty_status_test() {
-  let assert Ok(client) = http_gun.start(config.default())
+  let assert Ok(client) = http_gun.start(local_config())
   list.each(
     [
       http.Get,
@@ -90,7 +91,7 @@ pub fn arbitrary_methods_and_empty_status_test() {
 }
 
 pub fn invalid_config_test() {
-  let settings = config.default()
+  let settings = local_config()
   http_gun.start(config.Config(..settings, deadline_ms: 0)) |> should.be_error
 }
 
@@ -99,7 +100,7 @@ fn persistent() -> Int
 
 pub fn batch_preserves_input_order_and_binary_bodies_test() {
   let port = persistent()
-  let assert Ok(client) = http_gun.start(config.default())
+  let assert Ok(client) = http_gun.start(local_config())
   let requests =
     list.map(
       list.index_map(list.repeat(Nil, 30), fn(_, index) { index + 1 }),
@@ -125,7 +126,7 @@ pub fn batch_preserves_input_order_and_binary_bodies_test() {
 
 pub fn h1_reuses_idle_connection_test() {
   let port = persistent()
-  let assert Ok(client) = http_gun.start(config.default())
+  let assert Ok(client) = http_gun.start(local_config())
   let assert Ok(first) = http_gun.send(client, req(port))
   let assert Ok(second) = http_gun.send(client, req(port))
   response.get_header(first.response, "x-connection")
@@ -139,14 +140,14 @@ pub fn h1_reuses_idle_connection_test() {
 pub fn host_only_url_uses_root_target_test() {
   let port = persistent()
   let assert Ok(base) = request.to("http://localhost:" <> int.to_string(port))
-  let assert Ok(client) = http_gun.start(config.default())
+  let assert Ok(client) = http_gun.start(local_config())
   let assert Ok(value) = http_gun.send(client, request.set_body(base, <<>>))
   value.response.body |> should.equal(<<"abc":utf8>>)
   let _ = http_gun.stop(client)
 }
 
 pub fn invalid_method_and_query_fail_before_submission_test() {
-  let assert Ok(client) = http_gun.start(config.default())
+  let assert Ok(client) = http_gun.start(local_config())
   let invalid = req(1) |> request.set_method(http.Other("GET\r\nX: value"))
   let assert Error(failure) = http_gun.send(client, invalid)
   failure.reason
@@ -160,7 +161,7 @@ pub fn informational_headers_respect_admitted_head_limit_test() {
     serve(<<
       "HTTP/1.1 103 Early Hints\r\nX-Hint: 012345678901234567890123456789\r\n\r\nHTTP/1.1 204 No Content\r\n\r\n":utf8,
     >>)
-  let c = config.default()
+  let c = local_config()
   let assert Ok(client) =
     http_gun.start(
       config.Config(..c, limits: config.Limits(..c.limits, head_bytes: 16)),
@@ -174,7 +175,7 @@ pub fn informational_headers_respect_admitted_head_limit_test() {
 pub fn batch_failure_preserves_unrelated_results_test() {
   let port = persistent()
   let failure_port = serve(<<"bad HTTP\r\n":utf8>>)
-  let assert Ok(client) = http_gun.start(config.default())
+  let assert Ok(client) = http_gun.start(local_config())
   let assert Ok([Ok(a), Error(failure), Ok(b)]) =
     http_gun.batch(client, [req(port), req(failure_port), req(port)], 2)
   a.response.body |> should.equal(<<"abc":utf8>>)
@@ -184,7 +185,7 @@ pub fn batch_failure_preserves_unrelated_results_test() {
 }
 
 pub fn partial_byte_request_is_rejected_before_submission_test() {
-  let assert Ok(client) = http_gun.start(config.default())
+  let assert Ok(client) = http_gun.start(local_config())
   let assert Error(failure) =
     http_gun.send(client, req(1) |> request.set_body(<<1:size(1)>>))
   failure.evidence |> should.equal(error.NotSubmitted)
@@ -200,7 +201,7 @@ pub fn configured_header_count_above_gun_default_test() {
       <> string.repeat("x-many: a\r\n", 110)
       <> "\r\n",
     )
-  let c = config.default()
+  let c = local_config()
   let assert Ok(client) =
     http_gun.start(
       config.Config(..c, limits: config.Limits(..c.limits, header_count: 110)),
@@ -212,4 +213,16 @@ pub fn configured_header_count_above_gun_default_test() {
   let assert Ok(default_client) = http_gun.start(c)
   http_gun.send(default_client, req(serve(bytes))) |> should.be_error
   let _ = http_gun.stop(default_client)
+}
+
+// These exercises connect only to explicitly permitted local test servers.
+fn local_config() -> config.Config {
+  let defaults = config.default()
+  config.Config(
+    ..defaults,
+    destination: destination.Policy(
+      ..defaults.destination,
+      allow_loopback: True,
+    ),
+  )
 }

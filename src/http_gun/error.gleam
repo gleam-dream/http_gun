@@ -62,6 +62,8 @@ pub type Reason {
   InvalidRequest(String)
   ClientClosed
   AdmissionFull
+  DestinationRejected
+  ResolutionFailed
   ConnectionFailed(TransportCause)
   RequestFailed(TransportCause)
   DeadlineExceeded
@@ -92,6 +94,8 @@ pub fn describe(failure: Failure) -> String {
     InvalidRequest(_) -> "Invalid HTTP request"
     ClientClosed -> "HTTP client closed"
     AdmissionFull -> "HTTP admission limit reached"
+    DestinationRejected -> "Network destination rejected"
+    ResolutionFailed -> "Destination resolution failed"
     ConnectionFailed(cause) ->
       "Connection failed: " <> transport_description(cause)
     RequestFailed(cause) -> "Request failed: " <> transport_description(cause)

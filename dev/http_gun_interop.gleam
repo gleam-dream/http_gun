@@ -12,6 +12,7 @@ import gleam/result
 import http_gun
 import http_gun/body
 import http_gun/config
+import http_gun/destination
 import simplifile
 
 @external(erlang, "http_gun_measure_ffi", "now")
@@ -216,7 +217,7 @@ fn steady(
 pub fn main() -> Nil {
   let port = read_int("build/evidence/nghttpd/port")
   let duration = read_int("build/evidence/nghttpd/duration")
-  let defaults = config.default()
+  let defaults = local_config()
   let assert Ok(client) =
     http_gun.start(
       config.Config(
@@ -268,4 +269,16 @@ pub fn main() -> Nil {
   let assert 0 = stats.waiting
   let assert Ok(Nil) = http_gun.stop(client)
   Nil
+}
+
+// These exercises connect only to explicitly permitted local test servers.
+fn local_config() -> config.Config {
+  let defaults = config.default()
+  config.Config(
+    ..defaults,
+    destination: destination.Policy(
+      ..defaults.destination,
+      allow_loopback: True,
+    ),
+  )
 }

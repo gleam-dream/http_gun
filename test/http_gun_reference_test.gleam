@@ -9,6 +9,7 @@ import gleam/list
 import gleeunit/should
 import http_gun
 import http_gun/config
+import http_gun/destination
 
 @external(erlang, "http_gun_test_server", "persistent")
 fn server() -> Int
@@ -18,7 +19,7 @@ pub fn exhausted_flow_finishes_trailers_and_reuses_h1_test() {
   let assert Ok(req) =
     request.to("http://localhost:" <> int.to_string(port) <> "/flow-trailers")
   let req = request.set_body(req, <<>>)
-  let c = config.default()
+  let c = local_config()
   let assert Ok(client) =
     http_gun.start(
       config.Config(
@@ -63,7 +64,7 @@ fn released(client: http_gun.Client, attempts: Int) -> Bool {
 
 pub fn normal_owner_exit_releases_unfinished_body_test() {
   let #(port, server) = controlled()
-  let assert Ok(client) = http_gun.start(config.default())
+  let assert Ok(client) = http_gun.start(local_config())
   let opened = process.new_subject()
   let _ =
     process.spawn_unlinked(fn() {
@@ -80,7 +81,7 @@ pub fn normal_owner_exit_releases_unfinished_body_test() {
 pub fn batch_owner_loss_cancels_workers_and_releases_admission_test() {
   let #(a, first) = controlled()
   let #(b, second) = controlled()
-  let assert Ok(client) = http_gun.start(config.default())
+  let assert Ok(client) = http_gun.start(local_config())
   let owner =
     process.spawn_unlinked(fn() {
       let _ = http_gun.batch(client, [request_at(a), request_at(b)], 2)
@@ -94,4 +95,16 @@ pub fn batch_owner_loss_cancels_workers_and_releases_admission_test() {
   let assert Ok(reply) = http_gun.send(client, request_at(server()))
   reply.response.body |> should.equal(<<"abc":utf8>>)
   let assert Ok(Nil) = http_gun.stop(client)
+}
+
+// These exercises connect only to explicitly permitted local test servers.
+fn local_config() -> config.Config {
+  let defaults = config.default()
+  config.Config(
+    ..defaults,
+    destination: destination.Policy(
+      ..defaults.destination,
+      allow_loopback: True,
+    ),
+  )
 }

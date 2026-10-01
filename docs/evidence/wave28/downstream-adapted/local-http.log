@@ -1,0 +1,8 @@
+   Compiled in 0.20s
+    Running llm_wire_local_gate.main
+{"scenario":"h2_cancel_sibling","healthy_text_bytes":2097152,"cancelled":true}
+{"scenario":"simultaneous","callers":1,"failures":0,"elapsed_us":656,"p50_us":591,"p95_us":591,"max_us":591,"connections":1,"vm_memory_peak_bytes":63025282,"process_memory_peak_bytes":1715968,"mailbox_total_peak":2,"mailbox_single_peak":1,"process_count_peak":96,"ports_peak":2}
+{"scenario":"simultaneous","callers":10,"failures":0,"elapsed_us":1386,"p50_us":1043,"p95_us":1270,"max_us":1322,"connections":1,"vm_memory_peak_bytes":63631594,"process_memory_peak_bytes":1715968,"mailbox_total_peak":1,"mailbox_single_peak":1,"process_count_peak":103,"ports_peak":2}
+{"scenario":"simultaneous","callers":100,"failures":0,"elapsed_us":13371,"p50_us":8697,"p95_us":12926,"max_us":13145,"connections":1,"vm_memory_peak_bytes":65400458,"process_memory_peak_bytes":1715968,"mailbox_total_peak":9,"mailbox_single_peak":6,"process_count_peak":338,"ports_peak":2}
+{"scenario":"simultaneous","callers":1000,"failures":0,"elapsed_us":125288,"p50_us":63997,"p95_us":113864,"max_us":122373,"connections":1,"vm_memory_peak_bytes":102507522,"process_memory_peak_bytes":5988344,"mailbox_total_peak":44,"mailbox_single_peak":44,"process_count_peak":3536,"ports_peak":2}
+Verified TLS H2: one connection, cancelled streams and healthy siblings, 1/10/100/1000 simultaneous callers.
