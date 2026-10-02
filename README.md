@@ -112,7 +112,7 @@ Gun and cannot be validated by this client. Delivered headers are validated.
 
 ## Lifecycle observations
 
-Set `config.Config(..defaults, observations: Some(target))` with an application-supervised `sinal/forwarder.Forwarder`. HTTP Gun emits typed admission, local Gun-call return, headers and HTTP termination through `http_gun/telemetry.event()`. `http_gun.with_correlation(client, telemetry.new_id())` makes a pure correlated view of the shared client. Delivery is bounded and best effort; slow observers cause drops, never HTTP backpressure. No URLs, headers, bodies or per-chunk events are emitted. Use HTTP failures for submission evidence, never missing telemetry. See the [contract and public example](docs/OBSERVATIONS.md).
+Set `config.Config(..defaults, observations: Some(target))` with an application-supervised `sinal/forwarder.Forwarder`. HTTP Gun emits typed admission, local Gun-call return, headers and HTTP termination through `http_gun/telemetry.event()`. `http_gun.with_correlation(client, correlation)` makes a pure view of the shared client whose events carry the caller's `sinal/correlation.Correlation` under the ecosystem-wide `correlation` key; HTTP Gun's own per-invocation identity is `request_id`. Delivery is bounded and best effort; slow observers cause drops, never HTTP backpressure. No URLs, headers, bodies or per-chunk events are emitted. Use HTTP failures for submission evidence, never missing telemetry. See the [contract and public example](docs/OBSERVATIONS.md).
 
 ## One consumer, explicit startup mode
 

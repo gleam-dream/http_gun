@@ -15,6 +15,7 @@ import http_gun/recording
 import http_gun/request_options
 import http_gun/telemetry
 import sinal
+import sinal/correlation
 import sinal/forwarder
 
 @external(erlang, "http_gun_test_server", "persistent")
@@ -98,7 +99,9 @@ fn observed_request(req: request.Request(BitArray)) -> Nil {
     })
   let settings = config.Config(..local_config(), observations: Some(target))
   let assert Ok(shared) = http_gun.start(settings)
-  let correlation = telemetry.new_id()
+  // The application's own id for this unit of work; every gleam-dream
+  // package writes it under the same `correlation` metadata key.
+  let assert Ok(correlation) = correlation.from_string("order-42")
   let client = http_gun.with_correlation(shared, correlation)
   let assert Ok(_) = http_gun.send(client, req)
   let assert Ok(#(_, metadata)) = process.receive(completed, 1000)

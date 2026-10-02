@@ -76,7 +76,7 @@ A4 Fallible cancellation scope: `cancellation.try_with_token(on_start_error, run
 
 ## Accepted Sinal observation boundary (2026-10-01)
 
-The owner selected Sinal for lifecycle observation delivery. HTTP Gun supplies typed HTTP milestones, opaque request correlation and monotonic VM-local timestamps. An application-owned, supervised Sinal forwarder owns bounded asynchronous delivery and drop reporting. HTTP Gun does not add an observation collector, mailbox, retained timeline, ETS store or forwarding actor. The earlier fixed-slot experiment remains historical evidence, not the implementation target.
+The owner selected Sinal for lifecycle observation delivery. HTTP Gun supplies typed HTTP milestones, the caller's `sinal/correlation.Correlation` under the shared `correlation` key, its own opaque per-invocation `request_id` and monotonic VM-local timestamps. An application-owned, supervised Sinal forwarder owns bounded asynchronous delivery and drop reporting. HTTP Gun does not add an observation collector, mailbox, retained timeline, ETS store or forwarding actor. The earlier fixed-slot experiment remains historical evidence, not the implementation target.
 
 Observation is opt-in. HTTP Gun uses an explicitly supplied forwarder and direct forwarding; neither synchronous `sinal.emit` nor `emit_routed`'s synchronous no-route fallback may run user handlers inside HTTP owners. Full, unavailable or failed observation delivery must not alter HTTP outcomes, cancellation, deadlines or recording. Events contain no URLs, queries, headers, bodies, credentials or raw dependency terms, and there are no default per-chunk events. Applications own any retained history and downstream export queues.
 

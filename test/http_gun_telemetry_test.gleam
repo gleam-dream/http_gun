@@ -1,9 +1,11 @@
+import gleam/dynamic.{type Dynamic}
 import gleam/erlang/process
 import gleam/http/request
 import gleam/http/response
 import gleam/int
 import gleam/list
-import gleam/option.{Some}
+import gleam/option.{None, Some}
+import gleam/result
 import gleeunit/should
 import http_gun
 import http_gun/body
@@ -18,6 +20,8 @@ import http_gun/request_options
 import http_gun/telemetry
 import http_gun/testing
 import sinal
+import sinal/correlation
+import sinal/fields
 import sinal/forwarder
 
 pub fn scripted_lifecycle_has_correlation_without_network_submission_test() {
@@ -42,7 +46,7 @@ pub fn scripted_lifecycle_has_correlation_without_network_submission_test() {
     )
   let settings = config.Config(..local_config(), observations: Some(fwd))
   let assert Ok(shared) = testing.start(settings, [exchange])
-  let correlation = telemetry.new_id()
+  let assert Ok(correlation) = correlation.from_string("order-42")
   let client = http_gun.with_correlation(shared, correlation)
   let assert Ok(result) = http_gun.send(client, req)
   result.response |> should.equal(response.Response(201, [], <<0, 255>>))
@@ -78,6 +82,92 @@ pub fn scripted_lifecycle_has_correlation_without_network_submission_test() {
   let assert Ok(Nil) = sinal.detach(attachment)
   process.unlink(started.pid)
   process.kill(started.pid)
+}
+
+// Regression for HTTPGUN-R8: `correlation` holds the caller's Sinal value, so
+// a handler that knows only `correlation.field()` joins HTTP events with other
+// packages' events. HTTP Gun's own identity lives under `request_id`.
+pub fn native_metadata_carries_caller_correlation_and_request_id_test() {
+  let fwd =
+    forwarder.new(process.new_name("http-gun-native-observations"))
+    |> forwarder.with_capacity(64)
+  let spec = forwarder.supervised(fwd)
+  let assert Ok(started) = spec.start()
+  let native = process.new_subject()
+  attach_native("http-gun-native-metadata-test", native)
+  let req = request.new() |> request.set_body(<<>>)
+  let exchange =
+    fixture.Exchange(
+      req,
+      fixture.Respond(response.Response(204, [], []), fixture.Complete([])),
+    )
+  let settings = config.Config(..local_config(), observations: Some(fwd))
+  let assert Ok(shared) = testing.start(settings, list.repeat(exchange, 3))
+  let assert Ok(replaced) = correlation.from_string("replaced")
+  let assert Ok(order) = correlation.from_string("order-42")
+  // A later with_correlation replaces the view's value.
+  let client =
+    shared
+    |> http_gun.with_correlation(replaced)
+    |> http_gun.with_correlation(order)
+  let assert Ok(_) = http_gun.send(client, req)
+  let correlated_first = receive_native(native, 4)
+  let assert Ok(_) = http_gun.send(client, req)
+  let correlated_second = receive_native(native, 4)
+  let assert Ok(_) = http_gun.send(shared, req)
+  let uncorrelated = receive_native(native, 4)
+  list.append(correlated_first, correlated_second)
+  |> list.each(fn(raw) {
+    fields.decode(correlation.field(), raw) |> should.equal(Ok(Some(order)))
+    native_key(raw, "correlation") |> should.equal(Ok("order-42"))
+  })
+  list.each(uncorrelated, fn(raw) {
+    fields.decode(correlation.field(), raw) |> should.equal(Ok(None))
+    native_key(raw, "correlation") |> should.equal(Error(Nil))
+  })
+  // One request_id per invocation, shared by its milestones, distinct across
+  // invocations that reuse a correlation.
+  let first_id = single_request_id(correlated_first)
+  let second_id = single_request_id(correlated_second)
+  let third_id = single_request_id(uncorrelated)
+  { first_id != second_id && second_id != third_id && first_id != third_id }
+  |> should.be_true
+  detach_native("http-gun-native-metadata-test")
+  let _ = http_gun.stop(shared)
+  process.unlink(started.pid)
+  process.kill(started.pid)
+}
+
+@external(erlang, "http_gun_telemetry_test_ffi", "attach_native")
+fn attach_native(id: String, subject: process.Subject(Dynamic)) -> Nil
+
+@external(erlang, "http_gun_telemetry_test_ffi", "detach_native")
+fn detach_native(id: String) -> Nil
+
+fn receive_native(
+  subject: process.Subject(Dynamic),
+  remaining: Int,
+) -> List(Dynamic) {
+  case remaining {
+    0 -> []
+    _ -> {
+      let assert Ok(raw) = process.receive(subject, 1000)
+      [raw, ..receive_native(subject, remaining - 1)]
+    }
+  }
+}
+
+fn native_key(raw: Dynamic, key: String) -> Result(String, Nil) {
+  fields.decode(fields.string(key), raw) |> result.replace_error(Nil)
+}
+
+fn single_request_id(events: List(Dynamic)) -> String {
+  let assert [first, ..] = events
+  let assert Ok(id) = native_key(first, "request_id")
+  list.each(events, fn(raw) {
+    native_key(raw, "request_id") |> should.equal(Ok(id))
+  })
+  id
 }
 
 fn receive_events(
@@ -264,7 +354,7 @@ pub fn queued_deadline_terminates_without_grant_or_gun_return_test() {
   let assert Ok(first) = http_gun.open(shared, local_request(port))
   let _ = until(observer, telemetry.ResponseHeaders(200), 8)
   let result = process.new_subject()
-  let correlation = telemetry.new_id()
+  let correlation = correlation.unique()
   let client = http_gun.with_correlation(shared, correlation)
   let assert Ok(budget) = deadline.after(1000)
   let _ =
@@ -314,7 +404,7 @@ pub fn recording_and_strict_playback_keep_telemetry_out_of_matching_test() {
   let req = local_request(server())
   let path = temp_path()
   let assert Ok(recorded) = cassette.record(settings, path, recording.default())
-  let tag = telemetry.new_id()
+  let tag = correlation.unique()
   let assert Ok(original) =
     http_gun.send(http_gun.with_correlation(recorded.client, tag), req)
   let live = until(observer, telemetry.HttpTerminated(telemetry.Complete), 8)
@@ -336,7 +426,10 @@ pub fn recording_and_strict_playback_keep_telemetry_out_of_matching_test() {
   |> should.be_false
   // Different correlation, same exact request: mismatch did not consume it.
   let assert Ok(replayed) =
-    http_gun.send(http_gun.with_correlation(playback, telemetry.new_id()), req)
+    http_gun.send(
+      http_gun.with_correlation(playback, correlation.unique()),
+      req,
+    )
   replayed.response |> should.equal(original.response)
   let offline = until(observer, telemetry.HttpTerminated(telemetry.Complete), 8)
   list.all(offline, fn(value) { value.1.mode == telemetry.Offline })
@@ -422,8 +515,8 @@ pub fn observed_h2_cancellation_preserves_sibling_and_one_connection_test() {
     |> request.set_host("localhost")
     |> request.set_port(port)
     |> request.set_body(<<>>)
-  let slow_tag = telemetry.new_id()
-  let fast_tag = telemetry.new_id()
+  let slow_tag = correlation.unique()
+  let fast_tag = correlation.unique()
   let assert Ok(slow) =
     http_gun.open(
       http_gun.with_correlation(client, slow_tag),

@@ -21,9 +21,9 @@ compile_probe() {
 printf '%s\n' 'import http_gun' 'pub fn valid(client: http_gun.Client) { http_gun.snapshot(client) }' > "$work/negative/src/probe.gleam"
 compile_probe
 # Compile-time rejection from a separate package, never same-package visibility.
-for check in client body wrong_body recording deadline cancellation observation_id; do
+for check in client body wrong_body recording deadline cancellation request_id; do
   case "$check" in
-    observation_id) source='import http_gun/telemetry\npub fn invalid() { telemetry.Id }'; expected='Unknown module value';;
+    request_id) source='import http_gun/telemetry\npub fn invalid() { telemetry.RequestId("x") }'; expected='Unknown module value';;
     client) source='import http_gun\npub fn invalid() { http_gun.Client }'; expected='Unknown module value';;
     body) source='import http_gun/body\npub fn invalid() { body.Body }'; expected='Unknown module value';;
     wrong_body) source='import http_gun\nimport gleam/http/request\npub fn invalid(client: http_gun.Client) { http_gun.send(client, request.new()) }'; expected='Type mismatch';;
@@ -32,7 +32,7 @@ for check in client body wrong_body recording deadline cancellation observation_
     recording) source='import http_gun/recording\npub fn invalid() { recording.Recording }'; expected='Unknown module value';;
   esac
   case "$check" in
-    observation_id) symbol='Id';;
+    request_id) symbol='RequestId';;
     client) symbol='Client';; body) symbol='Body';; recording) symbol='Recording';;
     deadline) symbol='Deadline';; cancellation) symbol='Token';; wrong_body) symbol='BitArray';;
   esac

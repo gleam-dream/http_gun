@@ -39,7 +39,7 @@ import http_gun/internal/batch
 import http_gun/internal/bridge
 import http_gun/internal/pool
 import http_gun/request_options
-import http_gun/telemetry
+import sinal/correlation.{type Correlation}
 
 pub type Client =
   pool.Client
@@ -245,10 +245,15 @@ pub fn snapshot(client: Client) -> Result(Stats, Failure) {
   pool.snapshot(client)
 }
 
-/// Create a client view carrying an opaque observation correlation for subsequent
-/// calls, including a batch. It shares the same pool, policy and lifetime: stopping
-/// either view stops that client. Every invocation still gets its own request_id.
-/// This is pure and does not enable observations or alter HTTP/cassette matching.
-pub fn with_correlation(client: Client, id: telemetry.Id) -> Client {
-  pool.with_correlation(client, id)
+/// Create a client view whose lifecycle events carry the caller's correlation
+/// under the `correlation` metadata key, for subsequent calls including a
+/// batch. Pass the value the rest of the unit of work uses, so HTTP events join
+/// with other packages' events without a lookup table. A later call replaces
+/// the view's correlation.
+///
+/// The view shares the same pool, policy and lifetime: stopping either view
+/// stops that client. Every invocation still gets its own `request_id`. This is
+/// pure and does not enable observations or alter HTTP or cassette matching.
+pub fn with_correlation(client: Client, correlation: Correlation) -> Client {
+  pool.with_correlation(client, correlation)
 }

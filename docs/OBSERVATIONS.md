@@ -19,16 +19,29 @@ let assert Ok(supervisor) =
 
 let settings = config.Config(..config.default(), observations: Some(target))
 let assert Ok(shared) = http_gun.start(settings)
-let correlation = telemetry.new_id()
+let assert Ok(correlation) = correlation.from_string(order_id)
 let client = http_gun.with_correlation(shared, correlation)
 let result = http_gun.send(client, req)
 ```
 
-Import `http_gun/telemetry`, `sinal`, `sinal/forwarder`, `gleam/erlang/process`, `gleam/otp/static_supervisor` and `gleam/option.{Some}` alongside the normal HTTP imports. The application retains the supervisor for its service lifetime; completing one HTTP operation does not stop it. Use `http_gun.child(settings)` when supervising the client too. A restarted client needs the new Client capability; the same Sinal Forwarder capability survives its own restart.
+Import `http_gun/telemetry`, `sinal`, `sinal/correlation`, `sinal/forwarder`, `gleam/erlang/process`, `gleam/otp/static_supervisor` and `gleam/option.{Some}` alongside the normal HTTP imports. The application retains the supervisor for its service lifetime; completing one HTTP operation does not stop it. Use `http_gun.child(settings)` when supervising the client too. A restarted client needs the new Client capability; the same Sinal Forwarder capability survives its own restart.
 
 Attach with `sinal.observe(telemetry.event(), handler)`; Sinal assigns the handler id. The handler receives `Timing(monotonic_ms)` and `Metadata(request_id, correlation, mode, milestone)`. It runs in the forwarder process. Detach through the returned Sinal Attachment when the application no longer wants it. Sinal attachments are VM-wide by event name; applications distinguish their work using correlation and must avoid installing duplicate handlers per request.
 
-`with_correlation` creates a pure view of the existing shared client. It starts no process and changes no HTTP policy, request matching or ownership. Stopping either view stops that client. Reusing a correlation can identify a batch or application operation; every invocation that enters observation gets a separate opaque request ID. IDs are VM-local identities, not strings containing application data, credentials or Gun references. They are not durable identifiers across VM restarts.
+## Correlation and request identity
+
+Every event's metadata carries two identities with different owners:
+
+| Key | Gleam field | Owner | Meaning |
+| --- | --- | --- | --- |
+| `correlation` | `Option(sinal/correlation.Correlation)` | Caller | The unit of work, shared with every other gleam-dream package. Written by `correlation.field()`: a UTF-8 binary of 1 to 128 bytes, and the key is omitted when the client view carries none. |
+| `request_id` | `telemetry.RequestId` | HTTP Gun | One observed invocation. All milestones of that invocation share it; invocations that reuse a correlation get distinct values. |
+
+`http_gun.with_correlation(client, correlation)` is the only way to set the correlation. Pass the value the rest of the unit of work already uses: an order id or job id through `correlation.from_string`, a value received from an upstream package, or a fresh `correlation.unique()`. A handler then joins HTTP events with other packages' events by `metadata.correlation`, without a lookup table; an Erlang or Elixir handler reads the same `correlation` key. A correlation identifies one unit of work, so never use it as a metric tag.
+
+The view is pure: it shares the existing client, starts no process and changes no HTTP policy, request matching or ownership. Stopping either view stops that client. A later `with_correlation` on a view replaces its correlation.
+
+Only HTTP Gun creates a `RequestId`. It is opaque and compared by equality within one VM lifetime; Erlang handlers see a binary. It is not a durable identifier across VM restarts, and contains no application data, credentials or Gun references. Use it to group one invocation's milestones, not as a join key across packages.
 
 ## Exact milestones
 
@@ -57,13 +70,13 @@ Metadata contains no URLs, queries, headers, bodies, credentials or free-form fa
 
 ## Modes and independent outcomes
 
-Live mode emits `Live`; actual recording emits `Recorded`. Both can report GunCallReturned. Scripts and strict disk playback report `Offline` and never report a network call. They use the same admitted HTTP contract; offline matching, non-consuming mismatches and ordering are unchanged. Observation IDs and correlations are not fixture matching keys or stored request metadata.
+Live mode emits `Live`; actual recording emits `Recorded`. Both can report GunCallReturned. Scripts and strict disk playback report `Offline` and never report a network call. They use the same admitted HTTP contract; offline matching, non-consuming mismatches and ordering are unchanged. Request ids and correlations are not fixture matching keys or stored request metadata.
 
 HTTP termination, observation delivery and recording capture/persistence are separate outcomes. For example, HTTP can Complete while capture exceeds its budget and reports CaptureFailed. Always use the recording result for persistence, and never infer a published cassette from HTTP or telemetry completion.
 
 ## One Sinal source
 
-Development resolves `sinal = { path = "../sinal" }`, also used by the current downstream. This is the canonical Sinal implementation; the current snapshot pins local commit `8acec4507f23daa7f49c40cc7d39816a5a4c3d1d`. Sinal is not yet published on Hex, so the independent gate uses a hash-pinned source archive under `dev/dependencies`, materialized as that same sibling path inside a disposable workspace. It is a validation input, not an HTTP Gun fork or another runtime.
+Development resolves `sinal = { path = "../sinal" }`, also used by the current downstream. This is the canonical Sinal implementation; the current snapshot pins the Sinal commit recorded as `revision` in `dev/dependencies/sinal.json`. Sinal is not yet published on Hex, so the independent gate uses a hash-pinned source archive under `dev/dependencies`, materialized as that same sibling path inside a disposable workspace. It is a validation input, not an HTTP Gun fork or another runtime.
 
 If the canonical checkout is present, the gate verifies its selected files match the snapshot. The downstream gate uses the actual selected Sinal checkout and performs the same check. The historical LLM archive is verified first, then its old Sinal copy is replaced in the temporary workspace by this selected source. Only one Sinal copy resolves in each build. Licenses, source revision and per-file hashes are retained. Replace this temporary packaging with an immutable released dependency when one exists; no publication is implied or performed here.
 

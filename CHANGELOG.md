@@ -40,3 +40,16 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Built on Sinal's wave 2 API: `telemetry.event()` is a total definition with
   string names and keys, and observers attach with `sinal.observe(event,
   handler)` and an automatic handler id. The emitted event is unchanged.
+- `http_gun.with_correlation` takes the caller's
+  `sinal/correlation.Correlation` instead of an HTTP Gun id. Lifecycle
+  metadata writes it through `correlation.field()` under the shared
+  `correlation` key, omitted when absent, so HTTP events join other
+  packages' events without a lookup table. `telemetry.Metadata.correlation`
+  is `Option(Correlation)`.
+- `telemetry.Id` is now `telemetry.RequestId`, created only by HTTP Gun for
+  each observed invocation and carried under `request_id`.
+
+### Removed
+
+- `telemetry.new_id()`. Use `correlation.from_string(app_id)` or
+  `correlation.unique()` from `sinal/correlation`.

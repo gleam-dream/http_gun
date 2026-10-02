@@ -1,5 +1,16 @@
 # Restart progress
 
+Correlation follow-up (HTTPGUN-R8, correlation part), 2026-10-02.
+`http_gun.with_correlation` takes the caller's `sinal/correlation.Correlation`,
+written under `correlation` by `correlation.field()` and omitted when absent.
+HTTP Gun's per-invocation identity is the opaque `telemetry.RequestId` under
+`request_id`; `telemetry.new_id()` is removed. A native `:telemetry` handler
+test pins both keys, omission, replacement and distinct request ids under one
+correlation. The Sinal snapshot is refreshed to f9cca37. The full gate passes
+with 137 tests, the ordinary, async and archived LLM consumers and seven
+rejection probes. Routed emission is left to wave 3. App call sites are listed
+in [the migration guide](migration-wave-2.md).
+
 Warden feedback follow-up complete locally,2026-10-01 (waves29–31). G1's public
 bound now admits stdlib1.x; the full gate qualifies both0.71.0 and1.0.5. G2 adds
 in-memory DER trust anchors directly through OTP cacerts. G3's reproduced idle

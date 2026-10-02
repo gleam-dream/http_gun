@@ -27,6 +27,7 @@ import http_gun/internal/resolution
 import http_gun/recording
 import http_gun/request_options
 import http_gun/telemetry
+import sinal/correlation.{type Correlation}
 
 pub type Stats {
   Stats(connections: Int, bodies: Int, waiting: Int)
@@ -36,7 +37,7 @@ pub opaque type Client {
   Client(
     subject: process.Subject(Message),
     config: config.Config,
-    correlation: Option(telemetry.Id),
+    correlation: Option(Correlation),
   )
 }
 
@@ -86,7 +87,7 @@ type Message {
   Open(
     request.Request(BitArray),
     Origin,
-    Option(telemetry.Id),
+    Option(Correlation),
     Option(cancellation.Token),
     process.Pid,
     Int,
@@ -786,7 +787,7 @@ fn open_request(
   state: State,
   req: request.Request(BitArray),
   origin: Origin,
-  correlation: Option(telemetry.Id),
+  correlation: Option(Correlation),
   token: Option(cancellation.Token),
   owner: process.Pid,
   deadline: Int,
@@ -974,8 +975,8 @@ fn discard_reservation(state: State, p: Pending) -> State {
   }
 }
 
-pub fn with_correlation(client: Client, id: telemetry.Id) -> Client {
-  Client(..client, correlation: Some(id))
+pub fn with_correlation(client: Client, correlation: Correlation) -> Client {
+  Client(..client, correlation: Some(correlation))
 }
 
 fn preparing(status: Status) -> Bool {

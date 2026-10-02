@@ -1,6 +1,16 @@
 //// Best-effort HTTP lifecycle observations delivered by an explicit Sinal forwarder.
 //// No handlers run in HTTP owners. No history, URLs, headers or body data are kept.
 //// Missing events are not submission evidence or permission to retry.
+////
+//// Every event's metadata carries two identities:
+////
+//// - `correlation`: the caller's `sinal/correlation.Correlation`, set with
+////   `http_gun.with_correlation` and written through `correlation.field()`.
+////   The key is omitted when the client view carries none. Use it to join
+////   HTTP events with the events of other packages working on the same unit.
+//// - `request_id`: an opaque `RequestId` that HTTP Gun assigns to each
+////   observed invocation. Invocations that share a correlation still get
+////   distinct request ids, so a handler can group one invocation's milestones.
 
 import gleam/dynamic
 import gleam/dynamic/decode
@@ -10,19 +20,20 @@ import gleam/string
 import http_gun/error
 import http_gun/internal/bridge
 import sinal
+import sinal/correlation.{type Correlation}
 import sinal/fields
 import sinal/forwarder
 
-/// An opaque VM-local identifier. Equality is meaningful within this VM lifetime.
-pub opaque type Id {
-  Id(value: String)
+/// The identity HTTP Gun assigns to one observed invocation. Only HTTP Gun
+/// creates it. Equality is meaningful within one VM lifetime; it is not a
+/// durable identifier, a credential or a network reference. Erlang handlers
+/// see it as a binary under the `request_id` key.
+pub opaque type RequestId {
+  RequestId(value: String)
 }
 
-/// Create an identity for correlating a call or a group of calls. HTTP Gun also
-/// creates a distinct request_id for every observed invocation, even when a
-/// correlation is reused. Neither identity is a credential or a network reference.
-pub fn new_id() -> Id {
-  Id(string.inspect(reference.new()))
+fn new_request_id() -> RequestId {
+  RequestId(string.inspect(reference.new()))
 }
 
 /// Scripts and disk playback both report Offline; neither claims network activity.
@@ -63,8 +74,8 @@ pub type Timing {
 
 pub type Metadata {
   Metadata(
-    request_id: Id,
-    correlation: Option(Id),
+    request_id: RequestId,
+    correlation: Option(Correlation),
     mode: Mode,
     milestone: Milestone,
   )
@@ -90,10 +101,8 @@ pub fn event() -> sinal.Event(Timing, Metadata) {
       use milestone <- fields.parameter
       Metadata(request_id:, correlation:, mode:, milestone:)
     })
-    |> fields.and(id_field("request_id"), fn(m: Metadata) { m.request_id })
-    |> fields.and(fields.optional(id_field("correlation")), fn(m) {
-      m.correlation
-    })
+    |> fields.and(request_id_field(), fn(m: Metadata) { m.request_id })
+    |> fields.and(correlation.field(), fn(m) { m.correlation })
     |> fields.and(
       fields.enum("mode", [Live, Recorded, Offline], mode_name),
       fn(m) { m.mode },
@@ -103,11 +112,11 @@ pub fn event() -> sinal.Event(Timing, Metadata) {
   sinal.event(["http_gun", "lifecycle"], at, metadata)
 }
 
-fn id_field(name: String) -> fields.Fields(Id) {
+fn request_id_field() -> fields.Fields(RequestId) {
   fields.field(
-    name,
-    fn(id: Id) { dynamic.string(id.value) },
-    decode.string |> decode.map(Id),
+    "request_id",
+    fn(id: RequestId) { dynamic.string(id.value) },
+    decode.string |> decode.map(RequestId),
   )
 }
 
@@ -174,7 +183,12 @@ pub opaque type Emitter {
 
 @internal
 pub opaque type Context {
-  Context(emitter: Emitter, request_id: Id, correlation: Option(Id), mode: Mode)
+  Context(
+    emitter: Emitter,
+    request_id: RequestId,
+    correlation: Option(Correlation),
+    mode: Mode,
+  )
 }
 
 @internal
@@ -188,13 +202,13 @@ pub fn prepare(target: Option(forwarder.Forwarder)) -> Option(Emitter) {
 @internal
 pub fn begin(
   emitter: Option(Emitter),
-  correlation: Option(Id),
+  correlation: Option(Correlation),
   mode: Mode,
 ) -> Option(Context) {
   case emitter {
     None -> None
     Some(emitter) -> {
-      let context = Some(Context(emitter, new_id(), correlation, mode))
+      let context = Some(Context(emitter, new_request_id(), correlation, mode))
       emit(context, AdmissionEntered)
       context
     }
