@@ -6,7 +6,7 @@ Implement public API, domain state, pool admission, body ownership, batching, ma
 
 Gun/Cowlib own wire protocols. Do not patch dependencies, implement parsers or pursue whole-stack memory certification. Document post-parse admission limits honestly. No retries, redirects or decompression. Generic HTTP bytes, statuses, duplicate headers and trailers are required.
 
-Keep /code/gleam-dream/oversight and siblings read-only. No push, publication, upstream contact or provider credentials. Local archives in .archive preserve the pre-restart implementation; do not remove them. Never alter another task's checkout.
+Change only this repository unless the task names a sibling; /code/gleam-dream/oversight and sibling repositories are otherwise read-only. Push to master after the full gate passes. Hex publication, upstream contact and provider credentials need explicit owner approval. Local archives in .archive preserve the pre-restart implementation; do not remove them. Never alter another task's checkout.
 
 Use observable public tests, one failing scenario at a time, followed by minimal implementation and refactoring while green. Fast: ./dev/env sh dev/gate fast. Full: ./dev/env sh dev/gate full. Missing functionality is unfinished, not a passing limitation. Update progress and exact evidence; do not claim completion of unexecuted workflows.
 
