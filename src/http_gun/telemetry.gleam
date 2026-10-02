@@ -86,29 +86,28 @@ pub type Metadata {
 /// drops observations. Handler arrival order across pool/body producers is not
 /// a request ordering guarantee. Compare source timestamps and milestone meaning.
 pub fn event() -> sinal.Event(Timing, Metadata) {
-  let at =
-    fields.record({
-      use monotonic_ms <- fields.parameter
-      Timing(monotonic_ms:)
+  let at = {
+    use monotonic_ms <- fields.include(fields.int("monotonic_ms"), get: fn(t) {
+      t.monotonic_ms
     })
-    |> fields.and(fields.int("monotonic_ms"), fn(t: Timing) { t.monotonic_ms })
-    |> fields.build
-  let metadata =
-    fields.record({
-      use request_id <- fields.parameter
-      use correlation <- fields.parameter
-      use mode <- fields.parameter
-      use milestone <- fields.parameter
-      Metadata(request_id:, correlation:, mode:, milestone:)
+    fields.success(Timing(monotonic_ms:))
+  }
+  let metadata = {
+    use request_id <- fields.include(request_id_field(), get: fn(m) {
+      m.request_id
     })
-    |> fields.and(request_id_field(), fn(m: Metadata) { m.request_id })
-    |> fields.and(correlation.field(), fn(m) { m.correlation })
-    |> fields.and(
+    use correlation <- fields.include(correlation.field(), get: fn(m) {
+      m.correlation
+    })
+    use mode <- fields.include(
       fields.enum("mode", [Live, Recorded, Offline], mode_name),
-      fn(m) { m.mode },
+      get: fn(m) { m.mode },
     )
-    |> fields.and(milestone_field(), fn(m) { m.milestone })
-    |> fields.build
+    use milestone <- fields.include(milestone_field(), get: fn(m) {
+      m.milestone
+    })
+    fields.success(Metadata(request_id:, correlation:, mode:, milestone:))
+  }
   sinal.event(["http_gun", "lifecycle"], at, metadata)
 }
 
