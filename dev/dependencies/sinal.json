@@ -1,25 +1,25 @@
 {
   "name": "sinal",
-  "revision": "a0c05ef8169149d12cffddf059593ae17d42af3a",
+  "revision": "5aef827c5b486127f7623c8819929c2cd9e52760",
   "status": "",
   "files": {
     "LICENSE": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
-    "README.md": "cbb20a29f3953331ea8aa4beb3cc3fe34464636a8f6db3e4d7c54997d4607ddf",
+    "README.md": "825072b746a9769b84afc8590fb5502e414aa3f09f09f6e8f9eec5f61633cafd",
     "gleam.toml": "92ba7d884c80dc33c506e24467be9be10cf2133f247f803972d07e798e9c6af1",
     "manifest.toml": "50e749ddc80f019e0499cb2144a9bf537e51d1d00570eba07440dea416e9fa09",
-    "src/sinal.gleam": "6ba163692b2392a47f4d6782a8fdeb4a063237b0e199acfca12f99f47270159b",
-    "src/sinal/correlation.gleam": "801cd0ace27a8475d94807577806f4b4594df6ce42570d2a696aefde002ddd18",
-    "src/sinal/fields.gleam": "2489774c407faa75f3a948c52eac779a2df541e58500001db02f32f9618d276b",
-    "src/sinal/forwarder.gleam": "5179d54513460650770edac58f6badc0f31e797f6d709288b41882d65d1dae42",
-    "src/sinal/internal/ffi.gleam": "20b4b4fe87385a046393d747806d4b51f3daada5e6318a3a63651ab91e4ce7e2",
+    "src/sinal.gleam": "4bee7da2d0f1f4dad737d941aa1530248a9040a402188912553d2bbb9c99c093",
+    "src/sinal/correlation.gleam": "6089eefa21d27b51a3753dbca26eb92fe7314824173b253172d51a9334591c78",
+    "src/sinal/fields.gleam": "d4a305fc79e8c3694e8afd96ac6e584d7849dec182c148f823903d1c9ec765bd",
+    "src/sinal/forwarder.gleam": "b365950fcea21815868cb9c2557759454ea6096cd6132f88b2934991f887a307",
+    "src/sinal/internal/ffi.gleam": "2df653655a002e980b90442f587808d747ac24b804cf39e7a21d03a19a4ccb38",
     "src/sinal/internal/name.gleam": "bebc1136dd24cd5e7988b6a3389653d941ccdbc587eb71f8f08c3dce9ccbc826",
     "src/sinal/internal/route.gleam": "279ffc7662fad7b8cee0a5fa4a9044fa6f994d3d85eae4d31c50b28941ecf7ab",
-    "src/sinal/span.gleam": "15382c419eeb0e1b1db7a7befbd6292a23a902a6101e0ef76abf65022dc48fbe",
-    "src/sinal_ffi.erl": "bad2a95afd3d9413253bc4b9794990aac9bdceefda6a5ccd1a15841957e02baf",
+    "src/sinal/span.gleam": "09739809dc251aa54554ff09a735c00a5aa8d09f4ab2cbe8451b7d6403ef3d6d",
+    "src/sinal_ffi.erl": "16dbf3ac101184254bdf6c0d7488591e00a938e60beed3ae9dc8d4047b1bdcca",
     "src/sinal_forwarder_ffi.erl": "778368d9709fe36a8b367358356989b37930bc4d3f6e11a77c1c95d3c5e93c2e",
     "src/sinal_scope_ffi.erl": "99bad982c4cabb71b35962ccb4b5880805cee242d010193559106a5b2379a343"
   },
   "license": "Apache-2.0; original LICENSE and manifest preserved",
   "source": "Canonical local Sinal checkout, including owner-authorized generic forwarder correction; no HTTP-specific code.",
-  "archive_sha256": "ed9ede6a58ca7ecd487dd0208e3f7b5b3a3047e0813e742991c84398e6d21682"
+  "archive_sha256": "d4eebb025406b7f8fd678503bf7d1c0452eec7287d36cb19da786585ec724af7"
 }
