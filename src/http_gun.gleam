@@ -1,4 +1,30 @@
-//// Generic HTTP on Gun. Start once, share the client, own each response body.
+//// Starts HTTP clients on Gun and sends requests through them.
+////
+//// Use this module for live requests. `start`, or `child` under a supervisor,
+//// validates a `config.Config` and returns a `Client` that callers share. `send`
+//// collects a response into `Buffered`. `open`, `with_response` and
+//// `try_with_response` give a `body.Body` to stream. `batch` runs many requests
+//// with bounded concurrency. Each `_with_options` variant also takes a
+//// `request_options.Options` with a deadline, a cancellation token or a
+//// collection policy. Failures are `error.Failure` values. `testing` and
+//// `cassette` start offline clients of the same `Client` type.
+////
+//// ```gleam
+//// import gleam/http/request
+//// import http_gun
+//// import http_gun/config
+////
+//// pub fn main() {
+////   let assert Ok(client) = http_gun.start(config.default())
+////   let assert Ok(req) = request.to("https://example.com/data")
+////   let result = http_gun.send(client, request.set_body(req, <<>>))
+////   let _ = http_gun.stop(client)
+////   result
+//// }
+//// ```
+////
+//// Non-2xx statuses are response data. The client performs no retries,
+//// redirects or decompression.
 
 import gleam/bool
 import gleam/http/request

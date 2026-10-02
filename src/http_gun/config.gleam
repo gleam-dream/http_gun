@@ -1,4 +1,13 @@
-/// Pure startup policy. All limits are checked before starting a client.
+//// Defines client settings: protocol, TLS trust, timeouts, limits,
+//// observations and destination policy.
+////
+//// Build a `Config` from `default()` with record updates and pass it to
+//// `http_gun.start`, `testing.start`, `cassette.playback` or `cassette.record`.
+//// `validate` checks it without starting processes. `allow_loopback` admits
+//// local servers. `Negotiated` reports the protocol a response used. The
+//// destination rules live in `http_gun/destination`. A `Config` holds no
+//// credentials.
+
 import gleam/bit_array
 import gleam/list
 import gleam/option.{type Option, None}

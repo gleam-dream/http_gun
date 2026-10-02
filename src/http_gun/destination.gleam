@@ -1,5 +1,13 @@
-/// Network destination policy. Reserved addresses are never permitted.
-/// The optional allowlist restricts exact host names (case insensitive), not ports.
+//// Decides which network addresses a client may connect to.
+////
+//// A `Policy` is the `destination` field of `config.Config`. The default admits
+//// public addresses only. Set `allow_loopback` or `allow_private` to admit local
+//// or private networks. Reserved addresses, including cloud metadata addresses,
+//// are always refused. `allowed_hosts` restricts exact host names, not ports.
+//// Every resolved address of a new connection is checked before connecting. A
+//// custom `Resolver` replaces DNS lookup, for example in tests. `classify`
+//// reports the class of an address.
+
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/string

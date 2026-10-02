@@ -1,3 +1,13 @@
+//// Describes why an HTTP Gun operation failed.
+////
+//// Client, body, script and cassette functions return a `Failure`: a `Reason`
+//// and `Evidence` that says whether the request may have reached the server
+//// (`NotSubmitted` or `MayHaveBeenSent`). Neither value proves the server acted.
+//// Match on `Reason` to decide what to do, and use `describe` for a log line. A
+//// `Failure` carries typed limits and transport causes, and no URL, header,
+//// body or query from the request. Recording errors use
+//// `recording.CaptureError` instead.
+
 import gleam/int
 
 /// Submission evidence is conservative; neither alternative proves execution.

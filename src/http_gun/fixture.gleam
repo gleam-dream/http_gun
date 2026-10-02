@@ -1,4 +1,11 @@
-/// Ordered, binary-capable observations for scripts and cassettes.
+//// Defines the HTTP exchanges that scripts and cassettes replay.
+////
+//// An `Exchange` pairs an expected `Request(BitArray)` with a `Reply`: a
+//// response with its body chunks and `Ending`, or a `Failure`. Pass a list of
+//// exchanges to `testing.start` or `cassette.new`. `matches` and `sanitise`
+//// define how playback compares requests: credential headers are ignored, while
+//// the method, URL, other headers and body bytes must match exactly.
+
 import gleam/bit_array
 import gleam/http/request
 import gleam/http/response

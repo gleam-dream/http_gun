@@ -1,4 +1,11 @@
-/// Explicit, strictly ordered offline sessions. No network fallback.
+//// Starts an offline client that answers from a scripted list of exchanges.
+////
+//// `start` returns an ordinary `http_gun.Client` that never opens a network
+//// connection. Each request must match the next `fixture.Exchange` in order. A
+//// mismatch fails with `FixtureMismatch` and leaves that exchange in place; a
+//// request after the last exchange fails with `FixtureExhausted`. Use it to test
+//// code that takes a `Client`. Use `cassette` to load exchanges from a file.
+
 import gleam/list
 import gleam/result
 import http_gun

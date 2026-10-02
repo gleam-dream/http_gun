@@ -1,4 +1,8 @@
-//// Monotonic budgets shared across preparation and HTTP calls on this VM.
+//// Represents a monotonic time budget shared across several calls on one VM.
+////
+//// Create one with `after` and pass it in `request_options.Options`. A request
+//// then uses the earlier of the client's request ceiling and this deadline. A
+//// `Deadline` must not be persisted or sent to another node.
 
 import gleam/int
 import http_gun/error

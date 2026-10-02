@@ -1,5 +1,12 @@
-//// Recording coordination is a Gleam actor; a single linked IO worker executes
-//// bounded writes. Disk work never blocks the coordinator's control mailbox.
+//// Controls a cassette recording started by `cassette.record`.
+////
+//// `Options` set the byte budget and whether an existing file may be replaced.
+//// `finish` publishes the file when no work is in flight; `finish_wait`
+//// refuses further requests and waits for publication. `abort` abandons
+//// the capture while the live client keeps working. Capture failures
+//// (`CaptureError`, `FinishError`) are separate from HTTP outcomes. Credential
+//// headers are omitted from what is written; bodies and queries are stored
+//// exactly.
 
 import gleam/bit_array
 import gleam/dict.{type Dict}

@@ -1,4 +1,9 @@
-//// Execution controls; these never change the HTTP request or cassette key.
+//// Defines per-request controls: a deadline, a cancellation token and a
+//// collection policy.
+////
+//// Pass `Options` to `http_gun`'s `_with_options` functions. Start from
+//// `default()`, which uses the client's settings. These controls never change
+//// the HTTP request or its cassette match.
 
 import gleam/option.{type Option, None, Some}
 import http_gun/cancellation

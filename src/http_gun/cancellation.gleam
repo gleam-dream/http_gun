@@ -1,4 +1,11 @@
-//// Scoped, latched local cancellation. This capability never owns body reads.
+//// Cancels in-flight requests from another part of the program.
+////
+//// `with_token` and `try_with_token` run a callback with a `Token`. Pass the
+//// token in `request_options.Options` to `http_gun`'s `_with_options`
+//// functions. `cancel` stops every associated request that has not finished,
+//// before headers or during body consumption, and the token stays cancelled.
+//// Scope exit, an exception and the creator's death also cancel. Cancellation
+//// is local: it says nothing about whether the server processed the request.
 
 import gleam/erlang/process
 import gleam/otp/actor

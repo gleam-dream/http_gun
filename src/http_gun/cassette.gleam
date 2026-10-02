@@ -1,4 +1,17 @@
-/// Explicit disk playback. Loading never opens a network connection.
+//// Loads, saves, plays back and records HTTP exchanges as cassette files.
+////
+//// Use `load` or `parse`, then `playback`, to start a client that answers from
+//// recorded exchanges in order and never opens a network connection. Use
+//// `record` to start a live client that writes each exchange to disk, and
+//// `finish` or `recording.finish_wait` to publish the file. `new` and `encode`
+//// build and serialise a cassette from `fixture.Exchange` values. Playback and
+//// recording clients are ordinary `http_gun.Client` values.
+////
+//// Encoded cassettes and recordings omit the credential headers
+//// `authorization`, `proxy-authorization`, `cookie`, `set-cookie`, `x-api-key`,
+//// `api-key` and `x-goog-api-key`. Bodies and URL queries are stored exactly and
+//// can contain secrets.
+
 import gleam/bit_array
 import gleam/list
 import gleam/result

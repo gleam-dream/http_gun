@@ -1,4 +1,13 @@
-/// An owned byte stream. Copies share consumption state in one Gleam actor.
+//// Reads and closes a streamed response body.
+////
+//// `http_gun.open` and the scoped `with_response` functions return a
+//// `Response(Body)`. Read it chunk by chunk with `next`, or gather it with
+//// `collect`. `close` ends the stream early and is idempotent. The process that
+//// opened the response owns consumption: a read from another process fails with
+//// `WrongOwner`, and a read while another is pending fails with `ReadConflict`.
+//// Copies of a `Body` share one cursor. `http_gun.send` collects through this
+//// same path.
+
 import gleam/bit_array
 import gleam/erlang/process
 import gleam/erlang/reference
