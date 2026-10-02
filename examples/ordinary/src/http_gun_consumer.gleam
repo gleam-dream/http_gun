@@ -34,7 +34,12 @@ fn consume(client: http_gun.Client, req: request.Request(BitArray)) {
   let assert Ok(budget) = deadline.after(5000)
   let assert Ok(Ok(_)) =
     cancellation.with_token(fn(token) {
-      let options = request_options.Options(Some(budget), Some(token))
+      let options =
+        request_options.Options(
+          ..request_options.default(),
+          deadline: Some(budget),
+          cancellation: Some(token),
+        )
       http_gun.try_with_response_with_options(
         client,
         req,

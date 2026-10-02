@@ -1,7 +1,9 @@
 //// Generic HTTP on Gun. Start once, share the client, own each response body.
 
+import gleam/bool
 import gleam/http/request
 import gleam/http/response
+import gleam/option.{None, Some}
 import gleam/otp/supervision
 import gleam/result
 import http_gun/body
@@ -24,6 +26,10 @@ pub type Buffered {
     response: response.Response(BitArray),
     trailers: List(#(String, String)),
     protocol: config.Negotiated,
+    /// True only under a `request_options.Truncate` collection policy when the
+    /// body exceeded its limit: the body holds the first `limit` bytes and the
+    /// trailers are empty.
+    truncated: Bool,
   )
 }
 
@@ -146,6 +152,9 @@ pub fn try_with_response_with_options(
 /// Collect response bytes and trailers using the same owned streaming path.
 /// Enforces the client collection limit; always closes on success or failure.
 /// HTTP status codes, including non-2xx statuses, remain response data.
+/// An oversized body fails with `LimitExceeded(CollectedBodyBytes, ..)` and
+/// `MayHaveBeenSent`, without the response status or headers. When the status
+/// decides the outcome, use `send_with_options` with a `Truncate` policy.
 pub fn send(
   client: Client,
   req: request.Request(BitArray),
@@ -153,22 +162,39 @@ pub fn send(
   send_with_options(client, req, request_options.default())
 }
 
-/// Collect the owned stream within the client collection limit and request budget.
-/// Failures and scope exit close the body. Status codes remain response data.
+/// Collect the owned stream within the request budget. `options.collect` sets
+/// this call's body limit and overflow policy; `None` uses the client's
+/// `collect_bytes` and fails on overflow. A negative limit is rejected before
+/// submission. Failures and scope exit close the body. Status codes remain
+/// response data.
 pub fn send_with_options(
   client: Client,
   req: request.Request(BitArray),
   options: request_options.Options,
 ) -> Result(Buffered, Failure) {
+  let #(limit, overflow) = case options.collect {
+    Some(request_options.Collect(limit, overflow)) -> #(limit, overflow)
+    None -> #(pool.config(client).limits.collect_bytes, request_options.Fail)
+  }
+  use <- bool.guard(
+    limit < 0,
+    Error(error.Failure(
+      error.InvalidRequest("collect limit must be non-negative"),
+      error.NotSubmitted,
+    )),
+  )
   with_response_with_options(client, req, options, fn(response) {
-    use collected <- result.try(body.collect(
-      response.body,
-      pool.config(client).limits.collect_bytes,
-    ))
+    use #(collected, truncated) <- result.try(case overflow {
+      request_options.Fail ->
+        body.collect(response.body, limit)
+        |> result.map(fn(collected) { #(collected, False) })
+      request_options.Truncate -> body.collect_prefix(response.body, limit)
+    })
     Ok(Buffered(
       response.set_body(response, collected.bytes),
       collected.trailers,
       body.protocol(response.body),
+      truncated,
     ))
   })
   |> result.flatten

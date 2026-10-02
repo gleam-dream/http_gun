@@ -50,6 +50,85 @@ pub fn cancelled_token_refuses_fresh_work_test() {
   let _ = http_gun.stop(client)
 }
 
+fn oversized_script() -> #(request.Request(BitArray), fixture.Exchange) {
+  let req = request.new() |> request.set_body(<<>>)
+  let reply =
+    response.new(200)
+    |> response.set_header("x-receipt", "accepted")
+    |> response.set_body([<<"abc":utf8>>, <<"def":utf8>>])
+  #(req, fixture.Exchange(req, fixture.Respond(reply, fixture.Complete([]))))
+}
+
+pub fn truncate_overflow_keeps_status_and_headers_test() {
+  let #(req, exchange) = oversized_script()
+  let assert Ok(client) = testing.start(config.default(), [exchange])
+  let options =
+    request_options.Options(
+      ..request_options.default(),
+      collect: Some(request_options.Collect(4, request_options.Truncate)),
+    )
+  let assert Ok(buffered) = http_gun.send_with_options(client, req, options)
+  buffered.response.status |> should.equal(200)
+  response.get_header(buffered.response, "x-receipt")
+  |> should.equal(Ok("accepted"))
+  buffered.response.body |> should.equal(<<"abcd":utf8>>)
+  buffered.truncated |> should.be_true
+  buffered.trailers |> should.equal([])
+  let _ = http_gun.stop(client)
+}
+
+pub fn per_request_collect_limit_replaces_client_limit_test() {
+  let #(req, exchange) = oversized_script()
+  let assert Ok(client) = testing.start(config.default(), [exchange, exchange])
+  let narrow =
+    request_options.Options(
+      ..request_options.default(),
+      collect: Some(request_options.Collect(5, request_options.Fail)),
+    )
+  http_gun.send_with_options(client, req, narrow)
+  |> should.equal(
+    Error(error.Failure(
+      error.LimitExceeded(error.CollectedBodyBytes, 5, 6),
+      error.MayHaveBeenSent,
+    )),
+  )
+  let wide =
+    request_options.Options(
+      ..request_options.default(),
+      collect: Some(request_options.Collect(6, request_options.Truncate)),
+    )
+  let assert Ok(buffered) = http_gun.send_with_options(client, req, wide)
+  buffered.response.body |> should.equal(<<"abcdef":utf8>>)
+  buffered.truncated |> should.be_false
+  let _ = http_gun.stop(client)
+  let settings = config.default()
+  let settings =
+    config.Config(
+      ..settings,
+      limits: config.Limits(..settings.limits, collect_bytes: 2),
+    )
+  let assert Ok(client) = testing.start(settings, [exchange])
+  let assert Ok(buffered) = http_gun.send_with_options(client, req, wide)
+  buffered.response.body |> should.equal(<<"abcdef":utf8>>)
+  let _ = http_gun.stop(client)
+}
+
+pub fn negative_collect_limit_is_rejected_before_submission_test() {
+  let #(req, exchange) = oversized_script()
+  let assert Ok(client) = testing.start(config.default(), [exchange])
+  let options =
+    request_options.Options(
+      ..request_options.default(),
+      collect: Some(request_options.Collect(-1, request_options.Truncate)),
+    )
+  let assert Error(error.Failure(error.InvalidRequest(_), error.NotSubmitted)) =
+    http_gun.send_with_options(client, req, options)
+  let assert Ok(buffered) = http_gun.send(client, req)
+  buffered.response.body |> should.equal(<<"abcdef":utf8>>)
+  buffered.truncated |> should.be_false
+  let _ = http_gun.stop(client)
+}
+
 @external(erlang, "http_gun_test_server", "gated")
 fn gated() -> #(Int, process.Pid)
 

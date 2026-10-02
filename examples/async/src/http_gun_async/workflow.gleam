@@ -48,7 +48,11 @@ pub fn download(
     http_gun.try_with_response_with_options(
       client,
       req,
-      request_options.Options(deadline: Some(budget), cancellation: Some(token)),
+      request_options.Options(
+        ..request_options.default(),
+        deadline: Some(budget),
+        cancellation: Some(token),
+      ),
       Http,
       fn(reply) { count(reply.body, 0) },
     )

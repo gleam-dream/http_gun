@@ -140,40 +140,51 @@ pub fn protocol(body: Body) -> config.Negotiated {
 /// Other read failures propagate. The explicitly owned handle still needs close;
 /// send and scoped response callbacks perform that cleanup for you.
 pub fn collect(body: Body, limit: Int) -> Result(Collected, Failure) {
-  collect_loop(body, limit, [], 0)
+  collect_loop(body, limit, False, [], 0)
+  |> result.map(fn(collected) { collected.0 })
+}
+
+/// Collect like `collect`, but on overflow keep the first `limit` bytes, close
+/// the body and report `True` instead of failing. Trailers are then empty.
+@internal
+pub fn collect_prefix(
+  body: Body,
+  limit: Int,
+) -> Result(#(Collected, Bool), Failure) {
+  collect_loop(body, limit, True, [], 0)
 }
 
 fn collect_loop(
   body: Body,
   limit: Int,
+  truncate: Bool,
   chunks: List(BitArray),
   size: Int,
-) -> Result(Collected, Failure) {
+) -> Result(#(Collected, Bool), Failure) {
   use event <- result.try(next(body, 2_147_483_647))
   case event {
     End(trailers) ->
-      Ok(Collected(bit_array.concat(list.reverse(chunks)), trailers))
-    Chunk(bytes) ->
-      case size + bit_array.byte_size(bytes) <= limit {
-        True ->
-          collect_loop(
-            body,
-            limit,
-            [bytes, ..chunks],
-            size + bit_array.byte_size(bytes),
-          )
-        False -> {
+      Ok(#(Collected(bit_array.concat(list.reverse(chunks)), trailers), False))
+    Chunk(bytes) -> {
+      let total = size + bit_array.byte_size(bytes)
+      case total <= limit, truncate {
+        True, _ -> collect_loop(body, limit, truncate, [bytes, ..chunks], total)
+        False, False -> {
           let _ = close(body)
           Error(Failure(
-            error.LimitExceeded(
-              error.CollectedBodyBytes,
-              limit,
-              size + bit_array.byte_size(bytes),
-            ),
+            error.LimitExceeded(error.CollectedBodyBytes, limit, total),
             MayHaveBeenSent,
           ))
         }
+        False, True -> {
+          let _ = close(body)
+          let prefix =
+            bit_array.slice(bytes, 0, limit - size) |> result.unwrap(<<>>)
+          let bytes = bit_array.concat(list.reverse([prefix, ..chunks]))
+          Ok(#(Collected(bytes, []), True))
+        }
       }
+    }
   }
 }
 

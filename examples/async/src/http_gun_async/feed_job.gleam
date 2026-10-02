@@ -81,7 +81,11 @@ pub fn start(
           http_gun.try_with_response_with_options(
             client,
             req,
-            request_options.Options(Some(budget), Some(token)),
+            request_options.Options(
+              ..request_options.default(),
+              deadline: Some(budget),
+              cancellation: Some(token),
+            ),
             Http,
             fn(response) { read(response.body, sink, 0) },
           )

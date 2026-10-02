@@ -22,7 +22,7 @@ pub fn main() {
 }
 ```
 
-`send` returns `Result(Buffered, Failure)`. `Buffered` contains a standard `Response(BitArray)`, separate trailers and the observed `H1`, `H2` or `Offline` protocol. It collects the same stream used by streaming callers, enforcing the configured collection limit and closing on failure.
+`send` returns `Result(Buffered, Failure)`. `Buffered` contains a standard `Response(BitArray)`, separate trailers and the observed `H1`, `H2` or `Offline` protocol. It collects the same stream used by streaming callers, enforcing the configured collection limit and closing on failure. An oversized body fails with `LimitExceeded(CollectedBodyBytes, ..)` and `MayHaveBeenSent`, without the status. `send_with_options` accepts a per-request `request_options.Collect(limit, overflow)`: `Fail` keeps that failure, while `Truncate` returns the status, headers and the first `limit` bytes with `Buffered.truncated` set, so the caller can still act on the status.
 
 ## Streaming and batches
 
