@@ -53,6 +53,10 @@ for package in json.loads(pathlib.Path(sys.argv[1]).read_text()).values():
 PY
 rm -rf "$work/sinal"
 python3 dev/sinal_source.py "$work/sinal"
+# The archived llm_wire predates Sinal's wave 2 API. After provenance
+# verification, replace its one Sinal-using module in the disposable copy with
+# the same event (names, keys and emission) written against the current API.
+cp test/oracle/llm-wire-telemetry-sinal-wave2.gleam.txt "$work/llm_wire/src/llm_wire/telemetry.gleam"
 cp -R examples/llm "$work/llm"
 cp test/http_gun_test_server.erl "$work/llm/test/"
 (cd "$work/llm" && gleam build --warnings-as-errors && gleam run && gleam run -m http_gun_llm_integration)

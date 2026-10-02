@@ -1,0 +1,54 @@
+import sinal
+import sinal/fields
+
+/// Lifecycle observations contain only a fixed stage, provider name and
+/// low-cardinality outcome. They never carry request or response content.
+pub type Stage {
+  Prepared
+  RequestSent
+  FirstProgress
+  Terminal
+  Cancelled
+  Deadline
+  Cleanup
+}
+
+pub type Metadata {
+  Metadata(stage: String, provider: String, outcome: String)
+}
+
+@internal
+pub fn observe(stage: Stage, provider: String, outcome: String) -> Nil {
+  sinal.emit(
+    observation_event(),
+    Nil,
+    Metadata(stage_name(stage), provider, outcome),
+  )
+}
+
+pub fn observation_event() -> sinal.Event(Nil, Metadata) {
+  let metadata_fields =
+    fields.record({
+      use stage <- fields.parameter
+      use provider <- fields.parameter
+      use outcome <- fields.parameter
+      Metadata(stage:, provider:, outcome:)
+    })
+    |> fields.and(fields.string("stage"), fn(value: Metadata) { value.stage })
+    |> fields.and(fields.string("provider"), fn(value) { value.provider })
+    |> fields.and(fields.string("outcome"), fn(value) { value.outcome })
+    |> fields.build
+  sinal.event(["llm_wire", "observation"], fields.empty(), metadata_fields)
+}
+
+fn stage_name(stage: Stage) -> String {
+  case stage {
+    Prepared -> "prepared"
+    RequestSent -> "request_sent"
+    FirstProgress -> "first_progress"
+    Terminal -> "terminal"
+    Cancelled -> "cancelled"
+    Deadline -> "deadline"
+    Cleanup -> "cleanup"
+  }
+}

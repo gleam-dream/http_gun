@@ -80,16 +80,16 @@ pub fn main() {
 // Application startup owns the forwarder and its supervision. The HTTP client
 // emits fixed milestones; a handler does not run in its pool or body processes.
 fn observed_request(req: request.Request(BitArray)) -> Nil {
-  let assert Ok(target) =
-    forwarder.new(process.new_name("http-observations"), 64)
+  let target =
+    forwarder.new(process.new_name("http-observations"))
+    |> forwarder.with_capacity(64)
   let assert Ok(_supervisor) =
     static_supervisor.new(static_supervisor.OneForOne)
     |> static_supervisor.add(forwarder.supervised(target))
     |> static_supervisor.start
   let completed = process.new_subject()
-  let assert Ok(handler_id) = sinal.handler_id("ordinary-consumer-completion")
-  let assert Ok(attachment) =
-    sinal.observe(handler_id, telemetry.event(), fn(time, metadata) {
+  let attachment =
+    sinal.observe(telemetry.event(), fn(time, metadata) {
       case metadata.milestone {
         telemetry.HttpTerminated(telemetry.Complete) ->
           process.send(completed, #(time, metadata))

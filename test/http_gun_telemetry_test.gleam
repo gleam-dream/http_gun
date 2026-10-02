@@ -21,14 +21,14 @@ import sinal
 import sinal/forwarder
 
 pub fn scripted_lifecycle_has_correlation_without_network_submission_test() {
-  let assert Ok(fwd) =
-    forwarder.new(process.new_name("http-gun-observations"), 32)
+  let fwd =
+    forwarder.new(process.new_name("http-gun-observations"))
+    |> forwarder.with_capacity(32)
   let spec = forwarder.supervised(fwd)
   let assert Ok(started) = spec.start()
   let events = process.new_subject()
-  let assert Ok(id) = sinal.handler_id("http-gun-script-observation")
-  let assert Ok(attachment) =
-    sinal.observe(id, telemetry.event(), fn(time, metadata) {
+  let attachment =
+    sinal.observe(telemetry.event(), fn(time, metadata) {
       process.send(events, #(time, metadata))
     })
   let req = request.new() |> request.set_body(<<>>)
@@ -97,23 +97,22 @@ fn receive_events(
 fn queue_len(pid: process.Pid) -> Int
 
 pub fn blocked_observer_drops_without_stalling_bounded_batch_test() {
-  let assert Ok(fwd) =
-    forwarder.new(process.new_name("http-gun-blocked-observer"), 1)
+  let fwd =
+    forwarder.new(process.new_name("http-gun-blocked-observer"))
+    |> forwarder.with_capacity(1)
   let spec = forwarder.supervised(fwd)
   let assert Ok(started) = spec.start()
   let entered = process.new_subject()
   let finished = process.new_subject()
   let drops = process.new_subject()
-  let assert Ok(id) = sinal.handler_id("http-gun-blocked-observer")
-  let assert Ok(attachment) =
-    sinal.observe(id, telemetry.event(), fn(_, _) {
+  let attachment =
+    sinal.observe(telemetry.event(), fn(_, _) {
       let release = process.new_subject()
       process.send(entered, release)
       process.receive_forever(release)
     })
-  let assert Ok(drop_id) = sinal.handler_id("http-gun-drops")
-  let assert Ok(drop_attachment) =
-    sinal.observe(drop_id, forwarder.dropped_event(), fn(value, _) {
+  let drop_attachment =
+    sinal.observe(forwarder.dropped_event(), fn(value, _) {
       process.send(drops, value)
     })
   let req = request.new() |> request.set_body(<<>>)
@@ -158,13 +157,14 @@ type Observer {
 }
 
 fn observer(name: String) -> Observer {
-  let assert Ok(target) = forwarder.new(process.new_name(name), 64)
+  let target =
+    forwarder.new(process.new_name(name))
+    |> forwarder.with_capacity(64)
   let spec = forwarder.supervised(target)
   let assert Ok(started) = spec.start()
   let events = process.new_subject()
-  let assert Ok(id) = sinal.handler_id(name)
-  let assert Ok(attachment) =
-    sinal.observe(id, telemetry.event(), fn(time, metadata) {
+  let attachment =
+    sinal.observe(telemetry.event(), fn(time, metadata) {
       process.send(events, #(time, metadata))
     })
   Observer(target, started.pid, attachment, events)
@@ -367,8 +367,9 @@ pub fn recording_and_strict_playback_keep_telemetry_out_of_matching_test() {
 }
 
 pub fn unavailable_dead_and_throwing_observers_preserve_http_test() {
-  let assert Ok(target) =
-    forwarder.new(process.new_name("http-gun-fault-observer"), 16)
+  let target =
+    forwarder.new(process.new_name("http-gun-fault-observer"))
+    |> forwarder.with_capacity(16)
   let settings = config.Config(..local_config(), observations: Some(target))
   let req = request.new() |> request.set_body(<<>>)
   let exchange =
@@ -381,9 +382,8 @@ pub fn unavailable_dead_and_throwing_observers_preserve_http_test() {
   let spec = forwarder.supervised(target)
   let assert Ok(started) = spec.start()
   let entered = process.new_subject()
-  let assert Ok(id) = sinal.handler_id("http-gun-throwing-observer")
-  let assert Ok(_) =
-    sinal.observe(id, telemetry.event(), fn(_, _) {
+  let _ =
+    sinal.observe(telemetry.event(), fn(_, _) {
       process.send(entered, process.self())
       panic as "test observer failed"
     })

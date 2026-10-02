@@ -4,10 +4,8 @@
 
 import gleam/dynamic
 import gleam/dynamic/decode
-import gleam/erlang/atom
 import gleam/erlang/reference
 import gleam/option.{type Option, None, Some}
-import gleam/result
 import gleam/string
 import http_gun/error
 import http_gun/internal/bridge
@@ -78,80 +76,55 @@ pub type Metadata {
 /// a request ordering guarantee. Compare source timestamps and milestone meaning.
 pub fn event() -> sinal.Event(Timing, Metadata) {
   let at =
-    fields.imap(fields.int(atom.create("monotonic_ms")), Timing, fn(t) {
-      t.monotonic_ms
+    fields.record({
+      use monotonic_ms <- fields.parameter
+      Timing(monotonic_ms:)
     })
-  let id = id_field("request_id")
-  let assert Ok(correlation) = fields.optional(id_field("correlation"))
-  let assert Ok(ids) = fields.pair(id, correlation)
-  let mode = enum_field("mode", mode_name, parse_mode)
-  let stage =
-    fields.field(
-      atom.create("milestone"),
-      fn(value) {
-        let #(name, number) = encode_milestone(value)
-        Ok(dynamic.array([dynamic.string(name), dynamic.int(number)]))
-      },
-      fn(raw) {
-        use pair <- result.try(
-          decode.run(raw, {
-            use name <- decode.field(0, decode.string)
-            use value <- decode.field(1, decode.int)
-            decode.success(#(name, value))
-          })
-          |> result.map_error(fn(_) {
-            fields.FieldDecodeError("invalid HTTP milestone")
-          }),
-        )
-        parse_milestone(pair)
-        |> result.map_error(fn(_) {
-          fields.FieldDecodeError("invalid HTTP milestone")
-        })
-      },
-    )
-  let assert Ok(description) = fields.pair(mode, stage)
-  let assert Ok(all) = fields.pair(ids, description)
+    |> fields.and(fields.int("monotonic_ms"), fn(t: Timing) { t.monotonic_ms })
+    |> fields.build
   let metadata =
-    fields.imap(
-      all,
-      fn(value) { Metadata(value.0.0, value.0.1, value.1.0, value.1.1) },
-      fn(value) {
-        #(
-          #(value.request_id, value.correlation),
-          #(value.mode, value.milestone),
-        )
-      },
+    fields.record({
+      use request_id <- fields.parameter
+      use correlation <- fields.parameter
+      use mode <- fields.parameter
+      use milestone <- fields.parameter
+      Metadata(request_id:, correlation:, mode:, milestone:)
+    })
+    |> fields.and(id_field("request_id"), fn(m: Metadata) { m.request_id })
+    |> fields.and(fields.optional(id_field("correlation")), fn(m) {
+      m.correlation
+    })
+    |> fields.and(
+      fields.enum("mode", [Live, Recorded, Offline], mode_name),
+      fn(m) { m.mode },
     )
-  let assert Ok(event) =
-    sinal.event(
-      [atom.create("http_gun"), atom.create("lifecycle")],
-      at,
-      metadata,
-    )
-  event
+    |> fields.and(milestone_field(), fn(m) { m.milestone })
+    |> fields.build
+  sinal.event(["http_gun", "lifecycle"], at, metadata)
 }
 
 fn id_field(name: String) -> fields.Fields(Id) {
-  fields.imap(fields.string(atom.create(name)), Id, fn(id) { id.value })
+  fields.field(
+    name,
+    fn(id: Id) { dynamic.string(id.value) },
+    decode.string |> decode.map(Id),
+  )
 }
 
-fn enum_field(
-  name: String,
-  encode: fn(a) -> String,
-  parse: fn(String) -> Result(a, Nil),
-) -> fields.Fields(a) {
+fn milestone_field() -> fields.Fields(Milestone) {
   fields.field(
-    atom.create(name),
-    fn(value) { Ok(dynamic.string(encode(value))) },
-    fn(raw) {
-      use text <- result.try(
-        decode.run(raw, decode.string)
-        |> result.map_error(fn(_) {
-          fields.FieldDecodeError("invalid HTTP mode")
-        }),
-      )
-      parse(text)
-      |> result.map_error(fn(_) { fields.FieldDecodeError("invalid HTTP mode") })
+    "milestone",
+    fn(value) {
+      let #(name, number) = encode_milestone(value)
+      dynamic.array([dynamic.string(name), dynamic.int(number)])
+    },
+    {
+      use name <- decode.field(0, decode.string)
+      use number <- decode.field(1, decode.int)
+      case parse_milestone(#(name, number)) {
+        Ok(milestone) -> decode.success(milestone)
+        Error(Nil) -> decode.failure(AdmissionEntered, "HTTP milestone")
+      }
     },
   )
 }
@@ -161,15 +134,6 @@ fn mode_name(mode: Mode) -> String {
     Live -> "live"
     Recorded -> "recorded"
     Offline -> "offline"
-  }
-}
-
-fn parse_mode(name: String) -> Result(Mode, Nil) {
-  case name {
-    "live" -> Ok(Live)
-    "recorded" -> Ok(Recorded)
-    "offline" -> Ok(Offline)
-    _ -> Error(Nil)
   }
 }
 

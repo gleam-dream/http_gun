@@ -81,13 +81,13 @@ pub fn failures_do_not_carry_request_credentials_test() {
 }
 
 pub fn observations_do_not_carry_request_credentials_test() {
-  let assert Ok(fwd) =
-    forwarder.new(process.new_name("http-gun-secret-observations"), 32)
+  let fwd =
+    forwarder.new(process.new_name("http-gun-secret-observations"))
+    |> forwarder.with_capacity(32)
   let assert Ok(started) = forwarder.supervised(fwd).start()
   let events = process.new_subject()
-  let assert Ok(id) = sinal.handler_id("http-gun-secret-observation")
-  let assert Ok(attachment) =
-    sinal.observe(id, telemetry.event(), fn(time, metadata) {
+  let attachment =
+    sinal.observe(telemetry.event(), fn(time, metadata) {
       process.send(events, #(time, metadata))
     })
   let exchange =

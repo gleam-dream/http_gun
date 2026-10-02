@@ -34,3 +34,9 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Regression tests that `string.inspect` of failures, observation metadata,
   encoded and parsed cassettes, and recorded cassette files contains no
   `authorization`, `proxy-authorization`, `cookie` or `set-cookie` value.
+
+### Changed
+
+- Built on Sinal's wave 2 API: `telemetry.event()` is a total definition with
+  string names and keys, and observers attach with `sinal.observe(event,
+  handler)` and an automatic handler id. The emitted event is unchanged.

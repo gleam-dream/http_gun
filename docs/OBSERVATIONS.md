@@ -9,8 +9,9 @@ A REST service can measure admission time separately from response latency. A do
 The [ordinary public consumer](../examples/ordinary/src/http_gun_consumer.gleam) is executable and includes supervised setup, typed attachment, a live request and cleanup. Its dependencies include Sinal, Gleam Erlang and Gleam OTP. The essential configuration is:
 
 ```gleam
-let assert Ok(target) =
-  forwarder.new(process.new_name("http-observations"), 64)
+let target =
+  forwarder.new(process.new_name("http-observations"))
+  |> forwarder.with_capacity(64)
 let assert Ok(supervisor) =
   static_supervisor.new(static_supervisor.OneForOne)
   |> static_supervisor.add(forwarder.supervised(target))
@@ -25,7 +26,7 @@ let result = http_gun.send(client, req)
 
 Import `http_gun/telemetry`, `sinal`, `sinal/forwarder`, `gleam/erlang/process`, `gleam/otp/static_supervisor` and `gleam/option.{Some}` alongside the normal HTTP imports. The application retains the supervisor for its service lifetime; completing one HTTP operation does not stop it. Use `http_gun.child(settings)` when supervising the client too. A restarted client needs the new Client capability; the same Sinal Forwarder capability survives its own restart.
 
-Attach with `sinal.observe(handler_id, telemetry.event(), handler)`. The handler receives `Timing(monotonic_ms)` and `Metadata(request_id, correlation, mode, milestone)`. It runs in the forwarder process. Detach through the returned Sinal Attachment when the application no longer wants it. Sinal attachments are VM-wide by event name; applications distinguish their work using correlation and must avoid installing duplicate handlers per request.
+Attach with `sinal.observe(telemetry.event(), handler)`; Sinal assigns the handler id. The handler receives `Timing(monotonic_ms)` and `Metadata(request_id, correlation, mode, milestone)`. It runs in the forwarder process. Detach through the returned Sinal Attachment when the application no longer wants it. Sinal attachments are VM-wide by event name; applications distinguish their work using correlation and must avoid installing duplicate handlers per request.
 
 `with_correlation` creates a pure view of the existing shared client. It starts no process and changes no HTTP policy, request matching or ownership. Stopping either view stops that client. Reusing a correlation can identify a batch or application operation; every invocation that enters observation gets a separate opaque request ID. IDs are VM-local identities, not strings containing application data, credentials or Gun references. They are not durable identifiers across VM restarts.
 
