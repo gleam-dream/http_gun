@@ -9,7 +9,6 @@ import gleeunit
 import gleeunit/should
 import http_gun
 import http_gun/config
-import http_gun/destination
 import http_gun/error
 
 pub fn main() {
@@ -217,12 +216,5 @@ pub fn configured_header_count_above_gun_default_test() {
 
 // These exercises connect only to explicitly permitted local test servers.
 fn local_config() -> config.Config {
-  let defaults = config.default()
-  config.Config(
-    ..defaults,
-    destination: destination.Policy(
-      ..defaults.destination,
-      allow_loopback: True,
-    ),
-  )
+  config.default() |> config.allow_loopback
 }

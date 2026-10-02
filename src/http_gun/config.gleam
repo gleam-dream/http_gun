@@ -74,6 +74,20 @@ pub fn default() -> Config {
   )
 }
 
+/// Also admit loopback destinations (127.0.0.0/8 and ::1), e.g. a local fake
+/// server in tests or development. Every other destination setting is kept;
+/// private and reserved addresses stay refused. The default refuses loopback.
+///
+/// ```gleam
+/// let assert Ok(client) = http_gun.start(config.default() |> config.allow_loopback)
+/// ```
+pub fn allow_loopback(config: Config) -> Config {
+  Config(
+    ..config,
+    destination: destination.Policy(..config.destination, allow_loopback: True),
+  )
+}
+
 /// Check supported policies and positive capacities without starting processes.
 /// Returns the unchanged settings or a diagnostic for invalid configuration.
 pub fn validate(config: Config) -> Result(Config, String) {

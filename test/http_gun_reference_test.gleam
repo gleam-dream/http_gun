@@ -9,7 +9,6 @@ import gleam/list
 import gleeunit/should
 import http_gun
 import http_gun/config
-import http_gun/destination
 
 @external(erlang, "http_gun_test_server", "persistent")
 fn server() -> Int
@@ -99,12 +98,5 @@ pub fn batch_owner_loss_cancels_workers_and_releases_admission_test() {
 
 // These exercises connect only to explicitly permitted local test servers.
 fn local_config() -> config.Config {
-  let defaults = config.default()
-  config.Config(
-    ..defaults,
-    destination: destination.Policy(
-      ..defaults.destination,
-      allow_loopback: True,
-    ),
-  )
+  config.default() |> config.allow_loopback
 }

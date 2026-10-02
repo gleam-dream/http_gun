@@ -9,7 +9,6 @@ import http_gun/body
 import http_gun/cancellation
 import http_gun/config
 import http_gun/deadline
-import http_gun/destination
 import http_gun/error
 import http_gun/fixture
 import http_gun/request_options
@@ -359,12 +358,5 @@ pub fn last_queued_cancellation_releases_shared_connecting_socket_test() {
 
 // These exercises connect only to explicitly permitted local test servers.
 fn local_config() -> config.Config {
-  let defaults = config.default()
-  config.Config(
-    ..defaults,
-    destination: destination.Policy(
-      ..defaults.destination,
-      allow_loopback: True,
-    ),
-  )
+  config.default() |> config.allow_loopback
 }

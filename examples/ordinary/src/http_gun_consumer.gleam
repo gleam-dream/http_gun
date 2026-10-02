@@ -11,7 +11,6 @@ import http_gun/cancellation
 import http_gun/cassette
 import http_gun/config
 import http_gun/deadline
-import http_gun/destination
 import http_gun/recording
 import http_gun/request_options
 import http_gun/telemetry
@@ -109,12 +108,5 @@ fn observed_request(req: request.Request(BitArray)) -> Nil {
 
 // These exercises connect only to explicitly permitted local test servers.
 fn local_config() -> config.Config {
-  let defaults = config.default()
-  config.Config(
-    ..defaults,
-    destination: destination.Policy(
-      ..defaults.destination,
-      allow_loopback: True,
-    ),
-  )
+  config.default() |> config.allow_loopback
 }

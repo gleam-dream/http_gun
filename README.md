@@ -10,13 +10,10 @@ Requests use `gleam/http/request.Request(BitArray)`. Responses preserve status c
 import gleam/http/request
 import http_gun
 import http_gun/config
-import http_gun/destination
 
 pub fn main() {
-  let defaults = config.default()
   // Explicit opt-in for this local development server.
-  let settings = config.Config(..defaults, destination:
-    destination.Policy(..defaults.destination, allow_loopback: True))
+  let settings = config.default() |> config.allow_loopback
   let assert Ok(client) = http_gun.start(settings)
   let assert Ok(req) = request.to("http://localhost:8080/data")
   let result = http_gun.send(client, request.set_body(req, <<>>))
@@ -78,7 +75,8 @@ Defaults: public destinations only, H1, verified system TLS trust, 30-second req
 
 `config.destination` is a pure `destination.Policy`. Defaults allow public
 addresses and refuse loopback, private and reserved addresses. Opt into
-`allow_loopback` for local services and `allow_private` for private networks;
+`allow_loopback` for local services, or call `config.allow_loopback(config)`,
+which sets only that flag; opt into `allow_private` for private networks;
 reserved ranges and cloud metadata addresses remain forbidden. `allow_public`
 can also be disabled. Optional `allowed_hosts: Some(["issuer.example"])`
 restricts exact, case-insensitive host names, **not ports**. It intersects the

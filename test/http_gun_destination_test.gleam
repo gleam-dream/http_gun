@@ -73,6 +73,47 @@ pub fn default_refuses_loopback_before_connecting_test() {
   observed |> should.be_false
 }
 
+pub fn allow_loopback_helper_admits_only_loopback_test() {
+  let c = config.default()
+  let base =
+    config.Config(
+      ..c,
+      deadline_ms: 1000,
+      destination: destination.Policy(
+        ..c.destination,
+        allowed_hosts: Some(["localhost", "127.0.0.1"]),
+      ),
+    )
+  let opened = config.allow_loopback(base)
+  opened
+  |> should.equal(
+    config.Config(
+      ..base,
+      destination: destination.Policy(..base.destination, allow_loopback: True),
+    ),
+  )
+  opened.destination.allow_private |> should.be_false
+  let assert Ok(client) = http_gun.start(opened)
+  let assert Ok(reply) =
+    http_gun.send(client, local_request(server(), "127.0.0.1"))
+  reply.response.body |> should.equal(<<"abc":utf8>>)
+  let _ = http_gun.stop(client)
+  let private =
+    config.Config(
+      ..opened,
+      destination: destination.Policy(
+        ..opened.destination,
+        resolver: Some(fn(_, _) { Ok([destination.Ipv4(10, 0, 0, 7)]) }),
+      ),
+    )
+  let assert Ok(client) = http_gun.start(private)
+  http_gun.send(client, local_request(server(), "localhost"))
+  |> should.equal(
+    Error(error.Failure(error.DestinationRejected, error.NotSubmitted)),
+  )
+  let _ = http_gun.stop(client)
+}
+
 pub fn mixed_empty_failed_and_disallowed_hosts_test() {
   let defaults = config.default()
   let cases = [
@@ -120,11 +161,7 @@ fn local_request(port: Int, host: String) -> request.Request(BitArray) {
 }
 
 fn local_config() -> config.Config {
-  let c = config.default()
-  config.Config(
-    ..c,
-    destination: destination.Policy(..c.destination, allow_loopback: True),
-  )
+  config.default() |> config.allow_loopback
 }
 
 type Counter

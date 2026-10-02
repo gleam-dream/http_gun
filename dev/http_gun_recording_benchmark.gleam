@@ -11,7 +11,6 @@ import gleam/list
 import http_gun
 import http_gun/cassette
 import http_gun/config
-import http_gun/destination
 import http_gun/recording
 
 @external(erlang, "http_gun_test_server", "persistent")
@@ -107,12 +106,5 @@ pub fn main() -> Nil {
 
 // These exercises connect only to explicitly permitted local test servers.
 fn local_config() -> config.Config {
-  let defaults = config.default()
-  config.Config(
-    ..defaults,
-    destination: destination.Policy(
-      ..defaults.destination,
-      allow_loopback: True,
-    ),
-  )
+  config.default() |> config.allow_loopback
 }

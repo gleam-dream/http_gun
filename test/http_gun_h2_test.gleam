@@ -8,7 +8,6 @@ import http_gun
 import http_gun/body
 import http_gun/cancellation
 import http_gun/config
-import http_gun/destination
 import http_gun/error
 import http_gun/request_options
 
@@ -294,12 +293,5 @@ pub fn cancellation_token_preserves_h2_sibling_and_connection_test() {
 
 // These exercises connect only to explicitly permitted local test servers.
 fn local_config() -> config.Config {
-  let defaults = config.default()
-  config.Config(
-    ..defaults,
-    destination: destination.Policy(
-      ..defaults.destination,
-      allow_loopback: True,
-    ),
-  )
+  config.default() |> config.allow_loopback
 }

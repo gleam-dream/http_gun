@@ -10,7 +10,6 @@ import http_gun/body
 import http_gun/cancellation
 import http_gun/cassette
 import http_gun/config
-import http_gun/destination
 import http_gun/error
 import http_gun/recording
 import http_gun/request_options
@@ -414,12 +413,5 @@ pub fn token_cancellation_preserves_typed_outcome_on_replay_test() {
 
 // These exercises connect only to explicitly permitted local test servers.
 fn local_config() -> config.Config {
-  let defaults = config.default()
-  config.Config(
-    ..defaults,
-    destination: destination.Policy(
-      ..defaults.destination,
-      allow_loopback: True,
-    ),
-  )
+  config.default() |> config.allow_loopback
 }

@@ -12,7 +12,6 @@ import gleam/result
 import http_gun
 import http_gun/body
 import http_gun/config
-import http_gun/destination
 import simplifile
 
 @external(erlang, "http_gun_measure_ffi", "now")
@@ -273,12 +272,5 @@ pub fn main() -> Nil {
 
 // These exercises connect only to explicitly permitted local test servers.
 fn local_config() -> config.Config {
-  let defaults = config.default()
-  config.Config(
-    ..defaults,
-    destination: destination.Policy(
-      ..defaults.destination,
-      allow_loopback: True,
-    ),
-  )
+  config.default() |> config.allow_loopback
 }
