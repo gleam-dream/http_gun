@@ -1,14 +1,14 @@
 {
   "name": "sinal",
-  "revision": "5aef827c5b486127f7623c8819929c2cd9e52760",
+  "revision": "f9cca3796c3c54e76f74f553a4196c7283983513",
   "status": "",
   "files": {
     "LICENSE": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
-    "README.md": "825072b746a9769b84afc8590fb5502e414aa3f09f09f6e8f9eec5f61633cafd",
+    "README.md": "02ab2722fd1a40f292ead09a014e16ae414639226e3d832f0775f253da8bac55",
     "gleam.toml": "92ba7d884c80dc33c506e24467be9be10cf2133f247f803972d07e798e9c6af1",
     "manifest.toml": "50e749ddc80f019e0499cb2144a9bf537e51d1d00570eba07440dea416e9fa09",
     "src/sinal.gleam": "4bee7da2d0f1f4dad737d941aa1530248a9040a402188912553d2bbb9c99c093",
-    "src/sinal/correlation.gleam": "6089eefa21d27b51a3753dbca26eb92fe7314824173b253172d51a9334591c78",
+    "src/sinal/correlation.gleam": "db7398d722b8a26589cbc343ccbad27bdd72a257bb9ff6a91b9947ed35614fd9",
     "src/sinal/fields.gleam": "d4a305fc79e8c3694e8afd96ac6e584d7849dec182c148f823903d1c9ec765bd",
     "src/sinal/forwarder.gleam": "b365950fcea21815868cb9c2557759454ea6096cd6132f88b2934991f887a307",
     "src/sinal/internal/ffi.gleam": "2df653655a002e980b90442f587808d747ac24b804cf39e7a21d03a19a4ccb38",
@@ -21,5 +21,5 @@
   },
   "license": "Apache-2.0; original LICENSE and manifest preserved",
   "source": "Canonical local Sinal checkout, including owner-authorized generic forwarder correction; no HTTP-specific code.",
-  "archive_sha256": "d4eebb025406b7f8fd678503bf7d1c0452eec7287d36cb19da786585ec724af7"
+  "archive_sha256": "f675bf461eb4a2d1f370b353cd42b98e3b5559b15240003c0db0229d27d19133"
 }
