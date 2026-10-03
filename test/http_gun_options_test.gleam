@@ -2,6 +2,7 @@ import gleam/erlang/process
 import gleam/http
 import gleam/http/request
 import gleam/http/response
+import gleam/json
 import gleam/list
 import gleam/option.{Some}
 import gleeunit/should
@@ -11,6 +12,7 @@ import http_gun/cancellation
 import http_gun/config
 import http_gun/deadline
 import http_gun/error
+import http_gun/redaction
 import http_gun/testing
 
 pub fn expired_deadline_refuses_before_submission_test() {
@@ -65,6 +67,58 @@ pub fn truncate_overflow_keeps_status_and_headers_test() {
   http_gun.stop(client)
 }
 
+// A 429 whose body exceeds the limit keeps the headers a caller decides on,
+// after the client's redaction.
+pub fn fail_overflow_keeps_status_and_redacted_headers_test() {
+  let req = request.new() |> request.set_body(<<>>)
+  let reply =
+    response.Response(
+      429,
+      [
+        #("retry-after", "30"),
+        #("set-cookie", "session=secret"),
+        #("x-signature", "secret"),
+        #("link", "<a>"),
+        #("link", "<b>"),
+      ],
+      [<<"abc":utf8>>, <<"def":utf8>>],
+    )
+  let exchange =
+    testing.exchange(req, testing.Respond(reply, testing.Finished([])))
+  let settings =
+    config.default()
+    |> config.with_redaction(
+      redaction.default() |> redaction.with_headers(["X-Signature"]),
+    )
+  let assert Ok(client) = playback([exchange, exchange], settings)
+  let assert Error(failure) =
+    http_gun.send(client |> http_gun.with_body_limit(4, http_gun.Fail), req)
+  error.reason(failure)
+  |> should.equal(error.LimitExceeded(error.ResponseBodyBytes, 4, 6))
+  error.status(failure) |> should.equal(Some(429))
+  error.headers(failure)
+  |> should.equal([
+    #("retry-after", "30"),
+    #("link", "<a>"),
+    #("link", "<b>"),
+  ])
+  list.key_find(error.headers(failure), "retry-after")
+  |> should.equal(Ok("30"))
+  // The stored record keeps them too.
+  json.to_string(error.to_json(failure))
+  |> json.parse(error.decoder())
+  |> should.equal(Ok(failure))
+  // A batch failure keeps them the same way.
+  let assert Ok([Error(batched)]) =
+    http_gun.batch(
+      client |> http_gun.with_body_limit(4, http_gun.Fail),
+      [req],
+      1,
+    )
+  error.headers(batched) |> should.equal(error.headers(failure))
+  http_gun.stop(client)
+}
+
 pub fn per_request_collect_limit_replaces_client_limit_test() {
   let #(req, exchange) = oversized_script()
   let assert Ok(client) = playback([exchange, exchange], config.default())
@@ -75,7 +129,8 @@ pub fn per_request_collect_limit_replaces_client_limit_test() {
       error.LimitExceeded(error.ResponseBodyBytes, 5, 6),
       error.MaybeSent,
     )
-    |> error.with_status(200),
+    |> error.with_status(200)
+    |> error.with_headers([#("x-receipt", "accepted")]),
   ))
   let wide = fn(client) {
     client |> http_gun.with_body_limit(6, http_gun.Truncate)

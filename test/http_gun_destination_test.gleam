@@ -995,3 +995,110 @@ pub fn view_can_never_widen_the_client_policy_test() {
   connected(listener) |> should.be_false
   http_gun.stop(local)
 }
+
+// A multi-tenant client admits the union of its tenants' destinations. With
+// `require_view_destination`, a call that skips the tenant's view fails
+// closed instead of reaching that union.
+pub fn required_view_destination_refuses_a_bare_client_test() {
+  let #(port, listener) = listen()
+  let assert Ok(client) =
+    local_config()
+    |> config.require_view_destination
+    |> config.with_request_timeout(config.Milliseconds(1000))
+    |> http_gun.start
+  let required = Error(error.new(error.ViewDestinationRequired, error.NotSent))
+  let req = local_request(port, "127.0.0.1")
+  http_gun.send(client, req) |> should.equal(required)
+  // Other view settings do not count as a destination.
+  http_gun.send(client |> http_gun.with_timeout(config.Milliseconds(500)), req)
+  |> should.equal(required)
+  let assert Error(failure) = http_gun.open(client, req)
+  failure
+  |> should.equal(error.new(error.ViewDestinationRequired, error.NotSent))
+  error.kind(failure) |> should.equal(error.Refused)
+  error.is_retryable(failure, idempotent: True) |> should.be_false
+  http_gun.batch(client, [req, req], 2)
+  |> should.equal(Ok([required, required]))
+  // A public tenant's view refuses loopback; the local tenant's view admits it.
+  http_gun.send(client |> http_gun.with_destination(destination.default()), req)
+  |> should.equal(
+    Error(rejected(destination.AddressRefused(destination.Loopback))),
+  )
+  connected(listener) |> should.be_false
+  let local = client |> http_gun.with_destination(destination.loopback_only())
+  let assert Ok(reply) =
+    http_gun.send(local, local_request(server(), "127.0.0.1"))
+  reply.response.body |> should.equal(<<"abc":utf8>>)
+  http_gun.stop(client)
+}
+
+pub fn required_view_destination_never_widens_the_client_policy_test() {
+  let port = server()
+  let pinned = "127.0.0.1:" <> int.to_string(port)
+  let #(other, listener) = listen()
+  let assert Ok(client) =
+    config.default()
+    |> config.with_destination(
+      destination.loopback_only() |> destination.only_hosts([pinned]),
+    )
+    |> config.require_view_destination
+    |> config.with_resolver(fn(_, _) { Ok([destination.Ipv4(10, 0, 0, 7)]) })
+    |> http_gun.start
+  let wide =
+    destination.default()
+    |> destination.allow_loopback
+    |> destination.allow_private
+  let view = client |> http_gun.with_destination(wide)
+  // The client's host list still applies to a view without one.
+  http_gun.send(view, local_request(other, "127.0.0.1"))
+  |> should.equal(Error(rejected(destination.HostNotAllowed)))
+  connected(listener) |> should.be_false
+  // The client's address classes still apply: private stays refused.
+  let assert Ok(client_private) =
+    config.default()
+    |> config.allow_loopback
+    |> config.require_view_destination
+    |> config.with_resolver(fn(_, _) { Ok([destination.Ipv4(10, 0, 0, 7)]) })
+    |> http_gun.start
+  http_gun.send(
+    client_private |> http_gun.with_destination(wide),
+    local_request(server(), "localhost"),
+  )
+  |> should.equal(
+    Error(rejected(destination.AddressRefused(destination.Private))),
+  )
+  http_gun.stop(client_private)
+  // Within the client's bound, the wide view is admitted.
+  let assert Ok(reply) = http_gun.send(view, local_request(port, "127.0.0.1"))
+  reply.response.body |> should.equal(<<"abc":utf8>>)
+  http_gun.stop(client)
+}
+
+pub fn required_view_destination_applies_to_playback_test() {
+  let req = local_request(80, "127.0.0.1")
+  let exchange =
+    testing.exchange(
+      req,
+      testing.Respond(
+        response.new(204) |> response.set_body([]),
+        testing.Finished([]),
+      ),
+    )
+  let assert Ok(client) =
+    testing.playback(
+      testing.script([exchange]),
+      local_config() |> config.require_view_destination,
+    )
+  http_gun.send(client, req)
+  |> should.equal(
+    Error(error.new(error.ViewDestinationRequired, error.NotSent)),
+  )
+  // The refused call left the scripted exchange in place.
+  let assert Ok(reply) =
+    http_gun.send(
+      client |> http_gun.with_destination(destination.loopback_only()),
+      req,
+    )
+  reply.response.status |> should.equal(204)
+  http_gun.stop(client)
+}

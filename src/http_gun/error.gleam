@@ -18,13 +18,15 @@
 //// never reached the network, `MaybeSent` when the server may have received
 //// it. Neither proves the server acted. `status` returns the response status
 //// when final headers had arrived before the failure, for example when a body
-//// exceeded its limit.
+//// exceeded its limit, and `headers` returns that response's headers, so a
+//// caller can still read `retry-after` from a 429 whose body was too large.
 ////
 //// `Reason` gives detail and may gain variants in a minor release; match it
 //// with a `_` arm, and branch on `Kind` instead where you can. `name` is a
 //// stable identifier for logs and stored records, and `to_json` with
 //// `decoder` round-trips a failure. A failure never holds a URL, header,
-//// query or body from the request.
+//// query or body from the request; the response headers it may hold have
+//// the client's redaction applied (`config.with_redaction`).
 
 import gleam/dynamic/decode
 import gleam/int
@@ -50,7 +52,8 @@ pub type Evidence {
 pub type Kind {
   /// The request or a per-call setting is malformed. Fix the caller.
   InvalidInput
-  /// The destination policy refused the host or a resolved address.
+  /// The destination policy refused the host or a resolved address, or the
+  /// client requires a view destination and the view set none.
   Refused
   /// The client is stopped, restarting or full, it timed out waiting for a
   /// connection from its pool, or its recording closed.
@@ -139,6 +142,9 @@ pub type Reason {
   /// No connection became available within the pool timeout.
   PoolTimeout
   DestinationRejected(destination.Rejection)
+  /// The client was configured with `config.require_view_destination`, and
+  /// the request's view set no destination with `http_gun.with_destination`.
+  ViewDestinationRequired
   ResolutionFailed
   /// Resolving and connecting did not finish within the connect timeout.
   ConnectTimeout
@@ -164,19 +170,33 @@ pub type Reason {
 }
 
 /// A failed operation: its reason, submission evidence and, when final
-/// headers had arrived, the response status.
+/// headers had arrived, the response status and headers.
 pub opaque type Failure {
-  Failure(reason: Reason, evidence: Evidence, status: Option(Int))
+  Failure(
+    reason: Reason,
+    evidence: Evidence,
+    status: Option(Int),
+    headers: List(#(String, String)),
+  )
 }
 
 /// Build a failure, for scripted replies and test doubles.
 pub fn new(reason: Reason, evidence: Evidence) -> Failure {
-  Failure(reason:, evidence:, status: None)
+  Failure(reason:, evidence:, status: None, headers: [])
 }
 
 /// Record the response status that had arrived before the failure.
 pub fn with_status(failure: Failure, status: Int) -> Failure {
   Failure(..failure, status: Some(status))
+}
+
+/// Record the response headers that had arrived before the failure,
+/// replacing any recorded before. The caller applies its own redaction.
+pub fn with_headers(
+  failure: Failure,
+  headers: List(#(String, String)),
+) -> Failure {
+  Failure(..failure, headers:)
 }
 
 pub fn reason(failure: Failure) -> Reason {
@@ -193,11 +213,25 @@ pub fn status(failure: Failure) -> Option(Int) {
   failure.status
 }
 
+/// The response headers, in arrival order with duplicates kept, when final
+/// headers had arrived before a `send` or `batch` failure; otherwise `[]`.
+/// The client's redaction (`config.with_redaction`) has removed its
+/// listed headers, the credential headers by default. A streaming caller
+/// already holds the headers in its `Response`.
+///
+/// ```gleam
+/// // A 429 whose body exceeded `with_body_limit(_, _, Fail)`.
+/// list.key_find(error.headers(failure), "retry-after")
+/// ```
+pub fn headers(failure: Failure) -> List(#(String, String)) {
+  failure.headers
+}
+
 /// The closed classification of the failure.
 pub fn kind(failure: Failure) -> Kind {
   case failure.reason {
     InvalidRequest(_) -> InvalidInput
-    DestinationRejected(_) -> Refused
+    DestinationRejected(_) | ViewDestinationRequired -> Refused
     ClientClosed | AdmissionFull | PoolTimeout | RecordingClosed -> Unavailable
     ResolutionFailed | ConnectionFailed(_) | RequestFailed(_) -> Network
     ConnectTimeout | DeadlineExceeded | IdleTimeout -> TimedOut
@@ -234,6 +268,7 @@ pub fn name(failure: Failure) -> String {
     PoolTimeout -> "pool_timeout"
     DestinationRejected(rejection) ->
       "destination_rejected." <> rejection_tag(rejection)
+    ViewDestinationRequired -> "view_destination_required"
     ResolutionFailed -> "resolution_failed"
     ConnectTimeout -> "connect_timeout"
     ConnectionFailed(cause) -> "connection_failed." <> cause_tag(cause)
@@ -262,6 +297,8 @@ pub fn describe(failure: Failure) -> String {
     PoolTimeout -> "No connection available within the pool timeout"
     DestinationRejected(rejection) ->
       "Network destination rejected: " <> describe_rejection(rejection)
+    ViewDestinationRequired ->
+      "The client requires a destination set on the request's view"
     ResolutionFailed -> "Destination resolution failed"
     ConnectTimeout -> "Connect timeout exceeded"
     ConnectionFailed(cause) ->
@@ -296,11 +333,14 @@ pub fn describe(failure: Failure) -> String {
 }
 
 /// Encode a failure as JSON, for stored records such as a durable step
-/// error. `decoder` reads it back to an equal failure.
+/// error. `decoder` reads it back to an equal failure. Response headers, when
+/// present, are stored as `[name, value]` pairs, after the client's
+/// redaction.
 ///
 /// ```json
 /// {"name": "limit_exceeded.response_body_bytes", "evidence": "maybe_sent",
-///  "status": 200, "limit": 8388608, "observed": 8388609}
+///  "status": 429, "headers": [["retry-after", "30"]],
+///  "limit": 8388608, "observed": 8388609}
 /// ```
 pub fn to_json(failure: Failure) -> json.Json {
   let detail = case failure.reason {
@@ -315,10 +355,21 @@ pub fn to_json(failure: Failure) -> json.Json {
     Some(status) -> [#("status", json.int(status))]
     None -> []
   }
+  let headers = case failure.headers {
+    [] -> []
+    headers -> [
+      #(
+        "headers",
+        json.array(headers, fn(header) {
+          json.preprocessed_array([json.string(header.0), json.string(header.1)])
+        }),
+      ),
+    ]
+  }
   json.object([
     #("name", json.string(name(failure))),
     #("evidence", json.string(evidence_tag(failure.evidence))),
-    ..list.append(status, detail)
+    ..list.flatten([status, headers, detail])
   ])
 }
 
@@ -331,6 +382,19 @@ pub fn decoder() -> decode.Decoder(Failure) {
     None,
     decode.int |> decode.map(Some),
   )
+  use headers <- decode.optional_field(
+    "headers",
+    [],
+    decode.list(
+      decode.list(decode.string)
+      |> decode.then(fn(pair) {
+        case pair {
+          [name, value] -> decode.success(#(name, value))
+          _ -> decode.failure(#("", ""), "[name, value]")
+        }
+      }),
+    ),
+  )
   use limit <- decode.optional_field("limit", -1, decode.int)
   use observed <- decode.optional_field("observed", -1, decode.int)
   use position <- decode.optional_field("position", -1, decode.int)
@@ -342,7 +406,7 @@ pub fn decoder() -> decode.Decoder(Failure) {
   let reason = parse_name(name, limit, observed, position)
   case reason, evidence {
     Ok(reason), Ok(evidence) ->
-      decode.success(Failure(reason:, evidence:, status:))
+      decode.success(Failure(reason:, evidence:, status:, headers:))
     _, _ -> decode.failure(new(ClientClosed, NotSent), "http_gun failure")
   }
 }
@@ -364,6 +428,7 @@ fn parse_name(
     "pool_timeout", "" -> Ok(PoolTimeout)
     "destination_rejected", tag ->
       result.map(parse_rejection(tag), DestinationRejected)
+    "view_destination_required", "" -> Ok(ViewDestinationRequired)
     "resolution_failed", "" -> Ok(ResolutionFailed)
     "connect_timeout", "" -> Ok(ConnectTimeout)
     "connection_failed", tag -> result.map(parse_cause(tag), ConnectionFailed)

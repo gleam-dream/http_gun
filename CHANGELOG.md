@@ -68,6 +68,19 @@ changed item.
   library may silence its private client this way; labelling is preferred,
   because it leaves the choice to the application. The default is unchanged:
   every client emits through `sinal.emit`.
+- `config.require_view_destination(config)`: the client refuses, with
+  `ViewDestinationRequired` and `NotSent`, every request whose view has not
+  set a destination with `http_gun.with_destination`. A multi-tenant client
+  must admit the union of its tenants' destinations; with this setting a call
+  that skips the tenant's view fails closed instead of reaching that union.
+  The client's policy only bounds what views may narrow to; a view still
+  never widens it. The check holds for live, recording and playback clients.
+- `error.headers(failure)` and `error.with_headers(failure, headers)`: a
+  `send` or `batch` failure after the response head arrived keeps the
+  response headers, after the client's redaction, beside `error.status`. A
+  429 whose body exceeds `with_body_limit(_, _, Fail)` keeps its
+  `retry-after`. `error.to_json` stores them as `"headers": [[name, value]]`
+  and `error.decoder` reads them back.
 - `stop` drains: it refuses new work, fails queued requests, lets open bodies
   finish within the shutdown timeout, then cancels them.
 - [docs/GUN_AUDIT.md](docs/GUN_AUDIT.md), the audit of the Gun and Cowlib terms
@@ -111,7 +124,9 @@ changed item.
 ### New variants
 
 - `Reason`: `PoolTimeout`, `ConnectTimeout`, `IdleTimeout`,
-  `PlaybackMismatch`, `PlaybackExhausted`, `RecordingClosed`.
+  `PlaybackMismatch`, `PlaybackExhausted`, `RecordingClosed`,
+  `ViewDestinationRequired` (kind `Refused`, name
+  `"view_destination_required"`).
 - `LimitKind`: `BufferedBytes`, `ResponseBodyBytes`, `BatchBytes`.
 - `RequestProblem` (new): `BodyNotBytes`, `InvalidMethod`, `InvalidOrigin`,
   `InvalidTarget`, `InvalidHeader`, `InvalidBodyLimit`, `InvalidBatch`.

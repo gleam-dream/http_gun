@@ -466,3 +466,15 @@ bindings. Gleam owns all preparation, admission and lifetime changes. No
 dependency patch, commit, publication, provider traffic or sibling write.
 No current Linux/hosted CI, comparative benchmark or sustained soak was run.
 Evidence: docs/evidence/wave31/receipt.json and README.md in that directory.
+
+### Wave 3 follow-up — tenant views and failure headers
+
+Complete locally, 2026-10-02, from the webhooks re-run after wave 3.
+`config.require_view_destination` refuses (`ViewDestinationRequired`,
+`NotSent`) any request whose view set no destination, in live, recording and
+playback modes; views still only narrow. `send` and `batch` failures after the
+head keep the redacted response headers (`error.headers`), stored by
+`to_json`. A first draft captured the pool state in the reply callback and
+failed `burst_work_scales_with_requests_test`; the callback now captures only
+the redaction. `./dev/env sh dev/gate full` passes with 200 tests, all 11 load
+scenarios and nghttpd; LLM Wire and Warden build against the change.

@@ -141,8 +141,8 @@ The owner accepted the release API review (oversight `docs/release-api/http_gun.
 - Caller-built values are opaque with `with_*` setters: `config.Config`, `destination.Policy`, `redaction.Redaction`, `cassette.RecordOptions`. Validation happens once at start and returns `ConfigError`.
 - Per-call settings are client views (`with_timeout`, `with_deadline`, `with_idle_timeout`, `with_cancellation`, `with_body_limit`, `with_destination`, `with_correlation`); there is one entry point per operation. A view's timeout or deadline replaces the client's request timeout, shorter or longer; connect, pool and idle bounds stay in force.
 - Named timeouts: connect including DNS (5 s), pool checkout (5 s), request (30 s), idle read (30 s), idle pooled connection (60 s), shutdown drain (5 s). `Infinity` is explicit.
-- `error.Failure` is opaque with a closed `Kind`, `is_retryable(idempotent:)`, `status`, `name`, `to_json` and `decoder`. A body over its limit keeps the response status.
+- `error.Failure` is opaque with a closed `Kind`, `is_retryable(idempotent:)`, `status`, `headers`, `name`, `to_json` and `decoder`. A `send` or `batch` failure after the head arrived, including a body over its limit, keeps the response status and headers, after the client's redaction.
 - `supervised(config, name)` and `named(name)` give a restart-stable handle; `stop` drains.
-- Destination policies admit `host:port` entries, narrow per view and expose `check`.
+- Destination policies admit `host:port` entries, narrow per view and expose `check`. `config.require_view_destination` makes a client refuse (`ViewDestinationRequired`, `NotSent`) any request whose view set no destination, so a multi-tenant client's union policy only bounds what views narrow to and a call that skips the view fails closed.
 - Test support is `testing` (scripts, matchers) and `cassette` (schema 2 files, recording); redaction covers configured headers, named query parameters and a whole-body function, applied identically when recording and when matching playback.
 - Observations go through `sinal.emit` by default, so the application's routes decide where handlers run.

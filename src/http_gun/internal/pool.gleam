@@ -123,7 +123,11 @@ type Invocation {
 }
 
 pub type Opened {
-  Opened(response: response.Response(owner.Body), body_limit: #(Int, Bool))
+  Opened(
+    response: response.Response(owner.Body),
+    body_limit: #(Int, Bool),
+    redaction: redaction.Redaction,
+  )
 }
 
 pub opaque type Message {
@@ -1073,17 +1077,25 @@ fn open_request(
       False,
     ))
   // The pool or the body owner answers the caller once, adding the
-  // collection policy `send` needs.
+  // collection policy `send` needs. Capture only those values: this callback
+  // crosses process boundaries.
+  let redact = state.config.redaction
   let relay = fn(outcome) {
     process.send(
       reply,
-      result.map(outcome, fn(response) { Opened(response, body_limit) }),
+      result.map(outcome, fn(response) { Opened(response, body_limit, redact) }),
     )
   }
   let req = invocation.request()
-  let early = case validate_size(req, state.config.limits) {
-    Error(failure) -> Error(failure)
-    Ok(Nil) -> reserve_capture(state, req)
+  let early = case
+    state.config.view_destination_required && view.policies == []
+  {
+    True -> Error(error.new(error.ViewDestinationRequired, NotSent))
+    False ->
+      case validate_size(req, state.config.limits) {
+        Error(failure) -> Error(failure)
+        Ok(Nil) -> reserve_capture(state, req)
+      }
   }
   case early {
     Error(failure) -> {

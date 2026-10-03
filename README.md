@@ -40,6 +40,7 @@ explicitly with `config.Infinity`.
 | idle pooled connection | 60 s | `config.with_connection_idle_timeout` |
 | draining on `stop` | 5 s | `config.with_shutdown_timeout` |
 | destinations | public addresses only | `config.allow_loopback`, `config.with_destination` |
+| destination on every view | not required | `config.require_view_destination` |
 | protocol / TLS | HTTP/1.1, system CAs, peer and host name verified | `config.with_protocol`, `config.with_trust` |
 | connections | 16, 4 per origin, 100 HTTP/2 streams each | `with_max_connections`, `with_max_connections_per_origin`, `with_max_streams_per_connection` |
 | open bodies / queued requests | 128 / 128 | `with_max_open_bodies`, `with_max_queued_requests` |
@@ -92,7 +93,7 @@ let stream =
 | `with_deadline(client, deadline)` | an absolute budget shared across calls; replaces the request timeout |
 | `with_idle_timeout(client, timeout)` | replaces the idle timeout, for example for a model's first token |
 | `with_cancellation(client, token)` | cancels unfinished requests when the token is cancelled |
-| `with_body_limit(client, bytes, Fail \| Truncate)` | the collection limit; `Truncate` keeps the status and a prefix |
+| `with_body_limit(client, bytes, Fail \| Truncate)` | the collection limit; `Fail` keeps the status and headers on the failure, `Truncate` keeps them and a prefix |
 | `with_destination(client, policy)` | narrows the destinations; never widens them |
 | `with_correlation(client, correlation)` | tags lifecycle events with a `sinal/correlation.Correlation` |
 
@@ -151,7 +152,19 @@ retry; a `MaybeSent` one only for an idempotent request. `error.Reason` gives
 the detail and may gain variants, so match it with a `_` arm. `error.name`
 is a stable identifier such as `"connection_failed.connection_refused"`, and
 `error.to_json` with `error.decoder` stores and restores a failure. A failure
-never holds a URL, header, query or body.
+never holds a URL, query or body, nor a request header.
+
+A `send` or `batch` failure after the response head arrived keeps its status
+and headers, so a 429 whose body exceeded `with_body_limit(_, _, Fail)` still
+says when to retry. The client's redaction (`config.with_redaction`) removes
+its listed headers first, the credential headers by default:
+
+```gleam
+case error.status(failure), list.key_find(error.headers(failure), "retry-after") {
+  Some(429), Ok(seconds) -> snooze(seconds)
+  _, _ -> give_up(failure)
+}
+```
 
 ## Destinations
 
@@ -172,6 +185,43 @@ cloud metadata addresses are always refused. A host name is resolved once per
 connection; every A and AAAA address must pass the policy, and Gun connects to
 the checked address with the original TLS identity. `destination.check` applies
 a policy without resolving names; `config.with_resolver` replaces DNS in tests.
+
+### One client for several tenants
+
+A view can only narrow the client's policy, so a client shared by tenants with
+different destinations must admit their union, for example public hosts and
+loopback. Any call that holds the client without the tenant's view reaches
+that union. `config.require_view_destination` closes the gap: a request whose
+view has not called `with_destination` fails with `ViewDestinationRequired`
+and `NotSent` before anything is resolved or sent. The client's policy then
+only bounds what a view may narrow to.
+
+```gleam
+let assert Ok(client) =
+  config.default()
+  |> config.allow_loopback                 // the union: public and loopback
+  |> config.require_view_destination       // a call without a view fails closed
+  |> http_gun.start
+
+fn for_tenant(client: http_gun.Client, tier: Tier) -> http_gun.Client {
+  case tier {
+    Public -> client |> http_gun.with_destination(destination.default())
+    Internal(hosts) ->
+      client
+      |> http_gun.with_destination(
+        destination.loopback_only() |> destination.only_hosts(hosts),
+      )
+  }
+}
+
+for_tenant(client, tier) |> http_gun.send(req)  // narrowed to the tier
+http_gun.send(client, req)                      // Error: ViewDestinationRequired
+```
+
+A view that admits more than the client, such as `allow_private` on this
+client, still gets only what both admit. The requirement also holds for
+recording and playback clients built from the same configuration, so a test
+catches a call that skips the view.
 
 ## Lifecycle and supervision
 

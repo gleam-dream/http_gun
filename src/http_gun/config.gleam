@@ -21,6 +21,7 @@
 //// | Setting | Default | Setter |
 //// | --- | --- | --- |
 //// | destinations | public addresses only | `allow_loopback`, `with_destination` |
+//// | destination on every view | not required | `require_view_destination` |
 //// | protocol | HTTP/1.1 | `with_protocol` |
 //// | TLS trust | system CA store, peer and host name verified | `with_trust` |
 //// | connect, including DNS and TLS | 5 s | `with_connect_timeout` |
@@ -162,6 +163,7 @@ pub fn default() -> Config {
     observations: settings.Emit,
     label: None,
     destination: destination.default(),
+    view_destination_required: False,
     resolver: None,
     redaction: redaction.default(),
   )
@@ -179,6 +181,30 @@ pub fn allow_loopback(config: Config) -> Config {
 /// Replace the destination policy.
 pub fn with_destination(config: Config, policy: destination.Policy) -> Config {
   Settings(..config, destination: policy)
+}
+
+/// Refuse every request whose client view has not set a destination with
+/// `http_gun.with_destination`, failing it with `ViewDestinationRequired` and
+/// `NotSent` before it is validated, resolved or matched. The client's own
+/// policy then only bounds what views may narrow to: a view still narrows
+/// and never widens it.
+///
+/// A multi-tenant client must admit the union of its tenants' destinations,
+/// for example public addresses and loopback. Without this setting, a call
+/// that skips the tenant's view reaches that union; with it, the call fails
+/// closed. The check applies to live, recording and playback clients alike,
+/// so a cassette test catches a call that skips the view.
+///
+/// ```gleam
+/// let assert Ok(client) =
+///   config.default()
+///   |> config.allow_loopback
+///   |> config.require_view_destination
+///   |> http_gun.start
+/// let public = client |> http_gun.with_destination(destination.default())
+/// ```
+pub fn require_view_destination(config: Config) -> Config {
+  Settings(..config, view_destination_required: True)
 }
 
 /// Resolve host names with `resolver` instead of DNS.

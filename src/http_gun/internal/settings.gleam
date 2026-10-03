@@ -74,6 +74,8 @@ pub type Settings {
     observations: Observations,
     label: Option(String),
     destination: destination.Policy,
+    /// Refuse a request whose view set no destination policy.
+    view_destination_required: Bool,
     resolver: Option(Resolver),
     redaction: redaction.Redaction,
   )

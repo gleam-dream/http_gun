@@ -291,6 +291,11 @@ A view can narrow the policy per call; it never widens it:
 let tenant = client |> http_gun.with_destination(destination.default() |> destination.only_hosts(tenant_hosts))
 ```
 
+Because a view only narrows, a client shared by tenants with different
+destinations must admit their union, and a call that skips the tenant's view
+reaches that union. Add `config.require_view_destination`; see
+[Follow-up fixes](#follow-up-fixes).
+
 ## `http_gun/error`
 
 `Failure` is opaque. Use the accessors instead of fields and patterns.
@@ -747,3 +752,72 @@ App call sites: `http_gun.Client` 46, `stop` 14, `start` 15, `send` 10,
 16, `destination.Policy` updates 8 and full constructions 2, `error.describe`
 11, `Failure.reason` 9, `Failure.evidence` 4, `error.Failure` patterns 8,
 `telemetry.event` 7.
+
+## Follow-up fixes
+
+Two fixes after the webhooks re-run on wave 3 (oversight
+`apps/webhooks/FEEDBACK.md`, "Re-run after wave 3"). Neither breaks code that
+already compiles against wave 3, apart from an exhaustive `Reason` match,
+which needs the new variant or a `_` arm.
+
+### A multi-tenant client fails closed without a view destination
+
+Before, the one client of a multi-tenant app had to admit the union of every
+tier, so a call that skipped the app's narrowing helper let a public tenant
+reach loopback:
+
+```gleam
+// Safe: narrowed to the tenant's tier.
+egress.client_for(deps.egress, tier) |> http_gun.send(req)
+// Compiled, and let a public tenant's URL reach 127.0.0.1.
+deps.egress.client |> http_gun.send(req)
+```
+
+After, require a destination on every view. The union policy stays on the
+client and bounds what the views may narrow to:
+
+```gleam
+config.default()
+|> config.allow_loopback              // public and loopback: the union
+|> config.require_view_destination    // a view must narrow it
+```
+
+`deps.egress.client |> http_gun.send(req)` now fails with
+`error.ViewDestinationRequired`, `NotSent` and kind `Refused`, before the host
+is resolved, so `error.is_retryable` is `False`. A view that admits more than
+the client still gets only what both admit. Playback and recording clients
+started from the same configuration refuse the same call, so the cassette
+tests catch a missed view.
+
+| Before | After |
+| --- | --- |
+| a client with the union policy, safe only if every call goes through the view | `config.require_view_destination(config)`; a bare call fails with `ViewDestinationRequired` |
+| — | `error.ViewDestinationRequired` (`Refused`, `"view_destination_required"`) |
+
+### `Fail` keeps the response headers
+
+Before, `with_body_limit(max, Fail)` kept the status of an oversized response
+but dropped its headers, so a 429 lost its `retry-after`, and the only way to
+keep it was `Truncate` with a second branch on `Buffered.truncated`. After,
+every `send` or `batch` failure that has a status also has the response's
+headers, after the client's redaction:
+
+```gleam
+// After
+case error.status(failure), list.key_find(error.headers(failure), "retry-after") {
+  Some(429), Ok(seconds) -> snooze(seconds)
+  _, _ -> classify(failure)
+}
+```
+
+| Before | After |
+| --- | --- |
+| `Truncate` + `Buffered.truncated` + `response.get_header` to keep `retry-after` | `Fail` + `error.headers(failure)` |
+| `error.new(..) \|> error.with_status(s)` in a test double | add `\|> error.with_headers(headers)` when the double needs headers |
+| `to_json` without headers | an optional `"headers": [[name, value], ..]`; records without it decode to `[]` |
+
+A test that compares a whole `send` failure with `should.equal` and a status
+now needs the response's headers too, or compare `error.reason` and
+`error.status`. Streaming failures from `body.next` keep only the status; the
+caller already holds the headers in its `Response`.
+

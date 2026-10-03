@@ -5,6 +5,7 @@ import gleam/erlang/process
 import gleam/http/request
 import gleam/http/response
 import gleam/int
+import gleam/list
 import gleam/option.{Some}
 import gleam/otp/static_supervisor
 import gleam/string
@@ -227,4 +228,68 @@ pub fn record_then_replay_with_redaction_test() {
   http_gun.stop(replay)
   string.contains(encoded, "secret") |> should.be_false
   string.contains(encoded, "token=REDACTED&page=2") |> should.be_true
+}
+
+type Tier {
+  PublicTier
+  InternalTier(hosts: List(String))
+}
+
+fn for_tenant(client: http_gun.Client, tier: Tier) -> http_gun.Client {
+  case tier {
+    PublicTier -> client |> http_gun.with_destination(destination.default())
+    InternalTier(hosts) ->
+      client
+      |> http_gun.with_destination(
+        destination.loopback_only() |> destination.only_hosts(hosts),
+      )
+  }
+}
+
+pub fn one_client_for_several_tenants_test() {
+  let port = persistent()
+  let assert Ok(client) =
+    config.default()
+    |> config.allow_loopback
+    |> config.require_view_destination
+    |> http_gun.start
+  let internal = InternalTier(["127.0.0.1:" <> int.to_string(port)])
+  let assert Ok(buffered) =
+    for_tenant(client, internal) |> http_gun.send(local(port))
+  buffered.response.body |> should.equal(<<"abc">>)
+  let assert Error(failure) =
+    for_tenant(client, PublicTier) |> http_gun.send(local(port))
+  error.reason(failure)
+  |> should.equal(
+    error.DestinationRejected(destination.AddressRefused(destination.Loopback)),
+  )
+  let assert Error(failure) = http_gun.send(client, local(port))
+  error.reason(failure) |> should.equal(error.ViewDestinationRequired)
+  http_gun.stop(client)
+}
+
+pub fn failure_keeps_retry_after_test() {
+  let req = request.new() |> request.set_body(<<>>)
+  let reply =
+    response.new(429)
+    |> response.set_header("retry-after", "30")
+    |> response.set_body([<<"too large":utf8>>])
+  let assert Ok(client) =
+    testing.playback(
+      testing.script([
+        testing.exchange(req, testing.Respond(reply, testing.Finished([]))),
+      ]),
+      config.default(),
+    )
+  let assert Error(failure) =
+    http_gun.send(client |> http_gun.with_body_limit(4, http_gun.Fail), req)
+  let decision = case
+    error.status(failure),
+    list.key_find(error.headers(failure), "retry-after")
+  {
+    Some(429), Ok(seconds) -> Ok(seconds)
+    _, _ -> Error(failure)
+  }
+  decision |> should.equal(Ok("30"))
+  http_gun.stop(client)
 }

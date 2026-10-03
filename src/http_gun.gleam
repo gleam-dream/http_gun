@@ -35,6 +35,10 @@
 //// `with_timeout` and `with_deadline` replace the client's request timeout,
 //// shorter or longer; the connect, pool and idle timeouts still apply.
 //// `with_destination` can only narrow the destinations the client admits.
+//// A client that serves several tenants admits the union of their
+//// destinations, which any call holding the handle without a view reaches;
+//// `config.require_view_destination` makes such a call fail closed with
+//// `ViewDestinationRequired`.
 ////
 //// ## Lifecycle
 ////
@@ -52,7 +56,7 @@ import gleam/http/request.{type Request}
 import gleam/http/response.{type Response}
 import gleam/int
 import gleam/list
-import gleam/option.{Some}
+import gleam/option.{None, Some}
 import gleam/otp/actor
 import gleam/otp/supervision
 import gleam/result
@@ -67,6 +71,7 @@ import http_gun/internal/bridge
 import http_gun/internal/owner
 import http_gun/internal/pool
 import http_gun/internal/settings
+import http_gun/redaction
 import sinal/correlation.{type Correlation}
 
 /// A shared client handle: the pool it sends through and the view settings
@@ -103,7 +108,8 @@ pub type Stats {
 /// What `send` does when a response body exceeds its limit.
 pub type Overflow {
   /// Close the body and fail with `LimitExceeded(ResponseBodyBytes, ..)`;
-  /// `error.status` returns the response status.
+  /// `error.status` and `error.headers` return the response status and its
+  /// headers, such as `retry-after`.
   Fail
   /// Close the body and return the status, headers and the first `limit`
   /// bytes, with `Buffered.truncated` set and no trailers.
@@ -188,9 +194,11 @@ pub fn stop(client: Client) -> Nil {
 }
 
 /// Send a request and collect its response, up to the body limit. An
-/// oversized body fails with `LimitExceeded(ResponseBodyBytes, ..)` and the
-/// response status, unless the view chose `Truncate`. The body is closed on
-/// every path.
+/// oversized body fails with `LimitExceeded(ResponseBodyBytes, ..)`, the
+/// response status and its headers, unless the view chose `Truncate`. Every
+/// failure after the head arrived keeps the status (`error.status`) and the
+/// headers after the client's redaction (`error.headers`). The body is closed
+/// on every path.
 pub fn send(
   client: Client,
   req: Request(BitArray),
@@ -203,18 +211,26 @@ fn collect(
   req: Request(BitArray),
   charge: fn(Int) -> Result(Nil, Failure),
 ) -> Result(Buffered, Failure) {
-  use pool.Opened(response, #(limit, truncate)) <- result.try(pool.open(
+  use pool.Opened(response, #(limit, truncate), redact) <- result.try(pool.open(
     client,
     req,
   ))
   bridge.scoped(
     fn() {
-      use #(bytes, trailers, truncated) <- result.try(owner.collect(
-        response.body,
-        limit,
-        truncate,
-        charge,
-      ))
+      use #(bytes, trailers, truncated) <- result.try(
+        owner.collect(response.body, limit, truncate, charge)
+        |> result.map_error(fn(failure) {
+          // The head had arrived: keep the headers a caller decides on.
+          case error.status(failure) {
+            Some(_) ->
+              error.with_headers(
+                failure,
+                redaction.headers(redact, response.headers),
+              )
+            None -> failure
+          }
+        }),
+      )
       Ok(Buffered(
         response.set_body(response, bytes),
         trailers,
@@ -360,7 +376,9 @@ pub fn with_body_limit(
 /// Narrow the destinations of this view: a request must satisfy the client's
 /// policy and every policy added this way, including the addresses of a
 /// pooled connection it would reuse. A view can never widen what the client
-/// admits; host name resolution stays the client's.
+/// admits; host name resolution stays the client's. A client configured with
+/// `config.require_view_destination` refuses requests through a view that
+/// has not called this.
 pub fn with_destination(client: Client, policy: destination.Policy) -> Client {
   let view = pool.view(client)
   pool.with_view(

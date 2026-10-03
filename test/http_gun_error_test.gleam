@@ -210,6 +210,11 @@ fn reasons() -> List(#(error.Reason, error.Kind, String)) {
     }),
     [
       #(error.ClientClosed, error.Unavailable, "client_closed"),
+      #(
+        error.ViewDestinationRequired,
+        error.Refused,
+        "view_destination_required",
+      ),
       #(error.AdmissionFull, error.Unavailable, "admission_full"),
       #(error.PoolTimeout, error.Unavailable, "pool_timeout"),
       #(error.RecordingClosed, error.Unavailable, "recording_closed"),
@@ -231,7 +236,12 @@ fn all_failures() -> List(error.Failure) {
   list.flat_map(reasons(), fn(row) {
     list.flat_map([error.NotSent, error.MaybeSent], fn(evidence) {
       let failure = error.new(row.0, evidence)
-      [failure, error.with_status(failure, 200)]
+      [
+        failure,
+        error.with_status(failure, 200),
+        error.with_status(failure, 429)
+          |> error.with_headers([#("retry-after", "30"), #("link", "<a>")]),
+      ]
     })
   })
 }

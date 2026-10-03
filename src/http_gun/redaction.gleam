@@ -22,9 +22,11 @@
 //// comparing them, so a recorded cassette matches the live code that made it.
 //// The live request on the network is never changed.
 ////
-//// Failures and telemetry events never contain a URL, header, query or body,
-//// so no redaction can leak into them, and a waiting request's headers are
-//// held in a closure that crash reports print as a function reference.
+//// Failures and telemetry events never contain a URL, query or body, nor a
+//// request header. A `send` or `batch` failure after the response head
+//// arrived keeps the response headers (`error.headers`) with the listed
+//// headers removed. A waiting request's headers are held in a closure that
+//// crash reports print as a function reference.
 
 import gleam/http/request.{type Request}
 import gleam/list
@@ -58,7 +60,8 @@ pub fn default() -> Redaction {
 }
 
 /// Also remove these headers, compared without case, from stored requests
-/// and responses, including trailers.
+/// and responses, including trailers, and from the response headers a
+/// failure keeps.
 pub fn with_headers(redaction: Redaction, names: List(String)) -> Redaction {
   let names = list.map(names, string.lowercase)
   Redaction(
