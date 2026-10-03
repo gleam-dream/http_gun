@@ -11,7 +11,6 @@ import gleam/yielder
 import http_gun
 import http_gun/body
 import http_gun/config
-import http_gun/destination
 
 pub type Client {
   Gun(http_gun.Client)
@@ -31,24 +30,16 @@ pub type Reply {
 pub fn start(name: String, connections: Int) -> Client {
   case name {
     "gun" -> {
-      let c = local_config()
       let assert Ok(client) =
-        http_gun.start(
-          config.Config(
-            ..c,
-            deadline_ms: 60_000,
-            trust: config.CustomCa("test/fixtures/ca.crt"),
-            limits: config.Limits(
-              ..c.limits,
-              connections: connections,
-              per_origin: connections,
-              active: 1024,
-              waiting: 1024,
-              chunk_bytes: 524_288,
-              queue_bytes: 1_048_576,
-            ),
-          ),
-        )
+        local_config()
+        |> config.with_request_timeout(config.Milliseconds(60_000))
+        |> config.with_trust(config.CustomCa("test/fixtures/ca.crt"))
+        |> config.with_max_connections(connections)
+        |> config.with_max_connections_per_origin(connections)
+        |> config.with_max_open_bodies(1024)
+        |> config.with_max_queued_requests(1024)
+        |> config.with_max_buffered_bytes(1_048_576)
+        |> http_gun.start
       Gun(client)
     }
     _ -> {
@@ -61,10 +52,7 @@ pub fn start(name: String, connections: Int) -> Client {
 
 pub fn stop(client: Client) -> Nil {
   case client {
-    Gun(client) -> {
-      let _ = http_gun.stop(client)
-      Nil
-    }
+    Gun(client) -> http_gun.stop(client)
     Dream(profile) -> {
       let _ = dream.stop_profile(profile)
       Nil
@@ -151,14 +139,12 @@ pub fn stream(
 ) -> Result(Int, String) {
   case client {
     Gun(client) ->
-      case
-        http_gun.with_response(client, gun_request(port, False), fn(r) {
-          drain(r.body, 0, slow, first)
-        })
-      {
-        Ok(result) -> result
-        Error(e) -> Error(string.inspect(e))
-      }
+      http_gun.with_response(
+        client,
+        gun_request(port, False),
+        string.inspect,
+        fn(r) { drain(r.body, 0, slow, first) },
+      )
     Dream(profile) ->
       dream.stream_yielder(dream_request(profile, port, False))
       |> yielder.fold(Ok(0), fn(acc, event) {
@@ -181,9 +167,7 @@ fn drain(
   slow: Bool,
   first: fn() -> Nil,
 ) -> Result(Int, String) {
-  use event <- result.try(
-    body.next(stream, 60_000) |> result.map_error(string.inspect),
-  )
+  use event <- result.try(body.next(stream) |> result.map_error(string.inspect))
   case event {
     body.End(_) -> Ok(total)
     body.Chunk(bytes) -> {
@@ -200,12 +184,5 @@ fn drain(
 
 // These exercises connect only to explicitly permitted local test servers.
 fn local_config() -> config.Config {
-  let defaults = config.default()
-  config.Config(
-    ..defaults,
-    destination: destination.Policy(
-      ..defaults.destination,
-      allow_loopback: True,
-    ),
-  )
+  config.default() |> config.allow_loopback
 }

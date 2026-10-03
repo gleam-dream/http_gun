@@ -7,6 +7,7 @@ import gleam/int
 import gleam/io
 import gleam/json
 import gleam/list
+import gleam/option.{Some}
 import gleam/result
 import http_gun
 import http_gun/body
@@ -46,27 +47,21 @@ fn req(port: Int, tls: Bool, path: String) -> request.Request(BitArray) {
 }
 
 fn settings(tls: Bool) -> config.Config {
-  let c = local_config()
-  config.Config(
-    ..c,
-    deadline_ms: 60_000,
-    protocol: case tls {
-      True -> config.RequireHttp2
-      False -> config.Http1
-    },
-    trust: config.CustomCa("test/fixtures/ca.crt"),
-    limits: config.Limits(
-      ..c.limits,
-      connections: case tls {
-        True -> 1
-        False -> 4
-      },
-      per_origin: 4,
-      active: 128,
-      waiting: 1024,
-      streams_per_connection: 100,
-    ),
-  )
+  local_config()
+  |> config.with_request_timeout(config.Milliseconds(60_000))
+  |> config.with_protocol(case tls {
+    True -> config.RequireHttp2
+    False -> config.Http1
+  })
+  |> config.with_trust(config.CustomCa("test/fixtures/ca.crt"))
+  |> config.with_max_connections(case tls {
+    True -> 1
+    False -> 4
+  })
+  |> config.with_max_connections_per_origin(4)
+  |> config.with_max_open_bodies(128)
+  |> config.with_max_queued_requests(1024)
+  |> config.with_max_streams_per_connection(100)
 }
 
 fn percentile(values: List(Int), numerator: Int) -> Int {
@@ -155,12 +150,11 @@ fn concurrent(tls: Bool, count: Int) {
     sample,
     count * 3,
   )
-  let assert Ok(Nil) = http_gun.stop(client)
-  Nil
+  http_gun.stop(client)
 }
 
 fn drain(body: body.Body, total: Int, slow: Bool) -> Int {
-  let assert Ok(event) = body.next(body, 5000)
+  let assert Ok(Some(event)) = body.next_within(body, 5000)
   case event {
     body.End(_) -> total
     body.Chunk(bytes) -> {
@@ -175,24 +169,18 @@ fn drain(body: body.Body, total: Int, slow: Bool) -> Int {
 
 fn large_stream(slow: Bool) {
   let bytes = 33_554_432
-  let c = settings(False)
+  // One buffered-bytes limit now bounds both the queue and a single chunk.
   let assert Ok(client) =
-    http_gun.start(
-      config.Config(
-        ..c,
-        limits: config.Limits(
-          ..c.limits,
-          chunk_bytes: 524_288,
-          queue_bytes: 1_048_576,
-        ),
-      ),
-    )
+    http_gun.start(settings(False) |> config.with_max_buffered_bytes(1_048_576))
   let sample = sampler()
   let started = now()
   let assert Ok(actual) =
-    http_gun.with_response(client, req(large(bytes), False, "/"), fn(reply) {
-      drain(reply.body, 0, slow)
-    })
+    http_gun.with_response(
+      client,
+      req(large(bytes), False, "/"),
+      fn(failure) { failure },
+      fn(reply) { Ok(drain(reply.body, 0, slow)) },
+    )
   let assert True = actual == bytes
   emit(
     case slow {
@@ -206,8 +194,7 @@ fn large_stream(slow: Bool) {
     measured(sample),
     actual,
   )
-  let assert Ok(Nil) = http_gun.stop(client)
-  Nil
+  http_gun.stop(client)
 }
 
 fn mixed() {
@@ -219,9 +206,9 @@ fn mixed() {
   let assert Ok(replies) =
     http_gun.batch(client, list.repeat(req(port, True, "/fast"), 1000), 64)
   let assert True = list.all(replies, result.is_ok)
-  let assert Ok(_) = body.next(slow.body, 1000)
-  let assert Ok(Nil) = body.close(slow.body)
-  let assert Ok(stats) = http_gun.snapshot(client)
+  let assert Ok(Some(_)) = body.next_within(slow.body, 1000)
+  body.close(slow.body)
+  let assert Ok(stats) = http_gun.stats(client)
   let assert 1 = stats.connections
   emit(
     "h2-slow-stream-plus-batch",
@@ -232,8 +219,7 @@ fn mixed() {
     measured(sample),
     3000,
   )
-  let assert Ok(Nil) = http_gun.stop(client)
-  Nil
+  http_gun.stop(client)
 }
 
 pub fn main() {

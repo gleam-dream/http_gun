@@ -91,7 +91,10 @@ pub fn arbitrary_methods_and_empty_status_test() {
 
 pub fn invalid_config_test() {
   let settings = local_config()
-  http_gun.start(config.Config(..settings, deadline_ms: 0)) |> should.be_error
+  http_gun.start(config.with_request_timeout(settings, config.Milliseconds(0)))
+  |> should.equal(
+    Error(http_gun.InvalidConfig(config.OutOfRange(config.RequestTimeout, 0))),
+  )
 }
 
 @external(erlang, "http_gun_test_server", "persistent")
@@ -131,7 +134,7 @@ pub fn h1_reuses_idle_connection_test() {
   response.get_header(first.response, "x-connection")
   |> should.equal(response.get_header(second.response, "x-connection"))
   response.get_header(first.response, "x-connection") |> should.be_ok
-  let assert Ok(stats) = http_gun.snapshot(client)
+  let assert Ok(stats) = http_gun.stats(client)
   stats.connections |> should.equal(1)
   let _ = http_gun.stop(client)
 }
@@ -149,9 +152,9 @@ pub fn invalid_method_and_query_fail_before_submission_test() {
   let assert Ok(client) = http_gun.start(local_config())
   let invalid = req(1) |> request.set_method(http.Other("GET\r\nX: value"))
   let assert Error(failure) = http_gun.send(client, invalid)
-  failure.reason
-  |> should.equal(error.InvalidRequest("invalid origin, target or header"))
-  failure.evidence |> should.equal(error.NotSubmitted)
+  error.reason(failure)
+  |> should.equal(error.InvalidRequest(error.InvalidMethod))
+  error.evidence(failure) |> should.equal(error.NotSent)
   let _ = http_gun.stop(client)
 }
 
@@ -160,13 +163,10 @@ pub fn informational_headers_respect_admitted_head_limit_test() {
     serve(<<
       "HTTP/1.1 103 Early Hints\r\nX-Hint: 012345678901234567890123456789\r\n\r\nHTTP/1.1 204 No Content\r\n\r\n":utf8,
     >>)
-  let c = local_config()
   let assert Ok(client) =
-    http_gun.start(
-      config.Config(..c, limits: config.Limits(..c.limits, head_bytes: 16)),
-    )
+    http_gun.start(local_config() |> config.with_max_header_bytes(16))
   let assert Error(failure) = http_gun.send(client, req(port))
-  failure.reason
+  error.reason(failure)
   |> should.equal(error.LimitExceeded(error.ResponseHeaderBytes, 16, 36))
   let _ = http_gun.stop(client)
 }
@@ -179,7 +179,7 @@ pub fn batch_failure_preserves_unrelated_results_test() {
     http_gun.batch(client, [req(port), req(failure_port), req(port)], 2)
   a.response.body |> should.equal(<<"abc":utf8>>)
   b.response.body |> should.equal(<<"abc":utf8>>)
-  failure.evidence |> should.equal(error.MayHaveBeenSent)
+  error.evidence(failure) |> should.equal(error.MaybeSent)
   let _ = http_gun.stop(client)
 }
 
@@ -187,9 +187,9 @@ pub fn partial_byte_request_is_rejected_before_submission_test() {
   let assert Ok(client) = http_gun.start(local_config())
   let assert Error(failure) =
     http_gun.send(client, req(1) |> request.set_body(<<1:size(1)>>))
-  failure.evidence |> should.equal(error.NotSubmitted)
-  failure.reason
-  |> should.equal(error.InvalidRequest("body must contain whole bytes"))
+  error.evidence(failure) |> should.equal(error.NotSent)
+  error.reason(failure)
+  |> should.equal(error.InvalidRequest(error.BodyNotBytes))
   let _ = http_gun.stop(client)
 }
 
@@ -201,10 +201,7 @@ pub fn configured_header_count_above_gun_default_test() {
       <> "\r\n",
     )
   let c = local_config()
-  let assert Ok(client) =
-    http_gun.start(
-      config.Config(..c, limits: config.Limits(..c.limits, header_count: 110)),
-    )
+  let assert Ok(client) = http_gun.start(c |> config.with_max_header_count(110))
   let assert Ok(reply) = http_gun.send(client, req(serve(bytes)))
   reply.response.status |> should.equal(204)
   list.length(reply.response.headers) |> should.equal(110)

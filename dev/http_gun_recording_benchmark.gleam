@@ -11,7 +11,7 @@ import gleam/list
 import http_gun
 import http_gun/cassette
 import http_gun/config
-import http_gun/recording
+import http_gun/testing
 
 @external(erlang, "http_gun_test_server", "persistent")
 fn server() -> Int
@@ -31,16 +31,6 @@ fn sampler() -> process.Pid
 @external(erlang, "http_gun_measure_ffi", "finish")
 fn measured(pid: process.Pid) -> #(Int, Int, Int, Int, Int)
 
-fn finish(
-  rec: recording.Recording,
-  attempts: Int,
-) -> Result(String, recording.FinishError) {
-  case cassette.finish(rec) {
-    Error(recording.Busy) if attempts > 0 -> finish(rec, attempts - 1)
-    other -> other
-  }
-}
-
 pub fn main() -> Nil {
   let port = server()
   let destination = path()
@@ -52,15 +42,13 @@ pub fn main() -> Nil {
     request.to("http://localhost:" <> int.to_string(port) <> "/")
   let req = req |> request.set_method(http.Post) |> request.set_body(bytes)
   let inputs = list.repeat(req, 256)
-  let c = local_config()
   let settings =
-    config.Config(
-      ..c,
-      deadline_ms: 60_000,
-      limits: config.Limits(..c.limits, connections: 4, per_origin: 4),
-    )
+    local_config()
+    |> config.with_request_timeout(config.Milliseconds(60_000))
+    |> config.with_max_connections(4)
+    |> config.with_max_connections_per_origin(4)
   let assert Ok(recorded) =
-    cassette.record(settings, destination, recording.default())
+    cassette.record(settings, destination, cassette.options())
   let sample = sampler()
   let start = now()
   let assert Ok(replies) = http_gun.batch(recorded.client, inputs, 16)
@@ -68,23 +56,24 @@ pub fn main() -> Nil {
     let assert Ok(reply) = reply
     let assert True = reply.response.body == bytes
   })
-  let assert Ok(_) = finish(recorded.recording, 10_000)
+  // Every batched request has completed, so the wait only covers the writes.
+  let assert Ok(_) = cassette.finish(recorded.recording, 10_000)
   let elapsed = now() - start
   let stats = measured(sample)
-  let assert Ok(empty) = http_gun.snapshot(recorded.client)
-  let assert 0 = empty.bodies
-  let assert 0 = empty.waiting
+  let assert Ok(empty) = http_gun.stats(recorded.client)
+  let assert 0 = empty.open_bodies
+  let assert 0 = empty.queued_requests
   let assert True = empty.connections <= 4
-  let assert Ok(Nil) = http_gun.stop(recorded.client)
+  http_gun.stop(recorded.client)
   let assert Ok(tape) = cassette.load(destination, 16_777_216)
-  let assert Ok(playback) = cassette.playback(tape, settings)
+  let assert Ok(playback) = testing.playback(tape, settings)
   let assert Ok(replayed) = http_gun.batch(playback, inputs, 16)
   list.each(replayed, fn(reply) {
     let assert Ok(reply) = reply
     let assert config.Offline = reply.protocol
     let assert True = reply.response.body == bytes
   })
-  let assert Ok(Nil) = http_gun.stop(playback)
+  http_gun.stop(playback)
   remove(destination)
   io.println(
     json.object([

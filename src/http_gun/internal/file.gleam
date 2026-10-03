@@ -5,12 +5,33 @@ import file_streams/file_stream
 import file_streams/file_stream_error
 import gleam/bit_array
 import gleam/result
-import http_gun/error
 import http_gun/internal/bridge
 import simplifile
 
+pub type Operation {
+  OpenFile
+  ReadFile
+  WriteFile
+  CloseFile
+  CreateDirectory
+  SetPermissions
+  Publish
+}
+
+pub type Cause {
+  Missing
+  AlreadyExists
+  PermissionDenied
+  NoSpace
+  ReadOnlyFilesystem
+  NotDirectory
+  IsDirectory
+  CrossFilesystem
+  UnknownIo
+}
+
 pub type FileError {
-  Io(error.FileOperation, error.FileCause)
+  Io(Operation, Cause)
   TooLarge
 }
 
@@ -27,7 +48,7 @@ pub fn read(path: String, limit: Int) -> Result(BitArray, FileError) {
             False -> Error(TooLarge)
           }
         Error(file_stream_error.Eof) -> Ok(<<>>)
-        Error(problem) -> Error(stream_error(error.ReadFile, problem))
+        Error(problem) -> Error(stream_error(ReadFile, problem))
       }
     }
   }
@@ -36,13 +57,13 @@ pub fn read(path: String, limit: Int) -> Result(BitArray, FileError) {
 pub fn write_new(path: String, bytes: BitArray) -> Result(Nil, FileError) {
   use stream <- with_file(path, [Write, Exclusive, Raw])
   file_stream.write_bytes(stream, bytes)
-  |> result.map_error(stream_error(error.WriteFile, _))
+  |> result.map_error(stream_error(WriteFile, _))
 }
 
 pub fn append(path: String, bytes: BitArray) -> Result(Nil, FileError) {
   use stream <- with_file(path, [Append, Raw])
   file_stream.write_bytes(stream, bytes)
-  |> result.map_error(stream_error(error.WriteFile, _))
+  |> result.map_error(stream_error(WriteFile, _))
 }
 
 fn with_file(
@@ -52,14 +73,14 @@ fn with_file(
 ) -> Result(value, FileError) {
   use stream <- result.try(
     file_stream.open(path, modes)
-    |> result.map_error(stream_error(error.OpenFile, _)),
+    |> result.map_error(stream_error(OpenFile, _)),
   )
   bridge.on_exception(
     fn() {
       let outcome = run(stream)
       let closed =
         file_stream.close(stream)
-        |> result.map_error(stream_error(error.CloseFile, _))
+        |> result.map_error(stream_error(CloseFile, _))
       use value <- result.try(outcome)
       use Nil <- result.try(closed)
       Ok(value)
@@ -75,13 +96,13 @@ pub fn directory(destination: String) -> Result(String, FileError) {
   let path = directory_name(destination)
   use Nil <- result.try(
     simplifile.create_directory(path)
-    |> result.map_error(path_error(error.CreateDirectory, _)),
+    |> result.map_error(path_error(CreateDirectory, _)),
   )
   case simplifile.set_permissions_octal(path, 0o700) {
     Ok(Nil) -> Ok(path)
     Error(problem) -> {
       remove_directory(path)
-      Error(path_error(error.SetPermissions, problem))
+      Error(path_error(SetPermissions, problem))
     }
   }
 }
@@ -95,7 +116,7 @@ pub fn publish(
     True -> simplifile.rename(source, destination)
     False -> simplifile.create_link(source, destination)
   }
-  |> result.map_error(path_error(error.PublishFixture, _))
+  |> result.map_error(path_error(Publish, _))
 }
 
 pub fn remove(path: String) -> Nil {
@@ -104,38 +125,38 @@ pub fn remove(path: String) -> Nil {
 }
 
 fn stream_error(
-  operation: error.FileOperation,
+  operation: Operation,
   problem: file_stream_error.FileStreamError,
 ) -> FileError {
   Io(operation, case problem {
-    file_stream_error.Enoent -> error.FileMissing
-    file_stream_error.Eexist -> error.AlreadyExists
-    file_stream_error.Eacces -> error.PermissionDenied
-    file_stream_error.Eperm -> error.PermissionDenied
-    file_stream_error.Enospc -> error.NoSpace
-    file_stream_error.Erofs -> error.ReadOnlyFilesystem
-    file_stream_error.Enotdir -> error.NotDirectory
-    file_stream_error.Eisdir -> error.IsDirectory
-    file_stream_error.Exdev -> error.CrossFilesystem
-    _ -> error.UnknownIoFailure
+    file_stream_error.Enoent -> Missing
+    file_stream_error.Eexist -> AlreadyExists
+    file_stream_error.Eacces -> PermissionDenied
+    file_stream_error.Eperm -> PermissionDenied
+    file_stream_error.Enospc -> NoSpace
+    file_stream_error.Erofs -> ReadOnlyFilesystem
+    file_stream_error.Enotdir -> NotDirectory
+    file_stream_error.Eisdir -> IsDirectory
+    file_stream_error.Exdev -> CrossFilesystem
+    _ -> UnknownIo
   })
 }
 
 fn path_error(
-  operation: error.FileOperation,
+  operation: Operation,
   problem: simplifile.FileError,
 ) -> FileError {
   Io(operation, case problem {
-    simplifile.Enoent -> error.FileMissing
-    simplifile.Eexist -> error.AlreadyExists
-    simplifile.Eacces -> error.PermissionDenied
-    simplifile.Eperm -> error.PermissionDenied
-    simplifile.Enospc -> error.NoSpace
-    simplifile.Erofs -> error.ReadOnlyFilesystem
-    simplifile.Enotdir -> error.NotDirectory
-    simplifile.Eisdir -> error.IsDirectory
-    simplifile.Exdev -> error.CrossFilesystem
-    _ -> error.UnknownIoFailure
+    simplifile.Enoent -> Missing
+    simplifile.Eexist -> AlreadyExists
+    simplifile.Eacces -> PermissionDenied
+    simplifile.Eperm -> PermissionDenied
+    simplifile.Enospc -> NoSpace
+    simplifile.Erofs -> ReadOnlyFilesystem
+    simplifile.Enotdir -> NotDirectory
+    simplifile.Eisdir -> IsDirectory
+    simplifile.Exdev -> CrossFilesystem
+    _ -> UnknownIo
   })
 }
 

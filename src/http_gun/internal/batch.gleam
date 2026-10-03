@@ -4,7 +4,7 @@ import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/otp/actor
 import gleam/result
-import http_gun/error.{type Failure, Failure, MayHaveBeenSent, NotSubmitted}
+import http_gun/error.{type Failure, MaybeSent, NotSent}
 import http_gun/internal/call
 
 type Worker {
@@ -38,13 +38,7 @@ pub fn run(
   perform: fn(input) -> Result(value, Failure),
 ) -> Result(List(Result(value, Failure)), Failure) {
   case concurrency > 0 && concurrency <= 1024 && list.length(inputs) <= 10_000 {
-    False ->
-      Error(Failure(
-        error.InvalidRequest(
-          "batch requires 1..1024 workers and at most 10000 inputs",
-        ),
-        NotSubmitted,
-      ))
+    False -> Error(error.new(error.InvalidRequest(error.InvalidBatch), NotSent))
     True -> {
       let owner = process.self()
       let started =
@@ -73,7 +67,7 @@ pub fn run(
         |> actor.start
       use started <- result.try(
         started
-        |> result.map_error(fn(_) { Failure(error.ClientClosed, NotSubmitted) }),
+        |> result.map_error(fn(_) { error.new(error.ClientClosed, NotSent) }),
       )
       process.unlink(started.pid)
       call.run(started.data, Begin)
@@ -119,9 +113,9 @@ fn handle(
                   results: [
                     #(
                       worker.index,
-                      Error(Failure(
+                      Error(error.new(
                         error.RequestFailed(error.UnknownTransport),
-                        MayHaveBeenSent,
+                        MaybeSent,
                       )),
                     ),
                     ..state.results

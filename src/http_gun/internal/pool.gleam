@@ -1,3 +1,8 @@
+//// The pool actor behind every `http_gun.Client`: bounded admission, FIFO
+//// lanes per origin, connection lifecycle, playback and recording modes, and
+//// draining on stop. A `Client` holds the actor's subject and the view
+//// settings of one handle; the actor owns the configuration.
+
 import gleam/bit_array
 import gleam/dict.{type Dict}
 import gleam/erlang/process
@@ -11,196 +16,254 @@ import gleam/option.{type Option, None, Some}
 import gleam/otp/actor
 import gleam/result
 import gleam/string
-import http_gun/body
-import http_gun/cancellation
-import http_gun/config
-import http_gun/deadline
 import http_gun/destination
-import http_gun/error.{type Failure, Failure, NotSubmitted}
-import http_gun/fixture
+import http_gun/error.{type Failure, MaybeSent, NotSent}
 import http_gun/internal/bridge
 import http_gun/internal/call
+import http_gun/internal/lifecycle
 import http_gun/internal/observation as obs
+import http_gun/internal/owner
 import http_gun/internal/pending.{type Origin, type Pending, Origin, Pending}
 import http_gun/internal/preparation
+import http_gun/internal/recorder
 import http_gun/internal/resolution
-import http_gun/recording
-import http_gun/request_options
+import http_gun/internal/script
+import http_gun/internal/settings.{type Settings}
+import http_gun/internal/token
+import http_gun/redaction
 import http_gun/telemetry
 import sinal/correlation.{type Correlation}
 
-pub type Stats {
-  Stats(connections: Int, bodies: Int, waiting: Int)
-}
-
-pub opaque type Client {
-  Client(
-    subject: process.Subject(Message),
-    config: config.Config,
+/// Per-handle settings. Every field is optional and falls back to the
+/// client's configuration.
+pub type View {
+  View(
+    timeout: Option(settings.Bound),
+    deadline: Option(Int),
+    idle: Option(settings.Bound),
+    token: Option(token.Token),
+    body_limit: Option(#(Int, Bool)),
+    policies: List(destination.Policy),
     correlation: Option(Correlation),
   )
 }
 
+pub opaque type Client {
+  Client(subject: process.Subject(Message), view: View)
+}
+
+const no_view = View(None, None, None, None, None, [], None)
+
 type Status {
   Resolving
   Connecting
-  Ready(config.Negotiated, Int)
+  Ready(settings.Negotiated, Int)
   Checking(process.Pid)
   Checked
 }
 
 type Connection {
-  Connection(pid: process.Pid, origin: Origin, status: Status, used: Int)
+  Connection(
+    pid: process.Pid,
+    origin: Origin,
+    status: Status,
+    used: Int,
+    addresses: List(destination.Address),
+    idle_ref: Option(reference.Reference),
+    connect_until: Int,
+  )
 }
 
 type Owned {
   Owned(
     pid: process.Pid,
-    body: body.Body,
+    body: owner.Body,
     connection: Option(process.Pid),
     released: Bool,
   )
 }
 
 pub type Mode {
-  Record(recording.Recording)
+  Record(recorder.Recording)
   Live
-  Playback(remaining: List(fixture.Exchange), position: Int)
+  Playback(
+    remaining: List(script.Exchange),
+    position: Int,
+    matching: script.Matching,
+  )
+}
+
+type Phase {
+  Running
+  Draining(replies: List(process.Subject(Result(Nil, Failure))))
 }
 
 type State {
   State(
-    subject: process.Subject(Message),
+    self: process.Subject(Message),
     mode: Mode,
-    config: config.Config,
+    config: Settings,
     connections: List(Connection),
     pending: pending.Queue,
     owners: Dict(process.Pid, Owned),
-    observations: Option(telemetry.Emitter),
+    emitter: lifecycle.Emitter,
+    phase: Phase,
   )
 }
 
-type Message {
+/// What a caller sends to open one request.
+type Invocation {
+  Invocation(
+    request: fn() -> request.Request(BitArray),
+    origin: Origin,
+    entered: Int,
+    view: View,
+    owner: process.Pid,
+  )
+}
+
+pub type Opened {
+  Opened(response: response.Response(owner.Body), body_limit: #(Int, Bool))
+}
+
+pub opaque type Message {
   Resolved(process.Pid, Result(resolution.Resolved, error.Reason))
   CheckedConnection(process.Pid, process.Pid, Result(Bool, error.Reason))
-  Inspect(process.Subject(Result(Stats, Failure)))
-  Open(
-    request.Request(BitArray),
-    Origin,
-    Option(Correlation),
-    Option(cancellation.Token),
-    process.Pid,
-    Int,
-    process.Subject(Result(response.Response(body.Body), Failure)),
-  )
+  Inspect(process.Subject(Result(#(Int, Int, Int), Failure)))
+  Configuration(process.Subject(Result(Settings, Failure)))
+  Open(Invocation, process.Subject(Result(Opened, Failure)))
   Stop(process.Subject(Result(Nil, Failure)))
+  ShutdownExpired
   Wire(bridge.Event)
   Lost(process.Down)
   Expire(reference.Reference)
+  ConnectExpired(process.Pid)
+  IdleConnection(process.Pid, reference.Reference)
   Release(process.Pid, Option(process.Pid), Bool)
+  OwnerClosed(process.Pid)
 }
 
-pub fn snapshot(client: Client) -> Result(Stats, Failure) {
+pub fn named(name: process.Name(Message)) -> Client {
+  Client(process.named_subject(name), no_view)
+}
+
+pub fn stats(client: Client) -> Result(#(Int, Int, Int), Failure) {
   call.run(client.subject, Inspect)
 }
 
-pub fn config(client: Client) -> config.Config {
-  client.config
+pub fn settings(client: Client) -> Result(Settings, Failure) {
+  call.run(client.subject, Configuration)
+}
+
+pub fn view(client: Client) -> View {
+  client.view
+}
+
+pub fn with_view(client: Client, view: View) -> Client {
+  Client(..client, view:)
 }
 
 pub fn open(
   client: Client,
   req: request.Request(BitArray),
-) -> Result(response.Response(body.Body), Failure) {
-  open_with_options(client, req, request_options.default())
-}
-
-pub fn open_with_options(
-  client: Client,
-  req: request.Request(BitArray),
-  options: request_options.Options,
-) -> Result(response.Response(body.Body), Failure) {
-  use Nil <- result.try(case request_options.cancelled(options) {
-    True -> Error(Failure(error.Cancelled, NotSubmitted))
-    False -> Ok(Nil)
+) -> Result(Opened, Failure) {
+  let view = client.view
+  let entered = bridge.now()
+  use Nil <- result.try(case view.token {
+    Some(token) ->
+      case token.is_cancelled(token) {
+        True -> Error(error.new(error.Cancelled, NotSent))
+        False -> Ok(Nil)
+      }
+    None -> Ok(Nil)
   })
-  let until = case options.deadline {
-    None -> bridge.now() + client.config.deadline_ms
-    Some(budget) ->
-      int.min(
-        bridge.now() + client.config.deadline_ms,
-        deadline.timestamp(budget),
-      )
-  }
-  use Nil <- result.try(case until <= bridge.now() {
-    True -> Error(Failure(error.DeadlineExceeded, NotSubmitted))
-    False -> Ok(Nil)
+  use Nil <- result.try(case view.deadline {
+    Some(at) if at <= entered ->
+      Error(error.new(error.DeadlineExceeded, NotSent))
+    _ -> Ok(Nil)
+  })
+  use Nil <- result.try(case view.body_limit {
+    Some(#(limit, _)) if limit < 0 ->
+      Error(error.new(error.InvalidRequest(error.InvalidBodyLimit), NotSent))
+    _ -> Ok(Nil)
   })
   let req = case req.path {
     "" -> request.Request(..req, path: "/")
     _ -> req
   }
-  use origin <- result.try(validate(req, client.config.limits))
-  call.with_failure(
+  use origin <- result.try(validate_target(req))
+  // Nothing was sent when the client is not registered or already dead; a
+  // client that exits while handling the call may have submitted it.
+  call.with_failures(
     client.subject,
-    Open(
-      req,
-      origin,
-      client.correlation,
-      options.cancellation,
-      process.self(),
-      until,
-      _,
-    ),
-    Failure(error.ClientClosed, error.MayHaveBeenSent),
+    Open(Invocation(fn() { req }, origin, entered, view, process.self()), _),
+    not_running: error.new(error.ClientClosed, NotSent),
+    lost: error.new(error.ClientClosed, MaybeSent),
   )
 }
 
-pub fn stop(client: Client) -> Result(Nil, Failure) {
-  call.run(client.subject, Stop)
+/// Stop a client, letting open bodies finish within the shutdown timeout.
+pub fn stop(client: Client) -> Nil {
+  let _ = call.run(client.subject, Stop)
+  Nil
 }
 
-pub fn start(settings: config.Config) -> actor.StartResult(Client) {
-  start_mode(settings, Live)
+pub fn start(config: Settings, mode: Mode) -> actor.StartResult(Client) {
+  start_with(config, mode, None)
 }
 
-pub fn start_mode(
-  settings: config.Config,
-  mode: Mode,
+pub fn start_named(
+  config: Settings,
+  name: process.Name(Message),
 ) -> actor.StartResult(Client) {
-  use settings <- result.try(
-    config.validate(settings) |> result.map_error(actor.InitFailed),
-  )
+  start_with(config, Live, Some(name))
+}
+
+fn start_with(
+  config: Settings,
+  mode: Mode,
+  name: Option(process.Name(Message)),
+) -> actor.StartResult(Client) {
   use Nil <- result.try(
     case mode {
       Live | Record(_) -> bridge.start()
-      Playback(_, _) -> Ok(Nil)
+      Playback(..) -> Ok(Nil)
     }
     |> result.map_error(fn(_) {
       actor.InitFailed("Gun application could not start")
     }),
   )
-  actor.new_with_initialiser(1000, fn(subject) {
-    let selector =
-      process.new_selector()
-      |> process.select(subject)
-      |> process.select_monitors(Lost)
-      |> process.select_other(fn(value) { Wire(bridge.decode(value)) })
-    Ok(
-      actor.initialised(State(
-        subject,
-        mode,
-        settings,
-        [],
-        pending.new(),
-        dict.new(),
-        telemetry.prepare(settings.observations),
-      ))
-      |> actor.selecting(selector)
-      |> actor.returning(Client(subject, settings, None)),
-    )
-  })
-  |> actor.on_message(handle)
+  let builder =
+    actor.new_with_initialiser(1000, fn(public) {
+      // Timers, workers and body owners reply on a private subject, so a
+      // restarted named client never receives its predecessor's messages.
+      let private = process.new_subject()
+      let selector =
+        process.new_selector()
+        |> process.select(public)
+        |> process.select(private)
+        |> process.select_monitors(Lost)
+        |> process.select_other(fn(value) { Wire(bridge.decode(value)) })
+      Ok(
+        actor.initialised(State(
+          self: private,
+          mode:,
+          config:,
+          connections: [],
+          pending: pending.new(),
+          owners: dict.new(),
+          emitter: lifecycle.prepare(config.observations),
+          phase: Running,
+        ))
+        |> actor.selecting(selector)
+        |> actor.returning(Client(public, no_view)),
+      )
+    })
+    |> actor.on_message(handle)
+  case name {
+    Some(name) -> actor.named(builder, name)
+    None -> builder
+  }
   |> actor.start
 }
 
@@ -208,20 +271,85 @@ fn origin(req: request.Request(a)) -> Origin {
   let tls = req.scheme == http.Https
   Origin(
     bridge.unbracket(string.lowercase(req.host)),
-    option_port(req, tls),
+    case req.port {
+      Some(port) -> port
+      None ->
+        case tls {
+          True -> 443
+          False -> 80
+        }
+    },
     tls,
   )
 }
 
-fn option_port(req: request.Request(a), tls: Bool) -> Int {
-  case req.port {
-    Some(port) -> port
-    None ->
-      case tls {
-        True -> 443
-        False -> 80
+fn validate_target(req: request.Request(BitArray)) -> Result(Origin, Failure) {
+  let invalid = fn(problem) {
+    Error(error.new(error.InvalidRequest(problem), NotSent))
+  }
+  let origin = origin(req)
+  let method_ok =
+    http.parse_method(http.method_to_string(req.method)) |> result.is_ok
+  case bit_array.bit_size(req.body) % 8 == 0, method_ok {
+    False, _ -> invalid(error.BodyNotBytes)
+    True, False -> invalid(error.InvalidMethod)
+    True, True ->
+      case
+        origin.host != ""
+        && origin.port > 0
+        && origin.port <= 65_535
+        && safe_target(origin.host)
+      {
+        False -> invalid(error.InvalidOrigin)
+        True ->
+          case
+            safe_target(option.unwrap(req.query, ""))
+            && safe_target(req.path)
+            && string.starts_with(req.path, "/")
+          {
+            False -> invalid(error.InvalidTarget)
+            True ->
+              case
+                list.all(req.headers, fn(h) {
+                  h.0 == string.lowercase(h.0)
+                  && http.parse_method(h.0) |> result.is_ok
+                  && !string.contains(h.1, "\r")
+                  && !string.contains(h.1, "\n")
+                  && !string.contains(h.1, "\u{0}")
+                })
+              {
+                False -> invalid(error.InvalidHeader)
+                True -> Ok(origin)
+              }
+          }
       }
   }
+}
+
+fn validate_size(
+  req: request.Request(BitArray),
+  limits: settings.Limits,
+) -> Result(Nil, Failure) {
+  case bit_array.byte_size(req.body) <= limits.request_body_bytes {
+    False ->
+      Error(error.new(
+        error.LimitExceeded(
+          error.RequestBodyBytes,
+          limits.request_body_bytes,
+          bit_array.byte_size(req.body),
+        ),
+        NotSent,
+      ))
+    True ->
+      owner.check_headers(req.headers, limits, owner.RequestHeaders)
+      |> result.map_error(error.new(_, NotSent))
+  }
+}
+
+fn safe_target(value: String) -> Bool {
+  !list.any([" ", "\r", "\n", "\t", "\u{0}"], fn(char) {
+    string.contains(value, char)
+  })
 }
 
 fn handle(state: State, message: Message) -> actor.Next(State, Message) {
@@ -233,7 +361,7 @@ fn handle(state: State, message: Message) -> actor.Next(State, Message) {
     Inspect(reply) -> {
       process.send(
         reply,
-        Ok(Stats(
+        Ok(#(
           list.length(state.connections),
           dict.size(state.owners),
           pending.waiting(state.pending),
@@ -241,43 +369,86 @@ fn handle(state: State, message: Message) -> actor.Next(State, Message) {
       )
       actor.continue(state)
     }
-    Stop(reply) -> {
-      list.each(pending.values(state.pending), fn(p) {
-        reject(p, error.ClientClosed)
-      })
-      dict.each(state.owners, fn(_, o) {
-        let _ = body.close(o.body)
-        Nil
-      })
-      list.each(state.connections, close_connection)
-      process.send(reply, Ok(Nil))
-      actor.stop()
+    Configuration(reply) -> {
+      process.send(reply, Ok(state.config))
+      actor.continue(state)
     }
-    Open(req, origin, correlation, token, owner, deadline, reply) ->
-      open_request(
-        state,
-        req,
-        origin,
-        correlation,
-        token,
-        owner,
-        deadline,
-        reply,
-      )
+    Stop(reply) -> begin_stop(state, reply)
+    ShutdownExpired ->
+      case state.phase {
+        Draining(replies) -> finish_stop(state, replies)
+        Running -> actor.continue(state)
+      }
+    Open(invocation, reply) ->
+      case state.phase {
+        Draining(_) -> {
+          process.send(reply, Error(error.new(error.ClientClosed, NotSent)))
+          actor.continue(state)
+        }
+        Running -> open_request(state, invocation, reply)
+      }
     Expire(id) -> {
       let #(expired, queue) = pending.remove(state.pending, id)
       case expired {
         None -> actor.continue(state)
         Some(p) -> {
-          reject(p, error.DeadlineExceeded)
+          let now = bridge.now()
+          let reason = case p.deadline {
+            Some(at) if at <= now -> error.DeadlineExceeded
+            _ -> error.PoolTimeout
+          }
+          reject(p, reason)
           actor.continue(
             dispatch(discard_reservation(State(..state, pending: queue), p)),
           )
         }
       }
     }
+    ConnectExpired(pid) ->
+      case list.find(state.connections, fn(c) { c.pid == pid }) {
+        Ok(Connection(status: Resolving, ..) as c)
+        | Ok(Connection(status: Connecting, ..) as c) -> {
+          close_connection(c)
+          let state =
+            State(
+              ..state,
+              connections: list.filter(state.connections, fn(c) { c.pid != pid }),
+            )
+          actor.continue(
+            dispatch(fail_reason(
+              state,
+              pending.ForOrigin(c.origin),
+              error.ConnectTimeout,
+            )),
+          )
+        }
+        _ -> actor.continue(state)
+      }
+    IdleConnection(pid, id) ->
+      case list.find(state.connections, fn(c) { c.pid == pid }) {
+        Ok(c) if c.idle_ref == Some(id) && c.used == 0 -> {
+          close_connection(c)
+          actor.continue(
+            State(
+              ..state,
+              connections: list.filter(state.connections, fn(c) { c.pid != pid }),
+            ),
+          )
+        }
+        _ -> actor.continue(state)
+      }
     Release(pid, connection, clean) ->
       release_body(state, pid, connection, clean)
+    // A closed body no longer counts as open, before its process exits.
+    OwnerClosed(pid) ->
+      case dict.get(state.owners, pid) {
+        Ok(Owned(released: True, ..)) ->
+          actor.continue(
+            State(..state, owners: dict.delete(state.owners, pid))
+            |> dispatch_if_running,
+          )
+        _ -> actor.continue(state)
+      }
     Lost(process.PortDown(..)) -> actor.continue(state)
     Lost(process.ProcessDown(pid: pid, monitor: monitor, reason: reason)) -> {
       let #(cancelled, queue) =
@@ -294,13 +465,14 @@ fn handle(state: State, message: Message) -> actor.Next(State, Message) {
     }
     Wire(bridge.Up(pid, protocol)) ->
       case
-        state.config.protocol == config.RequireHttp2 && protocol != config.H2
+        state.config.protocol == settings.RequireHttp2
+        && protocol != settings.H2
       {
         True -> handle(state, Wire(bridge.Down(pid, error.UnexpectedProtocol)))
         False -> {
           // Wait for initial SETTINGS before admitting H2 application streams.
           let capacity = case protocol {
-            config.H1 -> 1
+            settings.H1 -> 1
             _ -> 0
           }
           let connections =
@@ -308,8 +480,8 @@ fn handle(state: State, message: Message) -> actor.Next(State, Message) {
               case c.pid == pid {
                 True ->
                   Connection(..c, status: case protocol {
-                    config.H1 -> Checked
-                    config.H2 | config.Offline -> Ready(protocol, capacity)
+                    settings.H1 -> Checked
+                    settings.H2 | settings.Offline -> Ready(protocol, capacity)
                   })
                 False -> c
               }
@@ -325,7 +497,7 @@ fn handle(state: State, message: Message) -> actor.Next(State, Message) {
               Connection(
                 ..c,
                 status: Ready(
-                  config.H2,
+                  settings.H2,
                   int.min(capacity, state.config.limits.streams_per_connection),
                 ),
               )
@@ -340,14 +512,73 @@ fn handle(state: State, message: Message) -> actor.Next(State, Message) {
   }
 }
 
+fn begin_stop(
+  state: State,
+  reply: process.Subject(Result(Nil, Failure)),
+) -> actor.Next(State, Message) {
+  case state.phase {
+    Draining(replies) ->
+      actor.continue(State(..state, phase: Draining([reply, ..replies])))
+    Running -> {
+      list.each(pending.values(state.pending), fn(p) {
+        reject(p, error.ClientClosed)
+      })
+      let state = State(..state, pending: pending.new())
+      case active(state) == 0 || state.config.shutdown_timeout == 0 {
+        True -> finish_stop(state, [reply])
+        False -> {
+          let _ =
+            process.send_after(
+              state.self,
+              state.config.shutdown_timeout,
+              ShutdownExpired,
+            )
+          actor.continue(State(..state, phase: Draining([reply])))
+        }
+      }
+    }
+  }
+}
+
+fn finish_stop(
+  state: State,
+  replies: List(process.Subject(Result(Nil, Failure))),
+) -> actor.Next(State, Message) {
+  dict.each(state.owners, fn(_, o) {
+    case o.released {
+      True -> Nil
+      False -> owner.close(o.body)
+    }
+  })
+  list.each(state.connections, close_connection)
+  list.each(replies, process.send(_, Ok(Nil)))
+  actor.stop()
+}
+
+fn dispatch_if_running(state: State) -> State {
+  case state.phase {
+    Running -> dispatch(state)
+    Draining(_) -> state
+  }
+}
+
+fn active(state: State) -> Int {
+  dict.fold(state.owners, 0, fn(count, _, o) {
+    case o.released {
+      True -> count
+      False -> count + 1
+    }
+  })
+}
+
 fn reject(p: Pending, reason: error.Reason) -> Nil {
-  reject_with(p, Failure(reason, NotSubmitted))
+  reject_with(p, error.new(reason, NotSent))
 }
 
 fn reject_with(p: Pending, failure: Failure) -> Nil {
-  telemetry.emit(p.observation, telemetry.termination(Error(failure)))
+  lifecycle.emit(p.observation, lifecycle.termination(Error(failure)))
   case p.capture {
-    Some(cap) -> recording.write(cap, obs.Failed(failure), fn(_) { Nil })
+    Some(cap) -> recorder.write(cap, obs.Failed(failure), fn(_) { Nil })
     None -> Nil
   }
   let _ = process.cancel_timer(p.timer)
@@ -356,7 +587,7 @@ fn reject_with(p: Pending, failure: Failure) -> Nil {
     None -> Nil
   }
   process.demonitor_process(p.monitor)
-  process.send(p.reply, Error(failure))
+  p.reply(Error(failure))
 }
 
 // A deferred head blocks only its origin. Playback uses one session lane.
@@ -367,7 +598,7 @@ type Admission {
 
 fn group(state: State, p: Pending) -> pending.Group {
   case state.mode {
-    Playback(_, _) -> pending.Session
+    Playback(..) -> pending.Session
     Live | Record(_) -> pending.ForOrigin(p.origin)
   }
 }
@@ -376,15 +607,33 @@ fn dispatch(state: State) -> State {
   let state = list.fold(pending.groups(state.pending), state, dispatch_group)
   // Readiness is usable only by this admission pass. If body capacity or a
   // cancelled waiter prevents launch, do not cache an old liveness observation.
-  State(
-    ..state,
-    connections: list.map(state.connections, fn(c) {
+  let connections =
+    list.map(state.connections, fn(c) {
       case c.status {
-        Checked -> Connection(..c, status: Ready(config.H1, 1))
+        Checked -> Connection(..c, status: Ready(settings.H1, 1))
         _ -> c
       }
-    }),
-  )
+    })
+  State(..state, connections: list.map(connections, idle_timer(state, _)))
+}
+
+// An established connection that carries nothing gets one idle timer; a
+// connection in use loses it.
+fn idle_timer(state: State, c: Connection) -> Connection {
+  case c.status, c.used, c.idle_ref {
+    Ready(..), 0, None -> {
+      let id = reference.new()
+      let _ =
+        process.send_after(
+          state.self,
+          state.config.connection_idle_timeout,
+          IdleConnection(c.pid, id),
+        )
+      Connection(..c, idle_ref: Some(id))
+    }
+    _, used, Some(_) if used > 0 -> Connection(..c, idle_ref: None)
+    _, _, _ -> c
+  }
 }
 
 fn dispatch_group(state: State, group: pending.Group) -> State {
@@ -408,15 +657,17 @@ fn dispatch_group(state: State, group: pending.Group) -> State {
   }
 }
 
+fn policies(state: State, p: Pending) -> List(destination.Policy) {
+  [state.config.destination, ..p.policies]
+}
+
 fn admit_live(state: State, p: Pending) -> Admission {
-  let permitted =
-    destination.permits_host(state.config.destination, p.origin.host)
-  case permitted {
-    False -> {
-      reject(p, error.DestinationRejected)
+  case resolution.admit(policies(state, p), p.origin.host, p.origin.port, []) {
+    Error(reason) -> {
+      reject(p, reason)
       Taken(state)
     }
-    True -> admit_connection(state, p)
+    Ok(Nil) -> admit_connection(state, p)
   }
 }
 
@@ -431,17 +682,93 @@ fn admit_connection(state: State, p: Pending) -> Admission {
       }
     })
   case eligible {
-    Ok(Connection(status: Ready(config.H1, _), ..) as connection) -> {
-      let subject = state.subject
+    Ok(connection) ->
+      // A narrower view must admit every address the connection resolved.
+      case
+        resolution.admit(
+          policies(state, p),
+          p.origin.host,
+          p.origin.port,
+          connection.addresses,
+        )
+      {
+        Error(reason) -> {
+          reject(p, reason)
+          Taken(state)
+        }
+        Ok(Nil) -> admit_eligible(state, p, connection)
+      }
+    Error(Nil) -> {
+      let state = make_room(state, p.origin)
+      let same = list.filter(state.connections, fn(c) { c.origin == p.origin })
+      case
+        list.length(state.connections) < state.config.limits.connections
+        && list.length(same) < state.config.limits.per_origin
+        && !list.any(same, fn(c) { preparing(c.status) })
+      {
+        False -> Deferred(state, p)
+        True -> {
+          let self = state.self
+          let connect_until = bridge.now() + state.config.connect_timeout
+          let pid =
+            resolution.start(
+              process.self(),
+              policies(state, p),
+              state.config.resolver,
+              p.origin.host,
+              p.origin.port,
+              connect_until,
+              fn(pid, result) { process.send(self, Resolved(pid, result)) },
+            )
+          let _ = process.monitor(pid)
+          let _ =
+            process.send_after(
+              state.self,
+              state.config.connect_timeout,
+              ConnectExpired(pid),
+            )
+          // The request that opens a connection may wait for it to connect.
+          let _ = process.cancel_timer(p.timer)
+          let until = case p.deadline {
+            Some(at) -> int.min(at, int.max(p.pool_until, connect_until + 1))
+            None -> int.max(p.pool_until, connect_until + 1)
+          }
+          let timer =
+            process.send_after(
+              state.self,
+              int.max(0, until - bridge.now()),
+              Expire(p.id),
+            )
+          Deferred(
+            State(..state, connections: [
+              Connection(pid, p.origin, Resolving, 0, [], None, connect_until),
+              ..state.connections
+            ]),
+            Pending(..p, reservation: Some(pid), timer:),
+          )
+        }
+      }
+    }
+  }
+}
+
+fn admit_eligible(
+  state: State,
+  p: Pending,
+  connection: Connection,
+) -> Admission {
+  case connection.status {
+    Ready(settings.H1, _) -> {
+      let self = state.self
       let pid = connection.pid
       let worker =
         preparation.start(
           process.self(),
-          p.deadline,
+          p.pool_until,
           error.ConnectionFailed(error.UnknownTransport),
           fn() { Ok(bridge.reusable(pid)) },
           fn(worker, result) {
-            process.send(subject, CheckedConnection(pid, worker, result))
+            process.send(self, CheckedConnection(pid, worker, result))
           },
         )
       let _ = process.monitor(worker)
@@ -458,63 +785,38 @@ fn admit_connection(state: State, p: Pending) -> Admission {
         Pending(..p, reservation: Some(pid)),
       )
     }
-    Ok(connection) -> Taken(launch(state, p, connection))
-    Error(Nil) -> {
-      let state = make_room(state, p.origin)
-      let same = list.filter(state.connections, fn(c) { c.origin == p.origin })
-      case
-        list.length(state.connections) < state.config.limits.connections
-        && list.length(same) < state.config.limits.per_origin
-        && !list.any(same, fn(c) { preparing(c.status) })
-      {
-        False -> Deferred(state, p)
-        True -> {
-          let subject = state.subject
-          let pid =
-            resolution.start(
-              process.self(),
-              state.config.destination,
-              p.origin.host,
-              p.deadline,
-              fn(pid, result) { process.send(subject, Resolved(pid, result)) },
-            )
-          let _ = process.monitor(pid)
-          Deferred(
-            State(..state, connections: [
-              Connection(pid, p.origin, Resolving, 0),
-              ..state.connections
-            ]),
-            Pending(..p, reservation: Some(pid)),
-          )
-        }
-      }
-    }
+    _ -> Taken(launch(state, p, connection))
   }
 }
 
+fn timing(p: Pending) -> owner.Timing {
+  owner.Timing(p.deadline, p.idle)
+}
+
 fn launch(state: State, p: Pending, connection: Connection) -> State {
-  telemetry.emit(p.observation, telemetry.AdmissionGranted)
+  lifecycle.emit(p.observation, telemetry.AdmissionGranted)
   let protocol = case connection.status {
     Ready(protocol, _) -> protocol
-    Resolving | Connecting | Checking(_) | Checked -> config.H1
+    Resolving | Connecting | Checking(_) | Checked -> settings.H1
   }
   // This callback crosses a process boundary. Capture only its destinations,
   // never the pool state (which also contains every queued request).
-  let subject = state.subject
+  let self = state.self
   let connection_pid = connection.pid
   let release = fn(clean) {
-    process.send(subject, Release(process.self(), Some(connection_pid), clean))
+    process.send(self, Release(process.self(), Some(connection_pid), clean))
   }
   case
-    body.start(
+    owner.start(
       process.self(),
-      body.Live(connection.pid, protocol),
+      owner.Live(connection.pid, protocol),
       p.request,
       p.owner,
-      p.deadline,
+      timing(p),
       state.config.limits,
       p.reply,
       release,
+      fn() { process.send(self, OwnerClosed(process.self())) },
       p.capture,
       p.cancellation,
       p.observation,
@@ -523,10 +825,7 @@ fn launch(state: State, p: Pending, connection: Connection) -> State {
     Error(_) -> {
       reject_with(
         p,
-        Failure(
-          error.RequestFailed(error.UnknownTransport),
-          error.MayHaveBeenSent,
-        ),
+        error.new(error.RequestFailed(error.UnknownTransport), MaybeSent),
       )
       bridge.close(connection.pid)
       State(
@@ -539,12 +838,7 @@ fn launch(state: State, p: Pending, connection: Connection) -> State {
     Ok(started) -> {
       process.unlink(started.pid)
       let _ = process.monitor(started.pid)
-      case p.cancel_monitor {
-        Some(monitor) -> process.demonitor_process(monitor)
-        None -> Nil
-      }
-      process.demonitor_process(p.monitor)
-      let _ = process.cancel_timer(p.timer)
+      settle(p)
       State(
         ..state,
         owners: dict.insert(
@@ -555,10 +849,15 @@ fn launch(state: State, p: Pending, connection: Connection) -> State {
         connections: list.map(state.connections, fn(c) {
           case c.pid == connection.pid {
             True ->
-              Connection(..c, used: c.used + 1, status: case c.status {
-                Checked -> Ready(config.H1, 1)
-                other -> other
-              })
+              Connection(
+                ..c,
+                used: c.used + 1,
+                idle_ref: None,
+                status: case c.status {
+                  Checked -> Ready(settings.H1, 1)
+                  other -> other
+                },
+              )
             False -> c
           }
         }),
@@ -567,68 +866,27 @@ fn launch(state: State, p: Pending, connection: Connection) -> State {
   }
 }
 
-fn validate(
-  req: request.Request(BitArray),
-  limits: config.Limits,
-) -> Result(Origin, Failure) {
-  use Nil <- result.try(case bit_array.bit_size(req.body) % 8 == 0 {
-    True -> Ok(Nil)
-    False ->
-      Error(Failure(
-        error.InvalidRequest("body must contain whole bytes"),
-        NotSubmitted,
-      ))
-  })
-  let origin = origin(req)
-  case
-    origin.host != ""
-    && origin.port > 0
-    && origin.port <= 65_535
-    && safe_target(origin.host)
-    && http.parse_method(http.method_to_string(req.method)) |> result.is_ok
-    && safe_target(option.unwrap(req.query, ""))
-    && safe_target(req.path)
-    && string.starts_with(req.path, "/")
-    && !string.contains(req.path, "\r")
-    && !string.contains(req.path, "\n")
-    && list.all(req.headers, fn(h) {
-      h.0 == string.lowercase(h.0)
-      && http.parse_method(h.0) |> result.is_ok
-      && !string.contains(h.1, "\r")
-      && !string.contains(h.1, "\n")
-      && !string.contains(h.1, "\u{0}")
-    })
-  {
-    False ->
-      Error(Failure(
-        error.InvalidRequest("invalid origin, target or header"),
-        NotSubmitted,
-      ))
-    True ->
-      case bit_array.byte_size(req.body) <= limits.request_bytes {
-        False ->
-          Error(Failure(
-            error.LimitExceeded(
-              error.RequestBodyBytes,
-              limits.request_bytes,
-              bit_array.byte_size(req.body),
-            ),
-            NotSubmitted,
-          ))
-        True ->
-          body.check_headers(req.headers, limits, body.RequestHeaders)
-          |> result.map_error(fn(f) { Failure(f.reason, NotSubmitted) })
-          |> result.map(fn(_) { origin })
-      }
+// The body owner now answers the caller; stop watching for its death here.
+fn settle(p: Pending) -> Nil {
+  case p.cancel_monitor {
+    Some(monitor) -> process.demonitor_process(monitor)
+    None -> Nil
   }
+  process.demonitor_process(p.monitor)
+  let _ = process.cancel_timer(p.timer)
+  Nil
 }
 
 fn admit(state: State, p: Pending) -> Admission {
   let cancelled = case p.cancellation {
     None -> False
-    Some(token) -> cancellation.is_cancelled(token)
+    Some(token) -> token.is_cancelled(token)
   }
-  case cancelled, bridge.now() >= p.deadline {
+  let expired = case p.deadline {
+    Some(at) -> bridge.now() >= at
+    None -> False
+  }
+  case cancelled, expired {
     True, _ -> {
       reject(p, error.Cancelled)
       Taken(state)
@@ -640,14 +898,14 @@ fn admit(state: State, p: Pending) -> Admission {
     False, False ->
       case
         dict.size(state.owners) + checking_count(state)
-        >= state.config.limits.active
+        >= state.config.limits.open_bodies
       {
         True -> Deferred(state, p)
         False ->
           case state.mode {
             Live | Record(_) -> admit_live(state, p)
-            Playback(exchanges, position) ->
-              Taken(admit_playback(state, p, exchanges, position))
+            Playback(exchanges, position, matching) ->
+              Taken(admit_playback(state, p, exchanges, position, matching))
           }
       }
   }
@@ -667,36 +925,45 @@ fn checking_count(state: State) -> Int {
 fn admit_playback(
   state: State,
   p: Pending,
-  exchanges: List(fixture.Exchange),
+  exchanges: List(script.Exchange),
   position: Int,
+  matching: script.Matching,
 ) -> State {
   case exchanges {
     [] -> {
-      reject(p, error.FixtureExhausted)
+      reject(p, error.PlaybackExhausted)
       state
     }
     [exchange, ..rest] ->
-      case fixture.matches(exchange.request, p.request) {
+      case
+        script.matches(
+          matching,
+          state.config.redaction,
+          exchange.request,
+          p.request(),
+        )
+      {
         False -> {
-          reject(p, error.FixtureMismatch(position))
+          reject(p, error.PlaybackMismatch(position))
           state
         }
         True -> {
-          telemetry.emit(p.observation, telemetry.AdmissionGranted)
-          let subject = state.subject
+          lifecycle.emit(p.observation, telemetry.AdmissionGranted)
+          let self = state.self
           let release = fn(clean) {
-            process.send(subject, Release(process.self(), None, clean))
+            process.send(self, Release(process.self(), None, clean))
           }
           case
-            body.start(
+            owner.start(
               process.self(),
-              body.Script(exchange.reply),
+              owner.Script(exchange.reply),
               p.request,
               p.owner,
-              p.deadline,
+              timing(p),
               state.config.limits,
               p.reply,
               release,
+              fn() { process.send(self, OwnerClosed(process.self())) },
               None,
               p.cancellation,
               p.observation,
@@ -709,15 +976,10 @@ fn admit_playback(
             Ok(started) -> {
               process.unlink(started.pid)
               let _ = process.monitor(started.pid)
-              case p.cancel_monitor {
-                Some(monitor) -> process.demonitor_process(monitor)
-                None -> Nil
-              }
-              process.demonitor_process(p.monitor)
-              let _ = process.cancel_timer(p.timer)
+              settle(p)
               State(
                 ..state,
-                mode: Playback(rest, position + 1),
+                mode: Playback(rest, position + 1, matching),
                 owners: dict.insert(
                   state.owners,
                   started.pid,
@@ -732,28 +994,24 @@ fn admit_playback(
 }
 
 fn reserve_capture(
-  mode: Mode,
+  state: State,
   req: request.Request(BitArray),
-) -> Result(Option(recording.Capture), Failure) {
-  case mode {
-    Live | Playback(_, _) -> Ok(None)
-    Record(recorder) ->
-      case recording.reserve(recorder, req) {
+) -> Result(Option(recorder.Capture), Failure) {
+  case state.mode {
+    Live | Playback(..) -> Ok(None)
+    Record(recording) ->
+      case
+        recorder.reserve(
+          recording,
+          redaction.request(state.config.redaction, req),
+        )
+      {
         Ok(cap) -> Ok(Some(cap))
-        Error(recording.SessionClosed) ->
-          Error(Failure(
-            error.CaptureFailed("recording is closing or finalized"),
-            NotSubmitted,
-          ))
+        Error(recorder.SessionClosed) ->
+          Error(error.new(error.RecordingClosed, NotSent))
         Error(_) -> Ok(None)
       }
   }
-}
-
-fn safe_target(value: String) -> Bool {
-  !list.any([" ", "\r", "\n", "\t", "\u{0}"], fn(char) {
-    string.contains(value, char)
-  })
 }
 
 // Idle sockets are a cache, never a permanent claim on global capacity.
@@ -783,51 +1041,85 @@ fn make_room(state: State, wanted: Origin) -> State {
   }
 }
 
+fn effective_deadline(config: Settings, invocation: Invocation) -> Option(Int) {
+  let view = invocation.view
+  case view.deadline, view.timeout {
+    Some(at), Some(timeout) ->
+      case settings.until(timeout, invocation.entered) {
+        Some(until) -> Some(int.min(at, until))
+        None -> Some(at)
+      }
+    Some(at), None -> Some(at)
+    None, Some(timeout) -> settings.until(timeout, invocation.entered)
+    None, None -> settings.until(config.request_timeout, invocation.entered)
+  }
+}
+
 fn open_request(
   state: State,
-  req: request.Request(BitArray),
-  origin: Origin,
-  correlation: Option(Correlation),
-  token: Option(cancellation.Token),
-  owner: process.Pid,
-  deadline: Int,
-  reply: process.Subject(Result(response.Response(body.Body), Failure)),
+  invocation: Invocation,
+  reply: process.Subject(Result(Opened, Failure)),
 ) -> actor.Next(State, Message) {
+  let view = invocation.view
   let observation =
-    telemetry.begin(state.observations, correlation, case state.mode {
+    lifecycle.begin(state.emitter, view.correlation, case state.mode {
       Live -> telemetry.Live
       Record(_) -> telemetry.Recorded
-      Playback(_, _) -> telemetry.Offline
+      Playback(..) -> telemetry.Offline
     })
-  case reserve_capture(state.mode, req) {
+  let body_limit =
+    option.unwrap(view.body_limit, #(
+      state.config.limits.response_body_bytes,
+      False,
+    ))
+  // The pool or the body owner answers the caller once, adding the
+  // collection policy `send` needs.
+  let relay = fn(outcome) {
+    process.send(
+      reply,
+      result.map(outcome, fn(response) { Opened(response, body_limit) }),
+    )
+  }
+  let req = invocation.request()
+  let early = case validate_size(req, state.config.limits) {
+    Error(failure) -> Error(failure)
+    Ok(Nil) -> reserve_capture(state, req)
+  }
+  case early {
     Error(failure) -> {
-      telemetry.emit(observation, telemetry.termination(Error(failure)))
+      lifecycle.emit(observation, lifecycle.termination(Error(failure)))
       process.send(reply, Error(failure))
       actor.continue(state)
     }
     Ok(capture) -> {
+      let deadline = effective_deadline(state.config, invocation)
+      let now = bridge.now()
+      let pool_until = now + state.config.pool_timeout
+      let first = case deadline {
+        Some(at) -> int.min(at, pool_until)
+        None -> pool_until
+      }
       let id = reference.new()
       let timer =
-        process.send_after(
-          state.subject,
-          int.max(0, deadline - bridge.now()),
-          Expire(id),
-        )
+        process.send_after(state.self, int.max(0, first - now), Expire(id))
       let p =
         Pending(
-          id,
-          owner,
-          req,
-          origin,
-          reply,
-          deadline,
-          process.monitor(owner),
-          timer,
-          None,
-          capture,
-          token,
-          option.map(token, cancellation.monitor),
-          observation,
+          id:,
+          owner: invocation.owner,
+          request: invocation.request,
+          origin: invocation.origin,
+          reply: relay,
+          deadline:,
+          pool_until:,
+          idle: option.unwrap(view.idle, state.config.idle_timeout),
+          policies: view.policies,
+          monitor: process.monitor(invocation.owner),
+          timer:,
+          reservation: None,
+          capture:,
+          cancellation: view.token,
+          cancel_monitor: option.map(view.token, token.monitor),
+          observation:,
         )
       let group = group(state, p)
       // Never let a new arrival overtake an existing head in its lane.
@@ -840,14 +1132,15 @@ fn open_request(
         Deferred(next, p) ->
           case
             p.reservation == None
-            && pending.waiting(next.pending) >= state.config.limits.waiting
+            && pending.waiting(next.pending)
+            >= state.config.limits.queued_requests
           {
             True -> {
               reject(p, error.AdmissionFull)
               actor.continue(next)
             }
             False -> {
-              telemetry.emit(p.observation, telemetry.AdmissionWaiting)
+              lifecycle.emit(p.observation, telemetry.AdmissionWaiting)
               actor.continue(
                 State(..next, pending: pending.push(next.pending, group, p)),
               )
@@ -873,7 +1166,7 @@ fn release_body(
             False -> Ok(c)
             True ->
               case c.status, clean {
-                Ready(config.H1, _), False -> {
+                Ready(settings.H1, _), False -> {
                   bridge.close(c.pid)
                   Error(Nil)
                 }
@@ -881,23 +1174,22 @@ fn release_body(
               }
           }
         })
-      actor.continue(dispatch(
+      let state =
         State(
           ..state,
           connections: connections,
           owners: dict.insert(state.owners, pid, Owned(..owner, released: True)),
-        ),
-      ))
+        )
+      case state.phase {
+        Draining(replies) ->
+          case active(state) {
+            0 -> finish_stop(state, replies)
+            _ -> actor.continue(state)
+          }
+        Running -> actor.continue(dispatch(state))
+      }
     }
   }
-}
-
-fn fail_group(
-  state: State,
-  group: pending.Group,
-  cause: error.TransportCause,
-) -> State {
-  fail_reason(state, group, error.ConnectionFailed(cause))
 }
 
 fn connection_lost(
@@ -922,7 +1214,10 @@ fn connection_lost(
             error.ResolutionFailed,
           )
         Connecting ->
-          fail_group(state, pending.ForOrigin(connection.origin), cause)
+          fail_reason(state, pending.ForOrigin(connection.origin), case cause {
+            error.TransportTimeout -> error.ConnectTimeout
+            _ -> error.ConnectionFailed(cause)
+          })
         Ready(_, _) | Checking(_) | Checked -> state
       }
     }
@@ -956,7 +1251,15 @@ fn process_lost(
       connection_lost(state, connection, error.UnknownTransport)
     _ -> state
   }
-  actor.continue(dispatch(State(..next, owners: dict.delete(next.owners, pid))))
+  let next = State(..next, owners: dict.delete(next.owners, pid))
+  case next.phase {
+    Draining(replies) ->
+      case active(next) {
+        0 -> finish_stop(next, replies)
+        _ -> actor.continue(next)
+      }
+    Running -> actor.continue(dispatch(next))
+  }
 }
 
 // A cancelled connecting reservation is not an idle established cache entry.
@@ -973,10 +1276,6 @@ fn discard_reservation(state: State, p: Pending) -> State {
       State(..state, connections: keep)
     }
   }
-}
-
-pub fn with_correlation(client: Client, correlation: Correlation) -> Client {
-  Client(..client, correlation: Some(correlation))
 }
 
 fn preparing(status: Status) -> Bool {
@@ -1030,10 +1329,15 @@ fn resolved(
       let group = pending.ForOrigin(connection.origin)
       case answer, pending.first(state.pending, group) {
         _, Error(_) -> without
-        Error(error.DeadlineExceeded), _ -> without
+        Error(error.DeadlineExceeded), _ ->
+          fail_reason(without, group, error.ConnectTimeout)
         Error(reason), _ -> fail_reason(without, group, reason)
         Ok(target), Ok(p) -> {
-          case p.deadline <= bridge.now() {
+          let remaining = case p.deadline {
+            Some(at) -> at - bridge.now()
+            None -> state.config.connect_timeout
+          }
+          case remaining <= 0 {
             True -> without
             False ->
               case
@@ -1044,7 +1348,14 @@ fn resolved(
                   p.origin.tls,
                   state.config.protocol,
                   state.config.trust,
-                  int.min(state.config.connect_ms, p.deadline - bridge.now()),
+                  int.max(
+                    1,
+                    int.min(connection.connect_until - bridge.now(), remaining),
+                  ),
+                  case state.config.idle_timeout {
+                    settings.Within(ms) -> bridge.SendWithin(ms)
+                    settings.Unbounded -> bridge.SendUnbounded
+                  },
                   state.config.limits.header_count,
                 )
               {
@@ -1052,8 +1363,23 @@ fn resolved(
                   fail_reason(without, group, error.ConnectionFailed(cause))
                 Ok(connected) -> {
                   let _ = process.monitor(connected)
+                  // The connect timer follows the connection to its new pid.
+                  let _ =
+                    process.send_after(
+                      state.self,
+                      int.max(0, connection.connect_until - bridge.now()),
+                      ConnectExpired(connected),
+                    )
                   State(..without, connections: [
-                    Connection(connected, connection.origin, Connecting, 0),
+                    Connection(
+                      connected,
+                      connection.origin,
+                      Connecting,
+                      0,
+                      target.addresses,
+                      None,
+                      connection.connect_until,
+                    ),
                     ..without.connections
                   ])
                 }
@@ -1100,4 +1426,8 @@ fn checked(
         }
       }
   }
+}
+
+pub fn with_correlation(client: Client, correlation: Correlation) -> Client {
+  Client(..client, view: View(..client.view, correlation: Some(correlation)))
 }

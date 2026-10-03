@@ -1,12 +1,6 @@
-//// Controls a cassette recording started by `cassette.record`.
-////
-//// `Options` set the byte budget and whether an existing file may be replaced.
-//// `finish` publishes the file when no work is in flight; `finish_wait`
-//// refuses further requests and waits for publication. `abort` abandons
-//// the capture while the live client keeps working. Capture failures
-//// (`CaptureError`, `FinishError`) are separate from HTTP outcomes. Credential
-//// headers are omitted from what is written; bodies and queries are stored
-//// exactly.
+//// The recorder behind `cassette.record`: ordered reservations, one
+//// acknowledged writer, a byte budget, and atomic publication of a complete
+//// cassette. Redaction is applied before anything is written.
 
 import gleam/bit_array
 import gleam/dict.{type Dict}
@@ -21,12 +15,13 @@ import gleam/otp/actor
 import gleam/result
 import gleam/string
 import http_gun/error
-import http_gun/fixture
 import http_gun/internal/bridge
 import http_gun/internal/call
 import http_gun/internal/codec
 import http_gun/internal/file
 import http_gun/internal/observation as obs
+import http_gun/internal/script
+import http_gun/redaction.{type Redaction}
 
 pub type Replacement {
   RefuseExisting
@@ -34,18 +29,12 @@ pub type Replacement {
 }
 
 pub type Options {
-  Options(max_bytes: Int, replacement: Replacement)
-}
-
-/// Capture at most 16 MiB of encoded data and refuse replacing an existing file.
-/// Publication provides atomic visibility, without a power-loss durability guarantee.
-pub fn default() -> Options {
-  Options(16_777_216, RefuseExisting)
+  Options(max_bytes: Int, replacement: Replacement, redaction: Redaction)
 }
 
 pub type CaptureError {
   CaptureLimit
-  IoFailure(operation: error.FileOperation, cause: error.FileCause)
+  IoFailure(operation: file.Operation, cause: file.Cause)
   DestinationExists
   SessionClosed
   Interrupted
@@ -61,7 +50,6 @@ pub opaque type Recording {
   Recording(subject: process.Subject(Message), pid: process.Pid)
 }
 
-@internal
 pub opaque type Capture {
   Capture(recording: Recording, id: Int)
 }
@@ -69,6 +57,8 @@ pub opaque type Capture {
 type StreamState {
   AwaitHead
   Receiving(has_chunks: Bool)
+  /// The body is held until it ends, so the body redaction sees it whole.
+  Buffering(chunks: List(BitArray))
   Ended
 }
 
@@ -141,9 +131,9 @@ type Message {
   WaitExpired(reference.Reference)
   Abandon
   Abort(process.Subject(Result(Nil, CaptureError)))
+  Discard(process.Subject(Result(Nil, CaptureError)))
 }
 
-@internal
 pub fn start(
   destination: String,
   options: Options,
@@ -200,7 +190,6 @@ pub fn start(
   }
 }
 
-@internal
 pub fn reserve(
   recording: Recording,
   req: request.Request(BitArray),
@@ -208,7 +197,6 @@ pub fn reserve(
   call.with_failure(recording.subject, Reserve(req, _), Interrupted)
 }
 
-@internal
 pub fn write(
   capture: Capture,
   observation: obs.Observation,
@@ -217,12 +205,10 @@ pub fn write(
   process.send(capture.recording.subject, Write(capture.id, observation, ack))
 }
 
-@internal
 pub fn owner(capture: Capture) -> process.Pid {
   capture.recording.pid
 }
 
-@internal
 pub fn abandon(capture: Capture) -> Nil {
   process.send(capture.recording.subject, Abandon)
 }
@@ -309,6 +295,17 @@ fn handle(state: State, message: Message) -> actor.Next(State, Message) {
     Abort(reply) -> {
       process.send(reply, Ok(Nil))
       advance(break_session(state, Interrupted))
+    }
+    Discard(reply) -> {
+      let _ = break_session(state, Interrupted)
+      cleanup(Publication(
+        state.directory,
+        state.destination,
+        state.options,
+        state.count,
+      ))
+      process.send(reply, Ok(Nil))
+      actor.stop()
     }
     Finish(reply) -> finish_session(state, reply)
     FinishWait(until, reply) ->
@@ -401,10 +398,32 @@ fn append_observation(
           break_session(state, Interrupted)
         }
         Ok(stage) ->
-          case fragment(stage, event) {
+          case fragment(state.options.redaction, stage, event) {
             Error(failure) -> {
               ack(Error(failure))
               break_session(state, failure)
+            }
+            Ok(#("", stage)) -> {
+              // Buffered for the body redaction: nothing to write yet, but
+              // the bytes count against the budget.
+              let held = case event {
+                obs.Bytes(bytes) -> bit_array.byte_size(bytes)
+                _ -> 0
+              }
+              case state.bytes + held > state.options.max_bytes {
+                True -> {
+                  ack(Error(CaptureLimit))
+                  break_session(state, CaptureLimit)
+                }
+                False -> {
+                  ack(Ok(Nil))
+                  State(
+                    ..state,
+                    streams: dict.insert(state.streams, id, stage),
+                    bytes: state.bytes + held,
+                  )
+                }
+              }
             }
             Ok(#(text, stage)) ->
               case
@@ -439,19 +458,27 @@ fn append_observation(
 }
 
 fn fragment(
+  policy: Redaction,
   stage: StreamState,
   event: obs.Observation,
 ) -> Result(#(String, StreamState), CaptureError) {
   case stage, event {
     AwaitHead, obs.Head(status, headers) ->
-      Ok(#(
-        "{\"kind\":\"response\",\"status\":"
-          <> int.to_string(status)
-          <> ",\"headers\":"
-          <> json.to_string(codec.headers_json(headers))
-          <> ",\"chunks\":[",
-        Receiving(False),
-      ))
+      Ok(
+        #(
+          "{\"kind\":\"response\",\"status\":"
+            <> int.to_string(status)
+            <> ",\"headers\":"
+            <> json.to_string(
+            codec.headers_json(redaction.headers(policy, headers)),
+          )
+            <> ",\"chunks\":[",
+          case redaction.rewrites_bodies(policy) {
+            True -> Buffering([])
+            False -> Receiving(False)
+          },
+        ),
+      )
     Receiving(has_chunks), obs.Bytes(bytes) ->
       Ok(#(
         case has_chunks {
@@ -461,17 +488,34 @@ fn fragment(
           <> json.to_string(codec.bytes_json(bytes)),
         Receiving(True),
       ))
+    Buffering(chunks), obs.Bytes(bytes) ->
+      Ok(#("", Buffering([bytes, ..chunks])))
+    Buffering(chunks), _ -> {
+      let body = redaction.body(policy, bit_array.concat(list.reverse(chunks)))
+      let chunk = case bit_array.byte_size(body) {
+        0 -> ""
+        _ -> json.to_string(codec.bytes_json(body))
+      }
+      use #(ending, stage) <- result.try(fragment(
+        policy,
+        Receiving(False),
+        event,
+      ))
+      Ok(#(chunk <> ending, stage))
+    }
     Receiving(_), obs.Complete(headers) ->
       Ok(#(
         "],\"ending\":"
-          <> json.to_string(codec.ending_json(fixture.Complete(headers)))
+          <> json.to_string(
+          codec.ending_json(script.Finished(redaction.headers(policy, headers))),
+        )
           <> "}}",
         Ended,
       ))
     Receiving(_), obs.Failed(failure) -> {
-      let ending = case failure.reason {
-        error.Closed -> fixture.Cancelled
-        _ -> fixture.Failed(failure)
+      let ending = case error.reason(failure) {
+        error.Closed -> script.Abandoned
+        _ -> script.Aborted(failure)
       }
       Ok(#(
         "],\"ending\":" <> json.to_string(codec.ending_json(ending)) <> "}}",
@@ -480,7 +524,7 @@ fn fragment(
     }
     AwaitHead, obs.Failed(failure) ->
       Ok(#(
-        json.to_string(codec.reply_json(fixture.Reject(failure))) <> "}",
+        json.to_string(codec.reply_json(script.Reject(failure))) <> "}",
         Ended,
       ))
     _, _ -> Error(Interrupted)
@@ -640,7 +684,9 @@ fn publish(state: Publication) -> Result(Nil, CaptureError) {
   use Nil <- result.try(
     file.write_new(
       output,
-      bit_array.from_string("{\"http_gun\":1,\"exchanges\":["),
+      bit_array.from_string(
+        "{\"http_gun\":" <> int.to_string(codec.version) <> ",\"exchanges\":[",
+      ),
     )
     |> result.map_error(file_error),
   )
@@ -702,7 +748,7 @@ fn exchange_path(directory: String, id: Int) -> String {
 
 fn file_error(problem: file.FileError) -> CaptureError {
   case problem {
-    file.Io(error.PublishFixture, error.AlreadyExists) -> DestinationExists
+    file.Io(file.Publish, file.AlreadyExists) -> DestinationExists
     file.TooLarge -> CaptureLimit
     file.Io(operation, cause) -> IoFailure(operation, cause)
   }
@@ -714,7 +760,13 @@ pub fn abort(recording: Recording) -> Result(Nil, CaptureError) {
   call.with_failure(recording.subject, Abort, Interrupted)
 }
 
-@internal
 pub fn attach_client(recording: Recording, pid: process.Pid) -> Nil {
   process.send(recording.subject, AttachClient(pid))
+}
+
+/// Abandon a recording that never got a client, removing its staging
+/// directory.
+pub fn discard(recording: Recording) -> Nil {
+  let _ = call.with_failure(recording.subject, Discard, Interrupted)
+  Nil
 }

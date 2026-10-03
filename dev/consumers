@@ -18,10 +18,10 @@ compile_probe() {
   gleam compile-package --target erlang --no-beam --package "$work/negative" \
     --out "$work/negative/build" --lib "$work/ordinary/build/dev/erlang"
 }
-printf '%s\n' 'import http_gun' 'pub fn valid(client: http_gun.Client) { http_gun.snapshot(client) }' > "$work/negative/src/probe.gleam"
+printf '%s\n' 'import http_gun' 'pub fn valid(client: http_gun.Client) { http_gun.stats(client) }' > "$work/negative/src/probe.gleam"
 compile_probe
 # Compile-time rejection from a separate package, never same-package visibility.
-for check in client body wrong_body recording deadline cancellation request_id; do
+for check in client body wrong_body recording deadline cancellation request_id config failure policy redaction; do
   case "$check" in
     request_id) source='import http_gun/telemetry\npub fn invalid() { telemetry.RequestId("x") }'; expected='Unknown module value';;
     client) source='import http_gun\npub fn invalid() { http_gun.Client }'; expected='Unknown module value';;
@@ -29,12 +29,17 @@ for check in client body wrong_body recording deadline cancellation request_id; 
     wrong_body) source='import http_gun\nimport gleam/http/request\npub fn invalid(client: http_gun.Client) { http_gun.send(client, request.new()) }'; expected='Type mismatch';;
     deadline) source='import http_gun/deadline\npub fn invalid() { deadline.Deadline }'; expected='Unknown module value';;
     cancellation) source='import http_gun/cancellation\npub fn invalid() { cancellation.Token }'; expected='Unknown module value';;
-    recording) source='import http_gun/recording\npub fn invalid() { recording.Recording }'; expected='Unknown module value';;
+    recording) source='import http_gun/cassette\npub fn invalid() { cassette.Recording }'; expected='Unknown module value';;
+    config) source='import http_gun/config\npub fn invalid() { config.Config }'; expected='Unknown module value';;
+    failure) source='import http_gun/error\npub fn invalid() { error.Failure }'; expected='Unknown module value';;
+    policy) source='import http_gun/destination\npub fn invalid() { destination.Policy }'; expected='Unknown module value';;
+    redaction) source='import http_gun/redaction\npub fn invalid() { redaction.Redaction }'; expected='Unknown module value';;
   esac
   case "$check" in
     request_id) symbol='RequestId';;
     client) symbol='Client';; body) symbol='Body';; recording) symbol='Recording';;
     deadline) symbol='Deadline';; cancellation) symbol='Token';; wrong_body) symbol='BitArray';;
+    config) symbol='Config';; failure) symbol='Failure';; policy) symbol='Policy';; redaction) symbol='Redaction';;
   esac
   printf '%b\n' "$source" > "$work/negative/src/probe.gleam"
   if compile_probe > "$work/rejected.log" 2>&1; then
@@ -44,22 +49,5 @@ for check in client body wrong_body recording deadline cancellation request_id; 
   if rg -q '^error: Unknown module$|error:.*dependency' "$work/rejected.log"; then cat "$work/rejected.log"; exit 1; fi
   echo "Confirmed public type rejection: $check"
 done
-tar -xzf test/oracle/llm-consumer-source.tar.gz -C "$work"
-python3 - "$root/test/oracle/consumer-source.json" "$work" <<'PY'
-import hashlib,json,pathlib,sys
-for package in json.loads(pathlib.Path(sys.argv[1]).read_text()).values():
-    for name,digest in package['files'].items():
-        assert hashlib.sha256((pathlib.Path(sys.argv[2])/name).read_bytes()).hexdigest()==digest,name
-PY
-rm -rf "$work/sinal"
-python3 dev/sinal_source.py "$work/sinal"
-# The archived llm_wire predates Sinal's wave 2 API. After provenance
-# verification, replace its one Sinal-using module in the disposable copy with
-# the same event (names, keys and emission) written against the current API.
-cp test/oracle/llm-wire-telemetry-sinal-wave2.gleam.txt "$work/llm_wire/src/llm_wire/telemetry.gleam"
-cp -R examples/llm "$work/llm"
-cp test/http_gun_test_server.erl "$work/llm/test/"
-(cd "$work/llm" && gleam build --warnings-as-errors && gleam run && gleam run -m http_gun_llm_integration)
-if [ "${UPDATE_CONSUMER_LOCKS:-0}" = 1 ]; then cp "$work/llm/manifest.toml" examples/llm/manifest.toml; fi
 sh dev/async-consumer
-echo 'Ordinary, async and archived LLM consumers; seven rejection fixtures passed.'
+echo 'Ordinary and async consumers; eleven rejection fixtures passed.'

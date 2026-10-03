@@ -2,12 +2,9 @@ import gleam/dynamic.{type Dynamic}
 import gleam/erlang/process.{type Pid}
 import gleam/option
 import gleam/string
-import http_gun/config.{type Negotiated, type Protocol, type Trust}
 import http_gun/destination
 import http_gun/error
-
-@external(erlang, "http_gun_ffi", "parse_address")
-pub fn parse_address(host: String) -> Result(destination.Address, Nil)
+import http_gun/internal/settings.{type Negotiated, type Protocol, type Trust}
 
 pub fn unbracket(host: String) -> String {
   case string.starts_with(host, "[") && string.ends_with(host, "]") {
@@ -56,9 +53,16 @@ pub fn open(
   tls: Bool,
   protocol: Protocol,
   trust: Trust,
-  timeout: Int,
+  connect_timeout: Int,
+  send_timeout: SendTimeout,
   header_count: Int,
 ) -> Result(Pid, error.TransportCause)
+
+/// The socket write stall bound: the idle timeout, or none.
+pub type SendTimeout {
+  SendWithin(Int)
+  SendUnbounded
+}
 
 @external(erlang, "http_gun_ffi", "request")
 pub fn request(
@@ -103,3 +107,13 @@ pub fn exit_cause(reason: process.ExitReason) -> error.TransportCause {
 
 @external(erlang, "http_gun_ffi", "cause")
 fn transport_cause(value: Dynamic) -> error.TransportCause
+
+/// A shared, lock-free byte counter for one batch.
+pub type Counter
+
+@external(erlang, "http_gun_ffi", "counter_new")
+pub fn counter_new() -> Counter
+
+/// Add `amount` and return the new total.
+@external(erlang, "http_gun_ffi", "counter_add")
+pub fn counter_add(counter: Counter, amount: Int) -> Int

@@ -15,17 +15,19 @@ erlc -Werror -o "$work/ffi" examples/async/test/*.erl
 if [ "${UPDATE_CONSUMER_LOCKS:-0}" = 1 ]; then cp "$work/async/manifest.toml" "$root/examples/async/manifest.toml"; fi
 # Controlled fault at the OTP startup boundary in the DISPOSABLE source copy.
 # No production fault switch or VM resource exhaustion. Preserve the real error
-# mapping and scope wrapper, replacing only the actor.start result.
-python3 - "$work/http_gun/src/http_gun/cancellation.gleam" <<'PY'
+# mapping of http_gun.start, testing.playback, cassette.record and supervised,
+# replacing only the client process's actor.start result.
+python3 - "$work/http_gun/src/http_gun/internal/pool.gleam" <<'PY'
 from pathlib import Path
 import sys
 p = Path(sys.argv[1])
 s = p.read_text()
-assert s.count('|> actor.start') == 1
-s = s.replace('|> actor.start', '''|> fn(_builder) {
-      let failed: actor.StartResult(Token) = Error(actor.InitTimeout)
-      failed
-    }''')
+assert s.count('|> actor.start\n') == 1
+s = s.replace('|> actor.start\n', '''|> fn(_builder) {
+    let failed: actor.StartResult(Client) = Error(actor.InitTimeout)
+    failed
+  }
+''')
 p.write_text(s)
 PY
 (cd "$work/async" && ERL_FLAGS='+S 1:1' gleam run -m http_gun_async_startup_test)

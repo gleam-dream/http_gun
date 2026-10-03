@@ -8,11 +8,13 @@ import gleam/http/request
 import gleam/http/response
 import gleam/list
 import gleam/option.{type Option, None, Some}
-import http_gun/body
-import http_gun/cancellation
+import http_gun/destination
 import http_gun/error.{type Failure}
-import http_gun/recording
-import http_gun/telemetry
+import http_gun/internal/lifecycle
+import http_gun/internal/owner
+import http_gun/internal/recorder
+import http_gun/internal/settings
+import http_gun/internal/token
 
 pub type Origin {
   Origin(host: String, port: Int, tls: Bool)
@@ -23,21 +25,27 @@ pub type Group {
   Session
 }
 
+/// One request waiting for admission. The request is held in a closure, so
+/// a crash report of the pool prints a function reference instead of its
+/// headers and body.
 pub type Pending {
   Pending(
     id: Reference,
     owner: process.Pid,
-    request: request.Request(BitArray),
+    request: fn() -> request.Request(BitArray),
     origin: Origin,
-    reply: process.Subject(Result(response.Response(body.Body), Failure)),
-    deadline: Int,
+    reply: fn(Result(response.Response(owner.Body), Failure)) -> Nil,
+    deadline: Option(Int),
+    pool_until: Int,
+    idle: settings.Bound,
+    policies: List(destination.Policy),
     monitor: process.Monitor,
     timer: process.Timer,
     reservation: Option(process.Pid),
-    capture: Option(recording.Capture),
-    cancellation: Option(cancellation.Token),
+    capture: Option(recorder.Capture),
+    cancellation: Option(token.Token),
     cancel_monitor: Option(process.Monitor),
-    observation: Option(telemetry.Context),
+    observation: lifecycle.Context,
   )
 }
 

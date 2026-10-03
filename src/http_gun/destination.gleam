@@ -1,22 +1,44 @@
-//// Decides which network addresses a client may connect to.
+//// Decides which hosts, ports and network addresses a client may reach.
 ////
-//// A `Policy` is the `destination` field of `config.Config`. The default admits
-//// public addresses only. Set `allow_loopback` or `allow_private` to admit local
-//// or private networks. Reserved addresses, including cloud metadata addresses,
-//// are always refused. `allowed_hosts` restricts exact host names, not ports.
-//// Every resolved address of a new connection is checked before connecting. A
-//// custom `Resolver` replaces DNS lookup, for example in tests. `classify`
-//// reports the class of an address.
+//// A `Policy` admits public addresses by default. The three setups that tests
+//// and local services need are each one line:
+////
+//// ```gleam
+//// // Public addresses and loopback.
+//// config.default() |> config.allow_loopback
+//// // Loopback only.
+//// config.default() |> config.with_destination(destination.loopback_only())
+//// // Loopback, pinned to one local server.
+//// config.default()
+//// |> config.with_destination(
+////   destination.loopback_only() |> destination.only_hosts(["127.0.0.1:8080"]),
+//// )
+//// ```
+////
+//// `allow_private` admits private networks. Reserved addresses, including
+//// cloud metadata addresses, are always refused. Every address that a host
+//// name resolves to is checked before a connection opens, and the connection
+//// uses that checked address.
+////
+//// `http_gun.with_destination` narrows the policy for one client view: a
+//// request must satisfy both the client's policy and every policy its view
+//// adds, so a view can never widen what the client admits. `check` applies a
+//// policy to a host and port without resolving names, for an application
+//// that validates URLs itself.
 
+import gleam/int
 import gleam/list
 import gleam/option.{type Option, None, Some}
+import gleam/result
 import gleam/string
 
+/// An IP address. `parse_address` reads one from text.
 pub type Address {
   Ipv4(Int, Int, Int, Int)
   Ipv6(Int, Int, Int, Int, Int, Int, Int, Int)
 }
 
+/// The class of an address, as `classify` reports it.
 pub type Class {
   Public
   Loopback
@@ -24,64 +46,201 @@ pub type Class {
   Reserved
 }
 
-/// Called once per new hostname connection, in an isolated worker. The supplied
-/// milliseconds are the remaining request budget. Return the complete A/AAAA
-/// answer; every address is checked. Exceptions and empty answers fail closed.
-pub type Resolver =
-  fn(String, Int) -> Result(List(Address), Nil)
+/// Why a policy refused a destination.
+pub type Rejection {
+  /// The host, or its port, is not in the `only_hosts` list.
+  HostNotAllowed
+  /// The host is, or resolved to, an address whose class the policy refuses.
+  AddressRefused(Class)
+}
 
-pub type Policy {
+/// Which destinations a client admits. Build one with `default` or
+/// `loopback_only` and the functions below.
+pub opaque type Policy {
   Policy(
     allow_public: Bool,
     allow_loopback: Bool,
     allow_private: Bool,
-    allowed_hosts: Option(List(String)),
-    resolver: Option(Resolver),
+    allowed: Option(List(String)),
   )
 }
 
+/// Public addresses only.
 pub fn default() -> Policy {
-  Policy(True, False, False, None, None)
+  Policy(
+    allow_public: True,
+    allow_loopback: False,
+    allow_private: False,
+    allowed: None,
+  )
 }
 
-@internal
-pub fn valid(policy: Policy) -> Bool {
-  case policy.allowed_hosts {
-    None -> True
+/// Loopback addresses only (127.0.0.0/8 and ::1): public, private and
+/// reserved addresses are refused.
+pub fn loopback_only() -> Policy {
+  Policy(
+    allow_public: False,
+    allow_loopback: True,
+    allow_private: False,
+    allowed: None,
+  )
+}
+
+/// Also admit loopback addresses.
+pub fn allow_loopback(policy: Policy) -> Policy {
+  Policy(..policy, allow_loopback: True)
+}
+
+/// Also admit private network addresses: 10.0.0.0/8, 172.16.0.0/12,
+/// 192.168.0.0/16, 100.64.0.0/10 and fc00::/7.
+pub fn allow_private(policy: Policy) -> Policy {
+  Policy(..policy, allow_private: True)
+}
+
+/// Admit only these hosts, compared without case. An entry is `"host"`, which
+/// admits every port, or `"host:port"`, which admits one port; write an IPv6
+/// address with a port as `"[::1]:8080"`. Address classes still apply, so
+/// `loopback_only() |> only_hosts(["127.0.0.1:8080"])` admits exactly one
+/// local server. Calling it again replaces the list.
+pub fn only_hosts(policy: Policy, hosts: List(String)) -> Policy {
+  Policy(..policy, allowed: Some(list.map(hosts, string.lowercase)))
+}
+
+/// Return the first malformed `only_hosts` entry: empty, containing
+/// whitespace, `/`, `?`, `#` or `@`, or with a port outside 1..65535. A
+/// malformed entry never matches a request; `config.validate` and
+/// `http_gun.start` report it.
+pub fn validate(policy: Policy) -> Result(Policy, String) {
+  case policy.allowed {
+    None -> Ok(policy)
     Some(hosts) ->
-      list.all(hosts, fn(host) {
-        host != ""
-        && !list.any(
-          [" ", "\t", "\r", "\n", "\u{0}", "/", "?", "#", "@"],
-          fn(c) { string.contains(host, c) },
-        )
-      })
+      case list.find(hosts, fn(entry) { result.is_error(parse_entry(entry)) }) {
+        Ok(bad) -> Error(bad)
+        Error(Nil) -> Ok(policy)
+      }
   }
 }
 
-@internal
-pub fn permits_host(policy: Policy, host: String) -> Bool {
-  case policy.allowed_hosts {
-    None -> True
-    Some(hosts) ->
-      list.any(hosts, fn(allowed) {
-        string.lowercase(allowed) == string.lowercase(host)
-      })
+/// Check a host and port against the policy without resolving names. A host
+/// that is an IP literal (with or without brackets) is also classified;
+/// a host name passes when the host list admits it, and its resolved
+/// addresses are checked again when a client connects.
+pub fn check(
+  policy: Policy,
+  host: String,
+  port: Int,
+) -> Result(Nil, Rejection) {
+  let host = string.lowercase(unbracket(host))
+  use Nil <- result.try(check_host(policy, host, port))
+  case parse_address(host) {
+    Ok(address) -> check_address(policy, address)
+    Error(Nil) -> Ok(Nil)
   }
 }
 
-@internal
-pub fn permits(policy: Policy, address: Address) -> Bool {
-  case classify(address) {
+/// Check one resolved address against the policy's address classes.
+pub fn check_address(
+  policy: Policy,
+  address: Address,
+) -> Result(Nil, Rejection) {
+  let class = classify(address)
+  let permitted = case class {
     Public -> policy.allow_public
     Loopback -> policy.allow_loopback
     Private -> policy.allow_private
     Reserved -> False
   }
+  case permitted {
+    True -> Ok(Nil)
+    False -> Error(AddressRefused(class))
+  }
 }
 
-/// Invalid integer components fail closed as Reserved. IPv4-mapped and the
-/// well-known NAT64 prefix inherit the embedded IPv4 classification.
+fn check_host(
+  policy: Policy,
+  host: String,
+  port: Int,
+) -> Result(Nil, Rejection) {
+  case policy.allowed {
+    None -> Ok(Nil)
+    Some(entries) ->
+      case
+        list.any(entries, fn(entry) {
+          case parse_entry(entry) {
+            Ok(#(name, None)) -> name == host
+            Ok(#(name, Some(allowed))) -> name == host && allowed == port
+            Error(Nil) -> False
+          }
+        })
+      {
+        True -> Ok(Nil)
+        False -> Error(HostNotAllowed)
+      }
+  }
+}
+
+// "host", "host:port", "[v6]" or "[v6]:port". A bare IPv6 literal has
+// several colons and no port.
+fn parse_entry(entry: String) -> Result(#(String, Option(Int)), Nil) {
+  use Nil <- result.try(
+    case
+      entry != ""
+      && !list.any(
+        [" ", "\t", "\r", "\n", "\u{0}", "/", "?", "#", "@"],
+        string.contains(entry, _),
+      )
+    {
+      True -> Ok(Nil)
+      False -> Error(Nil)
+    },
+  )
+  case string.starts_with(entry, "[") {
+    True ->
+      case string.split_once(string.drop_start(entry, 1), "]") {
+        Ok(#(host, "")) if host != "" -> Ok(#(host, None))
+        Ok(#(host, ":" <> port)) if host != "" ->
+          result.map(parse_port(port), fn(port) { #(host, Some(port)) })
+        _ -> Error(Nil)
+      }
+    False ->
+      case string.split(entry, ":") {
+        [host] -> Ok(#(host, None))
+        [host, port] if host != "" ->
+          result.map(parse_port(port), fn(port) { #(host, Some(port)) })
+        _ ->
+          case parse_address(entry) {
+            Ok(Ipv6(..)) -> Ok(#(entry, None))
+            _ -> Error(Nil)
+          }
+      }
+  }
+}
+
+fn parse_port(text: String) -> Result(Int, Nil) {
+  case int.parse(text) {
+    Ok(port) if port >= 1 && port <= 65_535 -> Ok(port)
+    _ -> Error(Nil)
+  }
+}
+
+fn unbracket(host: String) -> String {
+  case string.starts_with(host, "[") && string.ends_with(host, "]") {
+    True -> host |> string.drop_start(1) |> string.drop_end(1)
+    False -> host
+  }
+}
+
+/// Parse an IPv4 or IPv6 literal, as `"127.0.0.1"` or `"::1"`.
+pub fn parse_address(text: String) -> Result(Address, Nil) {
+  parse_strict(text)
+}
+
+@external(erlang, "http_gun_ffi", "parse_address")
+fn parse_strict(text: String) -> Result(Address, Nil)
+
+/// Classify an address. Invalid components fail closed as `Reserved`.
+/// IPv4-mapped and well-known NAT64 IPv6 addresses inherit the embedded IPv4
+/// classification.
 pub fn classify(address: Address) -> Class {
   let #(parts, maximum) = case address {
     Ipv4(a, b, c, d) -> #([a, b, c, d], 255)

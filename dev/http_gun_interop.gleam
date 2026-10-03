@@ -8,6 +8,7 @@ import gleam/int
 import gleam/io
 import gleam/json
 import gleam/list
+import gleam/option.{Some}
 import gleam/result
 import http_gun
 import http_gun/body
@@ -143,7 +144,7 @@ fn concurrent(
 }
 
 fn drain(stream: body.Body, bytes: Int) -> Int {
-  let assert Ok(part) = body.next(stream, 5000)
+  let assert Ok(part) = body.next(stream)
   case part {
     body.Chunk(chunk) -> drain(stream, bytes + bit_array.byte_size(chunk))
     body.End(trailers) -> {
@@ -158,7 +159,7 @@ fn mixed(client: http_gun.Client, port: Int) -> Nil {
   let start = now()
   let assert Ok(slow) = http_gun.open(client, req(port, "/large"))
   let assert config.H2 = body.protocol(slow.body)
-  let assert Ok(body.Chunk(_)) = body.next(slow.body, 1000)
+  let assert Ok(Some(body.Chunk(_))) = body.next_within(slow.body, 1000)
   // No further demand on the large stream while 1000 siblings finish.
   let assert Ok(replies) =
     http_gun.batch(client, list.repeat(req(port, "/bytes"), 1000), 32)
@@ -167,10 +168,10 @@ fn mixed(client: http_gun.Client, port: Int) -> Nil {
     check(reply)
   })
   let cancel = now()
-  let assert Ok(Nil) = body.close(slow.body)
-  let assert Ok(stats) = http_gun.snapshot(client)
+  body.close(slow.body)
+  let assert Ok(stats) = http_gun.stats(client)
   let assert 1 = stats.connections
-  let assert 0 = stats.bodies
+  let assert 0 = stats.open_bodies
   report(
     "nghttpd-slow-stream-plus-batch",
     1000,
@@ -182,12 +183,12 @@ fn mixed(client: http_gun.Client, port: Int) -> Nil {
   // A second cancellation while a sibling is itself still being streamed.
   let assert Ok(cancelled) = http_gun.open(client, req(port, "/large"))
   let assert Ok(sibling) = http_gun.open(client, req(port, "/large"))
-  let assert Ok(Nil) = body.close(cancelled.body)
+  body.close(cancelled.body)
   let sample = sampler()
   let start = now()
   let bytes = drain(sibling.body, 0)
   let assert 33_554_432 = bytes
-  let assert Ok(Nil) = body.close(sibling.body)
+  body.close(sibling.body)
   report("nghttpd-large-surviving-sibling", 1, start, [], sample, bytes)
 }
 
@@ -216,22 +217,15 @@ fn steady(
 pub fn main() -> Nil {
   let port = read_int("build/evidence/nghttpd/port")
   let duration = read_int("build/evidence/nghttpd/duration")
-  let defaults = local_config()
   let assert Ok(client) =
-    http_gun.start(
-      config.Config(
-        ..defaults,
-        protocol: config.RequireHttp2,
-        trust: config.CustomCa("test/fixtures/ca.crt"),
-        deadline_ms: 60_000,
-        limits: config.Limits(
-          ..defaults.limits,
-          connections: 1,
-          per_origin: 1,
-          waiting: 1024,
-        ),
-      ),
-    )
+    local_config()
+    |> config.with_protocol(config.RequireHttp2)
+    |> config.with_trust(config.CustomCa("test/fixtures/ca.crt"))
+    |> config.with_request_timeout(config.Milliseconds(60_000))
+    |> config.with_max_connections(1)
+    |> config.with_max_connections_per_origin(1)
+    |> config.with_max_queued_requests(1024)
+    |> http_gun.start
   let sample = sampler()
   let start = now()
   let assert Ok(cold) = http_gun.send(client, req(port, "/bytes"))
@@ -262,12 +256,11 @@ pub fn main() -> Nil {
       report("nghttpd-steady", count, start, [], sample, count * 256)
     }
   }
-  let assert Ok(stats) = http_gun.snapshot(client)
+  let assert Ok(stats) = http_gun.stats(client)
   let assert 1 = stats.connections
-  let assert 0 = stats.bodies
-  let assert 0 = stats.waiting
-  let assert Ok(Nil) = http_gun.stop(client)
-  Nil
+  let assert 0 = stats.open_bodies
+  let assert 0 = stats.queued_requests
+  http_gun.stop(client)
 }
 
 // These exercises connect only to explicitly permitted local test servers.

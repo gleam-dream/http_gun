@@ -1,7 +1,0 @@
-{
-  "revision": "a1ad984a9249389988bbc936a9af71002419fe79",
-  "path": "examples/llm/src/http_gun_llm_consumer.gleam",
-  "sha256": "8700e7b903c0cf9829f3592a1ef1c769f1ad331c8ef6d95c7168ef05ebaad31c",
-  "use": "adapted public provider-encoding/reducer consumer only; no HTTP Gun production source",
-  "license": "Apache-2.0"
-}

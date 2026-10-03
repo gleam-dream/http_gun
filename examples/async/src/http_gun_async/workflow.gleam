@@ -1,91 +1,106 @@
 //// Ordinary REST and streaming workflows using public HTTP Gun imports.
+////
+//// Per-call settings are client views: each `http_gun.with_*` returns a new
+//// handle over the same pool, so one shared client serves short REST calls,
+//// long downloads and grouped requests alike.
 
 import gleam/bit_array
+import gleam/http
 import gleam/http/request
-import gleam/int
-import gleam/option.{Some}
 import gleam/result
 import http_gun
 import http_gun/body
-import http_gun/cancellation
 import http_gun/config
 import http_gun/deadline
 import http_gun/error
-import http_gun/request_options
 
 pub type AppError {
   Http(error.Failure)
 }
 
+/// One REST call bounded at 2 s, retried at most twice when HTTP Gun says a
+/// retry is safe. HTTP Gun itself never retries: `is_retryable` admits a
+/// failure that may have reached the server only for an idempotent method.
 pub fn rest(
   client: http_gun.Client,
   req: request.Request(BitArray),
 ) -> Result(http_gun.Buffered, error.Failure) {
-  use budget <- result.try(deadline.after(2000))
-  http_gun.send_with_options(
-    client,
-    req,
-    request_options.Options(..request_options.default(), deadline: Some(budget)),
-  )
+  let client = client |> http_gun.with_timeout(config.Milliseconds(2000))
+  attempt(client, req, 2)
 }
 
-// An estimate taken now, not a reservation. The actual HTTP call recomputes it.
-pub fn estimate(client: http_gun.Client, budget: deadline.Deadline) -> Int {
-  int.min(http_gun.request_ceiling_ms(client), deadline.remaining_ms(budget))
+fn attempt(
+  client: http_gun.Client,
+  req: request.Request(BitArray),
+  retries: Int,
+) -> Result(http_gun.Buffered, error.Failure) {
+  case http_gun.send(client, req) {
+    Ok(reply) -> Ok(reply)
+    Error(failure) ->
+      case
+        retries > 0 && error.is_retryable(failure, idempotent: idempotent(req))
+      {
+        True -> attempt(client, req, retries - 1)
+        False -> Error(failure)
+      }
+  }
 }
 
-// Applications deliberately choose a finite longer ceiling at startup.
-pub fn start_downloads() -> Result(http_gun.Client, error.Failure) {
-  http_gun.start(config.Config(..config.default(), deadline_ms: 300_000))
+fn idempotent(req: request.Request(BitArray)) -> Bool {
+  case req.method {
+    http.Get | http.Head | http.Put | http.Delete | http.Options -> True
+    _ -> False
+  }
 }
 
+/// A long download on the shared client: the view replaces the client's
+/// request timeout with a deliberately chosen, longer finite one.
+/// `with_response` closes the body on every path and maps an opening failure
+/// into the application's error type.
 pub fn download(
   client: http_gun.Client,
   req: request.Request(BitArray),
 ) -> Result(Int, AppError) {
-  use budget <- result.try(deadline.after(300_000) |> result.map_error(Http))
-  cancellation.try_with_token(Http, fn(token) {
-    http_gun.try_with_response_with_options(
-      client,
-      req,
-      request_options.Options(
-        ..request_options.default(),
-        deadline: Some(budget),
-        cancellation: Some(token),
-      ),
-      Http,
-      fn(reply) { count(reply.body, 0) },
-    )
-  })
+  let client = client |> http_gun.with_timeout(config.Milliseconds(300_000))
+  use reply <- http_gun.with_response(client, req, Http)
+  count(reply.body, 0)
 }
 
 fn count(source: body.Body, total: Int) -> Result(Int, AppError) {
-  use event <- result.try(body.next(source, 1000) |> result.map_error(Http))
+  // `next` waits for bytes; the request and idle timeouts bound the wait.
+  use event <- result.try(body.next(source) |> result.map_error(Http))
   case event {
     body.End(_) -> Ok(total)
     body.Chunk(bytes) -> count(source, total + bit_array.byte_size(bytes))
   }
 }
 
+/// Two requests that share one 2 s budget: the second gets what the first
+/// left over.
 pub fn rest_pair(
   client: http_gun.Client,
   first: request.Request(BitArray),
   second: request.Request(BitArray),
 ) -> Result(#(http_gun.Buffered, http_gun.Buffered), AppError) {
-  cancellation.try_with_token(Http, fn(token) {
-    let options =
-      request_options.Options(
-        ..request_options.default(),
-        cancellation: Some(token),
-      )
-    use one <- result.try(
-      http_gun.send_with_options(client, first, options)
-      |> result.map_error(Http),
-    )
-    use two <- result.try(
-      http_gun.send_with_options(client, second, options)
-      |> result.map_error(Http),
-    )
-    Ok(#(one, two))
-  })
+  let client = client |> http_gun.with_deadline(deadline.after(2000))
+  use one <- result.try(http_gun.send(client, first) |> result.map_error(Http))
+  use two <- result.try(http_gun.send(client, second) |> result.map_error(Http))
+  Ok(#(one, two))
+}
+
+/// What the application does about a failure, from its closed `Kind`. The
+/// match is exhaustive and keeps compiling across HTTP Gun minor releases.
+pub fn advice(problem: AppError) -> String {
+  let Http(failure) = problem
+  case error.kind(failure) {
+    error.InvalidInput -> "fix the request"
+    error.Refused -> "the destination policy refused the host"
+    error.Unavailable -> "the client is busy or restarting; try again later"
+    error.Network -> "the network failed"
+    error.TimedOut -> "the server was too slow"
+    error.TooLarge -> "the response was larger than allowed"
+    error.CancelledLocally -> "the request was cancelled here"
+    error.Misuse -> "the body was read from the wrong process"
+    error.Playback -> "no scripted exchange matched"
+  }
 }

@@ -1,9 +1,12 @@
 %% Narrow transport/runtime boundary. No client state or server loops.
 -module(http_gun_ffi).
--export([start/0, open/8, request/5, credit/3, cancel/2, close/1, now/0, scoped/2, decode/1]).
+-export([start/0, open/9, request/5, credit/3, cancel/2, close/1, now/0, scoped/2, decode/1]).
 -export([on_exception/2, cause/1]).
 -export([parse_address/1, lookup/3]).
 -export([reusable/1]).
+-export([counter_new/0, counter_add/2]).
+counter_new() -> atomics:new(1, [{signed, true}]).
+counter_add(Ref, Amount) -> atomics:add_get(Ref, 1, Amount).
 reusable(Pid) ->
     try gun:info(Pid) of
         #{state_name := connected, protocol := http} -> true;
@@ -29,8 +32,9 @@ lookup(Host, Family, Timeout) ->
     end.
 ip({ipv4,A,B,C,D}) -> {A,B,C,D};
 ip({ipv6,A,B,C,D,E,F,G,H}) -> {A,B,C,D,E,F,G,H}.
-open(Address, ServerName, Port, Tls, Protocol, Trust, Timeout, HeaderCount) ->
+open(Address, ServerName, Port, Tls, Protocol, Trust, Timeout, SendTimeout, HeaderCount) ->
     try
+        Send = case SendTimeout of {send_within, Ms} -> Ms; send_unbounded -> infinity end,
         Protocols = case {Tls, Protocol} of
             {true, require_http2} -> [http2, http];
             {false, require_http2} -> [http2];
@@ -39,7 +43,7 @@ open(Address, ServerName, Port, Tls, Protocol, Trust, Timeout, HeaderCount) ->
         end,
         Base = #{retry => 0, protocols => Protocols, connect_timeout => Timeout,
             domain_lookup_timeout => Timeout, tls_handshake_timeout => Timeout,
-            tcp_opts => [{send_timeout, Timeout}, {send_timeout_close, true}],
+            tcp_opts => [{send_timeout, Send}, {send_timeout_close, true}],
             http_opts => #{flow => 1, max_headers => HeaderCount},
             http2_opts => #{flow => 1, notify_settings_changed => true,
                 %% HPACK includes :status; application header counts do not.
@@ -59,7 +63,7 @@ open(Address, ServerName, Port, Tls, Protocol, Trust, Timeout, HeaderCount) ->
                     {some, Host} -> [{server_name_indication, binary_to_list(Host)}]
                 end,
                 Base#{transport => tls, tls_opts => [Ca, {verify, verify_peer},
-                    {send_timeout, Timeout}, {send_timeout_close, true},
+                    {send_timeout, Send}, {send_timeout_close, true},
                     {customize_hostname_check, [{match_fun, public_key:pkix_verify_hostname_match_fun(https)}]} | Name]}
         end,
         case gun:open(ip(Address), Port, Options) of

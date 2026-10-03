@@ -2,6 +2,7 @@ import gleam/erlang/process
 import gleam/http
 import gleam/http/request
 import gleam/http/response
+import gleam/list
 import gleam/option.{Some}
 import gleeunit/should
 import http_gun
@@ -10,123 +11,97 @@ import http_gun/cancellation
 import http_gun/config
 import http_gun/deadline
 import http_gun/error
-import http_gun/fixture
-import http_gun/request_options
 import http_gun/testing
 
 pub fn expired_deadline_refuses_before_submission_test() {
   let assert Ok(client) = http_gun.start(local_config())
-  let assert Ok(budget) = deadline.after(0)
-  let options =
-    request_options.Options(..request_options.default(), deadline: Some(budget))
+  let budget = deadline.after(0)
   let req =
     request.new() |> request.set_host("localhost") |> request.set_body(<<>>)
-  let assert Error(failure) = http_gun.send_with_options(client, req, options)
-  failure
-  |> should.equal(error.Failure(error.DeadlineExceeded, error.NotSubmitted))
-  let assert Ok(stats) = http_gun.snapshot(client)
+  let assert Error(failure) =
+    http_gun.send(client |> http_gun.with_deadline(budget), req)
+  failure |> should.equal(error.new(error.DeadlineExceeded, error.NotSent))
+  let assert Ok(stats) = http_gun.stats(client)
   stats.connections |> should.equal(0)
-  let _ = http_gun.stop(client)
+  http_gun.stop(client)
 }
 
 pub fn cancelled_token_refuses_fresh_work_test() {
   let assert Ok(client) = http_gun.start(local_config())
-  let assert Ok(Nil) =
-    cancellation.with_token(fn(token) {
-      cancellation.cancel(token)
-      cancellation.cancel(token)
-      let options =
-        request_options.Options(
-          ..request_options.default(),
-          cancellation: Some(token),
-        )
-      let req =
-        request.new() |> request.set_host("localhost") |> request.set_body(<<>>)
-      http_gun.send_with_options(client, req, options)
-      |> should.equal(Error(error.Failure(error.Cancelled, error.NotSubmitted)))
-    })
-  let assert Ok(stats) = http_gun.snapshot(client)
+  cancellation.with_token(fn(token) {
+    cancellation.cancel(token)
+    cancellation.cancel(token)
+    cancellation.is_cancelled(token) |> should.be_true
+    let req =
+      request.new() |> request.set_host("localhost") |> request.set_body(<<>>)
+    http_gun.send(client |> http_gun.with_cancellation(token), req)
+    |> should.equal(Error(error.new(error.Cancelled, error.NotSent)))
+  })
+  let assert Ok(stats) = http_gun.stats(client)
   stats.connections |> should.equal(0)
-  let _ = http_gun.stop(client)
+  http_gun.stop(client)
 }
 
-fn oversized_script() -> #(request.Request(BitArray), fixture.Exchange) {
+fn oversized_script() -> #(request.Request(BitArray), testing.Exchange) {
   let req = request.new() |> request.set_body(<<>>)
   let reply =
     response.new(200)
     |> response.set_header("x-receipt", "accepted")
     |> response.set_body([<<"abc":utf8>>, <<"def":utf8>>])
-  #(req, fixture.Exchange(req, fixture.Respond(reply, fixture.Complete([]))))
+  #(req, testing.exchange(req, testing.Respond(reply, testing.Finished([]))))
 }
 
 pub fn truncate_overflow_keeps_status_and_headers_test() {
   let #(req, exchange) = oversized_script()
-  let assert Ok(client) = testing.start(config.default(), [exchange])
-  let options =
-    request_options.Options(
-      ..request_options.default(),
-      collect: Some(request_options.Collect(4, request_options.Truncate)),
-    )
-  let assert Ok(buffered) = http_gun.send_with_options(client, req, options)
+  let assert Ok(client) = playback([exchange], config.default())
+  let assert Ok(buffered) =
+    http_gun.send(client |> http_gun.with_body_limit(4, http_gun.Truncate), req)
   buffered.response.status |> should.equal(200)
   response.get_header(buffered.response, "x-receipt")
   |> should.equal(Ok("accepted"))
   buffered.response.body |> should.equal(<<"abcd":utf8>>)
   buffered.truncated |> should.be_true
   buffered.trailers |> should.equal([])
-  let _ = http_gun.stop(client)
+  http_gun.stop(client)
 }
 
 pub fn per_request_collect_limit_replaces_client_limit_test() {
   let #(req, exchange) = oversized_script()
-  let assert Ok(client) = testing.start(config.default(), [exchange, exchange])
-  let narrow =
-    request_options.Options(
-      ..request_options.default(),
-      collect: Some(request_options.Collect(5, request_options.Fail)),
+  let assert Ok(client) = playback([exchange, exchange], config.default())
+  // An oversized collected body fails with the response status.
+  http_gun.send(client |> http_gun.with_body_limit(5, http_gun.Fail), req)
+  |> should.equal(Error(
+    error.new(
+      error.LimitExceeded(error.ResponseBodyBytes, 5, 6),
+      error.MaybeSent,
     )
-  http_gun.send_with_options(client, req, narrow)
-  |> should.equal(
-    Error(error.Failure(
-      error.LimitExceeded(error.CollectedBodyBytes, 5, 6),
-      error.MayHaveBeenSent,
-    )),
-  )
-  let wide =
-    request_options.Options(
-      ..request_options.default(),
-      collect: Some(request_options.Collect(6, request_options.Truncate)),
-    )
-  let assert Ok(buffered) = http_gun.send_with_options(client, req, wide)
+    |> error.with_status(200),
+  ))
+  let wide = fn(client) {
+    client |> http_gun.with_body_limit(6, http_gun.Truncate)
+  }
+  let assert Ok(buffered) = http_gun.send(wide(client), req)
   buffered.response.body |> should.equal(<<"abcdef":utf8>>)
   buffered.truncated |> should.be_false
-  let _ = http_gun.stop(client)
-  let settings = config.default()
-  let settings =
-    config.Config(
-      ..settings,
-      limits: config.Limits(..settings.limits, collect_bytes: 2),
-    )
-  let assert Ok(client) = testing.start(settings, [exchange])
-  let assert Ok(buffered) = http_gun.send_with_options(client, req, wide)
+  http_gun.stop(client)
+  let settings = config.default() |> config.with_max_response_body_bytes(2)
+  let assert Ok(client) = playback([exchange], settings)
+  let assert Ok(buffered) = http_gun.send(wide(client), req)
   buffered.response.body |> should.equal(<<"abcdef":utf8>>)
-  let _ = http_gun.stop(client)
+  http_gun.stop(client)
 }
 
 pub fn negative_collect_limit_is_rejected_before_submission_test() {
   let #(req, exchange) = oversized_script()
-  let assert Ok(client) = testing.start(config.default(), [exchange])
-  let options =
-    request_options.Options(
-      ..request_options.default(),
-      collect: Some(request_options.Collect(-1, request_options.Truncate)),
-    )
-  let assert Error(error.Failure(error.InvalidRequest(_), error.NotSubmitted)) =
-    http_gun.send_with_options(client, req, options)
+  let assert Ok(client) = playback([exchange], config.default())
+  http_gun.send(client |> http_gun.with_body_limit(-1, http_gun.Truncate), req)
+  |> should.equal(
+    Error(error.new(error.InvalidRequest(error.InvalidBodyLimit), error.NotSent)),
+  )
   let assert Ok(buffered) = http_gun.send(client, req)
   buffered.response.body |> should.equal(<<"abcdef":utf8>>)
   buffered.truncated |> should.be_false
-  let _ = http_gun.stop(client)
+  http_gun.stop(client)
 }
 
 @external(erlang, "http_gun_test_server", "gated")
@@ -151,30 +126,21 @@ pub fn token_cancels_before_headers_without_killing_caller_test() {
   let assert Ok(client) = http_gun.start(local_config())
   let result = process.new_subject()
   let alive = process.new_subject()
-  let assert Ok(Nil) =
-    cancellation.with_token(fn(token) {
-      let options =
-        request_options.Options(
-          ..request_options.default(),
-          cancellation: Some(token),
-        )
-      let _ =
-        process.spawn_unlinked(fn() {
-          process.send(
-            result,
-            http_gun.open_with_options(client, req(port), options),
-          )
-          process.send(alive, Nil)
-        })
-      await_request(server)
-      cancellation.cancel(token)
-      let assert Ok(Error(failure)) = process.receive(result, 1000)
-      failure
-      |> should.equal(error.Failure(error.Cancelled, error.MayHaveBeenSent))
-      process.receive(alive, 1000) |> should.equal(Ok(Nil))
-      closed(server) |> should.be_true
-    })
-  let _ = http_gun.stop(client)
+  cancellation.with_token(fn(token) {
+    let view = client |> http_gun.with_cancellation(token)
+    let _ =
+      process.spawn_unlinked(fn() {
+        process.send(result, http_gun.open(view, req(port)))
+        process.send(alive, Nil)
+      })
+    await_request(server)
+    cancellation.cancel(token)
+    let assert Ok(Error(failure)) = process.receive(result, 1000)
+    failure |> should.equal(error.new(error.Cancelled, error.MaybeSent))
+    process.receive(alive, 1000) |> should.equal(Ok(Nil))
+    closed(server) |> should.be_true
+  })
+  http_gun.stop(client)
 }
 
 @external(erlang, "http_gun_test_server", "controlled")
@@ -182,42 +148,30 @@ fn controlled() -> #(Int, process.Pid)
 
 pub fn queued_cancellation_removes_waiter_without_submission_test() {
   let #(port, server) = controlled()
-  let c = local_config()
   let assert Ok(client) =
-    http_gun.start(
-      config.Config(..c, limits: config.Limits(..c.limits, active: 1)),
-    )
+    http_gun.start(local_config() |> config.with_max_open_bodies(1))
   let assert Ok(held) = http_gun.open(client, req(port))
   let result = process.new_subject()
-  let assert Ok(Nil) =
-    cancellation.with_token(fn(token) {
-      let options =
-        request_options.Options(
-          ..request_options.default(),
-          cancellation: Some(token),
-        )
-      let _ =
-        process.spawn_unlinked(fn() {
-          process.send(
-            result,
-            http_gun.send_with_options(client, req(port), options),
-          )
-        })
-      wait_for_queue(client, 1, 1000) |> should.be_true
-      cancellation.cancel(token)
-      let assert Ok(Error(failure)) = process.receive(result, 1000)
-      failure
-      |> should.equal(error.Failure(error.Cancelled, error.NotSubmitted))
-      wait_for_queue(client, 0, 1000) |> should.be_true
-    })
-  let _ = body.close(held.body)
+  cancellation.with_token(fn(token) {
+    let view = client |> http_gun.with_cancellation(token)
+    let _ =
+      process.spawn_unlinked(fn() {
+        process.send(result, http_gun.send(view, req(port)))
+      })
+    wait_for_queue(client, 1, 1000) |> should.be_true
+    cancellation.cancel(token)
+    let assert Ok(Error(failure)) = process.receive(result, 1000)
+    failure |> should.equal(error.new(error.Cancelled, error.NotSent))
+    wait_for_queue(client, 0, 1000) |> should.be_true
+  })
+  body.close(held.body)
   closed(server) |> should.be_true
-  let _ = http_gun.stop(client)
+  http_gun.stop(client)
 }
 
 fn wait_for_queue(client: http_gun.Client, size: Int, tries: Int) -> Bool {
-  let assert Ok(stats) = http_gun.snapshot(client)
-  case stats.waiting == size, tries {
+  let assert Ok(stats) = http_gun.stats(client)
+  case stats.queued_requests == size, tries {
     True, _ -> True
     False, 0 -> False
     False, _ -> wait_for_queue(client, size, tries - 1)
@@ -226,96 +180,140 @@ fn wait_for_queue(client: http_gun.Client, size: Int, tries: Int) -> Bool {
 
 pub fn cancellation_during_tls_setup_releases_connection_reservation_test() {
   let #(port, server) = gated()
-  let c = local_config()
-  let assert Ok(client) = http_gun.start(config.Config(..c, connect_ms: 500))
+  let assert Ok(client) =
+    http_gun.start(local_config() |> config.with_connect_timeout(500))
   let result = process.new_subject()
-  let assert Ok(Nil) =
-    cancellation.with_token(fn(token) {
-      let options =
-        request_options.Options(
-          ..request_options.default(),
-          cancellation: Some(token),
+  cancellation.with_token(fn(token) {
+    let view = client |> http_gun.with_cancellation(token)
+    let _ =
+      process.spawn_unlinked(fn() {
+        process.send(
+          result,
+          http_gun.send(view, req(port) |> request.set_scheme(http.Https)),
         )
-      let _ =
-        process.spawn_unlinked(fn() {
-          process.send(
-            result,
-            http_gun.send_with_options(
-              client,
-              req(port) |> request.set_scheme(http.Https),
-              options,
-            ),
-          )
-        })
-      await_request(server)
-      cancellation.cancel(token)
-      let assert Ok(Error(failure)) = process.receive(result, 1000)
-      failure
-      |> should.equal(error.Failure(error.Cancelled, error.NotSubmitted))
-      let assert Ok(stats) = http_gun.snapshot(client)
-      stats.connections |> should.equal(0)
-    })
-  let _ = http_gun.stop(client)
+      })
+    await_request(server)
+    cancellation.cancel(token)
+    let assert Ok(Error(failure)) = process.receive(result, 1000)
+    failure |> should.equal(error.new(error.Cancelled, error.NotSent))
+    let assert Ok(stats) = http_gun.stats(client)
+    stats.connections |> should.equal(0)
+  })
+  http_gun.stop(client)
 }
 
-pub fn supplied_deadline_covers_body_and_client_remains_ceiling_test() {
+@external(erlang, "http_gun_test_server", "send_control")
+fn send_control(server: process.Pid, bytes: BitArray) -> Nil
+
+@external(erlang, "http_gun_ffi", "now")
+fn now() -> Int
+
+pub fn supplied_deadline_covers_body_test() {
   let #(port, server) = controlled()
   let assert Ok(client) = http_gun.start(local_config())
-  let assert Ok(budget) = deadline.after(100)
-  let options =
-    request_options.Options(..request_options.default(), deadline: Some(budget))
+  let budget = deadline.after(100)
   let assert Ok(response) =
-    http_gun.open_with_options(client, req(port), options)
-  body.next(response.body, 1000)
-  |> should.equal(
-    Error(error.Failure(error.DeadlineExceeded, error.MayHaveBeenSent)),
-  )
+    http_gun.open(client |> http_gun.with_deadline(budget), req(port))
+  body.next_within(response.body, 1000)
+  |> should.equal(Error(
+    error.new(error.DeadlineExceeded, error.MaybeSent)
+    |> error.with_status(200),
+  ))
   deadline.remaining_ms(budget) |> should.equal(0)
   closed(server) |> should.be_true
-  let _ = body.close(response.body)
-  let _ = http_gun.stop(client)
+  body.close(response.body)
+  http_gun.stop(client)
+}
+
+// Regression: a view deadline replaces the client's request timeout instead
+// of taking the earlier of the two, so a per-call budget may exceed the
+// client's default.
+pub fn view_deadline_longer_than_client_request_timeout_succeeds_test() {
   let #(port, server) = controlled()
-  let c = local_config()
-  let assert Ok(client) = http_gun.start(config.Config(..c, deadline_ms: 100))
-  let assert Ok(budget) = deadline.after(5000)
-  let options = request_options.Options(..options, deadline: Some(budget))
+  let assert Ok(client) =
+    http_gun.start(
+      local_config() |> config.with_request_timeout(config.Milliseconds(100)),
+    )
   let assert Ok(response) =
-    http_gun.open_with_options(client, req(port), options)
-  body.next(response.body, 1000)
-  |> should.equal(
-    Error(error.Failure(error.DeadlineExceeded, error.MayHaveBeenSent)),
-  )
+    http_gun.open(
+      client |> http_gun.with_deadline(deadline.after(5000)),
+      req(port),
+    )
+  // Outlive the client's 100 ms request timeout before the body arrives.
+  process.sleep(300)
+  send_control(server, <<"3\r\nabc\r\n0\r\n\r\n":utf8>>)
+  body.collect(response.body, 100)
+  |> should.equal(Ok(body.Collected(<<"abc":utf8>>, [])))
+  body.close(response.body)
+  // The same wait through the client itself still meets its own timeout.
+  let #(port, server) = controlled()
+  let assert Ok(response) = http_gun.open(client, req(port))
+  process.sleep(300)
+  body.next_within(response.body, 1000)
+  |> should.equal(Error(
+    error.new(error.DeadlineExceeded, error.MaybeSent)
+    |> error.with_status(200),
+  ))
   closed(server) |> should.be_true
-  let _ = body.close(response.body)
-  let _ = http_gun.stop(client)
+  body.close(response.body)
+  http_gun.stop(client)
+}
+
+pub fn infinite_view_timeout_outlives_request_timeout_but_not_idle_timeout_test() {
+  let assert Ok(client) =
+    http_gun.start(
+      local_config()
+      |> config.with_request_timeout(config.Milliseconds(200))
+      |> config.with_idle_timeout(config.Milliseconds(300)),
+    )
+  let stream = client |> http_gun.with_timeout(config.Infinity)
+  // A body that keeps flowing for longer than the request timeout.
+  let #(port, server) = controlled()
+  let before = now()
+  let assert Ok(response) = http_gun.open(stream, req(port))
+  list.each(list.repeat(Nil, 6), fn(_) {
+    process.sleep(100)
+    send_control(server, <<"1\r\na\r\n":utf8>>)
+    body.next(response.body) |> should.equal(Ok(body.Chunk(<<"a":utf8>>)))
+  })
+  send_control(server, <<"0\r\n\r\n":utf8>>)
+  body.next(response.body) |> should.equal(Ok(body.End([])))
+  { now() - before >= 600 } |> should.be_true
+  body.close(response.body)
+  // A stalled stream still fails with the idle timeout.
+  let #(port, server) = controlled()
+  let assert Ok(response) = http_gun.open(stream, req(port))
+  let before = now()
+  body.next(response.body)
+  |> should.equal(Error(
+    error.new(error.IdleTimeout, error.MaybeSent) |> error.with_status(200),
+  ))
+  let waited = now() - before
+  { waited >= 250 && waited < 2000 } |> should.be_true
+  closed(server) |> should.be_true
+  body.close(response.body)
+  http_gun.stop(client)
 }
 
 pub fn scope_exit_cancels_stream_and_returned_token_stays_cancelled_test() {
   let #(port, server) = controlled()
   let assert Ok(client) = http_gun.start(local_config())
-  let assert Ok(#(response, token)) =
+  let #(response, token) =
     cancellation.with_token(fn(token) {
-      let options =
-        request_options.Options(
-          ..request_options.default(),
-          cancellation: Some(token),
-        )
       let assert Ok(response) =
-        http_gun.open_with_options(client, req(port), options)
+        http_gun.open(client |> http_gun.with_cancellation(token), req(port))
       #(response, token)
     })
-  body.next(response.body, 1000)
-  |> should.equal(Error(error.Failure(error.Cancelled, error.MayHaveBeenSent)))
+  body.next_within(response.body, 1000)
+  |> should.equal(Error(
+    error.new(error.Cancelled, error.MaybeSent) |> error.with_status(200),
+  ))
   closed(server) |> should.be_true
-  let _ = body.close(response.body)
-  let options =
-    request_options.Options(
-      ..request_options.default(),
-      cancellation: Some(token),
-    )
-  http_gun.send_with_options(client, req(port), options)
-  |> should.equal(Error(error.Failure(error.Cancelled, error.NotSubmitted)))
-  let _ = http_gun.stop(client)
+  body.close(response.body)
+  cancellation.is_cancelled(token) |> should.be_true
+  http_gun.send(client |> http_gun.with_cancellation(token), req(port))
+  |> should.equal(Error(error.new(error.Cancelled, error.NotSent)))
+  http_gun.stop(client)
 }
 
 pub fn cancellation_creator_death_unblocks_independent_consumer_test() {
@@ -325,114 +323,89 @@ pub fn cancellation_creator_death_unblocks_independent_consumer_test() {
   let result = process.new_subject()
   let creator =
     process.spawn_unlinked(fn() {
-      let _ =
-        cancellation.with_token(fn(token) {
-          process.send(ready, token)
-          process.sleep_forever()
-        })
-      Nil
+      cancellation.with_token(fn(token) {
+        process.send(ready, token)
+        process.sleep_forever()
+      })
     })
   let assert Ok(token) = process.receive(ready, 1000)
-  let options =
-    request_options.Options(
-      ..request_options.default(),
-      cancellation: Some(token),
-    )
+  let view = client |> http_gun.with_cancellation(token)
   let _ =
     process.spawn_unlinked(fn() {
-      process.send(
-        result,
-        http_gun.send_with_options(client, req(port), options),
-      )
+      process.send(result, http_gun.send(view, req(port)))
     })
   await_request(server)
   process.kill(creator)
   let assert Ok(Error(failure)) = process.receive(result, 1000)
-  failure |> should.equal(error.Failure(error.Cancelled, error.MayHaveBeenSent))
+  failure |> should.equal(error.new(error.Cancelled, error.MaybeSent))
   closed(server) |> should.be_true
-  let _ = http_gun.stop(client)
+  http_gun.stop(client)
 }
 
 pub fn completed_http_survives_later_cancellation_test() {
   let req = req(80)
   let exchange =
-    fixture.Exchange(
+    testing.exchange(
       req,
-      fixture.Respond(
+      testing.Respond(
         response.new(204) |> response.set_body([]),
-        fixture.Complete([#("x-end", "yes")]),
+        testing.Finished([#("x-end", "yes")]),
       ),
     )
-  let assert Ok(client) = testing.start(local_config(), [exchange])
-  let assert Ok(Nil) =
-    cancellation.with_token(fn(token) {
-      let options =
-        request_options.Options(
-          ..request_options.default(),
-          cancellation: Some(token),
-        )
-      let assert Ok(response) = http_gun.open_with_options(client, req, options)
-      body.next(response.body, 1000)
-      |> should.equal(Ok(body.End([#("x-end", "yes")])))
-      cancellation.cancel(token)
-      body.next(response.body, 1000)
-      |> should.equal(Ok(body.End([#("x-end", "yes")])))
-      let _ = body.close(response.body)
-      Nil
-    })
-  let _ = http_gun.stop(client)
+  let assert Ok(client) = playback([exchange], local_config())
+  cancellation.with_token(fn(token) {
+    let assert Ok(response) =
+      http_gun.open(client |> http_gun.with_cancellation(token), req)
+    body.next_within(response.body, 1000)
+    |> should.equal(Ok(Some(body.End([#("x-end", "yes")]))))
+    cancellation.cancel(token)
+    body.next_within(response.body, 1000)
+    |> should.equal(Ok(Some(body.End([#("x-end", "yes")]))))
+    body.close(response.body)
+  })
+  http_gun.stop(client)
 }
 
 pub fn last_queued_cancellation_releases_shared_connecting_socket_test() {
   let #(port, server) = gated()
-  let c = local_config()
-  let assert Ok(client) = http_gun.start(config.Config(..c, connect_ms: 5000))
+  let assert Ok(client) =
+    http_gun.start(local_config() |> config.with_connect_timeout(5000))
   let results = process.new_subject()
   let request = req(port) |> request.set_scheme(http.Https)
-  let assert Ok(Ok(Nil)) =
-    cancellation.with_token(fn(first) {
-      cancellation.with_token(fn(second) {
-        let first_options =
-          request_options.Options(
-            ..request_options.default(),
-            cancellation: Some(first),
-          )
-        let second_options =
-          request_options.Options(
-            ..request_options.default(),
-            cancellation: Some(second),
-          )
-        let _ =
-          process.spawn_unlinked(fn() {
-            process.send(
-              results,
-              http_gun.send_with_options(client, request, first_options),
-            )
-          })
-        await_request(server)
-        let _ =
-          process.spawn_unlinked(fn() {
-            process.send(
-              results,
-              http_gun.send_with_options(client, request, second_options),
-            )
-          })
-        wait_for_queue(client, 1, 1000) |> should.be_true
-        cancellation.cancel(first)
-        let assert Ok(Error(failure)) = process.receive(results, 1000)
-        failure
-        |> should.equal(error.Failure(error.Cancelled, error.NotSubmitted))
-        let assert Ok(stats) = http_gun.snapshot(client)
-        stats.connections |> should.equal(1)
-        cancellation.cancel(second)
-        let assert Ok(Error(failure)) = process.receive(results, 1000)
-        failure
-        |> should.equal(error.Failure(error.Cancelled, error.NotSubmitted))
-        let assert Ok(stats) = http_gun.snapshot(client)
-        stats.connections |> should.equal(0)
-      })
+  cancellation.with_token(fn(first) {
+    cancellation.with_token(fn(second) {
+      let first_view = client |> http_gun.with_cancellation(first)
+      let second_view = client |> http_gun.with_cancellation(second)
+      let _ =
+        process.spawn_unlinked(fn() {
+          process.send(results, http_gun.send(first_view, request))
+        })
+      await_request(server)
+      let _ =
+        process.spawn_unlinked(fn() {
+          process.send(results, http_gun.send(second_view, request))
+        })
+      wait_for_queue(client, 1, 1000) |> should.be_true
+      cancellation.cancel(first)
+      let assert Ok(Error(failure)) = process.receive(results, 1000)
+      failure |> should.equal(error.new(error.Cancelled, error.NotSent))
+      let assert Ok(stats) = http_gun.stats(client)
+      stats.connections |> should.equal(1)
+      cancellation.cancel(second)
+      let assert Ok(Error(failure)) = process.receive(results, 1000)
+      failure |> should.equal(error.new(error.Cancelled, error.NotSent))
+      let assert Ok(stats) = http_gun.stats(client)
+      stats.connections |> should.equal(0)
     })
-  let _ = http_gun.stop(client)
+  })
+  http_gun.stop(client)
+}
+
+fn playback(
+  exchanges: List(testing.Exchange),
+  settings: config.Config,
+) -> Result(http_gun.Client, http_gun.StartError) {
+  testing.playback(testing.script(exchanges), settings)
 }
 
 // These exercises connect only to explicitly permitted local test servers.

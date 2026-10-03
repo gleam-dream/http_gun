@@ -1,6 +1,23 @@
-//// Best-effort HTTP lifecycle observations delivered by an explicit Sinal forwarder.
-//// No handlers run in HTTP owners. No history, URLs, headers or body data are kept.
-//// Missing events are not submission evidence or permission to retry.
+//// Describes the `[http_gun, lifecycle]` event that every client emits as a
+//// request moves through admission, submission, headers and termination.
+////
+//// Events are best effort: a missing event is not submission evidence or
+//// permission to retry. They carry no URL, header, query or body.
+////
+//// HTTP Gun emits with `sinal.emit`, so the application decides where
+//// handlers run. Route the prefix to a forwarder once at startup to keep
+//// handlers out of HTTP Gun's pool and body processes:
+////
+//// ```gleam
+//// forwarder.route(["http_gun"], my_forwarder)
+//// let attachment = sinal.observe(telemetry.event(), fn(timing, metadata) {
+////   record(metadata.request_id, metadata.milestone, timing.monotonic_ms)
+//// })
+//// ```
+////
+//// Without a route, handlers run synchronously in the pool and body
+//// processes, and a slow handler slows requests. `config.with_observations`
+//// sends one client's events to a forwarder directly instead.
 ////
 //// Every event's metadata carries two identities:
 ////
@@ -15,25 +32,28 @@
 import gleam/dynamic
 import gleam/dynamic/decode
 import gleam/erlang/reference
-import gleam/option.{type Option, None, Some}
+import gleam/option.{type Option}
 import gleam/string
-import http_gun/error
-import http_gun/internal/bridge
 import sinal
 import sinal/correlation.{type Correlation}
 import sinal/fields
-import sinal/forwarder
 
-/// The identity HTTP Gun assigns to one observed invocation. Only HTTP Gun
-/// creates it. Equality is meaningful within one VM lifetime; it is not a
+/// The identity HTTP Gun assigns to one observed invocation. Equality is meaningful within one VM lifetime; it is not a
 /// durable identifier, a credential or a network reference. Erlang handlers
 /// see it as a binary under the `request_id` key.
 pub opaque type RequestId {
   RequestId(value: String)
 }
 
-fn new_request_id() -> RequestId {
+/// A fresh identity, unique within this VM. HTTP Gun creates one per
+/// request; a test double that emits HTTP Gun events can create its own.
+pub fn new_request_id() -> RequestId {
   RequestId(string.inspect(reference.new()))
+}
+
+/// The identity as text, for logs.
+pub fn request_id_to_string(id: RequestId) -> String {
+  id.value
 }
 
 /// Scripts and disk playback both report Offline; neither claims network activity.
@@ -81,10 +101,10 @@ pub type Metadata {
   )
 }
 
-/// The typed [http_gun, lifecycle] event. Attach handlers through Sinal in the
-/// application. A blocked handler stalls the configured forwarder; overflow
-/// drops observations. Handler arrival order across pool/body producers is not
-/// a request ordering guarantee. Compare source timestamps and milestone meaning.
+/// The typed `[http_gun, lifecycle]` event. Attach handlers through Sinal in
+/// the application. Handler arrival order across the pool and body processes
+/// is not a request ordering guarantee: compare `monotonic_ms` and the
+/// milestone's meaning.
 pub fn event() -> sinal.Event(Timing, Metadata) {
   let at = {
     use monotonic_ms <- fields.include(fields.int("monotonic_ms"), get: fn(t) {
@@ -173,71 +193,4 @@ fn parse_milestone(value: #(String, Int)) -> Result(Milestone, Nil) {
     #("failed", 0) -> Ok(HttpTerminated(Failed))
     _ -> Error(Nil)
   }
-}
-
-@internal
-pub opaque type Emitter {
-  Emitter(target: forwarder.Forwarder, event: sinal.Event(Timing, Metadata))
-}
-
-@internal
-pub opaque type Context {
-  Context(
-    emitter: Emitter,
-    request_id: RequestId,
-    correlation: Option(Correlation),
-    mode: Mode,
-  )
-}
-
-@internal
-pub fn prepare(target: Option(forwarder.Forwarder)) -> Option(Emitter) {
-  case target {
-    None -> None
-    Some(target) -> Some(Emitter(target, event()))
-  }
-}
-
-@internal
-pub fn begin(
-  emitter: Option(Emitter),
-  correlation: Option(Correlation),
-  mode: Mode,
-) -> Option(Context) {
-  case emitter {
-    None -> None
-    Some(emitter) -> {
-      let context = Some(Context(emitter, new_request_id(), correlation, mode))
-      emit(context, AdmissionEntered)
-      context
-    }
-  }
-}
-
-@internal
-pub fn emit(context: Option(Context), milestone: Milestone) -> Nil {
-  case context {
-    None -> Nil
-    Some(ctx) -> {
-      let _ =
-        forwarder.emit(
-          ctx.emitter.target,
-          ctx.emitter.event,
-          Timing(bridge.now()),
-          Metadata(ctx.request_id, ctx.correlation, ctx.mode, milestone),
-        )
-      Nil
-    }
-  }
-}
-
-@internal
-pub fn termination(outcome: Result(a, error.Failure)) -> Milestone {
-  HttpTerminated(case outcome {
-    Ok(_) -> Complete
-    Error(error.Failure(error.Cancelled, _))
-    | Error(error.Failure(error.Closed, _)) -> LocallyCancelled
-    Error(error.Failure(error.DeadlineExceeded, _)) -> DeadlineExpired
-    Error(_) -> Failed
-  })
 }

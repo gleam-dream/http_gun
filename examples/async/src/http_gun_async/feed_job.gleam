@@ -5,10 +5,8 @@
 import gleam/bit_array
 import gleam/erlang/process
 import gleam/http/request
-import gleam/option.{Some}
 import gleam/otp/actor
 import gleam/otp/static_supervisor
-import gleam/otp/supervision
 import gleam/result
 import http_gun
 import http_gun/body
@@ -16,7 +14,6 @@ import http_gun/cancellation
 import http_gun/config
 import http_gun/deadline
 import http_gun/error
-import http_gun/request_options
 
 pub type Decision {
   Continue
@@ -46,15 +43,15 @@ pub opaque type Job {
   )
 }
 
+/// Start the application's one shared client under a supervisor. The client
+/// registers under `name`; `http_gun.named(name)` is a handle that keeps
+/// working across restarts, so jobs never need a fresh capability.
 pub fn supervise(
   settings: config.Config,
-  ready: process.Subject(http_gun.Client),
+  name: process.Name(http_gun.Message),
 ) -> actor.StartResult(static_supervisor.Supervisor) {
   static_supervisor.new(static_supervisor.OneForOne)
-  |> static_supervisor.add(
-    http_gun.child(settings)
-    |> supervision.map_data(fn(client) { process.send(ready, client) }),
-  )
+  |> static_supervisor.add(http_gun.supervised(settings, name))
   |> static_supervisor.start
 }
 
@@ -73,32 +70,25 @@ pub fn start(
     process.spawn_unlinked(fn() {
       let worker = process.self()
       let _ = process.spawn_unlinked(fn() { guard(owner, worker) })
-      // Startup and completion use separate channels. No Job is returned when
-      // token startup fails, so that path must not send an unconsumable result.
-      let scoped =
-        cancellation.with_token(fn(token) {
-          process.send(ready, Ok(token))
-          http_gun.try_with_response_with_options(
-            client,
-            req,
-            request_options.Options(
-              ..request_options.default(),
-              deadline: Some(budget),
-              cancellation: Some(token),
-            ),
-            Http,
-            fn(response) { read(response.body, sink, 0) },
-          )
-        })
-      case scoped {
-        Ok(outcome) -> process.send(done, outcome)
-        Error(failure) -> process.send(ready, Error(Http(failure)))
+      // The token scope is the worker's: returning, raising or dying cancels
+      // the request. The token reaches the caller before opening begins, so a
+      // cancel works even while the server withholds the response head.
+      let outcome = {
+        use token <- cancellation.with_token
+        process.send(ready, token)
+        let client =
+          client
+          |> http_gun.with_deadline(budget)
+          |> http_gun.with_cancellation(token)
+        use response <- http_gun.with_response(client, req, Http)
+        read(response.body, sink, 0)
       }
+      process.send(done, outcome)
     })
   let monitor = process.monitor(worker)
   let outcome =
     process.new_selector()
-    |> process.select_map(ready, fn(outcome) { outcome })
+    |> process.select_map(ready, Ok)
     |> process.select_specific_monitor(monitor, fn(_) { Error(WorkerStopped) })
     |> process.selector_receive(1000)
     |> result.unwrap(Error(WaitExpired))
@@ -133,7 +123,9 @@ fn read(
   sink: fn(BitArray) -> Result(Decision, Nil),
   bytes: Int,
 ) -> Result(Completion, Problem) {
-  case body.next(source, 100) {
+  // `next` waits for bytes; the deadline, the idle timeout and the token
+  // bound the wait, so the recipe needs no local read loop.
+  case body.next(source) {
     Ok(body.End(trailers)) -> Ok(Eof(bytes, trailers))
     Ok(body.Chunk(chunk)) -> {
       let bytes = bytes + bit_array.byte_size(chunk)
@@ -145,7 +137,6 @@ fn read(
         Continue -> read(source, sink, bytes)
       }
     }
-    Error(error.Failure(error.ReadTimeout, _)) -> read(source, sink, bytes)
     Error(failure) -> Error(Http(failure))
   }
 }

@@ -3,14 +3,11 @@ import gleam/http/request
 import gleam/http/response
 import gleam/int
 import gleam/list
-import gleam/option.{Some}
 import gleeunit/should
 import http_gun
 import http_gun/config
 import http_gun/deadline
-import http_gun/destination
 import http_gun/error
-import http_gun/request_options
 
 @external(erlang, "http_gun_reuse_test_server", "close_peer")
 fn close_peer(server: process.Pid) -> Nil
@@ -22,13 +19,11 @@ fn server(tls: Bool, close_header: Bool) -> #(Int, process.Pid)
 fn stop(server: process.Pid) -> Nil
 
 fn settings() -> config.Config {
-  let c = config.default()
-  config.Config(
-    ..c,
-    trust: config.CustomCa("test/fixtures/ca.crt"),
-    destination: destination.Policy(..c.destination, allow_loopback: True),
-    limits: config.Limits(..c.limits, connections: 1, per_origin: 1),
-  )
+  config.default()
+  |> config.with_trust(config.CustomCa("test/fixtures/ca.crt"))
+  |> config.allow_loopback
+  |> config.with_max_connections(1)
+  |> config.with_max_connections_per_origin(1)
 }
 
 pub fn main() {
@@ -49,7 +44,7 @@ pub fn closed_idle_tls_connection_is_not_submitted_to_test() {
   // wait specifically; waiting for gun_down here would hide the regression.
   process.sleep(100)
   let second = http_gun.send(client, req)
-  let _ = http_gun.stop(client)
+  http_gun.stop(client)
   stop(peer)
   let assert Ok(second) = second
   response.get_header(second.response, "x-connection") |> should.equal(Ok("2"))
@@ -79,7 +74,7 @@ fn closing_requests(response_close: Bool) -> Nil {
     |> should.equal(Ok(int.to_string(index)))
     response.get_header(reply.response, "x-sequence") |> should.equal(Ok("1"))
   })
-  let _ = http_gun.stop(client)
+  http_gun.stop(client)
   stop(peer)
 }
 
@@ -91,20 +86,10 @@ pub fn readiness_wait_uses_the_original_deadline_test() {
   let assert Ok(_) = http_gun.send(client, req)
   close_peer(peer)
   process.sleep(100)
-  let assert Ok(until) = deadline.after(10)
-  let outcome =
-    http_gun.send_with_options(
-      client,
-      req,
-      request_options.Options(
-        ..request_options.default(),
-        deadline: Some(until),
-      ),
-    )
-  let _ = http_gun.stop(client)
+  let until = deadline.after(10)
+  let outcome = http_gun.send(client |> http_gun.with_deadline(until), req)
+  http_gun.stop(client)
   stop(peer)
   outcome
-  |> should.equal(
-    Error(error.Failure(error.DeadlineExceeded, error.NotSubmitted)),
-  )
+  |> should.equal(Error(error.new(error.DeadlineExceeded, error.NotSent)))
 }

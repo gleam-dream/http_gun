@@ -42,15 +42,12 @@ fn run(
 }
 
 pub fn main() -> Nil {
-  let defaults = local_config()
   let assert Ok(client) =
-    http_gun.start(
-      config.Config(
-        ..defaults,
-        deadline_ms: 60_000,
-        limits: config.Limits(..defaults.limits, connections: 4, per_origin: 4),
-      ),
-    )
+    local_config()
+    |> config.with_request_timeout(config.Milliseconds(60_000))
+    |> config.with_max_connections(4)
+    |> config.with_max_connections_per_origin(4)
+    |> http_gun.start
   let assert Ok(req) =
     request.to("http://localhost:" <> int.to_string(server()) <> "/")
   let req = request.set_body(req, <<>>)
@@ -58,8 +55,7 @@ pub fn main() -> Nil {
   list.each([500, 1000, 2000, 5000, 10_000], fn(count) {
     run(client, req, count)
   })
-  let assert Ok(Nil) = http_gun.stop(client)
-  Nil
+  http_gun.stop(client)
 }
 
 // These exercises connect only to explicitly permitted local test servers.

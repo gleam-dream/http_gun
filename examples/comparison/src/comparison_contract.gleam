@@ -13,8 +13,8 @@ import http_gun
 import http_gun/body
 import http_gun/cassette
 import http_gun/config
-import http_gun/destination
-import http_gun/recording
+import http_gun/error
+import http_gun/testing
 import simplifile
 
 @external(erlang, "comparison_ffi", "arguments")
@@ -129,10 +129,13 @@ fn check_pull(
 fn first(client: adapter.Client, port: Int) -> Int {
   case client {
     adapter.Gun(client) -> {
-      let assert Ok(Ok(body.Chunk(bytes))) =
-        http_gun.with_response(client, adapter.gun_request(port, False), fn(r) {
-          body.next(r.body, 1000)
-        })
+      let assert Ok(body.Chunk(bytes)) =
+        http_gun.with_response(
+          client,
+          adapter.gun_request(port, False),
+          fn(failure) { failure },
+          fn(r) { body.next(r.body) },
+        )
       bit_array.byte_size(bytes)
     }
     adapter.Dream(profile) -> {
@@ -150,7 +153,7 @@ fn abandon(client: adapter.Client, port: Int) -> Int {
     adapter.Gun(client) -> {
       let assert Ok(reply) =
         http_gun.open(client, adapter.gun_request(port, False))
-      let assert Ok(body.Chunk(bytes)) = body.next(reply.body, 1000)
+      let assert Ok(body.Chunk(bytes)) = body.next(reply.body)
       // The worker exits with an explicitly owned body still open.
       bit_array.byte_size(bytes)
     }
@@ -205,7 +208,7 @@ fn callback_cancel(profile: dream.HttpProfile) -> Bool {
 fn exchange(client: http_gun.Client, port: Int) -> String {
   case http_gun.send(client, adapter.gun_request(port, False)) {
     Ok(reply) -> string.inspect(reply.response.body)
-    Error(e) -> string.inspect(e)
+    Error(failure) -> error.name(failure)
   }
 }
 
@@ -225,16 +228,16 @@ fn recording_case(name: String, client: adapter.Client, repeated: Bool) -> Nil {
   case client {
     adapter.Gun(_) -> {
       let assert Ok(rec) =
-        cassette.record(local_config(), destination, recording.default())
+        cassette.record(local_config(), destination, cassette.options())
       let a = exchange(rec.client, port)
       let b = case repeated {
         True -> exchange(rec.client, port)
         False -> "not requested"
       }
-      let assert Ok(_) = cassette.finish(rec.recording)
-      let _ = http_gun.stop(rec.client)
+      let assert Ok(_) = cassette.finish(rec.recording, 0)
+      http_gun.stop(rec.client)
       let assert Ok(tape) = cassette.load(destination, 100_000)
-      let assert Ok(replay) = cassette.playback(tape, local_config())
+      let assert Ok(replay) = testing.playback(tape, local_config())
       let a2 = exchange(replay, port)
       let b2 = case repeated {
         True -> exchange(replay, port)
@@ -244,7 +247,7 @@ fn recording_case(name: String, client: adapter.Client, repeated: Bool) -> Nil {
       note(name, label, string.inspect(#(a, b, a2, b2, end)))
       let assert True = a == string.inspect(<<"abc":utf8>>) && a2 == a
       let assert True = b2 == b
-      let assert True = end == "Failure(FixtureExhausted, NotSubmitted)"
+      let assert True = end == "playback_exhausted"
       case repeated {
         True -> {
           let assert True = b == string.inspect(<<"xyz":utf8>>)
@@ -252,8 +255,7 @@ fn recording_case(name: String, client: adapter.Client, repeated: Bool) -> Nil {
         }
         False -> Nil
       }
-      let _ = http_gun.stop(replay)
-      Nil
+      http_gun.stop(replay)
     }
     adapter.Dream(profile) -> {
       let assert Ok(rec) =
@@ -369,12 +371,5 @@ pub fn main() {
 
 // These exercises connect only to explicitly permitted local test servers.
 fn local_config() -> config.Config {
-  let defaults = config.default()
-  config.Config(
-    ..defaults,
-    destination: destination.Policy(
-      ..defaults.destination,
-      allow_loopback: True,
-    ),
-  )
+  config.default() |> config.allow_loopback
 }

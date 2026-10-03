@@ -6,16 +6,25 @@ import http_gun/destination
 import http_gun/error
 import http_gun/internal/bridge
 import http_gun/internal/preparation
+import http_gun/internal/settings
 
 pub type Resolved {
-  Resolved(address: destination.Address, server_name: Option(String))
+  Resolved(
+    address: destination.Address,
+    server_name: Option(String),
+    /// The complete checked answer. A request reusing the connection must
+    /// admit every one of these addresses.
+    addresses: List(destination.Address),
+  )
 }
 
 // Resolution policy stays here; preparation owns only bounded worker lifetime.
 pub fn start(
   owner: process.Pid,
-  policy: destination.Policy,
+  policies: List(destination.Policy),
+  resolver: Option(settings.Resolver),
   host: String,
+  port: Int,
   until: Int,
   reply: fn(process.Pid, Result(Resolved, error.Reason)) -> Nil,
 ) -> process.Pid {
@@ -23,24 +32,37 @@ pub fn start(
     owner,
     until,
     error.ResolutionFailed,
-    fn() { resolve(policy, host, until) },
+    fn() { resolve(policies, resolver, host, port, until) },
     reply,
   )
 }
 
-fn resolve(
-  policy: destination.Policy,
+/// Every policy must admit the host, port and each address.
+pub fn admit(
+  policies: List(destination.Policy),
   host: String,
+  port: Int,
+  addresses: List(destination.Address),
+) -> Result(Nil, error.Reason) {
+  list.try_each(policies, fn(policy) {
+    use Nil <- result.try(destination.check(policy, host, port))
+    list.try_each(addresses, destination.check_address(policy, _))
+  })
+  |> result.map_error(error.DestinationRejected)
+}
+
+fn resolve(
+  policies: List(destination.Policy),
+  resolver: Option(settings.Resolver),
+  host: String,
+  port: Int,
   until: Int,
 ) -> Result(Resolved, error.Reason) {
-  use Nil <- result.try(case destination.permits_host(policy, host) {
-    True -> Ok(Nil)
-    False -> Error(error.DestinationRejected)
-  })
-  let #(answer, name) = case bridge.parse_address(host) {
+  use Nil <- result.try(admit(policies, host, port, []))
+  let #(answer, name) = case destination.parse_address(host) {
     Ok(address) -> #(Ok([address]), None)
     Error(_) -> {
-      let answer = case policy.resolver {
+      let answer = case resolver {
         Some(resolver) -> resolver(host, preparation.remaining(until))
         None -> lookup(host, until)
       }
@@ -57,11 +79,10 @@ fn resolve(
   case addresses, preparation.remaining(until) {
     _, 0 -> Error(error.DeadlineExceeded)
     [], _ -> Error(error.ResolutionFailed)
-    [first, ..], _ ->
-      case list.all(addresses, destination.permits(policy, _)) {
-        True -> Ok(Resolved(first, name))
-        False -> Error(error.DestinationRejected)
-      }
+    [first, ..], _ -> {
+      use Nil <- result.try(admit(policies, host, port, addresses))
+      Ok(Resolved(first, name, addresses))
+    }
   }
 }
 
