@@ -50,7 +50,8 @@ explicitly with `config.Infinity`.
 | `batch` | 1–1,024 workers, 10,000 requests, 64 MiB retained | `with_max_batch_bytes` |
 | scripts and cassettes | 16 MiB | `cassette.load`/`parse` take a byte limit; `cassette.with_max_bytes` |
 | cassette redaction | credential headers | `config.with_redaction` |
-| observations | `sinal.emit`, following the application's routes | `config.with_observations` |
+| observations | `sinal.emit`, following the application's routes | `config.with_observations`, `config.without_observations` |
+| client label in events | none | `config.with_label` |
 
 Each phase is also capped by the time left in the request. Lifting the request
 timeout never lifts the connect, pool or idle timeouts. [BOUNDS.md](BOUNDS.md)
@@ -261,6 +262,24 @@ forwarder.route(["http_gun"], app_forwarder)
 
 `config.with_observations(config, forwarder)` sends one client's events to a
 forwarder directly. Events are best effort and never submission evidence.
+
+A node-wide handler sees every client's events, including those of clients
+that libraries own. `config.with_label(config, "billing")` puts the label in
+each event's `client` field, so a handler can filter:
+
+```gleam
+sinal.observe(telemetry.event(), fn(timing, metadata) {
+  case metadata.client {
+    Some("billing") -> record(timing, metadata)
+    _ -> Nil
+  }
+})
+```
+
+A library that starts its own private client labels it with the library's
+name (`"warden"`, `"llm_wire"`). It may instead call
+`config.without_observations(config)`, after which the client emits nothing;
+prefer the label, which leaves the choice to the application.
 
 ## Dependencies
 

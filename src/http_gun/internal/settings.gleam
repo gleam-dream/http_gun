@@ -31,6 +31,16 @@ pub type Bound {
   Unbounded
 }
 
+/// Where a client's lifecycle events go.
+pub type Observations {
+  /// `sinal.emit`, which follows the application's routes. The default.
+  Emit
+  /// One forwarder, bypassing the application's routes.
+  Forward(forwarder.Forwarder)
+  /// Nowhere.
+  Silent
+}
+
 pub type Resolver =
   fn(String, Int) -> Result(List(destination.Address), Nil)
 
@@ -61,7 +71,8 @@ pub type Settings {
     connection_idle_timeout: Int,
     shutdown_timeout: Int,
     limits: Limits,
-    observations: Option(forwarder.Forwarder),
+    observations: Observations,
+    label: Option(String),
     destination: destination.Policy,
     resolver: Option(Resolver),
     redaction: redaction.Redaction,

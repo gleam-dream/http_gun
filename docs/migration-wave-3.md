@@ -15,7 +15,25 @@ one line each:
 - `supervised(config, name)` and `named(name)` replace `child`;
 - `http_gun/fixture` merged into `http_gun/testing`, `http_gun/recording` into
   `http_gun/cassette`, and cassettes move to schema 2;
-- redaction is configurable; observations default to `sinal.emit`.
+- redaction is configurable; observations default to `sinal.emit`, and a
+  client can carry a label or emit nothing.
+
+Four changes are easy to miss, because most still compile:
+
+- `config.allow_loopback` alone also leaves public hosts allowed. The old
+  `allow_loopback` plus nested `Policy(.., allow_public: False)` update is
+  `config.with_destination(destination.loopback_only())`. See
+  [destination](#http_gundestination).
+- A stopped client reports `ClientClosed` as `NotSent`; it was `MaybeSent`.
+  A client that exits while handling the call still reports `MaybeSent`. See
+  [error](#http_gunerror).
+- `stop` returns `Nil`. `let _ = http_gun.stop(c)` still compiles and can
+  become `http_gun.stop(c)`; `let assert Ok(Nil) = http_gun.stop(c)` does not
+  compile. See [http_gun](#http_gun).
+- `cassette.parse` reads a body or chunk from `text` (UTF-8) or `base64`; the
+  `bytes` count is gone, so a test that drops each required key lists `text`
+  instead of `bytes` and `base64`. See
+  [cassette files](#cassette-files-schema-1-to-2).
 
 Contents: [http_gun](#http_gun) · [config](#http_gunconfig) ·
 [destination](#http_gundestination) · [error](#http_gunerror) ·
@@ -208,6 +226,30 @@ let settings =
 
 `Address`, `Class` and `classify` are unchanged.
 
+`allow_loopback` adds loopback to the policy it is given and keeps every other
+destination, so `config.default() |> config.allow_loopback` still admits
+public hosts. To keep a test or local client off the public internet, which
+the old `allow_public: False, allow_loopback: True` update did, use
+`destination.loopback_only()`:
+
+```gleam
+// Before: loopback only
+config.Config(
+  ..defaults,
+  destination: destination.Policy(
+    ..defaults.destination,
+    allow_public: False,
+    allow_loopback: True,
+  ),
+)
+
+// After: equivalent
+config.default() |> config.with_destination(destination.loopback_only())
+
+// Not equivalent: public hosts stay allowed
+config.default() |> config.allow_loopback
+```
+
 ```gleam
 // Before: loopback only, pinned to hosts (checkout, research_agent, support_desk)
 let defaults = config.default()
@@ -276,6 +318,12 @@ let tenant = client |> http_gun.with_destination(destination.default() |> destin
 | — | `LimitKind.BatchBytes` |
 | `FileOperation`, `FileCause` | `cassette.FileOperation`, `cassette.FileCause` (`PublishFixture` is `PublishFile`) |
 | `file_description` | `cassette.describe_error` |
+
+A request on a stopped client fails with `ClientClosed` and `NotSent`; it was
+`MaybeSent`. Nothing reaches the network once the client has stopped. A client
+that exits while it handles the call still reports `MaybeSent`. A test that
+pins `error.new(error.ClientClosed, error.MaybeSent)` for a stopped client
+needs `NotSent`.
 
 Unchanged reasons: `ClientClosed`, `AdmissionFull`, `ResolutionFailed`,
 `ConnectionFailed(cause)`, `RequestFailed(cause)`, `DeadlineExceeded`,
@@ -536,7 +584,9 @@ python3 dev/convert_cassette.py old.json new.json                  # to a new fi
 
 It keeps every exchange, header and byte. Bodies and chunks that are valid
 UTF-8 become `{"text": ..}`; others stay `{"base64": ..}` without the byte
-count. Endings become `finished`, `aborted` and `abandoned`, and failures take
+count. `cassette.parse` reads `text` or `base64` and ignores `bytes`, so a
+test that removes each required key to check rejection names `text` where it
+named `bytes` and `base64`. Endings become `finished`, `aborted` and `abandoned`, and failures take
 the `error.to_json` shape. The two schema 1 cassettes in the dependents are
 `llm_wire/test/fixtures/http-gun-text.json` and
 `fabric/test/fixtures/llm/hello.json`; both convert cleanly.
@@ -566,9 +616,14 @@ the incoming request before comparing. `redaction.headers`, `request` and
 | `observations: Some(forwarder)` | `config.with_observations(config, forwarder)` sends that client's events to the forwarder directly |
 | `prepare`, `begin`, `emit`, `termination`, `Emitter`, `Context` (`@internal`) | internal |
 | — | `new_request_id()`, `request_id_to_string(id)` |
+| — | `config.with_label(config, label)`: the client's label, in `Metadata.client` and the native `client` key |
+| — | `config.without_observations(config)`: the client emits nothing |
 
-`event()`, `Metadata`, `Milestone`, `Outcome`, `Mode`, `Timing` and the
-metadata keys are unchanged.
+`event()`, `Milestone`, `Outcome`, `Mode` and `Timing` are unchanged.
+`Metadata` gains `client: Option(String)`, `None` for an unlabelled client,
+whose native key is then omitted. A handler that reads `Metadata` by label or
+with `Metadata(correlation:, ..)` keeps compiling; code that builds a
+`Metadata`, or matches it without `..`, adds `client:`.
 
 ```gleam
 // Before
@@ -581,6 +636,27 @@ let settings = config.default()
 
 An application that attaches a handler without routing now receives HTTP Gun
 events synchronously in the pool and body processes.
+
+A node-wide handler also sees the events of clients that libraries own, such
+as warden's and llm_wire's. A library that owns a private client labels it
+with its name, so the application can tell it apart:
+
+```gleam
+// In the library
+let settings = config.default() |> config.with_label("warden")
+
+// In the application: skip the library's HTTP
+sinal.observe(telemetry.event(), fn(timing, metadata) {
+  case metadata.client {
+    Some("warden") -> Nil
+    _ -> record(timing, metadata)
+  }
+})
+```
+
+A library may instead call `config.without_observations`, which leaves the
+application nothing to watch. Prefer the label: it keeps the choice with the
+application.
 
 ## Index of symbols each dependent uses
 

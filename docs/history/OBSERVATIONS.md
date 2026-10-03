@@ -26,7 +26,7 @@ let result = http_gun.send(client, req)
 
 Import `http_gun/telemetry`, `sinal`, `sinal/correlation`, `sinal/forwarder`, `gleam/erlang/process`, `gleam/otp/static_supervisor` and `gleam/option.{Some}` alongside the normal HTTP imports. The application retains the supervisor for its service lifetime; completing one HTTP operation does not stop it. Use `http_gun.child(settings)` when supervising the client too. A restarted client needs the new Client capability; the same Sinal Forwarder capability survives its own restart.
 
-Attach with `sinal.observe(telemetry.event(), handler)`; Sinal assigns the handler id. The handler receives `Timing(monotonic_ms)` and `Metadata(request_id, correlation, mode, milestone)`. It runs in the forwarder process. Detach through the returned Sinal Attachment when the application no longer wants it. Sinal attachments are VM-wide by event name; applications distinguish their work using correlation and must avoid installing duplicate handlers per request.
+Attach with `sinal.observe(telemetry.event(), handler)`; Sinal assigns the handler id. The handler receives `Timing(monotonic_ms)` and `Metadata(request_id, correlation, client, mode, milestone)`. It runs in the forwarder process. Detach through the returned Sinal Attachment when the application no longer wants it. Sinal attachments are VM-wide by event name; applications distinguish their work using correlation and must avoid installing duplicate handlers per request.
 
 ## Correlation and request identity
 
@@ -36,12 +36,38 @@ Every event's metadata carries two identities with different owners:
 | --- | --- | --- | --- |
 | `correlation` | `Option(sinal/correlation.Correlation)` | Caller | The unit of work, shared with every other gleam-dream package. Written by `correlation.field()`: a UTF-8 binary of 1 to 128 bytes, and the key is omitted when the client view carries none. |
 | `request_id` | `telemetry.RequestId` | HTTP Gun | One observed invocation. All milestones of that invocation share it; invocations that reuse a correlation get distinct values. |
+| `client` | `Option(String)` | Client owner | The label set with `config.with_label`. The key is omitted for an unlabelled client. |
 
 `http_gun.with_correlation(client, correlation)` is the only way to set the correlation. Pass the value the rest of the unit of work already uses: an order id or job id through `correlation.from_string`, a value received from an upstream package, or a fresh `correlation.unique()`. A handler then joins HTTP events with other packages' events by `metadata.correlation`, without a lookup table; an Erlang or Elixir handler reads the same `correlation` key. A correlation identifies one unit of work, so never use it as a metric tag.
 
 The view is pure: it shares the existing client, starts no process and changes no HTTP policy, request matching or ownership. Stopping either view stops that client. A later `with_correlation` on a view replaces its correlation.
 
 Only HTTP Gun creates a `RequestId`. It is opaque and compared by equality within one VM lifetime; Erlang handlers see a binary. It is not a durable identifier across VM restarts, and contains no application data, credentials or Gun references. Use it to group one invocation's milestones, not as a join key across packages.
+
+## Client labels and silenced clients
+
+Since observations default to `sinal.emit`, an application's node-wide handler receives the events of every client in the node, including clients that libraries start privately (warden's provider client, LLM Wire's, a test browser's). Their events usually carry no correlation from the application, so without a label they cannot be told apart.
+
+`config.with_label(config, label)` puts `label` in every event of that client, as `Metadata.client` and the native `client` key. A handler filters on it:
+
+```gleam
+sinal.observe(telemetry.event(), fn(timing, metadata) {
+  case metadata.client {
+    Some("warden") | Some("llm_wire") -> Nil
+    _ -> record(timing, metadata)
+  }
+})
+```
+
+`config.without_observations(config)` makes a client emit nothing, by `sinal.emit` and by a forwarder alike; a later `with_observations` turns its events back on. The label is independent of where events go and survives both.
+
+The convention for a library that owns a private client:
+
+- Label it with the library's name: `"warden"` for warden's discovery, token and JWKS client, `"llm_wire"` for LLM Wire's provider client. The application then decides whether to watch, count or skip that HTTP.
+- Silence it only when its events would mislead every application, and say so in the library's documentation. Labelling is preferred, because a silenced client leaves the application nothing to choose.
+- Leave a client that the application passes in untouched: its configuration belongs to the application.
+
+Applications see their own HTTP without setup: an unlabelled client still emits every event through `sinal.emit`, with `client` absent.
 
 ## Exact milestones
 

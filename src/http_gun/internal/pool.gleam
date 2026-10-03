@@ -252,7 +252,7 @@ fn start_with(
           connections: [],
           pending: pending.new(),
           owners: dict.new(),
-          emitter: lifecycle.prepare(config.observations),
+          emitter: lifecycle.prepare(config.observations, config.label),
           phase: Running,
         ))
         |> actor.selecting(selector)

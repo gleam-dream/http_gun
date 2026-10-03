@@ -60,6 +60,14 @@ changed item.
   the application's `forwarder.route` decides where handlers run;
   `config.with_observations` sends to a forwarder directly. Events carry the
   caller's `sinal/correlation.Correlation` and a per-request `RequestId`.
+- `config.with_label(config, label)` names a client in its events
+  (`telemetry.Metadata.client`, native key `client`), so a node-wide handler
+  can tell clients apart. A library that owns a private client labels it with
+  its name, such as `"warden"` or `"llm_wire"`.
+- `config.without_observations(config)` makes a client emit nothing. A
+  library may silence its private client this way; labelling is preferred,
+  because it leaves the choice to the application. The default is unchanged:
+  every client emits through `sinal.emit`.
 - `stop` drains: it refuses new work, fails queued requests, lets open bodies
   finish within the shutdown timeout, then cancels them.
 - [docs/GUN_AUDIT.md](docs/GUN_AUDIT.md), the audit of the Gun and Cowlib terms
@@ -91,6 +99,8 @@ changed item.
   and `BufferedBytes`.
 - Cassettes use schema 2; schema 1 files fail with `UnsupportedVersion(1)`.
 - Observations are on by default through `sinal.emit` instead of off.
+- A request on a stopped client fails with `ClientClosed` and `NotSent`
+  instead of `MaybeSent`.
 - `gun >= 2.6.0 and < 2.7.0` and `cowlib >= 2.20.0 and < 2.21.0` replace the
   exact pins. CI runs the minimum and the newest patch.
 - A waiting request's headers and body are held in a closure, so a pool crash

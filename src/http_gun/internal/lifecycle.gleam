@@ -2,20 +2,26 @@
 //// context when a request arrives; the pool and the body owner emit through
 //// it. Emission never fails and never blocks on a handler.
 
-import gleam/option.{type Option, None, Some}
+import gleam/option.{type Option}
 import http_gun/error
 import http_gun/internal/bridge
+import http_gun/internal/settings
 import http_gun/telemetry
 import sinal
 import sinal/correlation.{type Correlation}
 import sinal/forwarder
 
 pub opaque type Emitter {
-  Routed(event: sinal.Event(telemetry.Timing, telemetry.Metadata))
+  Routed(
+    event: sinal.Event(telemetry.Timing, telemetry.Metadata),
+    client: Option(String),
+  )
   Forwarded(
     target: forwarder.Forwarder,
     event: sinal.Event(telemetry.Timing, telemetry.Metadata),
+    client: Option(String),
   )
+  Silenced
 }
 
 pub opaque type Context {
@@ -27,10 +33,14 @@ pub opaque type Context {
   )
 }
 
-pub fn prepare(target: Option(forwarder.Forwarder)) -> Emitter {
-  case target {
-    None -> Routed(telemetry.event())
-    Some(target) -> Forwarded(target, telemetry.event())
+pub fn prepare(
+  observations: settings.Observations,
+  client: Option(String),
+) -> Emitter {
+  case observations {
+    settings.Emit -> Routed(telemetry.event(), client)
+    settings.Forward(target) -> Forwarded(target, telemetry.event(), client)
+    settings.Silent -> Silenced
   }
 }
 
@@ -45,21 +55,39 @@ pub fn begin(
 }
 
 pub fn emit(context: Context, milestone: telemetry.Milestone) -> Nil {
-  let timing = telemetry.Timing(bridge.now())
-  let metadata =
-    telemetry.Metadata(
-      context.request_id,
-      context.correlation,
-      context.mode,
-      milestone,
-    )
   case context.emitter {
-    Routed(event) -> sinal.emit(event, timing, metadata)
-    Forwarded(target, event) -> {
-      let _ = forwarder.emit(target, event, timing, metadata)
+    Routed(event, client) ->
+      sinal.emit(event, timing(), metadata(context, client, milestone))
+    Forwarded(target, event, client) -> {
+      let _ =
+        forwarder.emit(
+          target,
+          event,
+          timing(),
+          metadata(context, client, milestone),
+        )
       Nil
     }
+    Silenced -> Nil
   }
+}
+
+fn timing() -> telemetry.Timing {
+  telemetry.Timing(bridge.now())
+}
+
+fn metadata(
+  context: Context,
+  client: Option(String),
+  milestone: telemetry.Milestone,
+) -> telemetry.Metadata {
+  telemetry.Metadata(
+    request_id: context.request_id,
+    correlation: context.correlation,
+    client:,
+    mode: context.mode,
+    milestone:,
+  )
 }
 
 pub fn termination(outcome: Result(a, error.Failure)) -> telemetry.Milestone {

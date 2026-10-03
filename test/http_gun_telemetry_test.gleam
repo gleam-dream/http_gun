@@ -252,6 +252,7 @@ pub fn default_client_delivers_events_to_sinal_handler_test() {
   list.each(seen, fn(event) {
     { event.0 != process.self() } |> should.be_true
     { event.1 }.mode |> should.equal(telemetry.Offline)
+    { event.1 }.client |> should.equal(None)
   })
 }
 
@@ -701,6 +702,156 @@ fn terminations(
 }
 
 // These exercises connect only to explicitly permitted local test servers.
+// A labelled client names itself in every event, typed and native, so a
+// node-wide handler can tell a library's private client from the
+// application's own. An unlabelled client omits the key.
+pub fn labelled_client_events_carry_the_label_test() {
+  let events = process.new_subject()
+  let attachment = attach_with_pid(events)
+  let native = process.new_subject()
+  attach_native("http-gun-label-test", native)
+  let req = request.new() |> request.set_body(<<>>)
+  let assert Ok(labelled) =
+    testing.playback(
+      script_of(no_content(req), 1),
+      local_config() |> config.with_label("warden"),
+    )
+  let assert Ok(unlabelled) =
+    testing.playback(script_of(no_content(req), 1), local_config())
+  let labelled_tag = correlation.unique()
+  let first =
+    http_gun.send(http_gun.with_correlation(labelled, labelled_tag), req)
+  let labelled_seen = receive_tagged(events, labelled_tag, 4)
+  let labelled_native = receive_native_tagged(native, labelled_tag, 4)
+  let plain_tag = correlation.unique()
+  let second =
+    http_gun.send(http_gun.with_correlation(unlabelled, plain_tag), req)
+  let plain_seen = receive_tagged(events, plain_tag, 4)
+  let plain_native = receive_native_tagged(native, plain_tag, 4)
+  detach_native("http-gun-label-test")
+  let assert Ok(Nil) = sinal.detach(attachment)
+  http_gun.stop(labelled)
+  http_gun.stop(unlabelled)
+  first |> should.be_ok
+  second |> should.be_ok
+  list.length(labelled_seen) |> should.equal(4)
+  has_offline_milestones(labelled_seen) |> should.be_true
+  list.each(labelled_seen, fn(event) {
+    { event.1 }.client |> should.equal(Some("warden"))
+  })
+  list.length(labelled_native) |> should.equal(4)
+  list.each(labelled_native, fn(raw) {
+    native_key(raw, "client") |> should.equal(Ok("warden"))
+  })
+  list.length(plain_seen) |> should.equal(4)
+  list.each(plain_seen, fn(event) { { event.1 }.client |> should.equal(None) })
+  list.length(plain_native) |> should.equal(4)
+  list.each(plain_native, fn(raw) {
+    native_key(raw, "client") |> should.equal(Error(Nil))
+  })
+}
+
+// A labelled forwarder client keeps its label.
+pub fn label_survives_with_observations_test() {
+  let own =
+    forwarder.new(process.new_name("http-gun-labelled-observations"))
+    |> forwarder.with_capacity(64)
+  let assert Ok(started) = forwarder.supervised(own).start()
+  let events = process.new_subject()
+  let attachment = attach_with_pid(events)
+  let req = request.new() |> request.set_body(<<>>)
+  let assert Ok(client) =
+    testing.playback(
+      script_of(no_content(req), 1),
+      local_config()
+        |> config.with_label("llm_wire")
+        |> config.with_observations(own),
+    )
+  let tag = correlation.unique()
+  let sent = http_gun.send(http_gun.with_correlation(client, tag), req)
+  let seen = receive_tagged(events, tag, 4)
+  http_gun.stop(client)
+  let assert Ok(Nil) = sinal.detach(attachment)
+  process.unlink(started.pid)
+  process.kill(started.pid)
+  sent |> should.be_ok
+  list.length(seen) |> should.equal(4)
+  list.each(seen, fn(event) {
+    event.0 |> should.equal(started.pid)
+    { event.1 }.client |> should.equal(Some("llm_wire"))
+  })
+}
+
+// config.without_observations silences one client, by sinal.emit and by its
+// forwarder; a later with_observations turns its events back on.
+pub fn silenced_client_emits_nothing_test() {
+  let own =
+    forwarder.new(process.new_name("http-gun-silenced-observations"))
+    |> forwarder.with_capacity(64)
+  let assert Ok(started) = forwarder.supervised(own).start()
+  let events = process.new_subject()
+  let attachment = attach_with_pid(events)
+  let native = process.new_subject()
+  attach_native("http-gun-silenced-test", native)
+  let req = request.new() |> request.set_body(<<>>)
+  let silent_config =
+    local_config()
+    |> config.with_label("quiet")
+    |> config.with_observations(own)
+    |> config.without_observations
+  let assert Ok(silent) =
+    testing.playback(script_of(no_content(req), 1), silent_config)
+  let assert Ok(restored) =
+    testing.playback(
+      script_of(no_content(req), 1),
+      silent_config |> config.with_observations(own),
+    )
+  let silent_tag = correlation.unique()
+  let first = http_gun.send(http_gun.with_correlation(silent, silent_tag), req)
+  let silent_seen = receive_tagged(events, silent_tag, 1)
+  let silent_native = receive_native_tagged(native, silent_tag, 1)
+  let restored_tag = correlation.unique()
+  let second =
+    http_gun.send(http_gun.with_correlation(restored, restored_tag), req)
+  let restored_seen = receive_tagged(events, restored_tag, 4)
+  detach_native("http-gun-silenced-test")
+  let assert Ok(Nil) = sinal.detach(attachment)
+  http_gun.stop(silent)
+  http_gun.stop(restored)
+  process.unlink(started.pid)
+  process.kill(started.pid)
+  let assert Ok(reply) = first
+  reply.response.status |> should.equal(204)
+  second |> should.be_ok
+  silent_seen |> should.equal([])
+  silent_native |> should.equal([])
+  list.length(restored_seen) |> should.equal(4)
+  list.each(restored_seen, fn(event) {
+    event.0 |> should.equal(started.pid)
+    { event.1 }.client |> should.equal(Some("quiet"))
+  })
+}
+
+// Native metadata maps of one correlated request; other events are skipped.
+fn receive_native_tagged(
+  subject: process.Subject(Dynamic),
+  tag: correlation.Correlation,
+  remaining: Int,
+) -> List(Dynamic) {
+  case remaining {
+    0 -> []
+    _ ->
+      case process.receive(subject, 1000) {
+        Error(Nil) -> []
+        Ok(raw) ->
+          case fields.decode(correlation.field(), raw) == Ok(Some(tag)) {
+            True -> [raw, ..receive_native_tagged(subject, tag, remaining - 1)]
+            False -> receive_native_tagged(subject, tag, remaining)
+          }
+      }
+  }
+}
+
 fn local_config() -> config.Config {
   config.default() |> config.allow_loopback
 }

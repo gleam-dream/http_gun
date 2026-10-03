@@ -39,7 +39,8 @@
 //// | collected response body (`send`) | 8 MiB | `with_max_response_body_bytes` |
 //// | bytes retained by one `batch` | 64 MiB | `with_max_batch_bytes` |
 //// | redaction | credential headers | `with_redaction` |
-//// | observations | `sinal.emit`, which follows the application's routes | `with_observations` |
+//// | observations | `sinal.emit`, which follows the application's routes | `with_observations`, `without_observations` |
+//// | client label in events | none | `with_label` |
 
 import gleam/bit_array
 import gleam/int
@@ -158,7 +159,8 @@ pub fn default() -> Config {
       response_body_bytes: 8_388_608,
       batch_bytes: 67_108_864,
     ),
-    observations: None,
+    observations: settings.Emit,
+    label: None,
     destination: destination.default(),
     resolver: None,
     redaction: redaction.default(),
@@ -216,7 +218,28 @@ pub fn with_observations(
   config: Config,
   target: forwarder.Forwarder,
 ) -> Config {
-  Settings(..config, observations: Some(target))
+  Settings(..config, observations: settings.Forward(target))
+}
+
+/// Emit no lifecycle events from this client. A later `with_observations`
+/// turns them back on.
+///
+/// A library that owns a private client may choose this so that its HTTP
+/// stays out of the application's handlers. Prefer `with_label`: a labelled
+/// client lets the application decide whether to watch or skip it.
+pub fn without_observations(config: Config) -> Config {
+  Settings(..config, observations: settings.Silent)
+}
+
+/// Name this client in every lifecycle event, as the metadata's `client`
+/// field, so a handler that sees every client's events can tell them apart.
+/// Unlabelled clients report `None`. The label is any text; it is not a
+/// credential and is not stored in cassettes.
+///
+/// A library that starts its own private client should label it with the
+/// library's name, for example `"warden"`.
+pub fn with_label(config: Config, label: String) -> Config {
+  Settings(..config, label: Some(label))
 }
 
 /// Bound resolving, connecting and the TLS handshake of each new connection,

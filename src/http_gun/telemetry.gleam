@@ -17,7 +17,8 @@
 ////
 //// Without a route, handlers run synchronously in the pool and body
 //// processes, and a slow handler slows requests. `config.with_observations`
-//// sends one client's events to a forwarder directly instead.
+//// sends one client's events to a forwarder directly instead, and
+//// `config.without_observations` makes a client emit nothing.
 ////
 //// Every event's metadata carries two identities:
 ////
@@ -28,6 +29,18 @@
 //// - `request_id`: an opaque `RequestId` that HTTP Gun assigns to each
 ////   observed invocation. Invocations that share a correlation still get
 ////   distinct request ids, so a handler can group one invocation's milestones.
+////
+//// A third key names the client:
+////
+//// - `client`: the label set with `config.with_label`. The key is omitted for
+////   an unlabelled client. Use it to tell clients apart, for example to skip
+////   the events of a client that a library owns.
+////
+//// A library that starts its own private client labels it with the
+//// library's name, such as `"warden"`, so an application's
+//// node-wide handler can filter it. A library may instead silence its client
+//// with `config.without_observations`; labelling is preferred, because it
+//// leaves the application the choice.
 
 import gleam/dynamic
 import gleam/dynamic/decode
@@ -92,10 +105,15 @@ pub type Timing {
   Timing(monotonic_ms: Int)
 }
 
+/// One lifecycle event's metadata. Read it by label: a later release may add
+/// a field.
 pub type Metadata {
   Metadata(
     request_id: RequestId,
     correlation: Option(Correlation),
+    /// The emitting client's `config.with_label`, or `None` for an
+    /// unlabelled client.
+    client: Option(String),
     mode: Mode,
     milestone: Milestone,
   )
@@ -119,6 +137,10 @@ pub fn event() -> sinal.Event(Timing, Metadata) {
     use correlation <- fields.include(correlation.field(), get: fn(m) {
       m.correlation
     })
+    use client <- fields.include(
+      fields.optional(fields.string("client")),
+      get: fn(m) { m.client },
+    )
     use mode <- fields.include(
       fields.enum("mode", [Live, Recorded, Offline], mode_name),
       get: fn(m) { m.mode },
@@ -126,7 +148,13 @@ pub fn event() -> sinal.Event(Timing, Metadata) {
     use milestone <- fields.include(milestone_field(), get: fn(m) {
       m.milestone
     })
-    fields.success(Metadata(request_id:, correlation:, mode:, milestone:))
+    fields.success(Metadata(
+      request_id:,
+      correlation:,
+      client:,
+      mode:,
+      milestone:,
+    ))
   }
   sinal.event(["http_gun", "lifecycle"], at, metadata)
 }
