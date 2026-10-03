@@ -2,6 +2,7 @@ import gleam/http/request
 import gleam/int
 import gleam/io
 import gleam/list
+import gleam/time/duration
 import http_gun
 import http_gun/config
 
@@ -44,7 +45,7 @@ fn run(
 pub fn main() -> Nil {
   let assert Ok(client) =
     local_config()
-    |> config.with_request_timeout(config.Milliseconds(60_000))
+    |> config.with_request_timeout(config.After(duration.seconds(60)))
     |> config.with_max_connections(4)
     |> config.with_max_connections_per_origin(4)
     |> http_gun.start

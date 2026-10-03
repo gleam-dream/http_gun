@@ -10,6 +10,7 @@ import gleam/http/response
 import gleam/int
 import gleam/list
 import gleam/string
+import gleam/time/duration
 import gleeunit/should
 import http_gun
 import http_gun/body
@@ -297,7 +298,8 @@ pub fn live_recording_omits_credentials_and_configured_secrets_test() {
   let req = request.set_body(req, <<>>) |> with_credentials
   let assert Ok(live) = http_gun.send(recorded.client, req)
   live.response.status |> should.equal(200)
-  cassette.finish(recorded.recording, 5000) |> should.equal(Ok(destination))
+  cassette.finish(recorded.recording, duration.milliseconds(5000))
+  |> should.equal(Ok(destination))
   http_gun.stop(recorded.client)
   let assert Ok(text) = simplifile.read(destination)
   assert_no_secret(text)

@@ -28,18 +28,22 @@ you the status.
 
 ## Defaults
 
-Every wait, read and queue is bounded. An unbounded value is requested
-explicitly with `config.Infinity`.
+Every wait, read and queue is bounded. Every timeout, deadline and wait takes
+a `gleam/time/duration.Duration`; HTTP Gun keeps whole milliseconds and rounds
+a sub-millisecond remainder away from zero. An unbounded request or idle
+timeout is requested explicitly with `config.Infinity`; a bounded one is
+`config.After(duration)`.
 
 | Setting | Default | Change with |
 | --- | --- | --- |
-| connect, including DNS and TLS | 5 s | `config.with_connect_timeout` |
-| waiting for a pooled connection | 5 s | `config.with_pool_timeout` |
-| request, admission to last byte | 30 s | `config.with_request_timeout`, per call `http_gun.with_timeout` or `with_deadline` |
-| idle read, no bytes while reading | 30 s | `config.with_idle_timeout`, per call `http_gun.with_idle_timeout` |
-| idle pooled connection | 60 s | `config.with_connection_idle_timeout` |
-| draining on `stop` | 5 s | `config.with_shutdown_timeout` |
+| connect, including DNS and TLS | `duration.seconds(5)` | `config.with_connect_timeout` |
+| waiting for a pooled connection | `duration.seconds(5)` | `config.with_pool_timeout` |
+| request, admission to last byte | `config.After(duration.seconds(30))` | `config.with_request_timeout`, per call `http_gun.with_timeout` or `with_deadline` |
+| idle read, no bytes while reading | `config.After(duration.seconds(30))` | `config.with_idle_timeout`, per call `http_gun.with_idle_timeout` |
+| idle pooled connection | `duration.seconds(60)` | `config.with_connection_idle_timeout` |
+| draining on `stop` | `duration.seconds(5)` | `config.with_shutdown_timeout` |
 | destinations | public addresses only | `config.allow_loopback`, `config.with_destination` |
+| plaintext `http://` | allowed | `destination.with_plaintext` |
 | destination on every view | not required | `config.require_view_destination` |
 | protocol / TLS | HTTP/1.1, system CAs, peer and host name verified | `config.with_protocol`, `config.with_trust` |
 | connections | 16, 4 per origin, 100 HTTP/2 streams each | `with_max_connections`, `with_max_connections_per_origin`, `with_max_streams_per_connection` |
@@ -67,7 +71,7 @@ need, so a new option never breaks your code.
 let settings =
   config.default()
   |> config.with_protocol(config.PreferHttp2)
-  |> config.with_request_timeout(config.Milliseconds(10_000))
+  |> config.with_request_timeout(config.After(duration.seconds(10)))
   |> config.with_max_response_body_bytes(1_048_576)
 ```
 
@@ -83,7 +87,7 @@ same pool, and `send`, `open`, `with_response` and `batch` all honour it.
 let stream =
   client
   |> http_gun.with_timeout(config.Infinity)  // a long-lived SSE stream
-  |> http_gun.with_idle_timeout(config.Milliseconds(60_000))
+  |> http_gun.with_idle_timeout(config.After(duration.seconds(60)))
   |> http_gun.with_correlation(order)
 ```
 
@@ -115,7 +119,8 @@ fn count(stream: body.Body, total: Int) -> Result(Int, error.Failure) {
 `with_response` closes the body when the callback returns or raises, and maps
 an opening failure into the callback's error type. `body.next` waits until
 bytes arrive, bounded by the request and idle timeouts. `body.next_within`
-waits at most a given time and returns `Ok(None)`, leaving the stream intact.
+waits at most a given `Duration` and returns `Ok(None)`, leaving the stream
+intact.
 `open` returns the response for you to close.
 
 The opening process owns the body: a read from another process fails with
@@ -185,6 +190,13 @@ cloud metadata addresses are always refused. A host name is resolved once per
 connection; every A and AAAA address must pass the policy, and Gun connects to
 the checked address with the original TLS identity. `destination.check` applies
 a policy without resolving names; `config.with_resolver` replaces DNS in tests.
+
+`destination.with_plaintext` decides whether `http://` is admitted, against the
+same resolved addresses: `AllowPlaintext` (the default), `PlaintextToLoopbackOnly`
+(every resolved address must be loopback, so `http://localhost` passes) or
+`RequireTls`. A refused request fails with
+`DestinationRejected(PlaintextRefused(class))`, kind `Refused`, and `NotSent`.
+`https://` is never affected.
 
 ### One client for several tenants
 
@@ -271,7 +283,7 @@ back as a script:
 let assert Ok(cassette.Recorded(client:, recording:)) =
   cassette.record(settings, "test/orders.json", cassette.options())
 // ... make requests ...
-let assert Ok(_) = cassette.finish(recording, 5000)
+let assert Ok(_) = cassette.finish(recording, duration.seconds(5))
 
 let assert Ok(script) = cassette.load("test/orders.json", 1_048_576)
 let assert Ok(client) = testing.playback(script, settings)

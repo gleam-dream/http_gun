@@ -2,6 +2,7 @@
 //// `http_gun/config` builds it; the pool, body owners and recorder read it.
 
 import gleam/option.{type Option}
+import gleam/time/duration.{type Duration}
 import http_gun/destination
 import http_gun/redaction
 import sinal/forwarder
@@ -42,7 +43,7 @@ pub type Observations {
 }
 
 pub type Resolver =
-  fn(String, Int) -> Result(List(destination.Address), Nil)
+  fn(String, Duration) -> Result(List(destination.Address), Nil)
 
 pub type Limits {
   Limits(
@@ -79,6 +80,17 @@ pub type Settings {
     resolver: Option(Resolver),
     redaction: redaction.Redaction,
   )
+}
+
+/// Whole milliseconds, the internal precision. A sub-millisecond remainder
+/// rounds away from zero, so a positive duration stays positive and a
+/// negative one stays negative.
+pub fn milliseconds(of: Duration) -> Int {
+  let #(seconds, nanoseconds) = duration.to_seconds_and_nanoseconds(of)
+  case seconds < 0 {
+    True -> seconds * 1000 + nanoseconds / 1_000_000
+    False -> seconds * 1000 + { nanoseconds + 999_999 } / 1_000_000
+  }
 }
 
 /// The absolute monotonic instant a bound ends, from `now`.

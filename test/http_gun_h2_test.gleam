@@ -3,6 +3,7 @@ import gleam/erlang/process
 import gleam/http/request
 import gleam/list
 import gleam/option.{None, Some}
+import gleam/time/duration
 import gleeunit/should
 import http_gun
 import http_gun/body
@@ -24,7 +25,7 @@ fn settings() -> config.Config {
 // Wait at most a second for the next event; a local wait that passes is a
 // failure here because every exercised stream sends promptly.
 fn next(stream: body.Body) -> Result(body.Event, error.Failure) {
-  case body.next_within(stream, 1000) {
+  case body.next_within(stream, duration.milliseconds(1000)) {
     Ok(Some(event)) -> Ok(event)
     Ok(None) -> panic as "no body event within a second"
     Error(failure) -> Error(failure)
@@ -93,7 +94,8 @@ pub fn h2_window_credit_after_buffered_frames_test() {
   let config = settings()
   let assert Ok(client) =
     http_gun.start(
-      config |> config.with_request_timeout(config.Milliseconds(1000)),
+      config
+      |> config.with_request_timeout(config.After(duration.milliseconds(1000))),
     )
   let assert Ok(value) = http_gun.send(client, req(port, "/window-demand"))
   bit_array.byte_size(value.response.body) |> should.equal(16_387)
@@ -104,7 +106,9 @@ pub fn zero_peer_capacity_expires_without_submission_test() {
   let port = server()
   let c = settings()
   let assert Ok(client) =
-    http_gun.start(c |> config.with_request_timeout(config.Milliseconds(300)))
+    http_gun.start(
+      c |> config.with_request_timeout(config.After(duration.milliseconds(300))),
+    )
   let assert Ok(_) = http_gun.send(client, req(port, "/capacity-zero"))
   let assert Error(failure) = http_gun.send(client, req(port, "/fast"))
   error.evidence(failure) |> should.equal(error.NotSent)
@@ -119,7 +123,7 @@ pub fn untrusted_tls_fails_without_submission_test() {
     http_gun.start(
       c
       |> config.with_trust(config.SystemTrust)
-      |> config.with_request_timeout(config.Milliseconds(1000)),
+      |> config.with_request_timeout(config.After(duration.milliseconds(1000))),
     )
   let assert Error(failure) = http_gun.send(client, req(port, "/fast"))
   error.evidence(failure) |> should.equal(error.NotSent)
@@ -272,7 +276,8 @@ pub fn cancellation_token_preserves_h2_sibling_and_connection_test() {
     next(slow.body) |> should.equal(Ok(body.Chunk(<<"first":utf8>>)))
     let assert Ok(fast) = http_gun.open(client, req(port, "/fast"))
     cancellation.cancel(token)
-    let assert Error(failure) = body.next_within(slow.body, 1000)
+    let assert Error(failure) =
+      body.next_within(slow.body, duration.milliseconds(1000))
     error.reason(failure) |> should.equal(error.Cancelled)
     error.evidence(failure) |> should.equal(error.MaybeSent)
     let assert Ok(bytes) = body.collect(fast.body, 100)

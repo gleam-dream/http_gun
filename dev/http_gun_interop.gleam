@@ -10,6 +10,7 @@ import gleam/json
 import gleam/list
 import gleam/option.{Some}
 import gleam/result
+import gleam/time/duration
 import http_gun
 import http_gun/body
 import http_gun/config
@@ -159,7 +160,8 @@ fn mixed(client: http_gun.Client, port: Int) -> Nil {
   let start = now()
   let assert Ok(slow) = http_gun.open(client, req(port, "/large"))
   let assert config.H2 = body.protocol(slow.body)
-  let assert Ok(Some(body.Chunk(_))) = body.next_within(slow.body, 1000)
+  let assert Ok(Some(body.Chunk(_))) =
+    body.next_within(slow.body, duration.seconds(1))
   // No further demand on the large stream while 1000 siblings finish.
   let assert Ok(replies) =
     http_gun.batch(client, list.repeat(req(port, "/bytes"), 1000), 32)
@@ -221,7 +223,7 @@ pub fn main() -> Nil {
     local_config()
     |> config.with_protocol(config.RequireHttp2)
     |> config.with_trust(config.CustomCa("test/fixtures/ca.crt"))
-    |> config.with_request_timeout(config.Milliseconds(60_000))
+    |> config.with_request_timeout(config.After(duration.seconds(60)))
     |> config.with_max_connections(1)
     |> config.with_max_connections_per_origin(1)
     |> config.with_max_queued_requests(1024)

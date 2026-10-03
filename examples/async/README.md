@@ -19,7 +19,7 @@ Per-call settings are client views. Each `http_gun.with_*` returns a new handle 
 For each feed/download, the application starts a worker and later awaits or cancels it:
 
 ```gleam
-let budget = deadline.after(5000)
+let budget = deadline.after(duration.seconds(5))
 let assert Ok(job) = feed_job.start(client, req, budget, fn(bytes) {
   // Process this bounded chunk here; Continue requests the next chunk.
   // Return Stop for an intentional prefix, or Error(Nil) for a sink failure.

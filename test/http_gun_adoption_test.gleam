@@ -1,6 +1,7 @@
 import gleam/erlang/process
 import gleam/http
 import gleam/http/request
+import gleam/time/duration
 import gleeunit/should
 import http_gun
 import http_gun/body
@@ -58,8 +59,8 @@ pub fn token_scope_return_cancels_all_grouped_unfinished_bodies_test() {
   // The head had arrived, so the failure carries the response status.
   let cancelled =
     Error(error.new(error.Cancelled, error.MaybeSent) |> error.with_status(200))
-  body.next_within(one, 1000) |> should.equal(cancelled)
-  body.next_within(two, 1000) |> should.equal(cancelled)
+  body.next_within(one, duration.milliseconds(1000)) |> should.equal(cancelled)
+  body.next_within(two, duration.milliseconds(1000)) |> should.equal(cancelled)
   closed(peer) |> should.be_true
   closed(other_peer) |> should.be_true
   body.close(one)

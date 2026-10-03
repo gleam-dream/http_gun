@@ -4,7 +4,7 @@ import tomllib
 
 root = Path(__file__).resolve().parent.parent
 config = tomllib.loads((root / "gleam.toml").read_text())
-allowed = {"gleam_stdlib", "gleam_http", "gleam_erlang", "gleam_otp", "gleam_json", "gun", "cowlib", "file_streams", "simplifile", "sinal"}
+allowed = {"gleam_stdlib", "gleam_http", "gleam_erlang", "gleam_otp", "gleam_json", "gleam_time", "gun", "cowlib", "file_streams", "simplifile", "sinal"}
 assert set(config["dependencies"]) == allowed
 assert config["dependencies"]["sinal"] == {"path": "../sinal"}
 assert all(isinstance(value, str) for name, value in config["dependencies"].items() if name != "sinal")
@@ -18,6 +18,8 @@ assert config["dependencies"]["cowlib"] == ">= 2.20.0 and < 2.21.0"
 assert (2, 6, 0) <= version(versions["gun"]) < (2, 7, 0)
 assert (2, 20, 0) <= version(versions["cowlib"]) < (2, 21, 0)
 assert versions["file_streams"] == "1.7.0" and versions["simplifile"] == "2.7.0"
+# Owner decision: every public timeout is a gleam_time Duration, major-bounded.
+assert config["dependencies"]["gleam_time"] == ">= 1.11.0 and < 2.0.0"
 for path in (root / "src").rglob("*.gleam"):
     text = path.read_text()
     assert not any(sibling in text for sibling in ("llm_wire", "constellation", "json_blueprint")), path

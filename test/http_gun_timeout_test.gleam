@@ -3,6 +3,7 @@
 import gleam/erlang/process
 import gleam/http/request
 import gleam/int
+import gleam/time/duration
 import gleeunit/should
 import http_gun
 import http_gun/config
@@ -35,7 +36,7 @@ pub fn dns_counts_against_the_connect_timeout_test() {
       config.default()
       |> config.allow_loopback
       |> config.with_resolver(slow_resolver(1000))
-      |> config.with_connect_timeout(150),
+      |> config.with_connect_timeout(duration.milliseconds(150)),
     )
   let started = now()
   let assert Error(failure) = http_gun.send(client, named(port))
@@ -55,7 +56,7 @@ pub fn resolution_within_the_connect_timeout_succeeds_test() {
       config.default()
       |> config.allow_loopback
       |> config.with_resolver(slow_resolver(50))
-      |> config.with_connect_timeout(2000),
+      |> config.with_connect_timeout(duration.milliseconds(2000)),
     )
   let assert Ok(buffered) = http_gun.send(client, named(port))
   buffered.response.body |> should.equal(<<"abc">>)
@@ -72,7 +73,7 @@ pub fn a_shorter_view_timeout_bounds_dns_too_test() {
     )
   let assert Error(failure) =
     client
-    |> http_gun.with_timeout(config.Milliseconds(100))
+    |> http_gun.with_timeout(config.After(duration.milliseconds(100)))
     |> http_gun.send(named(port))
   error.reason(failure) |> should.equal(error.DeadlineExceeded)
   error.evidence(failure) |> should.equal(error.NotSent)
@@ -86,13 +87,35 @@ pub fn infinite_client_timeout_is_explicit_and_valid_test() {
   |> config.validate
   |> should.be_ok
   config.default()
-  |> config.with_idle_timeout(config.Milliseconds(0))
+  |> config.with_idle_timeout(config.After(duration.milliseconds(0)))
   |> config.validate
-  |> should.equal(Error(config.OutOfRange(config.IdleTimeout, 0)))
+  |> should.equal(
+    Error(config.TimeoutOutOfRange(config.IdleTimeout, duration.milliseconds(0))),
+  )
+  // Whole milliseconds, rounded away from zero: a positive sub-millisecond
+  // timeout stays positive and a negative one stays negative.
   config.default()
-  |> config.with_pool_timeout(-1)
+  |> config.with_connect_timeout(duration.nanoseconds(1))
+  |> config.validate
+  |> should.be_ok
+  config.default()
+  |> config.with_shutdown_timeout(duration.nanoseconds(-1))
+  |> config.validate
+  |> should.equal(
+    Error(config.TimeoutOutOfRange(
+      config.ShutdownTimeout,
+      duration.milliseconds(-1),
+    )),
+  )
+  config.default()
+  |> config.with_pool_timeout(duration.milliseconds(-1))
   |> http_gun.start
   |> should.equal(
-    Error(http_gun.InvalidConfig(config.OutOfRange(config.PoolTimeout, -1))),
+    Error(
+      http_gun.InvalidConfig(config.TimeoutOutOfRange(
+        config.PoolTimeout,
+        duration.milliseconds(-1),
+      )),
+    ),
   )
 }

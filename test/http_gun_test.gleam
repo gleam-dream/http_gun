@@ -5,6 +5,7 @@ import gleam/http/response
 import gleam/int
 import gleam/list
 import gleam/string
+import gleam/time/duration
 import gleeunit
 import gleeunit/should
 import http_gun
@@ -91,9 +92,17 @@ pub fn arbitrary_methods_and_empty_status_test() {
 
 pub fn invalid_config_test() {
   let settings = local_config()
-  http_gun.start(config.with_request_timeout(settings, config.Milliseconds(0)))
+  http_gun.start(config.with_request_timeout(
+    settings,
+    config.After(duration.milliseconds(0)),
+  ))
   |> should.equal(
-    Error(http_gun.InvalidConfig(config.OutOfRange(config.RequestTimeout, 0))),
+    Error(
+      http_gun.InvalidConfig(config.TimeoutOutOfRange(
+        config.RequestTimeout,
+        duration.milliseconds(0),
+      )),
+    ),
   )
 }
 

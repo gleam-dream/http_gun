@@ -7,7 +7,7 @@
 //// let assert Ok(cassette.Recorded(client:, recording:)) =
 ////   cassette.record(settings, "test/cassettes/orders.json", cassette.options())
 //// let _ = http_gun.send(client, req)
-//// let assert Ok(_path) = cassette.finish(recording, 5000)
+//// let assert Ok(_path) = cassette.finish(recording, duration.seconds(5))
 //// http_gun.stop(client)
 ////
 //// // Playback.
@@ -33,6 +33,7 @@ import gleam/bit_array
 import gleam/int
 import gleam/result
 import gleam/string
+import gleam/time/duration.{type Duration}
 import http_gun
 import http_gun/config
 import http_gun/internal/codec
@@ -40,6 +41,7 @@ import http_gun/internal/file
 import http_gun/internal/pool
 import http_gun/internal/recorder
 import http_gun/internal/script
+import http_gun/internal/settings
 import http_gun/redaction
 import http_gun/testing
 
@@ -220,14 +222,15 @@ pub fn record(
 
 /// Publish the recording. Zero or less finishes now if nothing is in flight
 /// and returns `Busy` otherwise. A positive wait refuses new requests, waits
-/// up to `wait_ms` for the requests in flight, then publishes. Once finished
+/// up to `wait` for the requests in flight, then publishes. Once finished
 /// or failed, every later call returns the same outcome.
 pub fn finish(
   recording: Recording,
-  wait_ms: Int,
+  wait: Duration,
 ) -> Result(String, FinishError) {
-  case wait_ms > 0 {
-    True -> recorder.finish_wait(recording, wait_ms)
+  let wait = settings.milliseconds(wait)
+  case wait > 0 {
+    True -> recorder.finish_wait(recording, wait)
     False -> recorder.finish(recording)
   }
   |> result.map_error(fn(problem) {

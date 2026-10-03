@@ -187,6 +187,10 @@ fn rejections() -> List(destination.Rejection) {
     destination.AddressRefused(destination.Loopback),
     destination.AddressRefused(destination.Private),
     destination.AddressRefused(destination.Reserved),
+    destination.PlaintextRefused(destination.Public),
+    destination.PlaintextRefused(destination.Loopback),
+    destination.PlaintextRefused(destination.Private),
+    destination.PlaintextRefused(destination.Reserved),
   ]
 }
 
@@ -343,6 +347,16 @@ pub fn names_are_stable_identifiers_test() {
     #(
       error.DestinationRejected(destination.AddressRefused(destination.Reserved)),
       "destination_rejected.reserved",
+    ),
+    #(
+      error.DestinationRejected(destination.PlaintextRefused(destination.Public)),
+      "destination_rejected.plaintext_public",
+    ),
+    #(
+      error.DestinationRejected(destination.PlaintextRefused(
+        destination.Loopback,
+      )),
+      "destination_rejected.plaintext_loopback",
     ),
     #(
       error.LimitExceeded(error.RequestBodyBytes, 1, 2),

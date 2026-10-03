@@ -12,7 +12,8 @@ new variants here under **New variants**.
 
 The first release. Wave 3 redesigned the API before publication; see
 [the wave 3 migration guide](docs/migration-wave-3.md) for every removed and
-changed item.
+changed item. Wave 4 moved every timeout to `Duration` and added the
+plaintext rule; see [the wave 4 migration guide](docs/migration-wave-4.md).
 
 ### Added
 
@@ -27,13 +28,22 @@ changed item.
   or longer.
 - Opaque `config.Config` built from `default()` with `with_*` setters, and a
   typed `ConfigError` from `validate` and `start` (`StartError.InvalidConfig`).
-- Named timeouts with these defaults: connect including DNS and TLS 5 s
-  (`with_connect_timeout`), pool checkout 5 s (`with_pool_timeout`), request
-  30 s (`with_request_timeout`), idle read 30 s (`with_idle_timeout`), idle
-  pooled connection 60 s (`with_connection_idle_timeout`) and shutdown drain
-  5 s (`with_shutdown_timeout`). `config.Infinity` lifts a bound explicitly.
+- Named timeouts, each a `gleam/time/duration.Duration`, with these
+  defaults: connect including DNS and TLS 5 s (`with_connect_timeout`), pool
+  checkout 5 s (`with_pool_timeout`), request 30 s (`with_request_timeout`),
+  idle read 30 s (`with_idle_timeout`), idle pooled connection 60 s
+  (`with_connection_idle_timeout`) and shutdown drain 5 s
+  (`with_shutdown_timeout`). The request and idle timeouts take
+  `config.After(duration)` or the explicit `config.Infinity`.
 - `body.next(body)` waits for data within those timeouts;
-  `body.next_within(body, ms)` returns `Ok(None)` when its local wait passes.
+  `body.next_within(body, wait)` returns `Ok(None)` when its local wait
+  passes.
+- `destination.with_plaintext(policy, AllowPlaintext | PlaintextToLoopbackOnly
+  | RequireTls)` decides whether `http://` is admitted, against every
+  resolved address and the addresses of a reused pooled connection. A refused
+  request fails with `DestinationRejected(PlaintextRefused(class))`, kind
+  `Refused`, and `NotSent`. The default, `AllowPlaintext`, keeps plaintext
+  callers working; `destination.check_plaintext` checks one address.
 - HTTP/1.1 and HTTP/2 (`Http1`, `PreferHttp2`, `RequireHttp2`), verified TLS
   with system, file or in-memory trust anchors, and byte, header, connection,
   stream and queue limits, each with a `with_max_*` setter.
@@ -87,6 +97,21 @@ changed item.
   the FFI relies on.
 - Module docs on every public module, a README defaults table, and README
   examples compiled as tests (`test/http_gun_readme_test.gleam`).
+
+### Changed (wave 4, breaking)
+
+- Every timeout, deadline and wait takes a `Duration` (new dependency
+  `gleam_time >= 1.11.0 and < 2.0.0`); no public signature takes `Int`
+  milliseconds. `config.Timeout` is `After(Duration) | Infinity` instead of
+  `Milliseconds(Int) | Infinity`; `with_connect_timeout`, `with_pool_timeout`,
+  `with_connection_idle_timeout` and `with_shutdown_timeout` take a
+  `Duration`; `config.Resolver` receives the time left as a `Duration`;
+  `deadline.after(Duration)` and `deadline.remaining(deadline) -> Duration`
+  replace `after(Int)` and `remaining_ms`; `body.next_within` and
+  `cassette.finish` take a `Duration` wait. A timeout out of range is
+  `ConfigError.TimeoutOutOfRange(setting, Duration)`; `OutOfRange` keeps
+  capacities. Defaults and the internal whole-millisecond precision are
+  unchanged; a sub-millisecond remainder rounds away from zero.
 
 ### Changed (wave 3, breaking)
 

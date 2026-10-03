@@ -9,6 +9,7 @@ import gleam/list
 import gleam/option.{Some}
 import gleam/otp/static_supervisor
 import gleam/result
+import gleam/time/duration
 import http_gun
 import http_gun/body
 import http_gun/cancellation
@@ -69,7 +70,7 @@ fn consume(client: http_gun.Client, req: request.Request(BitArray)) -> Nil {
   let assert <<"abc":utf8>> = reply.response.body
   // Per-call settings are views of the same client: a 5 s budget shared by
   // every request made through it, and a token that cancels them.
-  let budget = deadline.after(5000)
+  let budget = deadline.after(duration.seconds(5))
   let assert Ok(<<"abc":utf8>>) = {
     use token <- cancellation.with_token
     client
@@ -140,7 +141,8 @@ fn failures(req: request.Request(BitArray)) -> Nil {
   // The server received the request but sends no response within 200 ms. It
   // may have acted on it, so only an idempotent request is retried.
   let #(port, peer) = gated()
-  let slow = client |> http_gun.with_timeout(config.Milliseconds(200))
+  let slow =
+    client |> http_gun.with_timeout(config.After(duration.milliseconds(200)))
   let assert Error(timed_out) = http_gun.send(slow, local_request(port))
   arrived(peer)
   let assert error.TimedOut = error.kind(timed_out)
@@ -209,7 +211,7 @@ fn record_and_replay(req: request.Request(BitArray)) -> Nil {
   let assert Ok(cassette.Recorded(client:, recording:)) =
     cassette.record(local_config(), path, cassette.options())
   consume(client, req)
-  let assert Ok(saved) = cassette.finish(recording, 5000)
+  let assert Ok(saved) = cassette.finish(recording, duration.seconds(5))
   let assert True = path == saved
   http_gun.stop(client)
   let assert Ok(script) = cassette.load(path, 1_000_000)

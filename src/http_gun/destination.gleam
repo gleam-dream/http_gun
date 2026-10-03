@@ -20,6 +20,17 @@
 //// name resolves to is checked before a connection opens, and the connection
 //// uses that checked address.
 ////
+//// `with_plaintext` decides whether `http://` is admitted. The default allows
+//// it; `PlaintextToLoopbackOnly` admits it only when every resolved address
+//// is loopback, so `http://localhost` passes and `http://` to anywhere else
+//// fails, while `https://` is unaffected:
+////
+//// ```gleam
+//// destination.default()
+//// |> destination.allow_loopback
+//// |> destination.with_plaintext(destination.PlaintextToLoopbackOnly)
+//// ```
+////
 //// `http_gun.with_destination` narrows the policy for one client view: a
 //// request must satisfy both the client's policy and every policy its view
 //// adds, so a view can never widen what the client admits. `check` applies a
@@ -52,6 +63,19 @@ pub type Rejection {
   HostNotAllowed
   /// The host is, or resolved to, an address whose class the policy refuses.
   AddressRefused(Class)
+  /// The policy's plaintext rule refuses `http://` to an address of this
+  /// class.
+  PlaintextRefused(Class)
+}
+
+/// Whether a policy admits plaintext `http://`. `https://` is never affected.
+pub type Plaintext {
+  /// Admit `http://` to every address the policy admits. The default.
+  AllowPlaintext
+  /// Admit `http://` only when every resolved address is loopback.
+  PlaintextToLoopbackOnly
+  /// Refuse every `http://` request.
+  RequireTls
 }
 
 /// Which destinations a client admits. Build one with `default` or
@@ -62,6 +86,7 @@ pub opaque type Policy {
     allow_loopback: Bool,
     allow_private: Bool,
     allowed: Option(List(String)),
+    plaintext: Plaintext,
   )
 }
 
@@ -72,6 +97,7 @@ pub fn default() -> Policy {
     allow_loopback: False,
     allow_private: False,
     allowed: None,
+    plaintext: AllowPlaintext,
   )
 }
 
@@ -83,6 +109,7 @@ pub fn loopback_only() -> Policy {
     allow_loopback: True,
     allow_private: False,
     allowed: None,
+    plaintext: AllowPlaintext,
   )
 }
 
@@ -104,6 +131,15 @@ pub fn allow_private(policy: Policy) -> Policy {
 /// local server. Calling it again replaces the list.
 pub fn only_hosts(policy: Policy, hosts: List(String)) -> Policy {
   Policy(..policy, allowed: Some(list.map(hosts, string.lowercase)))
+}
+
+/// Choose whether `http://` is admitted. The rule is decided against each
+/// resolved address, like the address classes, including the addresses of
+/// a pooled connection a request would reuse; a refused request fails with
+/// `PlaintextRefused` and `NotSent`. A view's policy can tighten the rule
+/// and never loosen it, since every policy must admit the request.
+pub fn with_plaintext(policy: Policy, plaintext: Plaintext) -> Policy {
+  Policy(..policy, plaintext:)
 }
 
 /// Return the first malformed `only_hosts` entry: empty, containing
@@ -153,6 +189,20 @@ pub fn check_address(
   case permitted {
     True -> Ok(Nil)
     False -> Error(AddressRefused(class))
+  }
+}
+
+/// Check a plaintext `http://` connection to one resolved address against
+/// the policy's plaintext rule. The address classes are checked separately
+/// by `check_address`.
+pub fn check_plaintext(
+  policy: Policy,
+  address: Address,
+) -> Result(Nil, Rejection) {
+  let class = classify(address)
+  case policy.plaintext, class {
+    AllowPlaintext, _ | PlaintextToLoopbackOnly, Loopback -> Ok(Nil)
+    PlaintextToLoopbackOnly, _ | RequireTls, _ -> Error(PlaintextRefused(class))
   }
 }
 

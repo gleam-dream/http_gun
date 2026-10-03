@@ -3,6 +3,7 @@ import gleam/http/request
 import gleam/int
 import gleam/option.{None, Some}
 import gleam/result
+import gleam/time/duration
 import gleeunit/should
 import http_gun
 import http_gun/body
@@ -41,9 +42,9 @@ pub fn local_timeout_preserves_stream_and_copies_share_cursor_test() {
   let assert Ok(response) = http_gun.open(client, req(port))
   let copy = response.body
   // A local wait that passes is not a failure: the stream stays intact.
-  body.next_within(copy, 0) |> should.equal(Ok(None))
+  body.next_within(copy, duration.milliseconds(0)) |> should.equal(Ok(None))
   emit(server, <<"3\r\nabc\r\n":utf8>>)
-  body.next_within(response.body, 1000)
+  body.next_within(response.body, duration.milliseconds(1000))
   |> should.equal(Ok(Some(body.Chunk(<<"abc":utf8>>))))
   body.close(copy)
   body.close(response.body)
@@ -56,13 +57,16 @@ pub fn next_within_returns_none_and_stream_continues_test() {
   let assert Ok(client) = http_gun.start(local_config())
   let assert Ok(response) = http_gun.open(client, req(port))
   let started = now_us()
-  body.next_within(response.body, 50) |> should.equal(Ok(None))
+  body.next_within(response.body, duration.milliseconds(50))
+  |> should.equal(Ok(None))
   { now_us() - started >= 50_000 } |> should.be_true
-  body.next_within(response.body, 50) |> should.equal(Ok(None))
+  body.next_within(response.body, duration.milliseconds(50))
+  |> should.equal(Ok(None))
   emit(server, <<"3\r\nabc\r\n":utf8>>)
-  body.next_within(response.body, 1000)
+  body.next_within(response.body, duration.milliseconds(1000))
   |> should.equal(Ok(Some(body.Chunk(<<"abc":utf8>>))))
-  body.next_within(response.body, 50) |> should.equal(Ok(None))
+  body.next_within(response.body, duration.milliseconds(50))
+  |> should.equal(Ok(None))
   emit(server, <<"2\r\nde\r\n0\r\n\r\n":utf8>>)
   body.next(response.body) |> should.equal(Ok(body.Chunk(<<"de":utf8>>)))
   body.next(response.body) |> should.equal(Ok(body.End([])))
@@ -74,7 +78,8 @@ pub fn idle_timeout_fails_stalled_read_test() {
   let #(port, server) = controlled()
   let assert Ok(client) =
     http_gun.start(
-      local_config() |> config.with_idle_timeout(config.Milliseconds(100)),
+      local_config()
+      |> config.with_idle_timeout(config.After(duration.milliseconds(100))),
     )
   let assert Ok(response) = http_gun.open(client, req(port))
   let started = now_us()
@@ -94,7 +99,9 @@ pub fn view_idle_timeout_replaces_client_idle_timeout_test() {
   let #(port, server) = controlled()
   // The client's own idle timeout is the 30 s default.
   let assert Ok(client) = http_gun.start(local_config())
-  let impatient = client |> http_gun.with_idle_timeout(config.Milliseconds(100))
+  let impatient =
+    client
+    |> http_gun.with_idle_timeout(config.After(duration.milliseconds(100)))
   let assert Ok(response) = http_gun.open(impatient, req(port))
   let assert Error(failure) = body.next(response.body)
   error.reason(failure) |> should.equal(error.IdleTimeout)
@@ -107,20 +114,22 @@ pub fn paused_reader_is_not_failed_by_idle_timeout_test() {
   let #(port, server) = controlled()
   let assert Ok(client) =
     http_gun.start(
-      local_config() |> config.with_idle_timeout(config.Milliseconds(100)),
+      local_config()
+      |> config.with_idle_timeout(config.After(duration.milliseconds(100))),
     )
   let assert Ok(response) = http_gun.open(client, req(port))
   // Not reading for three idle periods is a pause, not idleness.
   process.sleep(300)
   // The idle period counts from the start of this wait, so a shorter wait
   // passes without failure.
-  body.next_within(response.body, 30) |> should.equal(Ok(None))
+  body.next_within(response.body, duration.milliseconds(30))
+  |> should.equal(Ok(None))
   process.sleep(300)
   emit(server, <<"3\r\nabc\r\n":utf8>>)
-  body.next_within(response.body, 1000)
+  body.next_within(response.body, duration.milliseconds(1000))
   |> should.equal(Ok(Some(body.Chunk(<<"abc":utf8>>))))
   emit(server, <<"0\r\n\r\n":utf8>>)
-  body.next_within(response.body, 1000)
+  body.next_within(response.body, duration.milliseconds(1000))
   |> should.equal(Ok(Some(body.End([]))))
   body.close(response.body)
   http_gun.stop(client)
@@ -130,14 +139,16 @@ pub fn overall_deadline_is_terminal_test() {
   let #(port, server) = controlled()
   let assert Ok(client) =
     http_gun.start(
-      local_config() |> config.with_request_timeout(config.Milliseconds(100)),
+      local_config()
+      |> config.with_request_timeout(config.After(duration.milliseconds(100))),
     )
   let assert Ok(response) = http_gun.open(client, req(port))
-  let assert Error(failure) = body.next_within(response.body, 1000)
+  let assert Error(failure) =
+    body.next_within(response.body, duration.milliseconds(1000))
   #(error.reason(failure), error.evidence(failure))
   |> should.equal(#(error.DeadlineExceeded, error.MaybeSent))
   error.status(failure) |> should.equal(Some(200))
-  body.next_within(response.body, 1000)
+  body.next_within(response.body, duration.milliseconds(1000))
   |> reason_and_evidence
   |> should.equal(Error(#(error.DeadlineExceeded, error.MaybeSent)))
   closed(server) |> should.be_true
@@ -156,7 +167,7 @@ pub fn owner_death_closes_socket_test() {
       process.sleep_forever()
     })
   let assert Ok(stream) = process.receive(ready, 1000)
-  body.next_within(stream, 1)
+  body.next_within(stream, duration.milliseconds(1))
   |> reason_and_evidence
   |> should.equal(Error(#(error.WrongOwner, error.MaybeSent)))
   process.kill(owner)
@@ -229,7 +240,10 @@ pub fn conflicting_reader_test() {
       process.send(ready, #(response.body, command))
       let assert Ok(Nil) = process.receive(command, 1000)
       process.send(reading, Nil)
-      process.send(finished, body.next_within(response.body, 2000))
+      process.send(
+        finished,
+        body.next_within(response.body, duration.milliseconds(2000)),
+      )
     })
   let assert Ok(#(stream, command)) = process.receive(ready, 1000)
   process.send(command, Nil)
@@ -245,7 +259,7 @@ fn await_conflict(stream: body.Body, remaining: Int) -> Bool {
   case remaining {
     0 -> False
     _ ->
-      case body.next_within(stream, 0) {
+      case body.next_within(stream, duration.milliseconds(0)) {
         Error(failure) ->
           case error.reason(failure) {
             error.ReadConflict -> True
@@ -278,7 +292,9 @@ pub fn fallible_scope_preserves_application_error_and_cleanup_test() {
 pub fn fallible_scope_maps_open_and_read_failures_test() {
   let #(port, server) = controlled()
   let assert Ok(client) = http_gun.start(local_config())
-  let impatient = client |> http_gun.with_idle_timeout(config.Milliseconds(50))
+  let impatient =
+    client
+    |> http_gun.with_idle_timeout(config.After(duration.milliseconds(50)))
   let assert Error(Http(failure)) =
     http_gun.with_response(impatient, req(port), Http, fn(response) {
       body.next(response.body) |> result.map_error(Http)

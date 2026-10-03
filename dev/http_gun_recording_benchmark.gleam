@@ -8,6 +8,7 @@ import gleam/int
 import gleam/io
 import gleam/json
 import gleam/list
+import gleam/time/duration
 import http_gun
 import http_gun/cassette
 import http_gun/config
@@ -44,7 +45,7 @@ pub fn main() -> Nil {
   let inputs = list.repeat(req, 256)
   let settings =
     local_config()
-    |> config.with_request_timeout(config.Milliseconds(60_000))
+    |> config.with_request_timeout(config.After(duration.seconds(60)))
     |> config.with_max_connections(4)
     |> config.with_max_connections_per_origin(4)
   let assert Ok(recorded) =
@@ -57,7 +58,7 @@ pub fn main() -> Nil {
     let assert True = reply.response.body == bytes
   })
   // Every batched request has completed, so the wait only covers the writes.
-  let assert Ok(_) = cassette.finish(recorded.recording, 10_000)
+  let assert Ok(_) = cassette.finish(recorded.recording, duration.seconds(10))
   let elapsed = now() - start
   let stats = measured(sample)
   let assert Ok(empty) = http_gun.stats(recorded.client)

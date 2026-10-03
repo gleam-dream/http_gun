@@ -666,7 +666,15 @@ fn policies(state: State, p: Pending) -> List(destination.Policy) {
 }
 
 fn admit_live(state: State, p: Pending) -> Admission {
-  case resolution.admit(policies(state, p), p.origin.host, p.origin.port, []) {
+  case
+    resolution.admit(
+      policies(state, p),
+      p.origin.host,
+      p.origin.port,
+      p.origin.tls,
+      [],
+    )
+  {
     Error(reason) -> {
       reject(p, reason)
       Taken(state)
@@ -693,6 +701,7 @@ fn admit_connection(state: State, p: Pending) -> Admission {
           policies(state, p),
           p.origin.host,
           p.origin.port,
+          p.origin.tls,
           connection.addresses,
         )
       {
@@ -721,6 +730,7 @@ fn admit_connection(state: State, p: Pending) -> Admission {
               state.config.resolver,
               p.origin.host,
               p.origin.port,
+              p.origin.tls,
               connect_until,
               fn(pid, result) { process.send(self, Resolved(pid, result)) },
             )

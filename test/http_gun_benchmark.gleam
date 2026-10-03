@@ -9,6 +9,7 @@ import gleam/json
 import gleam/list
 import gleam/option.{Some}
 import gleam/result
+import gleam/time/duration
 import http_gun
 import http_gun/body
 import http_gun/config
@@ -48,7 +49,7 @@ fn req(port: Int, tls: Bool, path: String) -> request.Request(BitArray) {
 
 fn settings(tls: Bool) -> config.Config {
   local_config()
-  |> config.with_request_timeout(config.Milliseconds(60_000))
+  |> config.with_request_timeout(config.After(duration.milliseconds(60_000)))
   |> config.with_protocol(case tls {
     True -> config.RequireHttp2
     False -> config.Http1
@@ -154,7 +155,8 @@ fn concurrent(tls: Bool, count: Int) {
 }
 
 fn drain(body: body.Body, total: Int, slow: Bool) -> Int {
-  let assert Ok(Some(event)) = body.next_within(body, 5000)
+  let assert Ok(Some(event)) =
+    body.next_within(body, duration.milliseconds(5000))
   case event {
     body.End(_) -> total
     body.Chunk(bytes) -> {
@@ -206,7 +208,8 @@ fn mixed() {
   let assert Ok(replies) =
     http_gun.batch(client, list.repeat(req(port, True, "/fast"), 1000), 64)
   let assert True = list.all(replies, result.is_ok)
-  let assert Ok(Some(_)) = body.next_within(slow.body, 1000)
+  let assert Ok(Some(_)) =
+    body.next_within(slow.body, duration.milliseconds(1000))
   body.close(slow.body)
   let assert Ok(stats) = http_gun.stats(client)
   let assert 1 = stats.connections

@@ -6,6 +6,7 @@ import gleam/http/response
 import gleam/int
 import gleam/io
 import gleam/option.{None}
+import gleam/time/duration
 import http_gun
 import http_gun/body
 import http_gun/cassette
@@ -46,7 +47,7 @@ fn req(port: Int) -> request.Request(BitArray) {
 }
 
 fn budget() -> deadline.Deadline {
-  deadline.after(5000)
+  deadline.after(duration.seconds(5))
 }
 
 // The reason and evidence of a job's HTTP failure.
@@ -81,7 +82,7 @@ fn waiting(client: http_gun.Client, n: Int, until: deadline.Deadline) -> Nil {
   case stats.queued_requests == n {
     True -> Nil
     False -> {
-      let assert True = deadline.remaining_ms(until) > 0
+      let assert True = duration.to_milliseconds(deadline.remaining(until)) > 0
       waiting(client, n, until)
     }
   }
@@ -92,7 +93,7 @@ fn empty(client: http_gun.Client, until: deadline.Deadline) -> Nil {
   case stats.open_bodies == 0 && stats.queued_requests == 0 {
     True -> Nil
     False -> {
-      let assert True = deadline.remaining_ms(until) > 0
+      let assert True = duration.to_milliseconds(deadline.remaining(until)) > 0
       empty(client, until)
     }
   }
@@ -153,27 +154,33 @@ fn admission_and_connect_cancellation() -> Nil {
 }
 
 fn budgets_and_read_waits() -> Nil {
-  let assert 0 = deadline.remaining_ms(deadline.after(0))
-  let assert 0 = deadline.remaining_ms(deadline.after(-5))
+  let assert 0 =
+    duration.to_milliseconds(
+      deadline.remaining(deadline.after(duration.milliseconds(0))),
+    )
+  let assert 0 =
+    duration.to_milliseconds(
+      deadline.remaining(deadline.after(duration.milliseconds(-5))),
+    )
   // A view's deadline replaces the client's request timeout, longer or
   // shorter: this client allows 100 ms, the view 5000 ms.
   let #(port, peer) = controlled()
   let assert Ok(client) =
     local_config()
-    |> config.with_request_timeout(config.Milliseconds(100))
+    |> config.with_request_timeout(config.After(duration.milliseconds(100)))
     |> http_gun.start
-  let longer = deadline.after(5000)
+  let longer = deadline.after(duration.seconds(5))
   let assert Ok(reply) =
     http_gun.open(client |> http_gun.with_deadline(longer), req(port))
   // A local wait that passes leaves the stream intact.
-  let assert Ok(None) = body.next_within(reply.body, 0)
-  let assert Ok(None) = body.next_within(reply.body, 300)
+  let assert Ok(None) = body.next_within(reply.body, duration.milliseconds(0))
+  let assert Ok(None) = body.next_within(reply.body, duration.milliseconds(300))
   send(peer, <<"1\r\nx\r\n":utf8>>)
   let assert Ok(body.Chunk(<<"x":utf8>>)) = body.next(reply.body)
-  let assert True = deadline.remaining_ms(longer) > 3000
+  let assert True = duration.to_milliseconds(deadline.remaining(longer)) > 3000
   io.println(
     "Deadline probe: client 100 ms, view 5000 ms, stream still open with "
-    <> int.to_string(deadline.remaining_ms(longer))
+    <> int.to_string(duration.to_milliseconds(deadline.remaining(longer)))
     <> " ms left",
   )
   body.close(reply.body)
@@ -195,12 +202,12 @@ fn budgets_and_read_waits() -> Nil {
   let assert Ok(client) = http_gun.start(one_slot())
   let #(port, peer) = controlled()
   let assert Ok(held) = http_gun.open(client, req(port))
-  let short = deadline.after(100)
+  let short = deadline.after(duration.milliseconds(100))
   let assert Ok(job) = feed_job.start(client, req(port), short, keep)
   waiting(client, 1, budget())
   let assert #(error.DeadlineExceeded, error.NotSent) =
     http_failure(feed_job.await(job, 1000))
-  let assert 0 = deadline.remaining_ms(short)
+  let assert 0 = duration.to_milliseconds(deadline.remaining(short))
   let assert #(error.DeadlineExceeded, error.NotSent) =
     failure_of(http_gun.send(client |> http_gun.with_deadline(short), req(port)))
   body.close(held.body)
@@ -284,7 +291,7 @@ fn copies_and_conflicts() -> Nil {
   let wrong = process.new_subject()
   let _ =
     process.spawn_unlinked(fn() {
-      process.send(wrong, body.next_within(copied, 0))
+      process.send(wrong, body.next_within(copied, duration.milliseconds(0)))
     })
   let assert Ok(outcome) = process.receive(wrong, 1000)
   let assert #(error.WrongOwner, _) = failure_of(outcome)
@@ -305,11 +312,11 @@ fn copies_and_conflicts() -> Nil {
 }
 
 fn conflict(source: body.Body, until: deadline.Deadline) -> Nil {
-  let assert Error(failure) = body.next_within(source, 0)
+  let assert Error(failure) = body.next_within(source, duration.milliseconds(0))
   case error.reason(failure) {
     error.ReadConflict -> Nil
     error.WrongOwner -> {
-      let assert True = deadline.remaining_ms(until) > 0
+      let assert True = duration.to_milliseconds(deadline.remaining(until)) > 0
       conflict(source, until)
     }
     _ -> panic as "unexpected conflicting-read outcome"
@@ -348,7 +355,7 @@ fn restarted(
   case process.named(name) {
     Ok(pid) if pid != old -> pid
     _ -> {
-      let assert True = deadline.remaining_ms(until) > 0
+      let assert True = duration.to_milliseconds(deadline.remaining(until)) > 0
       process.sleep(1)
       restarted(name, old, until)
     }
@@ -395,7 +402,7 @@ fn modes() -> Nil {
   let assert Ok(recorded) =
     cassette.record(local_config(), path, replacing(1_000_000))
   flow(recorded.client, request)
-  let assert Ok(_) = cassette.finish(recorded.recording, 1000)
+  let assert Ok(_) = cassette.finish(recorded.recording, duration.seconds(1))
   http_gun.stop(recorded.client)
   let assert Ok(tape) = cassette.load(path, 1_000_000)
   let assert Ok(client) = testing.playback(tape, local_config())
@@ -471,7 +478,9 @@ fn slow_sink_and_shutdown() -> Nil {
   // `stop` lets an open body finish within the shutdown timeout, then
   // cancels it; this stream never ends, so the job sees the cancellation.
   let assert Ok(client) =
-    local_config() |> config.with_shutdown_timeout(100) |> http_gun.start
+    local_config()
+    |> config.with_shutdown_timeout(duration.milliseconds(100))
+    |> http_gun.start
   let #(port, peer) = controlled()
   let job = start(client, req(port))
   arrived(peer)
@@ -495,7 +504,7 @@ fn recording_prefix_and_failure() -> Nil {
   send(peer, <<"1\r\nx\r\n":utf8>>)
   let assert Ok(feed_job.Early(1)) = feed_job.await(job, 1000)
   let assert True = closed(peer)
-  let assert Ok(_) = cassette.finish(recorded.recording, 1000)
+  let assert Ok(_) = cassette.finish(recorded.recording, duration.seconds(1))
   http_gun.stop(recorded.client)
   let assert Ok(tape) = cassette.load(path, 1_000_000)
   let assert Ok(client) = testing.playback(tape, local_config())
@@ -510,7 +519,7 @@ fn recording_prefix_and_failure() -> Nil {
   let job = start(recorded.client, req(persistent()))
   let assert Ok(feed_job.Eof(3, [])) = feed_job.await(job, 1000)
   let assert Error(cassette.CaptureFailed(cassette.CaptureLimit)) =
-    cassette.finish(recorded.recording, 1000)
+    cassette.finish(recorded.recording, duration.seconds(1))
   let assert Error(cassette.Missing) = cassette.load(path, 1000)
   http_gun.stop(recorded.client)
 }

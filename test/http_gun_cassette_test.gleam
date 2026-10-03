@@ -9,6 +9,7 @@ import gleam/json
 import gleam/list
 import gleam/option.{Some}
 import gleam/string
+import gleam/time/duration
 import gleeunit/should
 import http_gun
 import http_gun/body
@@ -144,15 +145,15 @@ pub fn schema_two_stores_text_and_base64_chunks_test() {
   testing.exchanges(parsed) |> should.equal(exchanges)
   let assert Ok(client) = testing.playback(parsed, config.default())
   let assert Ok(response) = http_gun.open(client, text_request)
-  body.next_within(response.body, 1000)
+  body.next_within(response.body, duration.milliseconds(1000))
   |> should.equal(Ok(Some(body.Chunk(text_chunk))))
-  body.next_within(response.body, 1000)
+  body.next_within(response.body, duration.milliseconds(1000))
   |> should.equal(Ok(Some(body.Chunk(binary_chunk))))
-  body.next_within(response.body, 1000)
+  body.next_within(response.body, duration.milliseconds(1000))
   |> should.equal(Ok(Some(body.Chunk(control_chunk))))
-  body.next_within(response.body, 1000)
+  body.next_within(response.body, duration.milliseconds(1000))
   |> should.equal(Ok(Some(body.Chunk(invalid_utf8_chunk))))
-  body.next_within(response.body, 1000)
+  body.next_within(response.body, duration.milliseconds(1000))
   |> should.equal(Ok(Some(body.End([]))))
   body.close(response.body)
   let assert Ok(empty) = http_gun.send(client, binary_request)
@@ -235,7 +236,7 @@ pub fn failure_before_headers_releases_admission_test() {
     testing.playback(
       testing.script([rejection, rejection]),
       config.default()
-        |> config.with_request_timeout(config.Milliseconds(100))
+        |> config.with_request_timeout(config.After(duration.milliseconds(100)))
         |> config.with_max_open_bodies(1),
     )
   let assert Error(first) = http_gun.send(client, req())

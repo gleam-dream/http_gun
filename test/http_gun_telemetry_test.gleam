@@ -6,6 +6,7 @@ import gleam/int
 import gleam/list
 import gleam/option.{None, Some}
 import gleam/result
+import gleam/time/duration
 import gleeunit/should
 import http_gun
 import http_gun/body
@@ -495,7 +496,7 @@ pub fn queued_deadline_terminates_without_grant_or_gun_return_test() {
   let client =
     shared
     |> http_gun.with_correlation(correlation)
-    |> http_gun.with_deadline(deadline.after(1000))
+    |> http_gun.with_deadline(deadline.after(duration.milliseconds(1000)))
   let _ =
     process.spawn_unlinked(fn() {
       process.send(result, http_gun.send(client, local_request(port)))
@@ -542,7 +543,8 @@ pub fn recording_and_strict_playback_keep_telemetry_out_of_matching_test() {
   |> should.be_true
   list.any(live, fn(value) { value.1.milestone == telemetry.GunCallReturned })
   |> should.be_true
-  let assert Ok(_) = cassette.finish(recorded.recording, 1000)
+  let assert Ok(_) =
+    cassette.finish(recorded.recording, duration.milliseconds(1000))
   http_gun.stop(recorded.client)
   let assert Ok(tape) = cassette.load(path, 100_000)
   let assert Ok(playback) = testing.playback(tape, settings)
@@ -583,7 +585,7 @@ pub fn recording_and_strict_playback_keep_telemetry_out_of_matching_test() {
     value.1.milestone == telemetry.HttpTerminated(telemetry.Failed)
   })
   |> should.be_false
-  cassette.finish(limited.recording, 1000)
+  cassette.finish(limited.recording, duration.milliseconds(1000))
   |> should.equal(Error(cassette.CaptureFailed(cassette.CaptureLimit)))
   http_gun.stop(limited.client)
   stop_observer(observer)
@@ -659,9 +661,10 @@ pub fn observed_h2_cancellation_preserves_sibling_and_one_connection_test() {
   |> should.equal(list.key_find(fast.headers, "x-connection"))
   body.close(slow.body)
   body.close(slow.body)
-  body.next_within(fast.body, 1000)
+  body.next_within(fast.body, duration.milliseconds(1000))
   |> should.equal(Ok(Some(body.Chunk(<<0, 255, 128>>))))
-  body.next_within(fast.body, 1000) |> should.equal(Ok(Some(body.End([]))))
+  body.next_within(fast.body, duration.milliseconds(1000))
+  |> should.equal(Ok(Some(body.End([]))))
   body.close(fast.body)
   let outcomes = terminations(observer, 2, 16)
   list.length(outcomes) |> should.equal(2)

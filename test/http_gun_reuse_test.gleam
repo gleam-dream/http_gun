@@ -3,6 +3,7 @@ import gleam/http/request
 import gleam/http/response
 import gleam/int
 import gleam/list
+import gleam/time/duration
 import gleeunit/should
 import http_gun
 import http_gun/config
@@ -86,7 +87,7 @@ pub fn readiness_wait_uses_the_original_deadline_test() {
   let assert Ok(_) = http_gun.send(client, req)
   close_peer(peer)
   process.sleep(100)
-  let until = deadline.after(10)
+  let until = deadline.after(duration.milliseconds(10))
   let outcome = http_gun.send(client |> http_gun.with_deadline(until), req)
   http_gun.stop(client)
   stop(peer)

@@ -8,6 +8,7 @@ import gleam/list
 import gleam/option.{Some}
 import gleam/result
 import gleam/string
+import gleam/time/duration
 import gleeunit/should
 import http_gun
 import http_gun/body
@@ -47,8 +48,10 @@ pub fn real_record_finish_and_offline_replay_test() {
     cassette.record(local_config(), destination, cassette.options())
   private_directory(destination) |> should.be_true
   let assert Ok(live) = http_gun.send(recorded.client, req(port))
-  cassette.finish(recorded.recording, 0) |> should.equal(Ok(destination))
-  cassette.finish(recorded.recording, 0) |> should.equal(Ok(destination))
+  cassette.finish(recorded.recording, duration.milliseconds(0))
+  |> should.equal(Ok(destination))
+  cassette.finish(recorded.recording, duration.milliseconds(0))
+  |> should.equal(Ok(destination))
   http_gun.stop(recorded.client)
   let assert Ok(value) = cassette.load(destination, 10_000)
   let assert Ok(playback) = testing.playback(value, local_config())
@@ -81,18 +84,23 @@ pub fn early_cancel_records_without_draining_test() {
   let assert Ok(recorded) =
     cassette.record(local_config(), destination, cassette.options())
   let assert Ok(response) = http_gun.open(recorded.client, req(port))
-  cassette.finish(recorded.recording, 0) |> should.equal(Error(cassette.Busy))
+  cassette.finish(recorded.recording, duration.milliseconds(0))
+  |> should.equal(Error(cassette.Busy))
   emit(server, <<"3\r\nabc\r\n":utf8>>)
-  body.next_within(response.body, 1000) |> should.equal(chunk(<<"abc":utf8>>))
+  body.next_within(response.body, duration.milliseconds(1000))
+  |> should.equal(chunk(<<"abc":utf8>>))
   body.close(response.body)
   closed(server) |> should.be_true
-  cassette.finish(recorded.recording, 1000) |> should.equal(Ok(destination))
+  cassette.finish(recorded.recording, duration.milliseconds(1000))
+  |> should.equal(Ok(destination))
   http_gun.stop(recorded.client)
   let assert Ok(cassette) = cassette.load(destination, 10_000)
   let assert Ok(client) = testing.playback(cassette, local_config())
   let assert Ok(response) = http_gun.open(client, req(port))
-  body.next_within(response.body, 1000) |> should.equal(chunk(<<"abc":utf8>>))
-  let assert Error(failure) = body.next_within(response.body, 1000)
+  body.next_within(response.body, duration.milliseconds(1000))
+  |> should.equal(chunk(<<"abc":utf8>>))
+  let assert Error(failure) =
+    body.next_within(response.body, duration.milliseconds(1000))
   error.reason(failure) |> should.equal(error.Closed)
   body.close(response.body)
   http_gun.stop(client)
@@ -110,7 +118,7 @@ pub fn capture_budget_failure_preserves_http_outcome_test() {
     )
   let assert Ok(response) = http_gun.send(recorded.client, req(port))
   response.response.body |> should.equal(<<0, 255, 128>>)
-  cassette.finish(recorded.recording, 0)
+  cassette.finish(recorded.recording, duration.milliseconds(0))
   |> should.equal(Error(cassette.CaptureFailed(cassette.CaptureLimit)))
   cassette.load(destination, 10_000) |> should.equal(Error(cassette.Missing))
   http_gun.stop(recorded.client)
@@ -122,9 +130,9 @@ pub fn existing_destination_refusal_is_deterministic_test() {
   let assert Ok(recorded) =
     cassette.record(local_config(), destination, cassette.options())
   let assert Ok(_) = http_gun.send(recorded.client, req(port))
-  cassette.finish(recorded.recording, 0)
+  cassette.finish(recorded.recording, duration.milliseconds(0))
   |> should.equal(Error(cassette.CaptureFailed(cassette.DestinationExists)))
-  cassette.finish(recorded.recording, 0)
+  cassette.finish(recorded.recording, duration.milliseconds(0))
   |> should.equal(Error(cassette.CaptureFailed(cassette.DestinationExists)))
   http_gun.stop(recorded.client)
   remove(destination)
@@ -141,7 +149,7 @@ pub fn interrupted_capture_never_publishes_test() {
   let assert Ok(collected) = body.collect(response.body, 1000)
   collected.bytes |> should.equal(<<"abc":utf8>>)
   body.close(response.body)
-  cassette.finish(recorded.recording, 0)
+  cassette.finish(recorded.recording, duration.milliseconds(0))
   |> should.equal(Error(cassette.CaptureFailed(cassette.Interrupted)))
   cassette.load(destination, 10_000) |> should.equal(Error(cassette.Missing))
   http_gun.stop(recorded.client)
@@ -163,13 +171,14 @@ pub fn actual_write_failure_does_not_replace_http_result_test() {
     cassette.record(local_config(), destination, cassette.options())
   let assert Ok(response) = http_gun.open(recorded.client, req(port))
   emit(server, <<"1\r\na\r\n":utf8>>)
-  body.next_within(response.body, 1000) |> should.equal(chunk(<<"a":utf8>>))
+  body.next_within(response.body, duration.milliseconds(1000))
+  |> should.equal(chunk(<<"a":utf8>>))
   break_file(destination)
   emit(server, <<"1\r\nb\r\n0\r\n\r\n":utf8>>)
   let assert Ok(tail) = body.collect(response.body, 100)
   tail.bytes |> should.equal(<<"b":utf8>>)
   body.close(response.body)
-  cassette.finish(recorded.recording, 0)
+  cassette.finish(recorded.recording, duration.milliseconds(0))
   |> should.equal(
     Error(
       cassette.CaptureFailed(cassette.IoFailure(
@@ -187,19 +196,22 @@ pub fn stalled_writer_keeps_control_and_completed_http_test() {
   let destination = path()
   let assert Ok(recorded) =
     cassette.record(
-      local_config() |> config.with_request_timeout(config.Milliseconds(300)),
+      local_config()
+        |> config.with_request_timeout(config.After(duration.milliseconds(300))),
       destination,
       cassette.options(),
     )
   let assert Ok(response) = http_gun.open(recorded.client, req(port))
   emit(server, <<"1\r\na\r\n":utf8>>)
-  body.next_within(response.body, 1000) |> should.equal(chunk(<<"a":utf8>>))
+  body.next_within(response.body, duration.milliseconds(1000))
+  |> should.equal(chunk(<<"a":utf8>>))
   let fifo = stall_file(destination)
   emit(server, <<"1\r\nb\r\n0\r\n\r\n":utf8>>)
-  cassette.finish(recorded.recording, 0) |> should.equal(Error(cassette.Busy))
+  cassette.finish(recorded.recording, duration.milliseconds(0))
+  |> should.equal(Error(cassette.Busy))
   let assert Ok(tail) = body.collect(response.body, 100)
   tail.bytes |> should.equal(<<"b":utf8>>)
-  cassette.finish(recorded.recording, 0)
+  cassette.finish(recorded.recording, duration.milliseconds(0))
   |> should.equal(Error(cassette.CaptureFailed(cassette.Interrupted)))
   release_fifo(fifo)
   body.close(response.body)
@@ -216,7 +228,8 @@ pub fn explicit_replacement_and_finalized_refusal_test() {
       cassette.options() |> cassette.replace_existing,
     )
   let assert Ok(_) = http_gun.send(recorded.client, req(port))
-  cassette.finish(recorded.recording, 0) |> should.equal(Ok(destination))
+  cassette.finish(recorded.recording, duration.milliseconds(0))
+  |> should.equal(Ok(destination))
   cassette.load(destination, 10_000) |> should.be_ok
   let assert Error(failure) = http_gun.send(recorded.client, req(port))
   error.evidence(failure) |> should.equal(error.NotSent)
@@ -245,7 +258,8 @@ pub fn cancelled_before_headers_records_without_inventing_response_test() {
   http_gun.stop(recorded.client)
   let assert Ok(Error(live)) = process.receive(reply, 1000)
   error.reason(live) |> should.equal(error.Closed)
-  cassette.finish(recorded.recording, 1000) |> should.equal(Ok(destination))
+  cassette.finish(recorded.recording, duration.milliseconds(1000))
+  |> should.equal(Ok(destination))
   let assert Ok(value) = cassette.load(destination, 10_000)
   let assert Ok(client) = testing.playback(value, local_config())
   let assert Error(replayed) = http_gun.open(client, req(port))
@@ -265,7 +279,8 @@ pub fn concurrent_recording_and_replay_test() {
     cassette.record(local_config(), destination, cassette.options())
   let assert Ok(live) = http_gun.batch(recorded.client, requests, 10)
   list.all(live, result.is_ok) |> should.be_true
-  cassette.finish(recorded.recording, 0) |> should.equal(Ok(destination))
+  cassette.finish(recorded.recording, duration.milliseconds(0))
+  |> should.equal(Ok(destination))
   http_gun.stop(recorded.client)
   let assert Ok(value) = cassette.load(destination, 100_000)
   let assert Ok(client) = testing.playback(value, local_config())
@@ -285,18 +300,23 @@ pub fn recorded_failure_retains_observed_prefix_test() {
     cassette.record(local_config(), destination, cassette.options())
   let assert Ok(reply) = http_gun.open(recorded.client, req(port))
   emit(server, <<"3\r\nabc\r\n":utf8>>)
-  body.next_within(reply.body, 1000) |> should.equal(chunk(<<"abc":utf8>>))
+  body.next_within(reply.body, duration.milliseconds(1000))
+  |> should.equal(chunk(<<"abc":utf8>>))
   disconnect(server)
-  let assert Error(failure) = body.next_within(reply.body, 1000)
+  let assert Error(failure) =
+    body.next_within(reply.body, duration.milliseconds(1000))
   error.evidence(failure) |> should.equal(error.MaybeSent)
   body.close(reply.body)
-  cassette.finish(recorded.recording, 1000) |> should.equal(Ok(destination))
+  cassette.finish(recorded.recording, duration.milliseconds(1000))
+  |> should.equal(Ok(destination))
   http_gun.stop(recorded.client)
   let assert Ok(tape) = cassette.load(destination, 10_000)
   let assert Ok(client) = testing.playback(tape, local_config())
   let assert Ok(replay) = http_gun.open(client, req(port))
-  body.next_within(replay.body, 1000) |> should.equal(chunk(<<"abc":utf8>>))
-  body.next_within(replay.body, 1000) |> should.equal(Error(failure))
+  body.next_within(replay.body, duration.milliseconds(1000))
+  |> should.equal(chunk(<<"abc":utf8>>))
+  body.next_within(replay.body, duration.milliseconds(1000))
+  |> should.equal(Error(failure))
   body.close(replay.body)
   http_gun.stop(client)
   remove(destination)
@@ -310,22 +330,27 @@ pub fn finish_wait_timeout_then_cancel_and_publish_test() {
     cassette.record(local_config(), destination, cassette.options())
   let assert Ok(response) = http_gun.open(recorded.client, req(port))
   // A positive wait seals the capture; an immediate finish would only refuse.
-  cassette.finish(recorded.recording, 1)
+  cassette.finish(recorded.recording, duration.milliseconds(1))
   |> should.equal(Error(cassette.WaitTimeout))
   let assert Error(refused) = http_gun.send(recorded.client, req(port))
   error.evidence(refused) |> should.equal(error.NotSent)
   emit(server, <<"3\r\nabc\r\n":utf8>>)
-  body.next_within(response.body, 1000) |> should.equal(chunk(<<"abc":utf8>>))
+  body.next_within(response.body, duration.milliseconds(1000))
+  |> should.equal(chunk(<<"abc":utf8>>))
   body.close(response.body)
   closed(server) |> should.be_true
-  cassette.finish(recorded.recording, 1000) |> should.equal(Ok(destination))
-  cassette.finish(recorded.recording, 0) |> should.equal(Ok(destination))
+  cassette.finish(recorded.recording, duration.milliseconds(1000))
+  |> should.equal(Ok(destination))
+  cassette.finish(recorded.recording, duration.milliseconds(0))
+  |> should.equal(Ok(destination))
   http_gun.stop(recorded.client)
   let assert Ok(tape) = cassette.load(destination, 10_000)
   let assert Ok(client) = testing.playback(tape, local_config())
   let assert Ok(replay) = http_gun.open(client, req(port))
-  body.next_within(replay.body, 1000) |> should.equal(chunk(<<"abc":utf8>>))
-  let assert Error(failure) = body.next_within(replay.body, 1000)
+  body.next_within(replay.body, duration.milliseconds(1000))
+  |> should.equal(chunk(<<"abc":utf8>>))
+  let assert Error(failure) =
+    body.next_within(replay.body, duration.milliseconds(1000))
   error.reason(failure) |> should.equal(error.Closed)
   body.close(replay.body)
   http_gun.stop(client)
@@ -349,7 +374,7 @@ pub fn finish_wait_contention_death_and_abort_test() {
   wait_for_finish_result(recorded.recording, cassette.WaitTimeout, 1000)
   |> should.be_true
   cassette.abort(recorded.recording) |> should.equal(Ok(Nil))
-  cassette.finish(recorded.recording, 1000)
+  cassette.finish(recorded.recording, duration.milliseconds(1000))
   |> should.equal(Error(cassette.CaptureFailed(cassette.Interrupted)))
   body.close(response.body)
   closed(server) |> should.be_true
@@ -364,7 +389,7 @@ fn wait_for_finish_result(
   expected: cassette.FinishError,
   tries: Int,
 ) -> Bool {
-  case cassette.finish(rec, 1), tries {
+  case cassette.finish(rec, duration.milliseconds(1)), tries {
     Error(actual), _ if actual == expected -> True
     _, 0 -> False
     _, _ -> wait_for_finish_result(rec, expected, tries - 1)
@@ -374,7 +399,7 @@ fn wait_for_finish_result(
 fn wait_until_registered(
   rec: cassette.Recording,
 ) -> Result(String, cassette.FinishError) {
-  case cassette.finish(rec, 10_000) {
+  case cassette.finish(rec, duration.milliseconds(10_000)) {
     Error(cassette.Busy) -> wait_until_registered(rec)
     result -> result
   }
@@ -392,22 +417,26 @@ pub fn token_cancellation_preserves_typed_outcome_on_replay_test() {
         |> http_gun.with_cancellation(token)
         |> http_gun.open(req(port))
       emit(server, <<"3\r\nabc\r\n":utf8>>)
-      body.next_within(response.body, 1000)
+      body.next_within(response.body, duration.milliseconds(1000))
       |> should.equal(chunk(<<"abc":utf8>>))
       cancellation.cancel(token)
-      let assert Error(failure) = body.next_within(response.body, 1000)
+      let assert Error(failure) =
+        body.next_within(response.body, duration.milliseconds(1000))
       error.reason(failure) |> should.equal(error.Cancelled)
       body.close(response.body)
       failure
     })
   closed(server) |> should.be_true
-  cassette.finish(recorded.recording, 1000) |> should.equal(Ok(destination))
+  cassette.finish(recorded.recording, duration.milliseconds(1000))
+  |> should.equal(Ok(destination))
   http_gun.stop(recorded.client)
   let assert Ok(tape) = cassette.load(destination, 100_000)
   let assert Ok(client) = testing.playback(tape, local_config())
   let assert Ok(response) = http_gun.open(client, req(port))
-  body.next_within(response.body, 1000) |> should.equal(chunk(<<"abc":utf8>>))
-  body.next_within(response.body, 1000) |> should.equal(Error(failure))
+  body.next_within(response.body, duration.milliseconds(1000))
+  |> should.equal(chunk(<<"abc":utf8>>))
+  body.next_within(response.body, duration.milliseconds(1000))
+  |> should.equal(Error(failure))
   body.close(response.body)
   http_gun.stop(client)
   remove(destination)
@@ -466,7 +495,8 @@ pub fn redaction_removes_headers_and_query_values_from_recording_test() {
   |> should.equal(Ok("resp-sig-secret"))
   live.trailers
   |> should.equal([#("x-signature", "trailer-sig-secret"), #("x-end", "yes")])
-  cassette.finish(recorded.recording, 1000) |> should.equal(Ok(destination))
+  cassette.finish(recorded.recording, duration.milliseconds(1000))
+  |> should.equal(Ok(destination))
   http_gun.stop(recorded.client)
 
   let assert Ok(text) = simplifile.read(destination)
@@ -512,15 +542,16 @@ pub fn body_redaction_sees_a_secret_split_across_chunks_test() {
   let assert Ok(response) = http_gun.open(recorded.client, secret_request(port))
   // The secret arrives in two chunks, each read separately.
   emit(server, <<"c\r\ndata resp-SE\r\n":utf8>>)
-  body.next_within(response.body, 1000)
+  body.next_within(response.body, duration.milliseconds(1000))
   |> should.equal(chunk(<<"data resp-SE":utf8>>))
   emit(server, <<"10\r\nCRET-value done.\r\n0\r\n\r\n":utf8>>)
-  body.next_within(response.body, 1000)
+  body.next_within(response.body, duration.milliseconds(1000))
   |> should.equal(chunk(<<"CRET-value done.":utf8>>))
-  body.next_within(response.body, 1000)
+  body.next_within(response.body, duration.milliseconds(1000))
   |> should.equal(Ok(Some(body.End([]))))
   body.close(response.body)
-  cassette.finish(recorded.recording, 1000) |> should.equal(Ok(destination))
+  cassette.finish(recorded.recording, duration.milliseconds(1000))
+  |> should.equal(Ok(destination))
   http_gun.stop(recorded.client)
 
   let assert Ok(text) = simplifile.read(destination)

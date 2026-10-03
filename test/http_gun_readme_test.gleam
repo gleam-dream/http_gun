@@ -9,6 +9,7 @@ import gleam/list
 import gleam/option.{Some}
 import gleam/otp/static_supervisor
 import gleam/string
+import gleam/time/duration
 import gleeunit/should
 import http_gun
 import http_gun/body
@@ -49,7 +50,7 @@ pub fn configure_test() {
   let settings =
     config.default()
     |> config.with_protocol(config.PreferHttp2)
-    |> config.with_request_timeout(config.Milliseconds(10_000))
+    |> config.with_request_timeout(config.After(duration.seconds(10)))
     |> config.with_max_response_body_bytes(1_048_576)
   config.validate(settings) |> should.be_ok
   config.default()
@@ -68,7 +69,7 @@ pub fn client_views_and_streaming_test() {
   let stream =
     client
     |> http_gun.with_timeout(config.Infinity)
-    |> http_gun.with_idle_timeout(config.Milliseconds(60_000))
+    |> http_gun.with_idle_timeout(config.After(duration.seconds(60)))
     |> http_gun.with_correlation(order)
   let counted = {
     use response <- http_gun.with_response(stream, local(port), fn(failure) {
@@ -216,7 +217,7 @@ pub fn record_then_replay_with_redaction_test() {
   let assert Ok(cassette.Recorded(client:, recording:)) =
     cassette.record(settings, path, cassette.options())
   let _ = http_gun.send(client, req)
-  let assert Ok(_) = cassette.finish(recording, 5000)
+  let assert Ok(_) = cassette.finish(recording, duration.seconds(5))
   http_gun.stop(client)
 
   let assert Ok(script) = cassette.load(path, 1_048_576)

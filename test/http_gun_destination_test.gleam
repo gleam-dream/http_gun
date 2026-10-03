@@ -4,6 +4,7 @@ import gleam/http/request
 import gleam/http/response
 import gleam/int
 import gleam/list
+import gleam/time/duration
 import gleeunit/should
 import http_gun
 import http_gun/cancellation
@@ -61,7 +62,7 @@ pub fn default_refuses_loopback_before_connecting_test() {
   let assert Ok(client) =
     http_gun.start(
       config.default()
-      |> config.with_request_timeout(config.Milliseconds(300)),
+      |> config.with_request_timeout(config.After(duration.milliseconds(300))),
     )
   let assert Ok(req) = request.to("http://127.0.0.1:" <> int.to_string(port))
   let result = http_gun.send(client, request.set_body(req, <<>>))
@@ -80,7 +81,7 @@ pub fn allow_loopback_helper_admits_only_loopback_test() {
     |> destination.only_hosts(["localhost", "127.0.0.1"])
   let base =
     config.default()
-    |> config.with_request_timeout(config.Milliseconds(1000))
+    |> config.with_request_timeout(config.After(duration.milliseconds(1000)))
     |> config.with_destination(hosts)
   let opened = config.allow_loopback(base)
   // allow_loopback keeps every other destination setting.
@@ -394,13 +395,15 @@ pub fn resolution_lifetime_cleanup_test() {
       let settings =
         local_config()
         |> config.with_request_timeout(
-          config.Milliseconds(case mode {
-            "deadline" -> 150
-            _ -> 5000
-          }),
+          config.After(
+            duration.milliseconds(case mode {
+              "deadline" -> 150
+              _ -> 5000
+            }),
+          ),
         )
         |> config.with_resolver(fn(_, budget) {
-          { budget > 0 } |> should.be_true
+          { duration.to_milliseconds(budget) > 0 } |> should.be_true
           process.send(entered, process.self())
           let forever: process.Subject(Nil) = process.new_subject()
           let _ = process.receive_forever(forever)
@@ -525,7 +528,8 @@ pub fn recording_enforces_destination_and_offline_modes_never_resolve_test() {
   let assert Ok(recorded) = cassette.record(settings, file, cassette.options())
   let failure = rejected(destination.AddressRefused(destination.Loopback))
   http_gun.send(recorded.client, req) |> should.equal(Error(failure))
-  cassette.finish(recorded.recording, 2000) |> should.equal(Ok(file))
+  cassette.finish(recorded.recording, duration.milliseconds(2000))
+  |> should.equal(Ok(file))
   http_gun.stop(recorded.client)
   let assert Ok(tape) = cassette.load(file, 10_000)
   let assert Ok(replay) = testing.playback(tape, settings)
@@ -1004,13 +1008,16 @@ pub fn required_view_destination_refuses_a_bare_client_test() {
   let assert Ok(client) =
     local_config()
     |> config.require_view_destination
-    |> config.with_request_timeout(config.Milliseconds(1000))
+    |> config.with_request_timeout(config.After(duration.milliseconds(1000)))
     |> http_gun.start
   let required = Error(error.new(error.ViewDestinationRequired, error.NotSent))
   let req = local_request(port, "127.0.0.1")
   http_gun.send(client, req) |> should.equal(required)
   // Other view settings do not count as a destination.
-  http_gun.send(client |> http_gun.with_timeout(config.Milliseconds(500)), req)
+  http_gun.send(
+    client |> http_gun.with_timeout(config.After(duration.milliseconds(500))),
+    req,
+  )
   |> should.equal(required)
   let assert Error(failure) = http_gun.open(client, req)
   failure
@@ -1101,4 +1108,123 @@ pub fn required_view_destination_applies_to_playback_test() {
     )
   reply.response.status |> should.equal(204)
   http_gun.stop(client)
+}
+
+pub fn plaintext_to_loopback_only_is_decided_on_resolved_addresses_test() {
+  let port = server()
+  let policy =
+    destination.default()
+    |> destination.allow_loopback
+    |> destination.allow_private
+    |> destination.with_plaintext(destination.PlaintextToLoopbackOnly)
+  let start = fn(answer: List(destination.Address)) {
+    let assert Ok(client) =
+      config.default()
+      |> config.with_destination(policy)
+      |> config.with_resolver(fn(_, _) { Ok(answer) })
+      |> http_gun.start
+    client
+  }
+  // A host name that resolves to loopback is admitted over plaintext.
+  let client = start([destination.Ipv4(127, 0, 0, 1)])
+  let assert Ok(reply) =
+    http_gun.send(client, local_request(port, "llm.localhost"))
+  reply.response.status |> should.equal(200)
+  // So is a loopback literal, without the resolver.
+  let assert Ok(_) = http_gun.send(client, local_request(port, "127.0.0.1"))
+  http_gun.stop(client)
+  // A name whose answer is private, or only partly loopback, is refused
+  // before connecting, although the policy admits private addresses.
+  list.each(
+    [
+      [destination.Ipv4(10, 0, 0, 7)],
+      [destination.Ipv4(127, 0, 0, 1), destination.Ipv4(10, 0, 0, 7)],
+    ],
+    fn(answer) {
+      let client = start(answer)
+      http_gun.send(client, local_request(port, "localhost"))
+      |> should.equal(
+        Error(rejected(destination.PlaintextRefused(destination.Private))),
+      )
+      http_gun.stop(client)
+    },
+  )
+  // The refusal is a typed Refused failure.
+  error.kind(rejected(destination.PlaintextRefused(destination.Private)))
+  |> should.equal(error.Refused)
+}
+
+pub fn require_tls_refuses_plaintext_and_admits_https_test() {
+  let assert Ok(client) =
+    config.default()
+    |> config.with_destination(
+      destination.loopback_only()
+      |> destination.with_plaintext(destination.RequireTls),
+    )
+    |> config.with_trust(config.CustomCa("test/fixtures/ca.crt"))
+    |> config.with_resolver(fn(_, _) { Ok([destination.Ipv4(127, 0, 0, 1)]) })
+    |> http_gun.start
+  http_gun.send(client, local_request(server(), "localhost"))
+  |> should.equal(
+    Error(rejected(destination.PlaintextRefused(destination.Loopback))),
+  )
+  let assert Ok(reply) =
+    http_gun.send(
+      client,
+      local_request(tls_hostname(), "localhost")
+        |> request.set_scheme(http.Https),
+    )
+  reply.response.status |> should.equal(200)
+  http_gun.stop(client)
+}
+
+pub fn view_plaintext_rule_applies_to_a_pooled_connection_test() {
+  let port = server()
+  let assert Ok(client) =
+    local_config()
+    |> config.with_resolver(fn(_, _) { Ok([destination.Ipv4(127, 0, 0, 1)]) })
+    |> http_gun.start
+  let req = local_request(port, "localhost")
+  // The default policy allows plaintext; this pools a connection.
+  let assert Ok(_) = http_gun.send(client, req)
+  let strict =
+    client
+    |> http_gun.with_destination(
+      destination.loopback_only()
+      |> destination.with_plaintext(destination.RequireTls),
+    )
+  http_gun.send(strict, req)
+  |> should.equal(
+    Error(rejected(destination.PlaintextRefused(destination.Loopback))),
+  )
+  let local_only =
+    client
+    |> http_gun.with_destination(
+      destination.loopback_only()
+      |> destination.with_plaintext(destination.PlaintextToLoopbackOnly),
+    )
+  let assert Ok(_) = http_gun.send(local_only, req)
+  http_gun.stop(client)
+}
+
+pub fn check_plaintext_results_test() {
+  let loopback = destination.Ipv6(0, 0, 0, 0, 0, 0, 0, 1)
+  let mapped = destination.Ipv6(0, 0, 0, 0, 0, 0xFFFF, 0x7F00, 1)
+  let public = destination.Ipv4(8, 8, 8, 8)
+  let policy = destination.default()
+  destination.check_plaintext(policy, public) |> should.equal(Ok(Nil))
+  let local_only =
+    destination.with_plaintext(policy, destination.PlaintextToLoopbackOnly)
+  destination.check_plaintext(local_only, loopback) |> should.equal(Ok(Nil))
+  destination.check_plaintext(local_only, mapped) |> should.equal(Ok(Nil))
+  destination.check_plaintext(local_only, public)
+  |> should.equal(Error(destination.PlaintextRefused(destination.Public)))
+  destination.check_plaintext(
+    destination.with_plaintext(policy, destination.RequireTls),
+    loopback,
+  )
+  |> should.equal(Error(destination.PlaintextRefused(destination.Loopback)))
+  // The plaintext rule never widens the address classes.
+  destination.check_address(local_only, loopback)
+  |> should.equal(Error(destination.AddressRefused(destination.Loopback)))
 }

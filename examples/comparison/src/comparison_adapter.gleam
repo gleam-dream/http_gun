@@ -7,6 +7,7 @@ import gleam/http/request
 import gleam/list
 import gleam/result
 import gleam/string
+import gleam/time/duration
 import gleam/yielder
 import http_gun
 import http_gun/body
@@ -32,7 +33,7 @@ pub fn start(name: String, connections: Int) -> Client {
     "gun" -> {
       let assert Ok(client) =
         local_config()
-        |> config.with_request_timeout(config.Milliseconds(60_000))
+        |> config.with_request_timeout(config.After(duration.seconds(60)))
         |> config.with_trust(config.CustomCa("test/fixtures/ca.crt"))
         |> config.with_max_connections(connections)
         |> config.with_max_connections_per_origin(connections)

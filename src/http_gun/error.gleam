@@ -498,10 +498,17 @@ fn describe_problem(problem: RequestProblem) -> String {
 fn rejection_tag(rejection: destination.Rejection) -> String {
   case rejection {
     destination.HostNotAllowed -> "host_not_allowed"
-    destination.AddressRefused(destination.Public) -> "public"
-    destination.AddressRefused(destination.Loopback) -> "loopback"
-    destination.AddressRefused(destination.Private) -> "private"
-    destination.AddressRefused(destination.Reserved) -> "reserved"
+    destination.AddressRefused(class) -> class_tag(class)
+    destination.PlaintextRefused(class) -> "plaintext_" <> class_tag(class)
+  }
+}
+
+fn class_tag(class: destination.Class) -> String {
+  case class {
+    destination.Public -> "public"
+    destination.Loopback -> "loopback"
+    destination.Private -> "private"
+    destination.Reserved -> "reserved"
   }
 }
 
@@ -512,6 +519,12 @@ fn parse_rejection(tag: String) -> Result(destination.Rejection, Nil) {
     "loopback" -> Ok(destination.AddressRefused(destination.Loopback))
     "private" -> Ok(destination.AddressRefused(destination.Private))
     "reserved" -> Ok(destination.AddressRefused(destination.Reserved))
+    "plaintext_public" -> Ok(destination.PlaintextRefused(destination.Public))
+    "plaintext_loopback" ->
+      Ok(destination.PlaintextRefused(destination.Loopback))
+    "plaintext_private" -> Ok(destination.PlaintextRefused(destination.Private))
+    "plaintext_reserved" ->
+      Ok(destination.PlaintextRefused(destination.Reserved))
     _ -> Error(Nil)
   }
 }
@@ -521,6 +534,8 @@ fn describe_rejection(rejection: destination.Rejection) -> String {
     destination.HostNotAllowed -> "host or port not allowed"
     destination.AddressRefused(_) ->
       rejection_tag(rejection) <> " address refused"
+    destination.PlaintextRefused(class) ->
+      "plaintext HTTP to a " <> class_tag(class) <> " address refused"
   }
 }
 

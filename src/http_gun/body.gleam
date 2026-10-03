@@ -27,6 +27,7 @@
 
 import gleam/option.{type Option, None, Some}
 import gleam/result
+import gleam/time/duration.{type Duration}
 import http_gun/config
 import http_gun/error.{type Failure}
 import http_gun/internal/bridge
@@ -58,11 +59,14 @@ pub fn next(body: Body) -> Result(Event, Failure) {
   }
 }
 
-/// Wait at most `wait_ms` for the next chunk or the end of the body. `None`
+/// Wait at most `wait` for the next chunk or the end of the body. `None`
 /// means nothing arrived in time; the stream stays intact and a later read
-/// continues it. A negative wait polls once.
-pub fn next_within(body: Body, wait_ms: Int) -> Result(Option(Event), Failure) {
-  owner.read(body, Some(bridge.now() + wait_ms))
+/// continues it. A zero or negative wait polls once.
+pub fn next_within(
+  body: Body,
+  wait: Duration,
+) -> Result(Option(Event), Failure) {
+  owner.read(body, Some(bridge.now() + settings.milliseconds(wait)))
   |> result.map(option.map(_, event_of))
 }
 

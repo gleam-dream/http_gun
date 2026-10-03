@@ -336,7 +336,9 @@ pub fn with_deadline(client: Client, deadline: deadline.Deadline) -> Client {
     client,
     pool.View(
       ..view,
-      deadline: Some(bridge.now() + deadline.remaining_ms(deadline)),
+      deadline: Some(
+        bridge.now() + settings.milliseconds(deadline.remaining(deadline)),
+      ),
     ),
   )
 }
@@ -397,7 +399,7 @@ pub fn with_correlation(client: Client, correlation: Correlation) -> Client {
 
 fn bound(timeout: config.Timeout) -> settings.Bound {
   case timeout {
-    config.Milliseconds(ms) -> settings.Within(ms)
+    config.After(timeout) -> settings.Within(settings.milliseconds(timeout))
     config.Infinity -> settings.Unbounded
   }
 }

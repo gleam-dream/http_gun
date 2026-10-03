@@ -1,6 +1,7 @@
 import gleam/http/request
 import gleam/http/response
 import gleam/io
+import gleam/time/duration
 import http_gun
 import http_gun/config
 import http_gun/deadline
@@ -21,7 +22,7 @@ pub fn main() -> Nil {
     )
   let assert Ok(client) =
     testing.playback(testing.script([exchange, exchange]), config.default())
-  let budget = deadline.after(5000)
+  let budget = deadline.after(duration.seconds(5))
   let assert Ok(first) =
     feed_job.start(client, req, budget, fn(_) { Ok(feed_job.Continue) })
   let assert Ok(second) =

@@ -5,6 +5,7 @@ import gleam/list
 import gleam/option.{Some}
 import gleam/otp/static_supervisor
 import gleam/result
+import gleam/time/duration
 import gleeunit/should
 import http_gun
 import http_gun/body
@@ -75,7 +76,7 @@ pub fn origin_fairness_and_queue_limit_test() {
       |> config.with_max_connections_per_origin(1)
       |> config.with_max_queued_requests(1)
       // Cancel the open slow body at once on stop; draining has its own tests.
-      |> config.with_shutdown_timeout(0),
+      |> config.with_shutdown_timeout(duration.milliseconds(0)),
     )
   let assert Ok(slow) = http_gun.open(client, req(port))
   let result = process.new_subject()
@@ -94,7 +95,7 @@ pub fn origin_fairness_and_queue_limit_test() {
   reason_and_evidence(queued_failure)
   |> should.equal(#(error.ClientClosed, error.NotSent))
   closed(server) |> should.be_true
-  body.next_within(slow.body, 0) |> should.be_error
+  body.next_within(slow.body, duration.milliseconds(0)) |> should.be_error
 }
 
 pub fn queued_deadline_is_not_submitted_test() {
@@ -102,7 +103,7 @@ pub fn queued_deadline_is_not_submitted_test() {
   let assert Ok(client) =
     http_gun.start(
       local_config()
-      |> config.with_request_timeout(config.Milliseconds(150))
+      |> config.with_request_timeout(config.After(duration.milliseconds(150)))
       |> config.with_max_open_bodies(1),
     )
   let assert Ok(slow) = http_gun.open(client, req(port))
@@ -118,7 +119,7 @@ pub fn pool_timeout_fails_request_waiting_for_slot_test() {
   let assert Ok(client) =
     http_gun.start(
       local_config()
-      |> config.with_pool_timeout(100)
+      |> config.with_pool_timeout(duration.milliseconds(100))
       |> config.with_max_open_bodies(1),
     )
   let assert Ok(held) = http_gun.open(client, req(port))
@@ -139,7 +140,10 @@ pub fn pool_timeout_fails_request_waiting_for_slot_test() {
 
 pub fn idle_pooled_connection_closes_after_connection_idle_timeout_test() {
   let assert Ok(client) =
-    http_gun.start(local_config() |> config.with_connection_idle_timeout(100))
+    http_gun.start(
+      local_config()
+      |> config.with_connection_idle_timeout(duration.milliseconds(100)),
+    )
   let port = persistent()
   let assert Ok(_) = http_gun.send(client, req(port))
   let assert Ok(stats) = http_gun.stats(client)
@@ -309,7 +313,10 @@ fn await_draining(
 pub fn stop_lets_open_body_finish_within_shutdown_timeout_test() {
   let #(port, server) = controlled()
   let assert Ok(client) =
-    http_gun.start(local_config() |> config.with_shutdown_timeout(5000))
+    http_gun.start(
+      local_config()
+      |> config.with_shutdown_timeout(duration.milliseconds(5000)),
+    )
   let assert Ok(open) = http_gun.open(client, req(port))
   let started = now_us()
   let stopped = spawn_stop(client)
@@ -317,9 +324,10 @@ pub fn stop_lets_open_body_finish_within_shutdown_timeout_test() {
   // Draining waits for the open body.
   process.receive(stopped, 100) |> should.equal(Error(Nil))
   emit(server, <<"3\r\nabc\r\n0\r\n\r\n":utf8>>)
-  body.next_within(open.body, 1000)
+  body.next_within(open.body, duration.milliseconds(1000))
   |> should.equal(Ok(Some(body.Chunk(<<"abc":utf8>>))))
-  body.next_within(open.body, 1000) |> should.equal(Ok(Some(body.End([]))))
+  body.next_within(open.body, duration.milliseconds(1000))
+  |> should.equal(Ok(Some(body.End([]))))
   // The finished body ends the drain long before the shutdown timeout.
   process.receive(stopped, 1000) |> should.equal(Ok(Nil))
   { now_us() - started < 3_000_000 } |> should.be_true
@@ -379,13 +387,16 @@ pub fn new_requests_during_draining_fail_not_sent_test() {
 pub fn shutdown_timeout_cancels_body_that_never_finishes_test() {
   let #(port, server) = controlled()
   let assert Ok(client) =
-    http_gun.start(local_config() |> config.with_shutdown_timeout(200))
+    http_gun.start(
+      local_config() |> config.with_shutdown_timeout(duration.milliseconds(200)),
+    )
   let assert Ok(open) = http_gun.open(client, req(port))
   let started = now_us()
   http_gun.stop(client)
   let waited = now_us() - started
   { waited >= 190_000 && waited < 2_000_000 } |> should.be_true
-  let assert Error(failure) = body.next_within(open.body, 1000)
+  let assert Error(failure) =
+    body.next_within(open.body, duration.milliseconds(1000))
   error.evidence(failure) |> should.equal(error.MaybeSent)
   closed(server) |> should.be_true
   body.close(open.body)
@@ -417,7 +428,7 @@ pub fn idle_connection_yields_capacity_to_other_origin_test() {
   let assert Ok(client) =
     http_gun.start(
       local_config()
-      |> config.with_request_timeout(config.Milliseconds(500))
+      |> config.with_request_timeout(config.After(duration.milliseconds(500)))
       |> config.with_max_connections(1),
     )
   let assert Ok(_) = http_gun.send(client, req(persistent()))
@@ -446,7 +457,9 @@ pub fn burst_work_scales_with_requests_test() {
   let assert Ok(client) =
     http_gun.start(
       local_config()
-      |> config.with_request_timeout(config.Milliseconds(10_000))
+      |> config.with_request_timeout(
+        config.After(duration.milliseconds(10_000)),
+      )
       |> config.with_max_connections(4)
       |> config.with_max_connections_per_origin(4)
       |> config.with_max_open_bodies(1024)
@@ -550,7 +563,7 @@ pub fn queued_deadlines_remove_entries_and_restore_capacity_test() {
   let assert Ok(client) =
     http_gun.start(
       local_config()
-      |> config.with_request_timeout(config.Milliseconds(150))
+      |> config.with_request_timeout(config.After(duration.milliseconds(150)))
       |> config.with_max_open_bodies(1)
       |> config.with_max_queued_requests(32),
     )
@@ -586,9 +599,10 @@ pub fn eligible_origins_take_turns_under_shared_body_capacity_test() {
   let assert Ok(held) = http_gun.open(client, request.set_path(req(a), "/held"))
   next_observed() |> should.equal("/held")
   // Retain the completed handle but make both connections eligible.
-  body.next_within(held.body, 1000)
+  body.next_within(held.body, duration.milliseconds(1000))
   |> should.equal(Ok(Some(body.Chunk(<<"abc":utf8>>))))
-  body.next_within(held.body, 1000) |> should.equal(Ok(Some(body.End([]))))
+  body.next_within(held.body, duration.milliseconds(1000))
+  |> should.equal(Ok(Some(body.End([]))))
   let done = process.new_subject()
   let _ = spawn_request(client, request.set_path(req(a), "/a1"), done)
   queued(client, 1, 1000) |> should.be_true

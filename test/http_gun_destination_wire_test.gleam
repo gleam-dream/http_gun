@@ -5,6 +5,7 @@ import gleam/http/request
 import gleam/int
 import gleam/list
 import gleam/string
+import gleam/time/duration
 import gleeunit/should
 import http_gun
 import http_gun/body
@@ -18,7 +19,7 @@ fn serve(bytes: BitArray) -> Int
 
 fn settings() -> config.Config {
   config.default()
-  |> config.with_request_timeout(config.Milliseconds(1000))
+  |> config.with_request_timeout(config.After(duration.milliseconds(1000)))
   |> config.allow_loopback
 }
 
@@ -151,7 +152,9 @@ pub fn stalled_sends_end_and_leave_no_caller_messages_test() {
       let baseline = mailbox_size()
       let c =
         settings()
-        |> config.with_request_timeout(config.Milliseconds(5000))
+        |> config.with_request_timeout(
+          config.After(duration.milliseconds(5000)),
+        )
         |> config.with_trust(config.CustomCa("test/fixtures/ip_ca.crt"))
         |> config.with_max_request_body_bytes(16_777_216)
       let assert Ok(client) = http_gun.start(c)
@@ -170,7 +173,7 @@ pub fn stalled_sends_end_and_leave_no_caller_messages_test() {
         False -> Nil
       }
       let bytes = payload(16_777_216)
-      let budget = deadline.after(300)
+      let budget = deadline.after(duration.milliseconds(300))
       let before = now()
       // The view deadline replaces the client's 5 s request timeout.
       let assert Error(failure) =
@@ -224,7 +227,8 @@ pub fn cancellation_and_body_deadline_leave_long_lived_caller_clean_test() {
   list.each([True, False], fn(cancel) {
     let assert Ok(client) =
       http_gun.start(
-        settings() |> config.with_request_timeout(config.Milliseconds(300)),
+        settings()
+        |> config.with_request_timeout(config.After(duration.milliseconds(300))),
       )
     let #(port, server) = controlled()
     let finished = process.new_subject()
@@ -240,7 +244,8 @@ pub fn cancellation_and_body_deadline_leave_long_lived_caller_clean_test() {
               req(port),
             )
           process.send(ready, probe)
-          let result = body.next_within(response.body, 1000)
+          let result =
+            body.next_within(response.body, duration.milliseconds(1000))
           body.close(response.body)
           process.send(finished, result)
           let assert Ok(Nil) = process.receive(probe, 2000)

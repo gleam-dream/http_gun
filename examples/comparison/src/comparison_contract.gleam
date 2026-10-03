@@ -8,6 +8,7 @@ import gleam/io
 import gleam/json
 import gleam/list
 import gleam/string
+import gleam/time/duration
 import gleam/yielder
 import http_gun
 import http_gun/body
@@ -234,7 +235,8 @@ fn recording_case(name: String, client: adapter.Client, repeated: Bool) -> Nil {
         True -> exchange(rec.client, port)
         False -> "not requested"
       }
-      let assert Ok(_) = cassette.finish(rec.recording, 0)
+      let assert Ok(_) =
+        cassette.finish(rec.recording, duration.milliseconds(0))
       http_gun.stop(rec.client)
       let assert Ok(tape) = cassette.load(destination, 100_000)
       let assert Ok(replay) = testing.playback(tape, local_config())

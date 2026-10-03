@@ -2,6 +2,7 @@ import gleam/erlang/process
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/result
+import gleam/time/duration
 import http_gun/destination
 import http_gun/error
 import http_gun/internal/bridge
@@ -25,6 +26,7 @@ pub fn start(
   resolver: Option(settings.Resolver),
   host: String,
   port: Int,
+  tls: Bool,
   until: Int,
   reply: fn(process.Pid, Result(Resolved, error.Reason)) -> Nil,
 ) -> process.Pid {
@@ -32,21 +34,29 @@ pub fn start(
     owner,
     until,
     error.ResolutionFailed,
-    fn() { resolve(policies, resolver, host, port, until) },
+    fn() { resolve(policies, resolver, host, port, tls, until) },
     reply,
   )
 }
 
-/// Every policy must admit the host, port and each address.
+/// Every policy must admit the host, port and each address, and, without
+/// TLS, admit plaintext to each address.
 pub fn admit(
   policies: List(destination.Policy),
   host: String,
   port: Int,
+  tls: Bool,
   addresses: List(destination.Address),
 ) -> Result(Nil, error.Reason) {
   list.try_each(policies, fn(policy) {
     use Nil <- result.try(destination.check(policy, host, port))
-    list.try_each(addresses, destination.check_address(policy, _))
+    use Nil <- result.try(
+      list.try_each(addresses, destination.check_address(policy, _)),
+    )
+    case tls {
+      True -> Ok(Nil)
+      False -> list.try_each(addresses, destination.check_plaintext(policy, _))
+    }
   })
   |> result.map_error(error.DestinationRejected)
 }
@@ -56,14 +66,16 @@ fn resolve(
   resolver: Option(settings.Resolver),
   host: String,
   port: Int,
+  tls: Bool,
   until: Int,
 ) -> Result(Resolved, error.Reason) {
-  use Nil <- result.try(admit(policies, host, port, []))
+  use Nil <- result.try(admit(policies, host, port, tls, []))
   let #(answer, name) = case destination.parse_address(host) {
     Ok(address) -> #(Ok([address]), None)
     Error(_) -> {
       let answer = case resolver {
-        Some(resolver) -> resolver(host, preparation.remaining(until))
+        Some(resolver) ->
+          resolver(host, duration.milliseconds(preparation.remaining(until)))
         None -> lookup(host, until)
       }
       #(answer, Some(host))
@@ -80,7 +92,7 @@ fn resolve(
     _, 0 -> Error(error.DeadlineExceeded)
     [], _ -> Error(error.ResolutionFailed)
     [first, ..], _ -> {
-      use Nil <- result.try(admit(policies, host, port, addresses))
+      use Nil <- result.try(admit(policies, host, port, tls, addresses))
       Ok(Resolved(first, name, addresses))
     }
   }

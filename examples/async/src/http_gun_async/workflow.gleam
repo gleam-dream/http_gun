@@ -8,6 +8,7 @@ import gleam/bit_array
 import gleam/http
 import gleam/http/request
 import gleam/result
+import gleam/time/duration
 import http_gun
 import http_gun/body
 import http_gun/config
@@ -25,7 +26,8 @@ pub fn rest(
   client: http_gun.Client,
   req: request.Request(BitArray),
 ) -> Result(http_gun.Buffered, error.Failure) {
-  let client = client |> http_gun.with_timeout(config.Milliseconds(2000))
+  let client =
+    client |> http_gun.with_timeout(config.After(duration.seconds(2)))
   attempt(client, req, 2)
 }
 
@@ -61,7 +63,9 @@ pub fn download(
   client: http_gun.Client,
   req: request.Request(BitArray),
 ) -> Result(Int, AppError) {
-  let client = client |> http_gun.with_timeout(config.Milliseconds(300_000))
+  let client =
+    client
+    |> http_gun.with_timeout(config.After(duration.seconds(300)))
   use reply <- http_gun.with_response(client, req, Http)
   count(reply.body, 0)
 }
@@ -82,7 +86,9 @@ pub fn rest_pair(
   first: request.Request(BitArray),
   second: request.Request(BitArray),
 ) -> Result(#(http_gun.Buffered, http_gun.Buffered), AppError) {
-  let client = client |> http_gun.with_deadline(deadline.after(2000))
+  let client =
+    client
+    |> http_gun.with_deadline(deadline.after(duration.seconds(2)))
   use one <- result.try(http_gun.send(client, first) |> result.map_error(Http))
   use two <- result.try(http_gun.send(client, second) |> result.map_error(Http))
   Ok(#(one, two))

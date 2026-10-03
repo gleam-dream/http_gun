@@ -5,6 +5,7 @@ import gleam/http/response
 import gleam/json
 import gleam/list
 import gleam/option.{Some}
+import gleam/time/duration
 import gleeunit/should
 import http_gun
 import http_gun/body
@@ -17,7 +18,7 @@ import http_gun/testing
 
 pub fn expired_deadline_refuses_before_submission_test() {
   let assert Ok(client) = http_gun.start(local_config())
-  let budget = deadline.after(0)
+  let budget = deadline.after(duration.milliseconds(0))
   let req =
     request.new() |> request.set_host("localhost") |> request.set_body(<<>>)
   let assert Error(failure) =
@@ -236,7 +237,9 @@ fn wait_for_queue(client: http_gun.Client, size: Int, tries: Int) -> Bool {
 pub fn cancellation_during_tls_setup_releases_connection_reservation_test() {
   let #(port, server) = gated()
   let assert Ok(client) =
-    http_gun.start(local_config() |> config.with_connect_timeout(500))
+    http_gun.start(
+      local_config() |> config.with_connect_timeout(duration.milliseconds(500)),
+    )
   let result = process.new_subject()
   cancellation.with_token(fn(token) {
     let view = client |> http_gun.with_cancellation(token)
@@ -266,15 +269,15 @@ fn now() -> Int
 pub fn supplied_deadline_covers_body_test() {
   let #(port, server) = controlled()
   let assert Ok(client) = http_gun.start(local_config())
-  let budget = deadline.after(100)
+  let budget = deadline.after(duration.milliseconds(100))
   let assert Ok(response) =
     http_gun.open(client |> http_gun.with_deadline(budget), req(port))
-  body.next_within(response.body, 1000)
+  body.next_within(response.body, duration.milliseconds(1000))
   |> should.equal(Error(
     error.new(error.DeadlineExceeded, error.MaybeSent)
     |> error.with_status(200),
   ))
-  deadline.remaining_ms(budget) |> should.equal(0)
+  duration.to_milliseconds(deadline.remaining(budget)) |> should.equal(0)
   closed(server) |> should.be_true
   body.close(response.body)
   http_gun.stop(client)
@@ -287,11 +290,13 @@ pub fn view_deadline_longer_than_client_request_timeout_succeeds_test() {
   let #(port, server) = controlled()
   let assert Ok(client) =
     http_gun.start(
-      local_config() |> config.with_request_timeout(config.Milliseconds(100)),
+      local_config()
+      |> config.with_request_timeout(config.After(duration.milliseconds(100))),
     )
   let assert Ok(response) =
     http_gun.open(
-      client |> http_gun.with_deadline(deadline.after(5000)),
+      client
+        |> http_gun.with_deadline(deadline.after(duration.milliseconds(5000))),
       req(port),
     )
   // Outlive the client's 100 ms request timeout before the body arrives.
@@ -304,7 +309,7 @@ pub fn view_deadline_longer_than_client_request_timeout_succeeds_test() {
   let #(port, server) = controlled()
   let assert Ok(response) = http_gun.open(client, req(port))
   process.sleep(300)
-  body.next_within(response.body, 1000)
+  body.next_within(response.body, duration.milliseconds(1000))
   |> should.equal(Error(
     error.new(error.DeadlineExceeded, error.MaybeSent)
     |> error.with_status(200),
@@ -318,8 +323,8 @@ pub fn infinite_view_timeout_outlives_request_timeout_but_not_idle_timeout_test(
   let assert Ok(client) =
     http_gun.start(
       local_config()
-      |> config.with_request_timeout(config.Milliseconds(200))
-      |> config.with_idle_timeout(config.Milliseconds(300)),
+      |> config.with_request_timeout(config.After(duration.milliseconds(200)))
+      |> config.with_idle_timeout(config.After(duration.milliseconds(300))),
     )
   let stream = client |> http_gun.with_timeout(config.Infinity)
   // A body that keeps flowing for longer than the request timeout.
@@ -359,7 +364,7 @@ pub fn scope_exit_cancels_stream_and_returned_token_stays_cancelled_test() {
         http_gun.open(client |> http_gun.with_cancellation(token), req(port))
       #(response, token)
     })
-  body.next_within(response.body, 1000)
+  body.next_within(response.body, duration.milliseconds(1000))
   |> should.equal(Error(
     error.new(error.Cancelled, error.MaybeSent) |> error.with_status(200),
   ))
@@ -411,10 +416,10 @@ pub fn completed_http_survives_later_cancellation_test() {
   cancellation.with_token(fn(token) {
     let assert Ok(response) =
       http_gun.open(client |> http_gun.with_cancellation(token), req)
-    body.next_within(response.body, 1000)
+    body.next_within(response.body, duration.milliseconds(1000))
     |> should.equal(Ok(Some(body.End([#("x-end", "yes")]))))
     cancellation.cancel(token)
-    body.next_within(response.body, 1000)
+    body.next_within(response.body, duration.milliseconds(1000))
     |> should.equal(Ok(Some(body.End([#("x-end", "yes")]))))
     body.close(response.body)
   })
@@ -424,7 +429,9 @@ pub fn completed_http_survives_later_cancellation_test() {
 pub fn last_queued_cancellation_releases_shared_connecting_socket_test() {
   let #(port, server) = gated()
   let assert Ok(client) =
-    http_gun.start(local_config() |> config.with_connect_timeout(5000))
+    http_gun.start(
+      local_config() |> config.with_connect_timeout(duration.milliseconds(5000)),
+    )
   let results = process.new_subject()
   let request = req(port) |> request.set_scheme(http.Https)
   cancellation.with_token(fn(first) {

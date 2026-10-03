@@ -3,6 +3,7 @@ version = "0.1.0"
 target = "erlang"
 
 [dependencies]
+gleam_time = "== 1.11.0"
 http_gun = { path = "../http_gun" }
 dream_http_client = { path = "../dream-bbc4b5402a7e0cb5247829c8f4be8fb273afc2a5/modules/http_client" }
 gleam_stdlib = "== 0.71.0"

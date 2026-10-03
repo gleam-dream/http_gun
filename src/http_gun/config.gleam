@@ -8,9 +8,14 @@
 ////   config.default()
 ////   |> config.allow_loopback
 ////   |> config.with_protocol(config.PreferHttp2)
-////   |> config.with_request_timeout(config.Milliseconds(10_000))
+////   |> config.with_request_timeout(config.After(duration.seconds(10)))
 //// let assert Ok(client) = http_gun.start(settings)
 //// ```
+////
+//// Every timeout is a `gleam/time/duration.Duration`; a timeout that may be
+//// lifted takes a `Timeout`, where `Infinity` must be chosen explicitly.
+//// HTTP Gun keeps whole milliseconds, rounding a sub-millisecond remainder
+//// away from zero.
 ////
 //// A `Config` is opaque, so a new option never breaks your code. `validate`
 //// checks it without starting processes; `http_gun.start` validates it too
@@ -24,12 +29,12 @@
 //// | destination on every view | not required | `require_view_destination` |
 //// | protocol | HTTP/1.1 | `with_protocol` |
 //// | TLS trust | system CA store, peer and host name verified | `with_trust` |
-//// | connect, including DNS and TLS | 5 s | `with_connect_timeout` |
-//// | waiting for a pooled connection | 5 s | `with_pool_timeout` |
-//// | request, admission to last byte | 30 s | `with_request_timeout` |
-//// | idle read, no bytes while reading | 30 s | `with_idle_timeout` |
-//// | idle pooled connection | 60 s | `with_connection_idle_timeout` |
-//// | draining on `stop` | 5 s | `with_shutdown_timeout` |
+//// | connect, including DNS and TLS | `duration.seconds(5)` | `with_connect_timeout` |
+//// | waiting for a pooled connection | `duration.seconds(5)` | `with_pool_timeout` |
+//// | request, admission to last byte | `After(duration.seconds(30))` | `with_request_timeout` |
+//// | idle read, no bytes while reading | `After(duration.seconds(30))` | `with_idle_timeout` |
+//// | idle pooled connection | `duration.seconds(60)` | `with_connection_idle_timeout` |
+//// | draining on `stop` | `duration.seconds(5)` | `with_shutdown_timeout` |
 //// | connections / per origin | 16 / 4 | `with_max_connections`, `with_max_connections_per_origin` |
 //// | HTTP/2 streams per connection | 100 | `with_max_streams_per_connection` |
 //// | open response bodies | 128 | `with_max_open_bodies` |
@@ -48,6 +53,7 @@ import gleam/int
 import gleam/list
 import gleam/option.{None, Some}
 import gleam/result
+import gleam/time/duration.{type Duration}
 import http_gun/destination
 import http_gun/internal/settings.{type Settings, Limits, Settings}
 import http_gun/redaction
@@ -78,9 +84,10 @@ pub type Trust {
   Anchors(certificates: List(BitArray))
 }
 
-/// A time bound. `Infinity` lifts the bound and must be chosen explicitly.
+/// A time bound that may be lifted. `Infinity` lifts it and must be chosen
+/// explicitly.
 pub type Timeout {
-  Milliseconds(Int)
+  After(Duration)
   Infinity
 }
 
@@ -93,14 +100,13 @@ pub type Negotiated {
 }
 
 /// Resolves a host name for a new connection, replacing DNS, for example in
-/// tests. It receives the host and the milliseconds left in the connect
-/// timeout, runs in an isolated worker, and returns the complete A/AAAA
+/// tests. It receives the host and the time left in the connect timeout, runs in an isolated worker, and returns the complete A/AAAA
 /// answer. Every address is checked against the destination policy; an
 /// exception or an empty answer fails closed.
 pub type Resolver =
-  fn(String, Int) -> Result(List(destination.Address), Nil)
+  fn(String, Duration) -> Result(List(destination.Address), Nil)
 
-/// A numeric setting, as `ConfigError` names it.
+/// A setting, as `ConfigError` names it.
 pub type Setting {
   ConnectTimeout
   PoolTimeout
@@ -123,10 +129,12 @@ pub type Setting {
 
 /// Why a configuration is invalid.
 pub type ConfigError {
-  /// The setting's value is out of range: timeouts and capacities must be
-  /// positive; the shutdown timeout, queued requests, request body and
-  /// response body limits may also be zero.
+  /// A capacity is out of range: it must be positive; queued requests,
+  /// request body and response body limits may also be zero.
   OutOfRange(setting: Setting, value: Int)
+  /// A timeout is out of range, in HTTP Gun's whole-millisecond precision:
+  /// it must be positive; the shutdown timeout may also be zero.
+  TimeoutOutOfRange(setting: Setting, value: Duration)
   /// `Anchors([])` trusts nothing.
   EmptyTrustAnchors
   /// A trust anchor is empty or not whole bytes.
@@ -269,16 +277,16 @@ pub fn with_label(config: Config, label: String) -> Config {
 }
 
 /// Bound resolving, connecting and the TLS handshake of each new connection,
-/// together, in milliseconds. Default 5,000.
-pub fn with_connect_timeout(config: Config, milliseconds: Int) -> Config {
-  Settings(..config, connect_timeout: milliseconds)
+/// together. Default 5 s.
+pub fn with_connect_timeout(config: Config, timeout: Duration) -> Config {
+  Settings(..config, connect_timeout: settings.milliseconds(timeout))
 }
 
 /// Bound the wait for a connection or stream from the pool, including an
-/// HTTP/1.1 readiness check, in milliseconds. A request that triggers a new
-/// connection is bounded by the connect timeout instead. Default 5,000.
-pub fn with_pool_timeout(config: Config, milliseconds: Int) -> Config {
-  Settings(..config, pool_timeout: milliseconds)
+/// HTTP/1.1 readiness check. A request that triggers a new connection is
+/// bounded by the connect timeout instead. Default 5 s.
+pub fn with_pool_timeout(config: Config, timeout: Duration) -> Config {
+  Settings(..config, pool_timeout: settings.milliseconds(timeout))
 }
 
 /// Bound each request from admission to the last body byte. Default 30 s.
@@ -297,19 +305,19 @@ pub fn with_idle_timeout(config: Config, timeout: Timeout) -> Config {
   Settings(..config, idle_timeout: bound(timeout))
 }
 
-/// Close a pooled connection that has carried no request for this many
-/// milliseconds. Default 60,000.
+/// Close a pooled connection that has carried no request for this long.
+/// Default 60 s.
 pub fn with_connection_idle_timeout(
   config: Config,
-  milliseconds: Int,
+  timeout: Duration,
 ) -> Config {
-  Settings(..config, connection_idle_timeout: milliseconds)
+  Settings(..config, connection_idle_timeout: settings.milliseconds(timeout))
 }
 
 /// How long `http_gun.stop` lets open responses finish before cancelling
-/// them, in milliseconds. Zero cancels at once. Default 5,000.
-pub fn with_shutdown_timeout(config: Config, milliseconds: Int) -> Config {
-  Settings(..config, shutdown_timeout: milliseconds)
+/// them. Zero cancels at once. Default 5 s.
+pub fn with_shutdown_timeout(config: Config, timeout: Duration) -> Config {
+  Settings(..config, shutdown_timeout: settings.milliseconds(timeout))
 }
 
 /// Connections across all origins. Default 16.
@@ -401,14 +409,23 @@ pub fn validate(config: Config) -> Result(Config, ConfigError) {
     destination.validate(config.destination)
     |> result.map_error(InvalidAllowedHost),
   )
-  let l = config.limits
-  let checks = [
+  let timeouts = [
     #(ConnectTimeout, config.connect_timeout, 1),
     #(PoolTimeout, config.pool_timeout, 1),
     #(RequestTimeout, bound_value(config.request_timeout), 1),
     #(IdleTimeout, bound_value(config.idle_timeout), 1),
     #(ConnectionIdleTimeout, config.connection_idle_timeout, 1),
     #(ShutdownTimeout, config.shutdown_timeout, 0),
+  ]
+  use Nil <- result.try(
+    case list.find(timeouts, fn(check) { check.1 < check.2 }) {
+      Ok(#(setting, milliseconds, _)) ->
+        Error(TimeoutOutOfRange(setting, duration.milliseconds(milliseconds)))
+      Error(Nil) -> Ok(Nil)
+    },
+  )
+  let l = config.limits
+  let checks = [
     #(MaxConnections, l.connections, 1),
     #(MaxConnectionsPerOrigin, l.per_origin, 1),
     #(MaxStreamsPerConnection, l.streams_per_connection, 1),
@@ -434,16 +451,26 @@ pub fn describe_error(error: ConfigError) -> String {
       setting_name(setting)
       <> " is out of range: "
       <> int.to_string(value)
-      <> case setting {
-        ShutdownTimeout
-        | MaxQueuedRequests
-        | MaxRequestBodyBytes
-        | MaxResponseBodyBytes -> " (must not be negative)"
-        _ -> " (must be positive)"
-      }
+      <> range_rule(setting)
+    TimeoutOutOfRange(setting, value) ->
+      setting_name(setting)
+      <> " is out of range: "
+      <> int.to_string(settings.milliseconds(value))
+      <> " ms"
+      <> range_rule(setting)
     EmptyTrustAnchors -> "trust anchors are empty"
     InvalidTrustAnchor -> "a trust anchor is empty or not whole bytes"
     InvalidAllowedHost(entry) -> "malformed allowed host entry: " <> entry
+  }
+}
+
+fn range_rule(setting: Setting) -> String {
+  case setting {
+    ShutdownTimeout
+    | MaxQueuedRequests
+    | MaxRequestBodyBytes
+    | MaxResponseBodyBytes -> " (must not be negative)"
+    _ -> " (must be positive)"
   }
 }
 
@@ -471,7 +498,7 @@ fn setting_name(setting: Setting) -> String {
 
 fn bound(timeout: Timeout) -> settings.Bound {
   case timeout {
-    Milliseconds(ms) -> settings.Within(ms)
+    After(timeout) -> settings.Within(settings.milliseconds(timeout))
     Infinity -> settings.Unbounded
   }
 }
