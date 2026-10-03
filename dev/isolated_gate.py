@@ -23,6 +23,11 @@ with tempfile.TemporaryDirectory(prefix='http-gun-gate-') as directory:
             shutil.copy2(source, package / name)
     extract(workspace / 'sinal')
     env = dict(os.environ, HTTP_GUN_ISOLATED_GATE='1')
+    # CI's "latest" job takes the newest gun and cowlib patch inside the
+    # declared ranges; the default job keeps the committed minimum.
+    if os.environ.get('HTTP_GUN_DEPENDENCIES') == 'latest':
+        subprocess.run(['gleam', 'update', 'gun', 'cowlib'], cwd=package, env=env, check=True)
+        subprocess.run(['gleam', 'deps', 'list'], cwd=package, env=env, check=True)
     code = subprocess.run(['sh', 'dev/gate', *sys.argv[1:]], cwd=package, env=env).returncode
     evidence = package / 'build/evidence'
     if evidence.exists():

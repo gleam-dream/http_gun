@@ -9,14 +9,19 @@ jobs:
       fail-fast: false
       matrix:
         runtime: [default, otp28, otp27]
+        # gun and cowlib are patch ranges (docs/GUN_AUDIT.md): test the
+        # committed minimum and the newest patch inside each range.
+        dependencies: [minimum, latest]
     steps:
       - uses: actions/checkout@v4
       - uses: cachix/install-nix-action@v31
         with:
           extra_nix_config: experimental-features = nix-command flakes
       - run: nix develop "path:.#${{ matrix.runtime }}" --command sh dev/gate full
+        env:
+          HTTP_GUN_DEPENDENCIES: ${{ matrix.dependencies }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: load-${{ matrix.runtime }}
+          name: load-${{ matrix.runtime }}-${{ matrix.dependencies }}
           path: build/evidence
