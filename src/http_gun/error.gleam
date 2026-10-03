@@ -143,7 +143,8 @@ pub type Reason {
   PoolTimeout
   DestinationRejected(destination.Rejection)
   /// The client was configured with `config.require_view_destination`, and
-  /// the request's view set no destination with `http_gun.with_destination`.
+  /// the request's view chose no destination with `http_gun.with_destination`:
+  /// no policy set a host list or refused an address class the client admits.
   ViewDestinationRequired
   ResolutionFailed
   /// Resolving and connecting did not finish within the connect timeout.

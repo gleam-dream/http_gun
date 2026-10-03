@@ -133,6 +133,27 @@ pub fn only_hosts(policy: Policy, hosts: List(String)) -> Policy {
   Policy(..policy, allowed: Some(list.map(hosts, string.lowercase)))
 }
 
+/// Whether `policy`, added by a client view, narrows `client`, the client's
+/// policy: it has an `only_hosts` list, or it refuses an address class that
+/// `client` admits. The plaintext rule never counts. A client configured with
+/// `config.require_view_destination` admits a view only when one of its
+/// policies narrows the client's policy this way.
+///
+/// ```gleam
+/// let client = destination.default() |> destination.allow_loopback
+/// destination.narrows(destination.loopback_only(), within: client)  // True
+/// destination.default()
+/// |> destination.allow_loopback
+/// |> destination.with_plaintext(destination.RequireTls)
+/// |> destination.narrows(within: client)                            // False
+/// ```
+pub fn narrows(policy: Policy, within client: Policy) -> Bool {
+  option.is_some(policy.allowed)
+  || { client.allow_public && !policy.allow_public }
+  || { client.allow_loopback && !policy.allow_loopback }
+  || { client.allow_private && !policy.allow_private }
+}
+
 /// Choose whether `http://` is admitted. The rule is decided against each
 /// resolved address, like the address classes, including the addresses of
 /// a pooled connection a request would reuse; a refused request fails with

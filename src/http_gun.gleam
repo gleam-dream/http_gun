@@ -38,7 +38,13 @@
 //// A client that serves several tenants admits the union of their
 //// destinations, which any call holding the handle without a view reaches;
 //// `config.require_view_destination` makes such a call fail closed with
-//// `ViewDestinationRequired`.
+//// `ViewDestinationRequired`. Only a view policy that narrows the client's
+//// destinations satisfies it; a policy that only tightens the plaintext rule
+//// does not, so a library tightening the scheme keeps the requirement.
+////
+//// A library that receives a view reads the caller's correlation with
+//// `correlation(client)` and copies it into its own events, so one
+//// `with_correlation` by the caller tags both packages' events.
 ////
 //// ## Lifecycle
 ////
@@ -56,7 +62,7 @@ import gleam/http/request.{type Request}
 import gleam/http/response.{type Response}
 import gleam/int
 import gleam/list
-import gleam/option.{None, Some}
+import gleam/option.{type Option, None, Some}
 import gleam/otp/actor
 import gleam/otp/supervision
 import gleam/result
@@ -378,9 +384,25 @@ pub fn with_body_limit(
 /// Narrow the destinations of this view: a request must satisfy the client's
 /// policy and every policy added this way, including the addresses of a
 /// pooled connection it would reuse. A view can never widen what the client
-/// admits; host name resolution stays the client's. A client configured with
-/// `config.require_view_destination` refuses requests through a view that
-/// has not called this.
+/// admits; host name resolution stays the client's.
+///
+/// A client configured with `config.require_view_destination` refuses
+/// requests through a view unless one of its policies chooses a destination:
+/// it sets `destination.only_hosts`, or it refuses an address class the
+/// client admits. A policy that admits everything the client admits and only
+/// tightens `destination.with_plaintext` chooses none, so a library that
+/// tightens the scheme on a caller's view never lifts the application's
+/// requirement:
+///
+/// ```gleam
+/// // A library: tightens the scheme, chooses no destination.
+/// let scheme =
+///   destination.default()
+///   |> destination.allow_loopback
+///   |> destination.allow_private
+///   |> destination.with_plaintext(destination.PlaintextToLoopbackOnly)
+/// client |> http_gun.with_destination(scheme)
+/// ```
 pub fn with_destination(client: Client, policy: destination.Policy) -> Client {
   let view = pool.view(client)
   pool.with_view(
@@ -395,6 +417,18 @@ pub fn with_destination(client: Client, policy: destination.Policy) -> Client {
 /// still gets its own `request_id`. A later call replaces the correlation.
 pub fn with_correlation(client: Client, correlation: Correlation) -> Client {
   pool.with_correlation(client, correlation)
+}
+
+/// The correlation this view tags its events with, set by
+/// `with_correlation`, or `None`. A library that receives a caller's view
+/// reads the caller's correlation here and copies it into its own
+/// telemetry, instead of asking the caller to pass it twice:
+///
+/// ```gleam
+/// let correlation = http_gun.correlation(client)
+/// ```
+pub fn correlation(client: Client) -> Option(Correlation) {
+  pool.view(client).correlation
 }
 
 fn bound(timeout: config.Timeout) -> settings.Bound {

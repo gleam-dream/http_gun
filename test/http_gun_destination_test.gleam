@@ -1051,10 +1051,13 @@ pub fn required_view_destination_never_widens_the_client_policy_test() {
     |> config.require_view_destination
     |> config.with_resolver(fn(_, _) { Ok([destination.Ipv4(10, 0, 0, 7)]) })
     |> http_gun.start
+  // A host list chosen by the application narrows, so it satisfies the
+  // requirement, although its address classes are wider than the client's.
   let wide =
     destination.default()
     |> destination.allow_loopback
     |> destination.allow_private
+    |> destination.only_hosts(["127.0.0.1", "localhost"])
   let view = client |> http_gun.with_destination(wide)
   // The client's host list still applies to a view without one.
   http_gun.send(view, local_request(other, "127.0.0.1"))
@@ -1107,6 +1110,64 @@ pub fn required_view_destination_applies_to_playback_test() {
       req,
     )
   reply.response.status |> should.equal(204)
+  http_gun.stop(client)
+}
+
+// A library that only tightens the scheme rule has not chosen the tenant's
+// destination, so its view leaves the application's fail-closed requirement
+// in force. The application's own narrowing still satisfies it, and the
+// library's rule still applies.
+pub fn scheme_tightening_does_not_satisfy_required_destination_test() {
+  let port = server()
+  let assert Ok(client) =
+    local_config()
+    |> config.require_view_destination
+    |> http_gun.start
+  let required = Error(error.new(error.ViewDestinationRequired, error.NotSent))
+  let req = local_request(port, "127.0.0.1")
+  let scheme_only =
+    destination.default()
+    |> destination.allow_loopback
+    |> destination.allow_private
+    |> destination.with_plaintext(destination.PlaintextToLoopbackOnly)
+  let library = client |> http_gun.with_destination(scheme_only)
+  http_gun.send(library, req) |> should.equal(required)
+  http_gun.send(library |> http_gun.with_destination(scheme_only), req)
+  |> should.equal(required)
+  // A policy that admits every class the client admits narrows nothing,
+  // whatever its plaintext rule.
+  let same_classes =
+    destination.default()
+    |> destination.allow_loopback
+    |> destination.with_plaintext(destination.RequireTls)
+  http_gun.send(client |> http_gun.with_destination(same_classes), req)
+  |> should.equal(required)
+  // The tenant's destination satisfies the requirement in either order.
+  let tenant = destination.loopback_only()
+  let assert Ok(reply) =
+    http_gun.send(library |> http_gun.with_destination(tenant), req)
+  reply.response.body |> should.equal(<<"abc":utf8>>)
+  let assert Ok(_) =
+    http_gun.send(
+      client
+        |> http_gun.with_destination(tenant)
+        |> http_gun.with_destination(scheme_only),
+      req,
+    )
+  // The library's rule still applies once the tenant's destination is set.
+  http_gun.send(
+    client
+      |> http_gun.with_destination(same_classes)
+      |> http_gun.with_destination(tenant),
+    req,
+  )
+  |> should.equal(
+    Error(rejected(destination.PlaintextRefused(destination.Loopback))),
+  )
+  // A host list chosen by the application counts, even over every class.
+  let pinned = scheme_only |> destination.only_hosts(["127.0.0.1"])
+  let assert Ok(_) =
+    http_gun.send(client |> http_gun.with_destination(pinned), req)
   http_gun.stop(client)
 }
 
@@ -1205,6 +1266,38 @@ pub fn view_plaintext_rule_applies_to_a_pooled_connection_test() {
     )
   let assert Ok(_) = http_gun.send(local_only, req)
   http_gun.stop(client)
+}
+
+pub fn narrows_results_test() {
+  let client = destination.default() |> destination.allow_loopback
+  let every_class =
+    destination.default()
+    |> destination.allow_loopback
+    |> destination.allow_private
+  destination.narrows(destination.loopback_only(), within: client)
+  |> should.be_true
+  destination.narrows(destination.default(), within: client) |> should.be_true
+  destination.narrows(
+    every_class |> destination.only_hosts(["api.example.com"]),
+    within: client,
+  )
+  |> should.be_true
+  // Refusing a class the client already refuses narrows nothing.
+  destination.narrows(client, within: client) |> should.be_false
+  destination.narrows(every_class, within: client) |> should.be_false
+  // The plaintext rule never counts.
+  list.each(
+    [destination.PlaintextToLoopbackOnly, destination.RequireTls],
+    fn(rule) {
+      destination.narrows(
+        destination.with_plaintext(every_class, rule),
+        within: client,
+      )
+      |> should.be_false
+    },
+  )
+  destination.narrows(every_class, within: every_class) |> should.be_false
+  destination.narrows(client, within: every_class) |> should.be_true
 }
 
 pub fn check_plaintext_results_test() {

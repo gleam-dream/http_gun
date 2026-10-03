@@ -478,3 +478,18 @@ head keep the redacted response headers (`error.headers`), stored by
 failed `burst_work_scales_with_requests_test`; the callback now captures only
 the redaction. `./dev/env sh dev/gate full` passes with 200 tests, all 11 load
 scenarios and nghttpd; LLM Wire and Warden build against the change.
+
+### Wave 4 follow-up — view correlation and narrowing destinations
+
+Complete locally, 2026-10-03, from LLM Wire's wave 4 redesign.
+`http_gun.correlation(client)` returns the view's correlation, so a library
+copies the caller's correlation instead of asking for it twice.
+`config.require_view_destination` is now satisfied only by a view policy that
+sets `only_hosts` or refuses an address class the client admits; a policy
+that only tightens the plaintext rule counts as none.
+`scheme_tightening_does_not_satisfy_required_destination_test` covers both
+directions; `required_view_destination_never_widens_the_client_policy_test`
+now narrows with a host list; `narrows_results_test` covers
+`destination.narrows`, which states the rule publicly because public modules
+carry no `@internal` functions. `./dev/env sh dev/gate full` passes with 206
+tests, all 11 load scenarios and nghttpd; Warden builds against the change.

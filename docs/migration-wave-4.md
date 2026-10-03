@@ -1,13 +1,16 @@
 # Wave 4 migration
 
-Wave 4 makes two changes:
+Wave 4 makes four changes:
 
 - every timeout, deadline and wait in the public API takes a
   `gleam/time/duration.Duration` (package `gleam_time`, `>= 1.11.0 and < 2.0.0`),
   and an unbounded timeout is the explicit `config.Infinity`. No public
   signature takes milliseconds as an `Int`, and no converted name ends in `_ms`;
 - a destination policy has a plaintext rule, `destination.with_plaintext`,
-  decided against the resolved addresses (LLM-R10).
+  decided against the resolved addresses (LLM-R10);
+- `http_gun.correlation(client)` reads the correlation a view carries;
+- `config.require_view_destination` is satisfied only by a view policy that
+  narrows the client's destinations; a plaintext rule alone no longer counts.
 
 The defaults are unchanged. HTTP Gun still keeps whole milliseconds inside: a
 sub-millisecond remainder rounds away from zero, so a positive duration stays
@@ -18,7 +21,7 @@ positive and a negative one stays negative. A dependent that imports
 Contents: [config](#http_gunconfig) · [http_gun](#http_gun) ·
 [body](#http_gunbody) · [deadline](#http_gundeadline) ·
 [cassette](#http_guncassette) · [destination](#http_gundestination) ·
-[dependents](#dependents)
+[view destinations](#view-destinations) · [dependents](#dependents)
 
 ## `http_gun/config`
 
@@ -69,6 +72,21 @@ with `duration.to_milliseconds(remaining)`.
 
 `with_timeout(client, config.Infinity)` and `with_deadline` are unchanged.
 
+| Before | After |
+| --- | --- |
+| — | `correlation(client) -> Option(Correlation)` |
+
+A library that receives a caller's view reads the caller's correlation from it
+and copies it into its own telemetry, so the caller sets it once:
+
+```gleam
+// Before: the caller passes the correlation to the library and the view.
+llm.generate(client |> http_gun.with_correlation(order), request, order)
+
+// After: the library reads it from the view it was given.
+let correlation = http_gun.correlation(client)
+```
+
 ## `http_gun/body`
 
 | Before | After |
@@ -113,6 +131,7 @@ callers keep working.
 | — | `Plaintext { AllowPlaintext PlaintextToLoopbackOnly RequireTls }` |
 | — | `with_plaintext(policy, plaintext) -> Policy`; the default is `AllowPlaintext` |
 | — | `check_plaintext(policy, address) -> Result(Nil, Rejection)` |
+| — | `narrows(policy, within: client) -> Bool`, the rule `require_view_destination` applies |
 | `Rejection { HostNotAllowed AddressRefused(Class) }` | also `PlaintextRefused(Class)` |
 
 `PlaintextToLoopbackOnly` admits `http://` only when every resolved address is
@@ -134,6 +153,40 @@ config.default()
 )
 ```
 
+## View destinations
+
+`config.require_view_destination` used to accept any view that had called
+`http_gun.with_destination`. It now accepts a view only when one of its
+policies chooses a destination: it sets `destination.only_hosts`, or it
+refuses an address class (public, loopback, private) that the client admits.
+The plaintext rule never counts. `destination.narrows(policy, within:
+client_policy)` reports the same decision. Without the requirement, nothing
+changes.
+
+A library that tightens the scheme on a caller's view, such as a policy that
+admits every class and adds `PlaintextToLoopbackOnly`, has chosen no tenant
+destination; the call still fails with `ViewDestinationRequired` until the
+application narrows the view. The tightening still applies once it does, in
+either order:
+
+```gleam
+// The application chooses the tenant's destination.
+let tenant = client |> http_gun.with_destination(destination.loopback_only())
+// A library tightens the scheme only; this alone does not satisfy the
+// requirement.
+let scheme =
+  destination.default()
+  |> destination.allow_loopback
+  |> destination.allow_private
+  |> destination.with_plaintext(destination.PlaintextToLoopbackOnly)
+http_gun.send(tenant |> http_gun.with_destination(scheme), req)
+```
+
+A view that relied on a policy admitting everything the client admits, such
+as `default() |> allow_loopback` on a client built with
+`config.allow_loopback`, now fails with `ViewDestinationRequired`. Narrow it
+to the tenant's classes or add the tenant's host list.
+
 ## Dependents
 
 ### llm_wire
@@ -153,6 +206,13 @@ config.default()
   `destination.with_plaintext(destination.PlaintextToLoopbackOnly)` on the
   client's policy; map `DestinationRejected(PlaintextRefused(_))` to
   llm_wire's own refusal.
+- Read the caller's correlation with `http_gun.correlation(client)` and copy
+  it into llm_wire's own events; drop the second correlation argument.
+- The `http://` view built with `with_plaintext(PlaintextToLoopbackOnly)`,
+  `allow_loopback` and `allow_private` keeps working, but no longer satisfies
+  an application's `require_view_destination`. Callers whose client sets the
+  requirement narrow the view they pass in; llm_wire must not add a
+  narrowing on their behalf.
 
 ### warden
 

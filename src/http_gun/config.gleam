@@ -191,11 +191,17 @@ pub fn with_destination(config: Config, policy: destination.Policy) -> Config {
   Settings(..config, destination: policy)
 }
 
-/// Refuse every request whose client view has not set a destination with
+/// Refuse every request whose client view has not chosen a destination with
 /// `http_gun.with_destination`, failing it with `ViewDestinationRequired` and
 /// `NotSent` before it is validated, resolved or matched. The client's own
 /// policy then only bounds what views may narrow to: a view still narrows
 /// and never widens it.
+///
+/// A view chooses a destination when one of its policies sets
+/// `destination.only_hosts` or refuses an address class this client admits.
+/// A plaintext rule never counts: a library that only tightens
+/// `destination.with_plaintext` on a caller's view leaves the requirement in
+/// force.
 ///
 /// A multi-tenant client must admit the union of its tenants' destinations,
 /// for example public addresses and loopback. Without this setting, a call

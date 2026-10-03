@@ -1098,7 +1098,8 @@ fn open_request(
   }
   let req = invocation.request()
   let early = case
-    state.config.view_destination_required && view.policies == []
+    state.config.view_destination_required
+    && !list.any(view.policies, destination.narrows(_, state.config.destination))
   {
     True -> Error(error.new(error.ViewDestinationRequired, NotSent))
     False ->

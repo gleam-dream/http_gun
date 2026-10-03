@@ -101,6 +101,10 @@ let stream =
 | `with_destination(client, policy)` | narrows the destinations; never widens them |
 | `with_correlation(client, correlation)` | tags lifecycle events with a `sinal/correlation.Correlation` |
 
+`http_gun.correlation(client)` reads a view's correlation. A library that
+receives a caller's view reads the caller's correlation there and copies it
+into its own telemetry, so the caller sets it once.
+
 ## Stream a body
 
 ```gleam
@@ -204,9 +208,12 @@ A view can only narrow the client's policy, so a client shared by tenants with
 different destinations must admit their union, for example public hosts and
 loopback. Any call that holds the client without the tenant's view reaches
 that union. `config.require_view_destination` closes the gap: a request whose
-view has not called `with_destination` fails with `ViewDestinationRequired`
-and `NotSent` before anything is resolved or sent. The client's policy then
-only bounds what a view may narrow to.
+view has not chosen a destination fails with `ViewDestinationRequired` and
+`NotSent` before anything is resolved or sent. A view chooses one when a
+`with_destination` policy sets `only_hosts` or refuses an address class the
+client admits. A policy that only tightens `with_plaintext` chooses none, so
+a library that tightens the scheme on a tenant's view keeps the requirement.
+The client's policy then only bounds what a view may narrow to.
 
 ```gleam
 let assert Ok(client) =

@@ -12,8 +12,9 @@ new variants here under **New variants**.
 
 The first release. Wave 3 redesigned the API before publication; see
 [the wave 3 migration guide](docs/migration-wave-3.md) for every removed and
-changed item. Wave 4 moved every timeout to `Duration` and added the
-plaintext rule; see [the wave 4 migration guide](docs/migration-wave-4.md).
+changed item. Wave 4 moved every timeout to `Duration`, added the
+plaintext rule and the view correlation accessor, and made only a narrowing
+view policy satisfy `require_view_destination`; see [the wave 4 migration guide](docs/migration-wave-4.md).
 
 ### Added
 
@@ -80,11 +81,20 @@ plaintext rule; see [the wave 4 migration guide](docs/migration-wave-4.md).
   every client emits through `sinal.emit`.
 - `config.require_view_destination(config)`: the client refuses, with
   `ViewDestinationRequired` and `NotSent`, every request whose view has not
-  set a destination with `http_gun.with_destination`. A multi-tenant client
+  chosen a destination with `http_gun.with_destination`. A multi-tenant client
   must admit the union of its tenants' destinations; with this setting a call
   that skips the tenant's view fails closed instead of reaching that union.
-  The client's policy only bounds what views may narrow to; a view still
-  never widens it. The check holds for live, recording and playback clients.
+  Only a view policy that narrows the client's destinations counts: one that
+  sets `destination.only_hosts` or refuses an address class the client
+  admits, as `destination.narrows(policy, within: client)` reports. A policy
+  that only tightens `destination.with_plaintext` counts as none, so a library that tightens the scheme on a caller's view never lifts
+  the requirement. The client's policy only bounds what views may narrow to;
+  a view still never widens it. The check holds for live, recording and
+  playback clients.
+- `http_gun.correlation(client) -> Option(Correlation)` reads the
+  correlation a view carries. A library that receives a caller's view reads
+  the caller's correlation from it and copies it into its own telemetry,
+  instead of asking the caller to set it twice.
 - `error.headers(failure)` and `error.with_headers(failure, headers)`: a
   `send` or `batch` failure after the response head arrived keeps the
   response headers, after the client's redaction, beside `error.status`. A

@@ -56,7 +56,12 @@ pub fn scripted_lifecycle_has_correlation_without_network_submission_test() {
   let settings = local_config() |> config.with_observations(fwd)
   let assert Ok(shared) = testing.playback(testing.script([exchange]), settings)
   let assert Ok(correlation) = correlation.from_string("order-42")
+  http_gun.correlation(shared) |> should.equal(None)
   let client = http_gun.with_correlation(shared, correlation)
+  // A library given this view reads the caller's correlation from it.
+  http_gun.correlation(client) |> should.equal(Some(correlation))
+  http_gun.correlation(client |> http_gun.with_timeout(config.Infinity))
+  |> should.equal(Some(correlation))
   let assert Ok(result) = http_gun.send(client, req)
   result.response |> should.equal(response.Response(201, [], <<0, 255>>))
   let seen = receive_events(events, 4)
