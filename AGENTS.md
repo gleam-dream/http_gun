@@ -1,6 +1,6 @@
 # HTTP Gun — Gleam-first restart
 
-The owner's 2026-09-29 restart prompt governs this package. Read docs/DESIGN.md, docs/PROGRESS.md and docs/implementation/gleam-first/wave-tracker.md. Use progressive implementation for follow-up work; preserve accepted behavior and record each tested wave. This supersedes the previous Erlang orchestration architecture, local plans and conflicting oversight requirements.
+The owner's 2026-09-29 restart prompt governs this package. Read docs/DESIGN.md, docs/history/PROGRESS.md and docs/history/implementation/gleam-first/wave-tracker.md. Use progressive implementation for follow-up work; preserve accepted behavior and record each tested wave. This supersedes the previous Erlang orchestration architecture, local plans and conflicting oversight requirements.
 
 Implement public API, domain state, pool admission, body ownership, batching, matching, codecs and recording coordination in Gleam. Use pinned gleam_otp and gleam_erlang APIs. Handwritten Erlang is restricted to Gun bindings/message conversion, genuinely missing filesystem/runtime operations and exception-safe scope cleanup. No Erlang pool, body-owner or cassette-session servers.
 

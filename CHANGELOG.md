@@ -4,52 +4,118 @@ All notable changes to this package are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the package
 uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+`error.Reason`, `error.TransportCause`, `error.LimitKind` and
+`error.RequestProblem` may gain variants in a minor release. Each release lists
+new variants here under **New variants**.
+
 ## Unreleased
+
+The first release. Wave 3 redesigned the API before publication; see
+[the wave 3 migration guide](docs/migration-wave-3.md) for every removed and
+changed item.
 
 ### Added
 
-- An HTTP client on Gun: `http_gun.start` and `child` start a client with its
-  own connection pool; `send` collects a response, `open`, `with_response`
-  and `try_with_response` stream an owned `body.Body`, and `batch` runs
-  requests with bounded concurrency.
+- An HTTP client on Gun: `http_gun.start`, or `supervised(config, name)` with
+  `named(name)` under a supervisor; `send` collects a response, `open` and
+  `with_response` stream an owned `body.Body`, and `batch` runs requests with
+  bounded concurrency. One entry point per operation.
+- Client views for per-call settings: `with_timeout`, `with_deadline`,
+  `with_idle_timeout`, `with_cancellation`, `with_body_limit` (`Fail` or
+  `Truncate`), `with_destination` (narrows only) and `with_correlation`. A
+  view's timeout or deadline replaces the client's request timeout, shorter
+  or longer.
+- Opaque `config.Config` built from `default()` with `with_*` setters, and a
+  typed `ConfigError` from `validate` and `start` (`StartError.InvalidConfig`).
+- Named timeouts with these defaults: connect including DNS and TLS 5 s
+  (`with_connect_timeout`), pool checkout 5 s (`with_pool_timeout`), request
+  30 s (`with_request_timeout`), idle read 30 s (`with_idle_timeout`), idle
+  pooled connection 60 s (`with_connection_idle_timeout`) and shutdown drain
+  5 s (`with_shutdown_timeout`). `config.Infinity` lifts a bound explicitly.
+- `body.next(body)` waits for data within those timeouts;
+  `body.next_within(body, ms)` returns `Ok(None)` when its local wait passes.
 - HTTP/1.1 and HTTP/2 (`Http1`, `PreferHttp2`, `RequireHttp2`), verified TLS
-  with system, file or in-memory trust anchors, and a pure `config.Config`
-  with byte, header, connection and stream limits.
+  with system, file or in-memory trust anchors, and byte, header, connection,
+  stream and queue limits, each with a `with_max_*` setter.
+- `batch` retains at most `with_max_batch_bytes` (64 MiB) of bodies; later
+  requests fail with `LimitExceeded(BatchBytes, ..)` and `NotSent`.
 - A destination policy (`http_gun/destination`) that admits public addresses
   by default, checks every resolved address before connecting, and always
-  refuses reserved and cloud metadata addresses.
-- Per-request deadlines (`http_gun/deadline`), scoped cancellation
-  (`http_gun/cancellation`) and a per-request collection policy that can keep
-  the status on overflow (`request_options.Collect`).
-- Typed failures (`http_gun/error`) with submission evidence (`NotSubmitted`,
-  `MayHaveBeenSent`) and a bounded `describe`.
-- Offline scripts (`http_gun/testing`), cassette playback and recording
-  (`http_gun/cassette`, `http_gun/recording`). Cassettes omit credential
-  headers (`authorization`, `proxy-authorization`, `cookie`, `set-cookie`,
-  `x-api-key`, `api-key`, `x-goog-api-key`).
-- Lifecycle observations through a Sinal forwarder (`http_gun/telemetry`).
-- Every public module now has a rendered `////` module doc. Seven modules
-  (`body`, `cassette`, `config`, `destination`, `error`, `fixture`,
-  `testing`) had none, and `recording` described its internals.
-- Regression tests that `string.inspect` of failures, observation metadata,
-  encoded and parsed cassettes, and recorded cassette files contains no
-  `authorization`, `proxy-authorization`, `cookie` or `set-cookie` value.
+  refuses reserved and cloud metadata addresses. `loopback_only`,
+  `allow_loopback`, `allow_private`, `only_hosts` with `host:port` entries,
+  `check`, `check_address`, `validate` and `parse_address`.
+- An opaque `error.Failure` with `reason`, `evidence` (`NotSent`,
+  `MaybeSent`), `status`, a closed `Kind`, `is_retryable(idempotent:)`,
+  `name`, `describe`, `to_json` and `decoder`. A collected body over its limit
+  keeps the response status.
+- Offline scripts (`http_gun/testing`) with `ignoring_headers` and `matching`,
+  and readable schema 2 cassettes (`http_gun/cassette`) with incremental
+  recording and atomic publication. `dev/convert_cassette.py` converts schema
+  1 files.
+- Redaction (`http_gun/redaction`, `config.with_redaction`): credential
+  headers by default, configured headers, named query parameters and a
+  whole-body function, applied identically when recording and when matching
+  playback.
+- Lifecycle observations (`http_gun/telemetry`) emitted with `sinal.emit`, so
+  the application's `forwarder.route` decides where handlers run;
+  `config.with_observations` sends to a forwarder directly. Events carry the
+  caller's `sinal/correlation.Correlation` and a per-request `RequestId`.
+- `stop` drains: it refuses new work, fails queued requests, lets open bodies
+  finish within the shutdown timeout, then cancels them.
+- [docs/GUN_AUDIT.md](docs/GUN_AUDIT.md), the audit of the Gun and Cowlib terms
+  the FFI relies on.
+- Module docs on every public module, a README defaults table, and README
+  examples compiled as tests (`test/http_gun_readme_test.gleam`).
 
-### Changed
+### Changed (wave 3, breaking)
 
-- Built on Sinal's wave 2 API: `telemetry.event()` is a total definition with
-  string names and keys, and observers attach with `sinal.observe(event,
-  handler)` and an automatic handler id. The emitted event is unchanged.
-- `http_gun.with_correlation` takes the caller's
-  `sinal/correlation.Correlation` instead of an HTTP Gun id. Lifecycle
-  metadata writes it through `correlation.field()` under the shared
-  `correlation` key, omitted when absent, so HTTP events join other
-  packages' events without a lookup table. `telemetry.Metadata.correlation`
-  is `Option(Correlation)`.
-- `telemetry.Id` is now `telemetry.RequestId`, created only by HTTP Gun for
-  each observed invocation and carried under `request_id`.
+- Every value a caller builds is opaque: `config.Config`, `config.Limits`
+  (removed into setters), `destination.Policy`, `cassette.RecordOptions`.
+- `http_gun.start` returns `StartError`; `stop` returns `Nil`; `child` became
+  `supervised(config, name)`; `snapshot` became `stats` with fields
+  `connections`, `open_bodies`, `queued_requests`.
+- The `_with_options` twins and `try_with_response` were folded into the views
+  and `with_response(client, req, on_failure, run)`.
+- `deadline.after` is total; `cancellation.with_token` cannot fail and
+  `cancel` returns at once.
+- `http_gun/fixture` merged into `http_gun/testing` (`Complete`, `Failed`,
+  `Cancelled` became `Finished`, `Aborted`, `Abandoned`), and
+  `http_gun/recording` into `http_gun/cassette` (`finish(recording, wait_ms)`
+  replaces `finish` and `finish_wait`).
+- Error vocabulary: `NotSubmitted` and `MayHaveBeenSent` became `NotSent` and
+  `MaybeSent`; `InvalidRequest` takes a `RequestProblem`;
+  `DestinationRejected` takes a `destination.Rejection`;
+  `FixtureExhausted` and `FixtureMismatch` became `PlaybackExhausted` and
+  `PlaybackMismatch`; `CaptureFailed(String)` became `RecordingClosed`;
+  `CollectedBodyBytes` and `ResponseQueueBytes` became `ResponseBodyBytes`
+  and `BufferedBytes`.
+- Cassettes use schema 2; schema 1 files fail with `UnsupportedVersion(1)`.
+- Observations are on by default through `sinal.emit` instead of off.
+- `gun >= 2.6.0 and < 2.7.0` and `cowlib >= 2.20.0 and < 2.21.0` replace the
+  exact pins. CI runs the minimum and the newest patch.
+- A waiting request's headers and body are held in a closure, so a pool crash
+  report prints no credential; `testing.exchange` drops credential headers
+  from the in-memory script.
+- Construction records moved to `docs/history/`.
+
+### New variants
+
+- `Reason`: `PoolTimeout`, `ConnectTimeout`, `IdleTimeout`,
+  `PlaybackMismatch`, `PlaybackExhausted`, `RecordingClosed`.
+- `LimitKind`: `BufferedBytes`, `ResponseBodyBytes`, `BatchBytes`.
+- `RequestProblem` (new): `BodyNotBytes`, `InvalidMethod`, `InvalidOrigin`,
+  `InvalidTarget`, `InvalidHeader`, `InvalidBodyLimit`, `InvalidBatch`.
 
 ### Removed
 
-- `telemetry.new_id()`. Use `correlation.from_string(app_id)` or
-  `correlation.unique()` from `sinal/correlation`.
+- `http_gun/request_options`, `http_gun/fixture`, `http_gun/recording`.
+- `http_gun.request_ceiling_ms`, `open_with_options`, `send_with_options`,
+  `with_response_with_options`, `try_with_response`,
+  `try_with_response_with_options`, `child`, `snapshot`.
+- `error.InvalidConfig`, `ReadTimeout`, `FixtureMissing`, `FixtureIo`,
+  `FixtureCorrupt`, `FixtureVersion`, `CaptureFailed`, `ResponseChunkBytes`,
+  `FixtureBytes`, `file_description`; `cancellation.try_with_token`;
+  `deadline.timestamp`; every `@internal` function in a public module.
+- The archived LLM Wire consumer from the gate: LLM Wire is a live dependent
+  and migrates itself.
+- `telemetry.new_id()`, replaced earlier by `sinal/correlation`.

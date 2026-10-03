@@ -4,7 +4,7 @@ import argparse, collections, hashlib, json, os, platform, shutil, socket, stati
 
 ROOT = Path(__file__).resolve().parents[2]
 WORK = ROOT / 'build/dream-comparison'
-OUT = ROOT / 'docs/evidence/dream-comparison'
+OUT = ROOT / 'docs/history/evidence/dream-comparison'
 SHA = 'bbc4b5402a7e0cb5247829c8f4be8fb273afc2a5'
 ARCHIVE_SHA = 'd518ec13f566dd8d60482eef0076fa562625fed4f1f2ffcbb38c4cbc1d8735fd'
 DREAM = WORK / f'dream-{SHA}'
@@ -51,7 +51,7 @@ def prepare():
     if not DREAM.exists():
         with tarfile.open(archive) as source:
             source.extractall(WORK, filter='data')
-    receipt = json.loads((ROOT / 'docs/evidence/dream-comparison/source.json').read_text())
+    receipt = json.loads((ROOT / 'docs/history/evidence/dream-comparison/source.json').read_text())
     for name, expected in receipt['module_files'].items():
         if not name.endswith('/manifest.toml'):
             assert hashlib.sha256((DREAM / name).read_bytes()).hexdigest() == expected, name

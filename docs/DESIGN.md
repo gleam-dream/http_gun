@@ -7,14 +7,14 @@ Accepted authority: the owner's HTTP Gun restart prompt, 2026-09-29. This is a f
 ```gleam
 let assert Ok(client) = http_gun.start(config.default())
 let result = http_gun.send(client, request)
-let result = http_gun.with_response(client, request, fn(response) {
-  body.next(response.body, 1000) // returning early cancels locally
+let result = http_gun.with_response(client, request, fn(f) { f }, fn(response) {
+  body.next(response.body) // returning early cancels locally
 })
 let results = http_gun.batch(client, requests, 10) // input order
-let _ = http_gun.stop(client)
+http_gun.stop(client)
 ```
 
-Live uses start; scripts use testing.start; disk playback uses cassette.playback; recording uses cassette.record. Every constructor returns the same Client, with recording additionally returning a finish capability. Mode selection belongs at application startup. No automatic fallback.
+Live uses start or supervised; scripts use testing.playback; disk playback uses cassette.load then testing.playback; recording uses cassette.record. Every constructor returns the same Client, with recording additionally returning a finish capability. Mode selection belongs at application startup. No automatic fallback.
 
 ## Ownership and transitions
 
@@ -133,3 +133,16 @@ lease when either request or response carries a close token.
 Body owners retain structured connection errors sent to their reply address,
 including Gun's header/trailer limit category. Unavailable parser detail stays
 unknown or closed; no inference from internal crash stacks changes evidence.
+
+## Release API (wave 3, 2026-10-02)
+
+The owner accepted the release API review (oversight `docs/release-api/http_gun.md`, HTTPGUN-R1 to R10). It supersedes the request-option and fixture shapes above where they differ:
+
+- Caller-built values are opaque with `with_*` setters: `config.Config`, `destination.Policy`, `redaction.Redaction`, `cassette.RecordOptions`. Validation happens once at start and returns `ConfigError`.
+- Per-call settings are client views (`with_timeout`, `with_deadline`, `with_idle_timeout`, `with_cancellation`, `with_body_limit`, `with_destination`, `with_correlation`); there is one entry point per operation. A view's timeout or deadline replaces the client's request timeout, shorter or longer; connect, pool and idle bounds stay in force.
+- Named timeouts: connect including DNS (5 s), pool checkout (5 s), request (30 s), idle read (30 s), idle pooled connection (60 s), shutdown drain (5 s). `Infinity` is explicit.
+- `error.Failure` is opaque with a closed `Kind`, `is_retryable(idempotent:)`, `status`, `name`, `to_json` and `decoder`. A body over its limit keeps the response status.
+- `supervised(config, name)` and `named(name)` give a restart-stable handle; `stop` drains.
+- Destination policies admit `host:port` entries, narrow per view and expose `check`.
+- Test support is `testing` (scripts, matchers) and `cassette` (schema 2 files, recording); redaction covers configured headers, named query parameters and a whole-body function, applied identically when recording and when matching playback.
+- Observations go through `sinal.emit` by default, so the application's routes decide where handlers run.

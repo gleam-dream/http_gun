@@ -30,7 +30,7 @@ def inputs(root):
     selected = {}
     for name in sorted(set(names.decode().split("\0")) - {""}):
         path = root / name
-        if name.startswith((".archive/", "docs/evidence/", "build/", ".direnv/")):
+        if name.startswith((".archive/", "docs/history/evidence/", "build/", ".direnv/")):
             continue
         if path.is_symlink() and not path.resolve().is_relative_to(root):
             raise ValueError(f"Source symlink leaves its checkout: {path}")
