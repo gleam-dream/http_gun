@@ -1,10 +1,16 @@
 -module(http_gun_recording_fault_test_ffi).
 -include_lib("kernel/include/file.hrl").
--export([break_file/1, stall_file/1, release/1, private/1]).
+-export([break_file/1, stall_file/1, release/1, private/1, staging_count/1, kill_recorder/1]).
 private(Destination) ->
     [Path] = filelib:wildcard(binary_to_list(Destination) ++ ".http-gun-*"),
     {ok,Info} = file:read_file_info(Path),
     (Info#file_info.mode band 8#777) =:= 8#700.
+staging_count(Destination) ->
+    length(filelib:wildcard(binary_to_list(Destination) ++ ".http-gun-*")).
+%% A Recording is {recording, Subject, Pid}; the crash stands in for a bug.
+kill_recorder(Recording) ->
+    exit(element(3, Recording), kill),
+    nil.
 spool(Destination) ->
     [Path] = filelib:wildcard(binary_to_list(Destination) ++ ".http-gun-*/0.json"),
     Path.

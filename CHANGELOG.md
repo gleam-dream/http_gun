@@ -16,6 +16,17 @@ changed item. Wave 4 moved every timeout to `Duration`, added the
 plaintext rule and the view correlation accessor, and made only a narrowing
 view policy satisfy `require_view_destination`; see [the wave 4 migration guide](docs/migration-wave-4.md).
 
+### Fixed
+
+- `cassette.abort` left the `<path>.http-gun-*` staging directory and its
+  files behind, as did every other failed recording: a capture failure such as
+  the byte budget or a write error, a failed `finish` (for example
+  `DestinationExists`), the death of the process that started the recording,
+  and a crash of the recorder. Each now removes the staging directory;
+  `abort` has removed it when it returns. It stays only if the VM is killed
+  mid-recording or a writer is stuck in a blocking file operation, and then
+  only until that operation returns.
+
 ### Added
 
 - An HTTP client on Gun: `http_gun.start`, or `supervised(config, name)` with

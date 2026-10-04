@@ -155,6 +155,8 @@ pub fn start(
   let started =
     actor.new_with_initialiser(1000, fn(subject) {
       let _ = process.monitor(owner)
+      let recorder = process.self()
+      let _ = process.spawn_unlinked(fn() { janitor(recorder, directory) })
       let selector =
         process.new_selector()
         |> process.select(subject)
@@ -293,8 +295,9 @@ fn handle(state: State, message: Message) -> actor.Next(State, Message) {
     Lost(process.PortDown(..)) -> actor.continue(state)
     Abandon -> advance(break_session(state, Interrupted))
     Abort(reply) -> {
+      let state = break_session(state, Interrupted)
       process.send(reply, Ok(Nil))
-      advance(break_session(state, Interrupted))
+      advance(state)
     }
     Discard(reply) -> {
       let _ = break_session(state, Interrupted)
@@ -582,9 +585,48 @@ fn break_session(state: State, failure: CaptureError) -> State {
       }
       list.each(state.queue, fn(job) { job.ack(Error(failure)) })
       let state = notify_waiter(state, Error(CaptureFailed(failure)))
+      remove_staging(state)
       State(..state, phase: Broken(failure), working: None, queue: [])
     }
   }
+}
+
+/// A broken session never publishes, so its staging directory goes now. A
+/// killed writer may still be inside a file operation: removal waits for it
+/// to exit, for a short while here and then in the background, so that a
+/// writer stuck in a blocking operation cannot stall the recorder.
+fn remove_staging(state: State) -> Nil {
+  let directory = state.directory
+  case state.working {
+    None -> file.remove_staging(directory)
+    Some(work) -> {
+      let writer = work.pid
+      let cleaner =
+        process.spawn_unlinked(fn() {
+          await_exit(writer)
+          file.remove_staging(directory)
+        })
+      let monitor = process.monitor(cleaner)
+      let _ =
+        process.new_selector()
+        |> process.select_specific_monitor(monitor, fn(_) { Nil })
+        |> process.selector_receive(200)
+      process.demonitor_process(monitor)
+    }
+  }
+}
+
+fn await_exit(pid: process.Pid) -> Nil {
+  process.new_selector()
+  |> process.select_specific_monitor(process.monitor(pid), fn(_) { Nil })
+  |> process.selector_receive_forever
+}
+
+/// Removes the staging directory once the recorder has exited for any reason,
+/// including a crash, which no handler of the recorder could clean up after.
+fn janitor(recorder: process.Pid, directory: String) -> Nil {
+  await_exit(recorder)
+  file.remove_staging(directory)
 }
 
 fn unfinished(state: State) -> Bool {
@@ -735,11 +777,7 @@ fn copy_exchanges(
 }
 
 fn cleanup(state: Publication) -> Nil {
-  int.range(0, state.count, Nil, fn(_, index) {
-    file.remove(exchange_path(state.directory, index))
-  })
-  file.remove(state.directory <> "/complete.json")
-  file.remove_directory(state.directory)
+  file.remove_staging(state.directory)
 }
 
 fn exchange_path(directory: String, id: Int) -> String {

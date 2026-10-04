@@ -41,6 +41,29 @@ fn req(port: Int) -> request.Request(BitArray) {
 @external(erlang, "http_gun_recording_fault_test_ffi", "private")
 fn private_directory(path: String) -> Bool
 
+@external(erlang, "http_gun_recording_fault_test_ffi", "staging_count")
+fn staging_count(destination: String) -> Int
+
+@external(erlang, "http_gun_recording_fault_test_ffi", "kill_recorder")
+fn kill_recorder(recording: cassette.Recording) -> Nil
+
+// Removal can follow the call that caused it (a killed writer, a crashed
+// recorder), so the leak checks poll for a moment.
+fn staging_removed(destination: String) -> Bool {
+  staging_removed_within(destination, 200)
+}
+
+fn staging_removed_within(destination: String, tries: Int) -> Bool {
+  case staging_count(destination), tries {
+    0, _ -> True
+    _, 0 -> False
+    _, _ -> {
+      process.sleep(10)
+      staging_removed_within(destination, tries - 1)
+    }
+  }
+}
+
 pub fn real_record_finish_and_offline_replay_test() {
   let port = server()
   let destination = path()
@@ -52,6 +75,7 @@ pub fn real_record_finish_and_offline_replay_test() {
   |> should.equal(Ok(destination))
   cassette.finish(recorded.recording, duration.milliseconds(0))
   |> should.equal(Ok(destination))
+  staging_count(destination) |> should.equal(0)
   http_gun.stop(recorded.client)
   let assert Ok(value) = cassette.load(destination, 10_000)
   let assert Ok(playback) = testing.playback(value, local_config())
@@ -121,6 +145,7 @@ pub fn capture_budget_failure_preserves_http_outcome_test() {
   cassette.finish(recorded.recording, duration.milliseconds(0))
   |> should.equal(Error(cassette.CaptureFailed(cassette.CaptureLimit)))
   cassette.load(destination, 10_000) |> should.equal(Error(cassette.Missing))
+  staging_removed(destination) |> should.be_true
   http_gun.stop(recorded.client)
 }
 
@@ -134,6 +159,7 @@ pub fn existing_destination_refusal_is_deterministic_test() {
   |> should.equal(Error(cassette.CaptureFailed(cassette.DestinationExists)))
   cassette.finish(recorded.recording, duration.milliseconds(0))
   |> should.equal(Error(cassette.CaptureFailed(cassette.DestinationExists)))
+  staging_removed(destination) |> should.be_true
   http_gun.stop(recorded.client)
   remove(destination)
 }
@@ -145,6 +171,7 @@ pub fn interrupted_capture_never_publishes_test() {
     cassette.record(local_config(), destination, cassette.options())
   let assert Ok(response) = http_gun.open(recorded.client, req(port))
   cassette.abort(recorded.recording) |> should.equal(Ok(Nil))
+  staging_count(destination) |> should.equal(0)
   emit(server, <<"3\r\nabc\r\n0\r\n\r\n":utf8>>)
   let assert Ok(collected) = body.collect(response.body, 1000)
   collected.bytes |> should.equal(<<"abc":utf8>>)
@@ -188,6 +215,7 @@ pub fn actual_write_failure_does_not_replace_http_result_test() {
     ),
   )
   cassette.load(destination, 10_000) |> should.equal(Error(cassette.Missing))
+  staging_removed(destination) |> should.be_true
   http_gun.stop(recorded.client)
 }
 
@@ -214,8 +242,84 @@ pub fn stalled_writer_keeps_control_and_completed_http_test() {
   cassette.finish(recorded.recording, duration.milliseconds(0))
   |> should.equal(Error(cassette.CaptureFailed(cassette.Interrupted)))
   release_fifo(fifo)
+  staging_removed(destination) |> should.be_true
   body.close(response.body)
   http_gun.stop(recorded.client)
+}
+
+pub fn abort_removes_the_staging_directory_test() {
+  let destination = path()
+  let assert Ok(recorded) =
+    cassette.record(local_config(), destination, cassette.options())
+  staging_count(destination) |> should.equal(1)
+  cassette.abort(recorded.recording) |> should.equal(Ok(Nil))
+  staging_count(destination) |> should.equal(0)
+  cassette.abort(recorded.recording) |> should.equal(Ok(Nil))
+  cassette.finish(recorded.recording, duration.milliseconds(0))
+  |> should.equal(Error(cassette.CaptureFailed(cassette.Interrupted)))
+  cassette.load(destination, 10_000) |> should.equal(Error(cassette.Missing))
+  http_gun.stop(recorded.client)
+}
+
+pub fn abort_with_exchanges_on_disk_removes_them_test() {
+  let port = server()
+  let destination = path()
+  let assert Ok(recorded) =
+    cassette.record(local_config(), destination, cassette.options())
+  let assert Ok(_) = http_gun.send(recorded.client, req(port))
+  cassette.abort(recorded.recording) |> should.equal(Ok(Nil))
+  staging_count(destination) |> should.equal(0)
+  http_gun.stop(recorded.client)
+}
+
+pub fn abort_after_a_failed_finish_leaves_nothing_test() {
+  let port = server()
+  let destination = store("existing bytes")
+  let assert Ok(recorded) =
+    cassette.record(local_config(), destination, cassette.options())
+  let assert Ok(_) = http_gun.send(recorded.client, req(port))
+  cassette.finish(recorded.recording, duration.milliseconds(0))
+  |> should.equal(Error(cassette.CaptureFailed(cassette.DestinationExists)))
+  cassette.abort(recorded.recording) |> should.equal(Ok(Nil))
+  staging_count(destination) |> should.equal(0)
+  http_gun.stop(recorded.client)
+  remove(destination)
+}
+
+pub fn owner_death_removes_the_staging_directory_test() {
+  let destination = path()
+  let started = process.new_subject()
+  let owner =
+    process.spawn_unlinked(fn() {
+      let assert Ok(recorded) =
+        cassette.record(local_config(), destination, cassette.options())
+      process.send(started, recorded)
+      process.sleep_forever()
+    })
+  let assert Ok(recorded) = process.receive(started, 5000)
+  let client = recorded.client
+  staging_count(destination) |> should.equal(1)
+  process.kill(owner)
+  staging_removed(destination) |> should.be_true
+  http_gun.stop(client)
+}
+
+pub fn recorder_crash_removes_the_staging_directory_test() {
+  let port = server()
+  let destination = path()
+  let started = process.new_subject()
+  // The recorder is linked to its owner, so the owner is a spare process.
+  let _ =
+    process.spawn_unlinked(fn() {
+      let assert Ok(recorded) =
+        cassette.record(local_config(), destination, cassette.options())
+      let assert Ok(_) = http_gun.send(recorded.client, req(port))
+      process.send(started, recorded.client)
+      kill_recorder(recorded.recording)
+    })
+  let assert Ok(client) = process.receive(started, 5000)
+  staging_removed(destination) |> should.be_true
+  http_gun.stop(client)
 }
 
 pub fn explicit_replacement_and_finalized_refusal_test() {

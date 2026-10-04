@@ -166,3 +166,8 @@ fn directory_name(destination: String) -> String
 // simplifile.delete is recursive; cleanup must only remove an empty directory.
 @external(erlang, "http_gun_file_ffi", "remove_directory")
 pub fn remove_directory(path: String) -> Nil
+
+/// Remove a staging directory with the files directly inside it. Failures are
+/// ignored; a removal that cannot happen leaves the directory behind.
+@external(erlang, "http_gun_file_ffi", "remove_staging")
+pub fn remove_staging(path: String) -> Nil

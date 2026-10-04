@@ -28,6 +28,13 @@
 //// A recording writes each exchange as it completes, within a byte budget,
 //// and publishes the file atomically when `finish` succeeds. Capture
 //// failures are separate from HTTP outcomes: the live client keeps working.
+////
+//// Exchanges are staged in a private `<path>.http-gun-*` directory next to the
+//// destination. Success, `abort`, a failed `finish`, a capture failure, the
+//// death of the process that called `record` and a crash of the recorder all
+//// remove it. A writer stuck in a blocking file operation delays removal until
+//// that operation returns. Nothing can remove it if the VM is killed or halted
+//// mid-recording; such a directory is safe to delete.
 
 import gleam/bit_array
 import gleam/int
@@ -242,8 +249,9 @@ pub fn finish(
   })
 }
 
-/// Abandon the capture; the live client keeps working. A published file is
-/// not removed.
+/// Abandon the capture; the live client keeps working. The staging directory
+/// beside the destination is removed before this returns, and nothing is
+/// published. A file already published is not removed.
 pub fn abort(recording: Recording) -> Result(Nil, RecordError) {
   recorder.abort(recording) |> result.map_error(record_error)
 }

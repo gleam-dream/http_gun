@@ -21,6 +21,7 @@ HTTP Gun enforces application admission and storage limits. These are not a boun
 | Idle read | 30 s | While the opener waits for the head or a reader waits with nothing buffered; reset by every delivered event; also the socket `send_timeout` |
 | Idle pooled connection | 60 s | A ready connection carrying no request is closed |
 | Shutdown drain | 5 s | `stop` waits for open bodies, then cancels them |
+| Recording staging directory | 1 per recording | Removed on publication, abort, any capture or finish failure, owner death and recorder crash; left behind only if the VM is killed mid-recording or a writer is stuck in a blocking file operation |
 | Recording finish waiter | 1 | Extra concurrent waits return Busy; timeout/death removes the waiter without aborting finalization |
 
 Limits are finite integers; configuration validation rejects invalid capacities before client startup. `body.next` waits for data; the request and idle timeouts bound it. `body.next_within` adds a local wait that returns `None` and keeps the stream. A cancellation token is one plain process that each admitted pending/body owner monitors, and release removes its monitor; cancelling kills it, which latches cancellation without retaining completed-request history. Applications bound the number of token scopes they create. Completed HTTP is not retrospectively made unsuccessful because a read happens after its deadline. Capture may separately fail if it cannot finish within that budget.
