@@ -12,12 +12,12 @@ Repeated on 2026-09-29 with the original comparison package, Gleam 1.18.1 / OTP2
 
 The reproduction loop ranked three hypotheses before intervention: (1) repeated pending-queue scans dominate; (2) per-request actor/monitor overhead dominates; (3) connection policy accounts for most of the gap. The latter two remain background costs but do not explain the reduction obtained with the same number of callers, connections and body actors.
 
-| Unprofiled case | Median ms | Range ms | Connections |
-| --- | ---: | ---: | ---: |
-| Original, 1,000 callers | 695.506 | 683.761–708.923 | 4 |
-| Original, four workers processing 1,000 requests | 38.566 | 35.730–39.075 | 4 |
-| Diagnostic: omit repeated host lowercasing | 374.577 | 366.880–381.764 | 4 |
-| Diagnostic: stop checking an already blocked origin | 56.335 | 54.859–56.368 | 4 |
+| Unprofiled case                                     | Median ms |        Range ms | Connections |
+| --------------------------------------------------- | --------: | --------------: | ----------: |
+| Original, 1,000 callers                             |   695.506 | 683.761–708.923 |           4 |
+| Original, four workers processing 1,000 requests    |    38.566 |   35.730–39.075 |           4 |
+| Diagnostic: omit repeated host lowercasing          |   374.577 | 366.880–381.764 |           4 |
+| Diagnostic: stop checking an already blocked origin |    56.335 |   54.859–56.368 |           4 |
 
 Each row has three fresh-VM trials. The two diagnostic rows are independent changes to the original isolated source, not cumulative optimizations. The first preserves behavior for this already-lowercase `localhost` workload only. The second exploits the workload's single queued origin: derive the protected-origin set from the first queued request and stop dispatch when that origin is blocked, retaining the remaining FIFO. It preserves the caller count, connection cap and body lifecycle, but does **not** implement general multi-origin scheduling. Neither is a production fix. Both were applied only in the ignored benchmark copy, then restored in a `finally` block and rebuilt with warnings as errors.
 
@@ -27,12 +27,12 @@ The single-origin experiment removes about 92% of the measured burst elapsed tim
 
 OTP's [tprof](https://www.erlang.org/doc/apps/tools/tprof.html) counted functions in `http_gun@internal@pool` after explicitly loading that module. Counts include the two warmup requests. Profiled wall-clock times are excluded from the timing table because tracing changes execution cost and scheduling.
 
-| Workload | Admission checks | Origin calculations | Actual launches |
-| --- | ---: | ---: | ---: |
-| 100 callers | 9,611 | 19,222 | 102 |
-| 500 callers | 247,267 | 494,534 | 502 |
-| 1,000 callers | 993,648 | 1,987,296 | 1,002 |
-| Four workers, 1,000 requests | 1,025 | 2,050 | 1,002 |
+| Workload                     | Admission checks | Origin calculations | Actual launches |
+| ---------------------------- | ---------------: | ------------------: | --------------: |
+| 100 callers                  |            9,611 |              19,222 |             102 |
+| 500 callers                  |          247,267 |             494,534 |             502 |
+| 1,000 callers                |          993,648 |           1,987,296 |           1,002 |
+| Four workers, 1,000 requests |            1,025 |               2,050 |           1,002 |
 
 Doubling the burst from 500 to 1,000 produces about four times as many admission checks. The worker case launches exactly as many requests but avoids the large pending queue.
 

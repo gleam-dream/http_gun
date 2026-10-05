@@ -8,9 +8,7 @@
   "sampling_interval_ms": 10,
   "log_prefix_limit": 262144,
   "log_sha256": "a2d4ac895819979f16dda341eaa2803affd554b9233b11ec6455d4a4ce832477",
-  "request_connection_ids": [
-    "2"
-  ],
+  "request_connection_ids": ["2"],
   "rst_stream": 2,
   "request_headers": 1116,
   "h2_selected": 1,

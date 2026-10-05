@@ -4,64 +4,32 @@
     "min_ms": 683.761,
     "max_ms": 708.923,
     "failures": 0,
-    "connections": [
-      4,
-      4,
-      4
-    ],
-    "peak_processes": [
-      1091,
-      1091,
-      1091
-    ]
+    "connections": [4, 4, 4],
+    "peak_processes": [1091, 1091, 1091]
   },
   "bounded": {
     "median_ms": 38.566,
     "min_ms": 35.73,
     "max_ms": 39.075,
     "failures": 0,
-    "connections": [
-      4,
-      4,
-      4
-    ],
-    "peak_processes": [
-      100,
-      100,
-      100
-    ]
+    "connections": [4, 4, 4],
+    "peak_processes": [100, 100, 100]
   },
   "skip-repeated-normalization": {
     "median_ms": 374.577,
     "min_ms": 366.88,
     "max_ms": 381.764,
     "failures": 0,
-    "connections": [
-      4,
-      4,
-      4
-    ],
-    "peak_processes": [
-      1090,
-      1090,
-      1089
-    ]
+    "connections": [4, 4, 4],
+    "peak_processes": [1090, 1090, 1089]
   },
   "one-origin-scheduling": {
     "median_ms": 56.335,
     "min_ms": 54.859,
     "max_ms": 56.368,
     "failures": 0,
-    "connections": [
-      4,
-      4,
-      4
-    ],
-    "peak_processes": [
-      920,
-      919,
-      961
-    ]
+    "connections": [4, 4, 4],
+    "peak_processes": [920, 919, 961]
   },
   "production_unchanged": true,
   "temporary_source_restored_and_rebuilt": true

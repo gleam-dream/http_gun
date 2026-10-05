@@ -2,13 +2,13 @@
 
 The owner approved this follow-up with “Proceed”, against HTTP Gun `ebf2b479761e8c932b0c85a8f83cf8460c014d4f` and migrated LLM Wire `1c0ad614149b6ba286a6f778e223bd294f403b30`. Those revisions identify the reviewed baseline; the accepted changes are retained in local commits. The [wave tracker](implementation/gleam-first/wave-tracker.md) records approval, tests and acceptance. The original proposal's hash is retained in [wave18](evidence/wave18/proposal-source.json).
 
-| Area | Delivery | Reason and boundary |
-| --- | --- | --- |
-| Current adoption | Implemented documentation and opt-in downstream gate | The current migration is real; the archived text consumer cannot establish its compatibility. Ordinary gates still need no sibling checkout. |
-| Asynchronous ownership | Implemented maintained public consumer and11 lifecycle groups | Downloads/feeds need cancellation before headers, one opening/reading worker and application-owned shutdown. No library task runtime added. |
-| Deadline discovery | Implemented `request_ceiling_ms(client)` | Wrappers receiving only a Client can inspect its immutable startup ceiling without duplicating configuration. It is not a liveness check or budget reservation. |
-| Fallible scope | Implemented `cancellation.try_with_token` | Byte-counting downloads and grouped REST requests avoid repeated outer-error mapping/flattening. This is a convenience with the existing lifetime contract. |
-| Lifecycle observations | Implemented and qualified through Sinal in waves22–24 | The pool/body owners emit typed milestones through an application-supervised bounded forwarder. No HTTP Gun collector/history exists. See [the exact contract](OBSERVATIONS.md). |
+| Area                   | Delivery                                                      | Reason and boundary                                                                                                                                                              |
+| ---------------------- | ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Current adoption       | Implemented documentation and opt-in downstream gate          | The current migration is real; the archived text consumer cannot establish its compatibility. Ordinary gates still need no sibling checkout.                                     |
+| Asynchronous ownership | Implemented maintained public consumer and11 lifecycle groups | Downloads/feeds need cancellation before headers, one opening/reading worker and application-owned shutdown. No library task runtime added.                                      |
+| Deadline discovery     | Implemented `request_ceiling_ms(client)`                      | Wrappers receiving only a Client can inspect its immutable startup ceiling without duplicating configuration. It is not a liveness check or budget reservation.                  |
+| Fallible scope         | Implemented `cancellation.try_with_token`                     | Byte-counting downloads and grouped REST requests avoid repeated outer-error mapping/flattening. This is a convenience with the existing lifetime contract.                      |
+| Lifecycle observations | Implemented and qualified through Sinal in waves22–24         | The pool/body owners emit typed milestones through an application-supervised bounded forwarder. No HTTP Gun collector/history exists. See [the exact contract](OBSERVATIONS.md). |
 
 Waves18–21 added two small public functions, delegating to existing configuration and scope behavior. Those waves changed no error constructor, fixture schema, default, dependency or FFI. Waves22–24 add opt-in Sinal observation; request options and failure/fixture contracts remain unchanged. Startup failure is mapped only by the caller's error mapper; callback failures retain their type/value. Exceptions still propagate after cleanup. Policy inspection returns the old scalar for stopped/stale capabilities; supervised restarts supply new capabilities.
 
@@ -23,10 +23,10 @@ Gun2.6 `gun.erl:706–717` validates inputs, makes a reference, casts a request 
 The disposable Gleam probe compares two storage mechanisms at capacity64 with six synthetic lifecycle marks per request. It runs in `/private/tmp/http-gun-observation-wave21`; no experiment code is imported into production or added to the ordinary gate. Timestamps are synthetic stage values, not measurements of real HTTP. A barrier pauses the ring consumer; there are no timing sleeps.
 
 | Requests | Ring retained events | Ring incoming mailbox | Fixed slot rows | Slot observation mailbox | Slot ETS allocation bytes |
-| ---: | ---: | ---: | ---: | ---: | ---: |
-| 1 | 6 | 6 | 1 | 0 | 2840 |
-| 100 | 64 | 600 | 64 | 0 | 24512 |
-| 10000 | 64 | 60000 | 64 | 0 | 24512 |
+| -------: | -------------------: | --------------------: | --------------: | -----------------------: | ------------------------: |
+|        1 |                    6 |                     6 |               1 |                        0 |                      2840 |
+|      100 |                   64 |                   600 |              64 |                        0 |                     24512 |
+|    10000 |                   64 |                 60000 |              64 |                        0 |                     24512 |
 
 The first design retains a bounded list while its mailbox grows with traffic. It is unsuitable without an additional ingress contract. The fixed-slot probe overwrites old generations and uses one atomic compare-and-replace attempt for each notice. Failure drops the observation rather than waiting on a reader. It retains at most six typed marks in each of64 rows; there are no free-form metadata values or per-chunk events. Sixty-four synchronized contenders reading the same old value produce one successful commit and63 losses. Stale generations cannot change replacements, duplicate terminal updates do not replace the first terminal, reordered arrival retains distinct stage times, and a dead storage owner produces Stopped. A throwing reader does not stop later writes. Scripts/playback suppress the synthetic Gun-return mark; recording follows the live path, with capture outcomes absent from HTTP marks.
 

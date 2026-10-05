@@ -35,14 +35,14 @@ consumer or substitute for a released dependency.
 
 ## Red/green chain
 
-| Concern | Failure before correction | Qualification |
-| --- | --- | --- |
-| Stdlib compatibility | [Independent consumer cannot resolve1.0.5](../wave29/stdlib-red.log) | [Consumer and original120-test suite pass](../wave29/stdlib-green.log); final full gates exercise128 tests on both pins |
-| In-memory trust | [Unknown Anchors constructor](../wave29/anchors-red.log) | [Verified TLS](../wave29/anchors-green.log), [wrong-name/untrusted/invalid-only controls](../wave29/anchors-controls.log) |
-| Idle TLS reuse | [PeerClosed/MayHaveBeenSent100ms after acknowledged close](../wave30/idle-red.log) | [Fresh connection2, sequence1](../wave30/idle-green.log); [close-token/deadline tests](../wave30/close-and-deadline-green.log) |
-| Close token policy | [Mixed-case request close fails in the complete suite](fast.log) | Fixed token retirement; final128-test gates |
-| Admission ordering | [First full run fails eligible-origin ordering on stdlib1.0.5](full-first.log) | Checks reserve active capacity; unused readiness is reset each dispatch; [128 tests pass](../wave30/fairness-green.log) and final matrix |
-| Header-limit evidence | [Body ignores Gun's structured connection event](header-event-red.log) | [Public HeaderLimitReached result](header-green.log), with strict codec roundtrip in the normal suite |
+| Concern               | Failure before correction                                                          | Qualification                                                                                                                            |
+| --------------------- | ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Stdlib compatibility  | [Independent consumer cannot resolve1.0.5](../wave29/stdlib-red.log)               | [Consumer and original120-test suite pass](../wave29/stdlib-green.log); final full gates exercise128 tests on both pins                  |
+| In-memory trust       | [Unknown Anchors constructor](../wave29/anchors-red.log)                           | [Verified TLS](../wave29/anchors-green.log), [wrong-name/untrusted/invalid-only controls](../wave29/anchors-controls.log)                |
+| Idle TLS reuse        | [PeerClosed/MayHaveBeenSent100ms after acknowledged close](../wave30/idle-red.log) | [Fresh connection2, sequence1](../wave30/idle-green.log); [close-token/deadline tests](../wave30/close-and-deadline-green.log)           |
+| Close token policy    | [Mixed-case request close fails in the complete suite](fast.log)                   | Fixed token retirement; final128-test gates                                                                                              |
+| Admission ordering    | [First full run fails eligible-origin ordering on stdlib1.0.5](full-first.log)     | Checks reserve active capacity; unused readiness is reset each dispatch; [128 tests pass](../wave30/fairness-green.log) and final matrix |
+| Header-limit evidence | [Body ignores Gun's structured connection event](header-event-red.log)             | [Public HeaderLimitReached result](header-green.log), with strict codec roundtrip in the normal suite                                    |
 
 `wave30/close-red.log` is an initially passing probe despite its historical
 filename; it is **not** evidence of a reproduced failure. The idle TLS case

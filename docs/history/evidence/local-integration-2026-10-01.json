@@ -1,10 +1,7 @@
 {
   "http_gun_baseline": "ebf2b479761e8c932b0c85a8f83cf8460c014d4f",
   "sinal_commit": "8acec4507f23daa7f49c40cc7d39816a5a4c3d1d",
-  "validated_receipts": [
-    "wave23/sinal-receipt.json",
-    "wave24/receipt.json"
-  ],
+  "validated_receipts": ["wave23/sinal-receipt.json", "wave24/receipt.json"],
   "changed_frozen_inputs": {
     "dev/dependencies/sinal.json": {
       "validated_sha256": "b7f801eca48cede63b28c001fe768615efeafde5a1aebef3d56f9481a1e5ae39",

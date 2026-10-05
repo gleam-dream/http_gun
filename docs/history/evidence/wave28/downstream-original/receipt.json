@@ -401,10 +401,7 @@
   "host": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
   "commands": [
     {
-      "argv": [
-        "gleam",
-        "--version"
-      ],
+      "argv": ["gleam", "--version"],
       "cwd": "/tmp/nix-shell.N8t19q/http-gun-downstream-s212nh3d/llm_wire",
       "exit": 0,
       "log": "gleam.log"
@@ -421,38 +418,25 @@
       "log": "runtime.log"
     },
     {
-      "argv": [
-        "nghttpd",
-        "--version"
-      ],
+      "argv": ["nghttpd", "--version"],
       "cwd": "/tmp/nix-shell.N8t19q/http-gun-downstream-s212nh3d/llm_wire",
       "exit": 0,
       "log": "nghttpd.log"
     },
     {
-      "argv": [
-        "gleam",
-        "check"
-      ],
+      "argv": ["gleam", "check"],
       "cwd": "/tmp/nix-shell.N8t19q/http-gun-downstream-s212nh3d/llm_wire",
       "exit": 0,
       "log": "check.log"
     },
     {
-      "argv": [
-        "gleam",
-        "build",
-        "--warnings-as-errors"
-      ],
+      "argv": ["gleam", "build", "--warnings-as-errors"],
       "cwd": "/tmp/nix-shell.N8t19q/http-gun-downstream-s212nh3d/llm_wire",
       "exit": 0,
       "log": "build.log"
     },
     {
-      "argv": [
-        "gleam",
-        "test"
-      ],
+      "argv": ["gleam", "test"],
       "cwd": "/tmp/nix-shell.N8t19q/http-gun-downstream-s212nh3d/llm_wire",
       "exit": 1,
       "log": "tests.log"

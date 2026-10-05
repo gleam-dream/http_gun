@@ -10,14 +10,14 @@ Subsequent [burst diagnosis](BURST_DIAGNOSIS.md) identified repeated pending-que
 
 The requested [Dream branch](https://github.com/lostbean/dream/tree/codex/http-client-combined) was pinned to [bbc4b5402a7e0cb5247829c8f4be8fb273afc2a5](https://github.com/lostbean/dream/tree/bbc4b5402a7e0cb5247829c8f4be8fb273afc2a5/modules/http_client), HTTP client 5.1.3. Its archive SHA256 is `d518ec13f566dd8d60482eef0076fa562625fed4f1f2ffcbb38c4cbc1d8735fd`. [Source receipts](evidence/dream-comparison/source.json) record file hashes before use. The isolated archive retains its MIT license. No Dream production or test source was patched, and no sibling checkout was modified.
 
-| Check | Outcome |
-| --- | --- |
-| Dream, original lock, `gleam check` / `gleam test` | Both stopped before tests: stale local dependency versions |
-| Dream, `gleam format --check` on Gleam 1.18.1 | Failed for `client.gleam`, `recorder.gleam`, `recording.gleam`; source left unchanged |
-| Dream, two local lock entries reconciled | Check passed; **213 tests passed, zero failures** |
-| HTTP Gun fast gate | **50 tests passed**, formatting/check/build/FFI warnings and package boundaries passed |
-| Separate public API comparison package | Build with warnings as errors passed; **15 HTTP Gun and 16 Dream contract cases** checked |
-| Repeated workloads | **54 runs**, zero request failures, all byte totals correct |
+| Check                                              | Outcome                                                                                   |
+| -------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| Dream, original lock, `gleam check` / `gleam test` | Both stopped before tests: stale local dependency versions                                |
+| Dream, `gleam format --check` on Gleam 1.18.1      | Failed for `client.gleam`, `recorder.gleam`, `recording.gleam`; source left unchanged     |
+| Dream, two local lock entries reconciled           | Check passed; **213 tests passed, zero failures**                                         |
+| HTTP Gun fast gate                                 | **50 tests passed**, formatting/check/build/FFI warnings and package boundaries passed    |
+| Separate public API comparison package             | Build with warnings as errors passed; **15 HTTP Gun and 16 Dream contract cases** checked |
+| Repeated workloads                                 | **54 runs**, zero request failures, all byte totals correct                               |
 
 The two lock corrections were `dream` 2.3.1 → 2.4.1 and `dream_mock_server` 1.0.0 → 1.1.1, matching the archive's local manifests. Released dependency versions stayed unchanged for the successful native suite. An earlier broad dependency refresh failed because released `glisten` called the removed `gleam/list.range` API with stdlib 0.71; that experiment and the original failures remain in the evidence. Neither is reported as a passing raw-branch gate. Dream's Makefile was not used because its cleanup can kill unrelated owners of port 9876.
 
@@ -27,20 +27,20 @@ The comparative package uses a shared lock for both clients: stdlib 0.71.0, glea
 
 The harness exercises public imports against controlled loopback servers. It asserts each client's observed contract; passing does not mean the contracts are equivalent. Exact output: [HTTP Gun](evidence/dream-comparison/gun-contracts.jsonl), [Dream](evidence/dream-comparison/dream-contracts.jsonl).
 
-| Scenario | HTTP Gun | Dream at the pinned revision |
-| --- | --- | --- |
-| Buffered 201 / empty 204 | Response with bytes / empty bytes | Response with string / empty string |
-| Buffered 429 | Ordinary response data | `ResponseError` retaining status, headers and body |
-| Buffered bytes `00 ff 80` | Preserved exactly | `RequestError`: conversion to string failed |
-| Duplicate headers and trailers | Both duplicate values retained; trailers separate | Both duplicate values retained; trailers merged into buffered headers |
-| Pull response 201 / 429 | Body delivered normally; status available on response | String errors `HTTP 201: abc` / `HTTP 429: abc` through `stream_yielder` |
-| Pull empty 204 / binary 200 | Completed / all three bytes delivered | Completed / all three bytes delivered |
-| TLS with a trusted local CA | Verified request succeeded | Verified request succeeded |
-| Stop after the first pull chunk | Scope exit closed the socket within two seconds | `yielder.take(1)` did not close it within two seconds |
-| Worker exits holding an unfinished pull stream | Owner monitor closed the socket within two seconds | No closure observed within two seconds |
-| Explicit Dream callback cancellation | Scoped/owned cancellation covered by HTTP Gun's suite | `cancel_stream_handle` closed the socket within two seconds |
-| Real record → server gone → replay | Replayed bytes, then `FixtureExhausted` | Replayed bytes; the single matching fixture remained reusable |
-| Record identical requests returning `abc`, then `xyz` | Replayed both in order, then exhausted | Playback reported two ambiguous matches on each attempt |
+| Scenario                                              | HTTP Gun                                              | Dream at the pinned revision                                             |
+| ----------------------------------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------ |
+| Buffered 201 / empty 204                              | Response with bytes / empty bytes                     | Response with string / empty string                                      |
+| Buffered 429                                          | Ordinary response data                                | `ResponseError` retaining status, headers and body                       |
+| Buffered bytes `00 ff 80`                             | Preserved exactly                                     | `RequestError`: conversion to string failed                              |
+| Duplicate headers and trailers                        | Both duplicate values retained; trailers separate     | Both duplicate values retained; trailers merged into buffered headers    |
+| Pull response 201 / 429                               | Body delivered normally; status available on response | String errors `HTTP 201: abc` / `HTTP 429: abc` through `stream_yielder` |
+| Pull empty 204 / binary 200                           | Completed / all three bytes delivered                 | Completed / all three bytes delivered                                    |
+| TLS with a trusted local CA                           | Verified request succeeded                            | Verified request succeeded                                               |
+| Stop after the first pull chunk                       | Scope exit closed the socket within two seconds       | `yielder.take(1)` did not close it within two seconds                    |
+| Worker exits holding an unfinished pull stream        | Owner monitor closed the socket within two seconds    | No closure observed within two seconds                                   |
+| Explicit Dream callback cancellation                  | Scoped/owned cancellation covered by HTTP Gun's suite | `cancel_stream_handle` closed the socket within two seconds              |
+| Real record → server gone → replay                    | Replayed bytes, then `FixtureExhausted`               | Replayed bytes; the single matching fixture remained reusable            |
+| Record identical requests returning `abc`, then `xyz` | Replayed both in order, then exhausted                | Playback reported two ambiguous matches on each attempt                  |
 
 Dream also exposes `stream_yielder_detailed` and `on_http_response_error`, preserving complete error responses. Its README documents that successful stream status is unavailable from `httpc`'s stream-start event, and distinguishes pull-based yielders from push-based callbacks. The tests above use its basic pull API; they do not imply that no richer error API exists. [Pinned Dream README](https://github.com/lostbean/dream/blob/bbc4b5402a7e0cb5247829c8f4be8fb273afc2a5/modules/http_client/README.md).
 
@@ -64,17 +64,17 @@ The burst cases spawn one caller per input without an application concurrency ga
 
 Elapsed milliseconds, **median [minimum–maximum] of three trials**. Connections are distinct server-side connection identities used by the workload, shown as the observed range; they are not a measurement of peak simultaneous sockets. The sensitivity row changes only the public connection/session setting to 100.
 
-| Workload | HTTP Gun ms | Dream ms | Connections, Gun / Dream |
-| --- | ---: | ---: | ---: |
-| 1 caller | 0.54 [0.50–0.59] | 1.61 [1.59–2.05] | 1 / 1 |
-| 10 callers | 1.70 [1.47–1.82] | 3.08 [2.77–3.17] | 3 / 4–5 |
-| 100 callers | 10.46 [10.39–10.59] | 77.57 [65.03–83.68] | 4 / 24–26 |
-| 1,000 callers | 705.99 [698.74–715.08] | 66.97 [43.86–1,084.23] | 4 / 11–431 |
-| 1,000 requests, four workers | 35.42 [33.63–40.50] | 59.46 [58.10–63.50] | 4 / 1 |
-| 1,000 callers, setting 100 | 1,129.77 [1,126.10–1,145.54] | 74.06 [37.04–199.95] | 44 / 8–33 |
-| 32 MiB pull stream | 201.20 [196.73–204.65] | 205.13 [199.00–209.44] | 1 / 1 |
-| 32 MiB slow reader | 1,552.46 [1,546.77–1,758.37] | 1,551.39 [1,550.97–1,566.94] | 1 / 1 |
-| Slow stream + 1,000 callers | 1,542.85 [1,542.70–1,547.32] | 1,557.75 [1,548.89–1,558.65] | 4 / 10–220 |
+| Workload                     |                  HTTP Gun ms |                     Dream ms | Connections, Gun / Dream |
+| ---------------------------- | ---------------------------: | ---------------------------: | -----------------------: |
+| 1 caller                     |             0.54 [0.50–0.59] |             1.61 [1.59–2.05] |                    1 / 1 |
+| 10 callers                   |             1.70 [1.47–1.82] |             3.08 [2.77–3.17] |                  3 / 4–5 |
+| 100 callers                  |          10.46 [10.39–10.59] |          77.57 [65.03–83.68] |                4 / 24–26 |
+| 1,000 callers                |       705.99 [698.74–715.08] |       66.97 [43.86–1,084.23] |               4 / 11–431 |
+| 1,000 requests, four workers |          35.42 [33.63–40.50] |          59.46 [58.10–63.50] |                    4 / 1 |
+| 1,000 callers, setting 100   | 1,129.77 [1,126.10–1,145.54] |         74.06 [37.04–199.95] |                44 / 8–33 |
+| 32 MiB pull stream           |       201.20 [196.73–204.65] |       205.13 [199.00–209.44] |                    1 / 1 |
+| 32 MiB slow reader           | 1,552.46 [1,546.77–1,758.37] | 1,551.39 [1,550.97–1,566.94] |                    1 / 1 |
+| Slow stream + 1,000 callers  | 1,542.85 [1,542.70–1,547.32] | 1,557.75 [1,548.89–1,558.65] |               4 / 10–220 |
 
 The mixed elapsed time mostly measures the slow stream. Median per-trial p95 latency for its **small requests** was 691.77 ms for HTTP Gun and 31.76 ms for Dream. HTTP Gun's 1,000-caller behavior deserves profiling of its own admission and scheduling path. Raising the cap to 100 made its measured burst time worse, so merely increasing connection count is not a demonstrated fix. The four-worker result shows that caller admission policy materially changes performance. No CPU/reduction profile was collected, so the cause is not established.
 
@@ -82,18 +82,18 @@ The mixed elapsed time mostly measures the slow stream. Median per-trial p95 lat
 
 Memory is the median of each trial's sampled **whole-VM** peak, including server processes, both installed applications, callers and the sampler. Mailbox/process/port columns are the largest sampled value across the three trials. The sampler checks approximately every ten milliseconds; it can miss short peaks, especially in the shortest cases. These are practical observations, not allocation bounds or retained-client-memory measurements. Erlang ports include both ends of sockets and runtime ports.
 
-| Workload / client | p95 request ms, median | VM peak MiB, median | Max one mailbox | Max all mailboxes | Max processes | Max ports |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| 1,000 callers / Gun | 700.81 | 64.08 | 678 | 679 | 1,091 | 11 |
-| 1,000 callers / Dream | 37.86 | 65.39 | 996 | 998 | 894 | 223 |
-| Four workers / Gun | 0.21 | 52.19 | 3 | 4 | 100 | 11 |
-| Four workers / Dream | 0.33 | 51.53 | 3 | 3 | 94 | 5 |
-| 32 MiB / Gun | — | 51.78 | 1 | 2 | 90 | 5 |
-| 32 MiB / Dream | — | 51.40 | 1 | 2 | 90 | 4 |
-| Slow reader / Gun | — | 51.81 | 1 | 1 | 90 | 4 |
-| Slow reader / Dream | — | 51.17 | 1 | 1 | 90 | 4 |
-| Mixed / Gun | 691.77 | 64.32 | 689 | 689 | 1,095 | 11 |
-| Mixed / Dream | 31.76 | 63.45 | 1,009 | 1,009 | 953 | 105 |
+| Workload / client     | p95 request ms, median | VM peak MiB, median | Max one mailbox | Max all mailboxes | Max processes | Max ports |
+| --------------------- | ---------------------: | ------------------: | --------------: | ----------------: | ------------: | --------: |
+| 1,000 callers / Gun   |                 700.81 |               64.08 |             678 |               679 |         1,091 |        11 |
+| 1,000 callers / Dream |                  37.86 |               65.39 |             996 |               998 |           894 |       223 |
+| Four workers / Gun    |                   0.21 |               52.19 |               3 |                 4 |           100 |        11 |
+| Four workers / Dream  |                   0.33 |               51.53 |               3 |                 3 |            94 |         5 |
+| 32 MiB / Gun          |                      — |               51.78 |               1 |                 2 |            90 |         5 |
+| 32 MiB / Dream        |                      — |               51.40 |               1 |                 2 |            90 |         4 |
+| Slow reader / Gun     |                      — |               51.81 |               1 |                 1 |            90 |         4 |
+| Slow reader / Dream   |                      — |               51.17 |               1 |                 1 |            90 |         4 |
+| Mixed / Gun           |                 691.77 |               64.32 |             689 |               689 |         1,095 |        11 |
+| Mixed / Dream         |                  31.76 |               63.45 |           1,009 |             1,009 |           953 |       105 |
 
 Per-request timing begins in each worker before its public request call and includes client queuing; it excludes time before that worker runs. Bounded-case request percentiles exclude time an input waits for its worker's earlier jobs; total elapsed time includes all jobs. Mixed percentiles cover only small requests. Stream-only percentile fields are zero in raw output, meaning unmeasured, not zero latency. Raw [54 measurements](evidence/dream-comparison/benchmark.jsonl) and [all metric summaries](evidence/dream-comparison/summary.json) include p50/p95/p99 and ranges. Three local trials are too few for an SLA or statistical significance claim.
 

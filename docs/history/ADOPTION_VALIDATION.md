@@ -28,12 +28,12 @@ Batch workers now capture one request and the operation/destination, instead of 
 The public batch regression reproduced the defect before the fix. Three warmed fresh-VM runs with four workers/four H1 connections gave these medians:
 
 | Requests | Before ms | After ms |
-| ---: | ---: | ---: |
-| 500 | 36.771 | 19.812 |
-| 1000 | 116.238 | 36.374 |
-| 2000 | 408.884 | 67.674 |
-| 5000 | 2377.275 | 166.490 |
-| 10000 | not run | 327.580 |
+| -------: | --------: | -------: |
+|      500 |    36.771 |   19.812 |
+|     1000 |   116.238 |   36.374 |
+|     2000 |   408.884 |   67.674 |
+|     5000 |  2377.275 |  166.490 |
+|    10000 |   not run |  327.580 |
 
 All results had correct bytes. The 5,000-request median improved 14.3×. The retained full-gate regression checks tenfold input growth with a generous noise allowance; it is not an absolute speed promise. [Red/green receipts](evidence/wave10/) preserve exact trials.
 
@@ -45,12 +45,12 @@ Only the example retains reviewed LLM Wire framing code and provider fixture str
 
 Reference scenarios added through public HTTP Gun calls:
 
-| Reference | Retained observation |
-| --- | --- |
-| Gun flow suite | 25 successive H1 responses, each with 25 chunks of 4096 bytes and duplicate trailers, reuse one socket after exhausted credit |
-| Finch lifecycle | Normal caller exit closes an unfinished body; batch owner death cancels workers and restores admission |
-| Finch/Gun shutdown | An accepted H2 sibling finishes while GOAWAY drains the connection; explicit fresh work succeeds after supported shutdown observation |
-| ReqCassette/Mint methods | 65 ordered responses contain all 256 byte values at different chunk boundaries; mismatches preserve each expected exchange |
+| Reference                | Retained observation                                                                                                                  |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Gun flow suite           | 25 successive H1 responses, each with 25 chunks of 4096 bytes and duplicate trailers, reuse one socket after exhausted credit         |
+| Finch lifecycle          | Normal caller exit closes an unfinished body; batch owner death cancels workers and restores admission                                |
+| Finch/Gun shutdown       | An accepted H2 sibling finishes while GOAWAY drains the connection; explicit fresh work succeeds after supported shutdown observation |
+| ReqCassette/Mint methods | 65 ordered responses contain all 256 byte values at different chunk boundaries; mismatches preserve each expected exchange            |
 
 Existing deadline, caller-death, FIFO/fairness, H2 cancellation/window, writer-backpressure and persistence-failure tests remain. The fast suite now has62 tests. The referenced upstream suites were not executed in this follow-up; scenarios were re-expressed at our public boundary. [Reference revisions/hashes](evidence/adoption-review/reference-sources.json), [consumer source](evidence/wave11/donor-source.json), and [exact checks](evidence/wave11/final.log) establish the scope.
 

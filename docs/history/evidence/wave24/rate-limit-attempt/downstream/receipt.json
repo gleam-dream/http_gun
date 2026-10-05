@@ -375,10 +375,7 @@
   "host": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
   "commands": [
     {
-      "argv": [
-        "gleam",
-        "--version"
-      ],
+      "argv": ["gleam", "--version"],
       "cwd": "/tmp/nix-shell.n5du96/http-gun-downstream-vz6d9_ng/llm_wire",
       "exit": 0,
       "log": "gleam.log"
@@ -395,47 +392,31 @@
       "log": "runtime.log"
     },
     {
-      "argv": [
-        "nghttpd",
-        "--version"
-      ],
+      "argv": ["nghttpd", "--version"],
       "cwd": "/tmp/nix-shell.n5du96/http-gun-downstream-vz6d9_ng/llm_wire",
       "exit": 0,
       "log": "nghttpd.log"
     },
     {
-      "argv": [
-        "gleam",
-        "check"
-      ],
+      "argv": ["gleam", "check"],
       "cwd": "/tmp/nix-shell.n5du96/http-gun-downstream-vz6d9_ng/llm_wire",
       "exit": 0,
       "log": "check.log"
     },
     {
-      "argv": [
-        "gleam",
-        "build",
-        "--warnings-as-errors"
-      ],
+      "argv": ["gleam", "build", "--warnings-as-errors"],
       "cwd": "/tmp/nix-shell.n5du96/http-gun-downstream-vz6d9_ng/llm_wire",
       "exit": 0,
       "log": "build.log"
     },
     {
-      "argv": [
-        "gleam",
-        "test"
-      ],
+      "argv": ["gleam", "test"],
       "cwd": "/tmp/nix-shell.n5du96/http-gun-downstream-vz6d9_ng/llm_wire",
       "exit": 0,
       "log": "tests.log"
     },
     {
-      "argv": [
-        "sh",
-        "test/external_package_boundary.sh"
-      ],
+      "argv": ["sh", "test/external_package_boundary.sh"],
       "cwd": "/tmp/nix-shell.n5du96/http-gun-downstream-vz6d9_ng/llm_wire",
       "exit": 1,
       "log": "boundary.log"

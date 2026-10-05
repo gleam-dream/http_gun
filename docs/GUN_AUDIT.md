@@ -15,15 +15,15 @@ minor release without notice. CI runs the full gate on the minimum versions
 
 ## Documented API used
 
-| Call or term | Where | Status |
-| ------------ | ----- | ------ |
-| `gun:open/3` with `retry`, `protocols`, `connect_timeout`, `domain_lookup_timeout`, `tls_handshake_timeout`, `tcp_opts`, `tls_opts`, `transport`, `http_opts` (`flow`, `max_headers`), `http2_opts` (`flow`, `notify_settings_changed`, `max_headers`, window sizes) | `http_gun_ffi:open/9` | documented in `gun(3)` |
-| `gun:request/6` with `reply_to` and `flow` | `request/5` | documented |
-| `gun:update_flow/3`, `gun:cancel/2`, `gun:close/1` | `credit/3`, `cancel/2`, `close/1` | documented |
-| `gun_up`, `gun_response`, `gun_data`, `gun_trailers`, `gun_inform`, `gun_upgrade` messages | `decode/1` | documented message shapes |
-| `{gun_notify, Pid, settings_changed, Settings}` and `max_concurrent_streams` | `decode/1` | documented with `notify_settings_changed` |
-| `gun:info/1` key `protocol` (`http`) | `reusable/1` | documented |
-| `{tls_alert, {Alert, _}}`, `{bad_cert, _}` | `cause/1` | OTP `ssl` terms, documented by OTP |
+| Call or term                                                                                                                                                                                                                                                         | Where                             | Status                                    |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- | ----------------------------------------- |
+| `gun:open/3` with `retry`, `protocols`, `connect_timeout`, `domain_lookup_timeout`, `tls_handshake_timeout`, `tcp_opts`, `tls_opts`, `transport`, `http_opts` (`flow`, `max_headers`), `http2_opts` (`flow`, `notify_settings_changed`, `max_headers`, window sizes) | `http_gun_ffi:open/9`             | documented in `gun(3)`                    |
+| `gun:request/6` with `reply_to` and `flow`                                                                                                                                                                                                                           | `request/5`                       | documented                                |
+| `gun:update_flow/3`, `gun:cancel/2`, `gun:close/1`                                                                                                                                                                                                                   | `credit/3`, `cancel/2`, `close/1` | documented                                |
+| `gun_up`, `gun_response`, `gun_data`, `gun_trailers`, `gun_inform`, `gun_upgrade` messages                                                                                                                                                                           | `decode/1`                        | documented message shapes                 |
+| `{gun_notify, Pid, settings_changed, Settings}` and `max_concurrent_streams`                                                                                                                                                                                         | `decode/1`                        | documented with `notify_settings_changed` |
+| `gun:info/1` key `protocol` (`http`)                                                                                                                                                                                                                                 | `reusable/1`                      | documented                                |
+| `{tls_alert, {Alert, _}}`, `{bad_cert, _}`                                                                                                                                                                                                                           | `cause/1`                         | OTP `ssl` terms, documented by OTP        |
 
 ## Undocumented terms relied on
 

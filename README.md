@@ -34,29 +34,29 @@ a sub-millisecond remainder away from zero. An unbounded request or idle
 timeout is requested explicitly with `config.Infinity`; a bounded one is
 `config.After(duration)`.
 
-| Setting | Default | Change with |
-| --- | --- | --- |
-| connect, including DNS and TLS | `duration.seconds(5)` | `config.with_connect_timeout` |
-| waiting for a pooled connection | `duration.seconds(5)` | `config.with_pool_timeout` |
-| request, admission to last byte | `config.After(duration.seconds(30))` | `config.with_request_timeout`, per call `http_gun.with_timeout` or `with_deadline` |
-| idle read, no bytes while reading | `config.After(duration.seconds(30))` | `config.with_idle_timeout`, per call `http_gun.with_idle_timeout` |
-| idle pooled connection | `duration.seconds(60)` | `config.with_connection_idle_timeout` |
-| draining on `stop` | `duration.seconds(5)` | `config.with_shutdown_timeout` |
-| destinations | public addresses only | `config.allow_loopback`, `config.with_destination` |
-| plaintext `http://` | allowed | `destination.with_plaintext` |
-| destination on every view | not required | `config.require_view_destination` |
-| protocol / TLS | HTTP/1.1, system CAs, peer and host name verified | `config.with_protocol`, `config.with_trust` |
-| connections | 16, 4 per origin, 100 HTTP/2 streams each | `with_max_connections`, `with_max_connections_per_origin`, `with_max_streams_per_connection` |
-| open bodies / queued requests | 128 / 128 | `with_max_open_bodies`, `with_max_queued_requests` |
-| request body | 1 MiB | `with_max_request_body_bytes` |
-| headers | 16 KiB, 100 | `with_max_header_bytes`, `with_max_header_count` |
-| buffered response bytes | 128 KiB | `with_max_buffered_bytes` |
-| collected response body (`send`) | 8 MiB | `with_max_response_body_bytes`, per call `http_gun.with_body_limit` |
-| `batch` | 1–1,024 workers, 10,000 requests, 64 MiB retained | `with_max_batch_bytes` |
-| scripts and cassettes | 16 MiB | `cassette.load`/`parse` take a byte limit; `cassette.with_max_bytes` |
-| cassette redaction | credential headers | `config.with_redaction` |
-| observations | `sinal.emit`, following the application's routes | `config.with_observations`, `config.without_observations` |
-| client label in events | none | `config.with_label` |
+| Setting                           | Default                                           | Change with                                                                                  |
+| --------------------------------- | ------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| connect, including DNS and TLS    | `duration.seconds(5)`                             | `config.with_connect_timeout`                                                                |
+| waiting for a pooled connection   | `duration.seconds(5)`                             | `config.with_pool_timeout`                                                                   |
+| request, admission to last byte   | `config.After(duration.seconds(30))`              | `config.with_request_timeout`, per call `http_gun.with_timeout` or `with_deadline`           |
+| idle read, no bytes while reading | `config.After(duration.seconds(30))`              | `config.with_idle_timeout`, per call `http_gun.with_idle_timeout`                            |
+| idle pooled connection            | `duration.seconds(60)`                            | `config.with_connection_idle_timeout`                                                        |
+| draining on `stop`                | `duration.seconds(5)`                             | `config.with_shutdown_timeout`                                                               |
+| destinations                      | public addresses only                             | `config.allow_loopback`, `config.with_destination`                                           |
+| plaintext `http://`               | allowed                                           | `destination.with_plaintext`                                                                 |
+| destination on every view         | not required                                      | `config.require_view_destination`                                                            |
+| protocol / TLS                    | HTTP/1.1, system CAs, peer and host name verified | `config.with_protocol`, `config.with_trust`                                                  |
+| connections                       | 16, 4 per origin, 100 HTTP/2 streams each         | `with_max_connections`, `with_max_connections_per_origin`, `with_max_streams_per_connection` |
+| open bodies / queued requests     | 128 / 128                                         | `with_max_open_bodies`, `with_max_queued_requests`                                           |
+| request body                      | 1 MiB                                             | `with_max_request_body_bytes`                                                                |
+| headers                           | 16 KiB, 100                                       | `with_max_header_bytes`, `with_max_header_count`                                             |
+| buffered response bytes           | 128 KiB                                           | `with_max_buffered_bytes`                                                                    |
+| collected response body (`send`)  | 8 MiB                                             | `with_max_response_body_bytes`, per call `http_gun.with_body_limit`                          |
+| `batch`                           | 1–1,024 workers, 10,000 requests, 64 MiB retained | `with_max_batch_bytes`                                                                       |
+| scripts and cassettes             | 16 MiB                                            | `cassette.load`/`parse` take a byte limit; `cassette.with_max_bytes`                         |
+| cassette redaction                | credential headers                                | `config.with_redaction`                                                                      |
+| observations                      | `sinal.emit`, following the application's routes  | `config.with_observations`, `config.without_observations`                                    |
+| client label in events            | none                                              | `config.with_label`                                                                          |
 
 Each phase is also capped by the time left in the request. Lifting the request
 timeout never lifts the connect, pool or idle timeouts. [BOUNDS.md](BOUNDS.md)
@@ -91,15 +91,15 @@ let stream =
   |> http_gun.with_correlation(order)
 ```
 
-| View | Effect |
-| --- | --- |
-| `with_timeout(client, timeout)` | replaces the request timeout, shorter or longer |
-| `with_deadline(client, deadline)` | an absolute budget shared across calls; replaces the request timeout |
-| `with_idle_timeout(client, timeout)` | replaces the idle timeout, for example for a model's first token |
-| `with_cancellation(client, token)` | cancels unfinished requests when the token is cancelled |
+| View                                               | Effect                                                                                                       |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `with_timeout(client, timeout)`                    | replaces the request timeout, shorter or longer                                                              |
+| `with_deadline(client, deadline)`                  | an absolute budget shared across calls; replaces the request timeout                                         |
+| `with_idle_timeout(client, timeout)`               | replaces the idle timeout, for example for a model's first token                                             |
+| `with_cancellation(client, token)`                 | cancels unfinished requests when the token is cancelled                                                      |
 | `with_body_limit(client, bytes, Fail \| Truncate)` | the collection limit; `Fail` keeps the status and headers on the failure, `Truncate` keeps them and a prefix |
-| `with_destination(client, policy)` | narrows the destinations; never widens them |
-| `with_correlation(client, correlation)` | tags lifecycle events with a `sinal/correlation.Correlation` |
+| `with_destination(client, policy)`                 | narrows the destinations; never widens them                                                                  |
+| `with_correlation(client, correlation)`            | tags lifecycle events with a `sinal/correlation.Correlation`                                                 |
 
 `http_gun.correlation(client)` reads a view's correlation. A library that
 receives a caller's view reads the caller's correlation there and copies it

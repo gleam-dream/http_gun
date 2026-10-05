@@ -387,29 +387,19 @@
   },
   "commands": [
     {
-      "argv": [
-        "gleam",
-        "--version"
-      ],
+      "argv": ["gleam", "--version"],
       "cwd": "/tmp/nix-shell.QAbuhM/http-gun-destination-adoption-1jq_oynf/llm_wire",
       "exit": 0,
       "log": "gleam.log"
     },
     {
-      "argv": [
-        "gleam",
-        "check"
-      ],
+      "argv": ["gleam", "check"],
       "cwd": "/tmp/nix-shell.QAbuhM/http-gun-destination-adoption-1jq_oynf/llm_wire",
       "exit": 0,
       "log": "check.log"
     },
     {
-      "argv": [
-        "gleam",
-        "build",
-        "--warnings-as-errors"
-      ],
+      "argv": ["gleam", "build", "--warnings-as-errors"],
       "cwd": "/tmp/nix-shell.QAbuhM/http-gun-destination-adoption-1jq_oynf/llm_wire",
       "exit": 1,
       "log": "build.log"

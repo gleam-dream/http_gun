@@ -10,6 +10,8 @@ new variants here under **New variants**.
 
 ## Unreleased
 
+- Round 9: normalize existing documentation and evidence formatting; no public API change.
+
 The first release. Wave 3 redesigned the API before publication; see
 [the wave 3 migration guide](docs/migration-wave-3.md) for every removed and
 changed item. Wave 4 moved every timeout to `Duration`, added the
@@ -51,7 +53,7 @@ view policy satisfy `require_view_destination`; see [the wave 4 migration guide]
   `body.next_within(body, wait)` returns `Ok(None)` when its local wait
   passes.
 - `destination.with_plaintext(policy, AllowPlaintext | PlaintextToLoopbackOnly
-  | RequireTls)` decides whether `http://` is admitted, against every
+| RequireTls)` decides whether `http://` is admitted, against every
   resolved address and the addresses of a reused pooled connection. A refused
   request fails with `DestinationRejected(PlaintextRefused(class))`, kind
   `Refused`, and `NotSent`. The default, `AllowPlaintext`, keeps plaintext

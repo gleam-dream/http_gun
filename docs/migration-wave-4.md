@@ -25,26 +25,26 @@ Contents: [config](#http_gunconfig) · [http_gun](#http_gun) ·
 
 ## `http_gun/config`
 
-| Before | After |
-| --- | --- |
-| `Timeout { Milliseconds(Int) Infinity }` | `Timeout { After(Duration) Infinity }` |
-| `with_connect_timeout(config, milliseconds: Int)` | `with_connect_timeout(config, timeout: Duration)` |
-| `with_pool_timeout(config, milliseconds: Int)` | `with_pool_timeout(config, timeout: Duration)` |
-| `with_request_timeout(config, Milliseconds(ms))` | `with_request_timeout(config, After(duration))` |
-| `with_idle_timeout(config, Milliseconds(ms))` | `with_idle_timeout(config, After(duration))` |
-| `with_connection_idle_timeout(config, milliseconds: Int)` | `with_connection_idle_timeout(config, timeout: Duration)` |
-| `with_shutdown_timeout(config, milliseconds: Int)` | `with_shutdown_timeout(config, timeout: Duration)` |
-| `Resolver = fn(String, Int) -> ..` (milliseconds left) | `Resolver = fn(String, Duration) -> ..` (time left) |
-| `OutOfRange(setting, value: Int)` for a timeout | `TimeoutOutOfRange(setting, value: Duration)`; `OutOfRange` keeps capacities |
+| Before                                                    | After                                                                        |
+| --------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `Timeout { Milliseconds(Int) Infinity }`                  | `Timeout { After(Duration) Infinity }`                                       |
+| `with_connect_timeout(config, milliseconds: Int)`         | `with_connect_timeout(config, timeout: Duration)`                            |
+| `with_pool_timeout(config, milliseconds: Int)`            | `with_pool_timeout(config, timeout: Duration)`                               |
+| `with_request_timeout(config, Milliseconds(ms))`          | `with_request_timeout(config, After(duration))`                              |
+| `with_idle_timeout(config, Milliseconds(ms))`             | `with_idle_timeout(config, After(duration))`                                 |
+| `with_connection_idle_timeout(config, milliseconds: Int)` | `with_connection_idle_timeout(config, timeout: Duration)`                    |
+| `with_shutdown_timeout(config, milliseconds: Int)`        | `with_shutdown_timeout(config, timeout: Duration)`                           |
+| `Resolver = fn(String, Int) -> ..` (milliseconds left)    | `Resolver = fn(String, Duration) -> ..` (time left)                          |
+| `OutOfRange(setting, value: Int)` for a timeout           | `TimeoutOutOfRange(setting, value: Duration)`; `OutOfRange` keeps capacities |
 
-| Setting | Default, unchanged |
-| --- | --- |
-| connect, including DNS and TLS | `duration.seconds(5)` |
-| waiting for a pooled connection | `duration.seconds(5)` |
+| Setting                         | Default, unchanged            |
+| ------------------------------- | ----------------------------- |
+| connect, including DNS and TLS  | `duration.seconds(5)`         |
+| waiting for a pooled connection | `duration.seconds(5)`         |
 | request, admission to last byte | `After(duration.seconds(30))` |
-| idle read | `After(duration.seconds(30))` |
-| idle pooled connection | `duration.seconds(60)` |
-| draining on `stop` | `duration.seconds(5)` |
+| idle read                       | `After(duration.seconds(30))` |
+| idle pooled connection          | `duration.seconds(60)`        |
+| draining on `stop`              | `duration.seconds(5)`         |
 
 ```gleam
 // Before
@@ -65,16 +65,16 @@ with `duration.to_milliseconds(remaining)`.
 
 ## `http_gun`
 
-| Before | After |
-| --- | --- |
-| `with_timeout(client, config.Milliseconds(ms))` | `with_timeout(client, config.After(duration))` |
+| Before                                               | After                                               |
+| ---------------------------------------------------- | --------------------------------------------------- |
+| `with_timeout(client, config.Milliseconds(ms))`      | `with_timeout(client, config.After(duration))`      |
 | `with_idle_timeout(client, config.Milliseconds(ms))` | `with_idle_timeout(client, config.After(duration))` |
 
 `with_timeout(client, config.Infinity)` and `with_deadline` are unchanged.
 
-| Before | After |
-| --- | --- |
-| — | `correlation(client) -> Option(Correlation)` |
+| Before | After                                        |
+| ------ | -------------------------------------------- |
+| —      | `correlation(client) -> Option(Correlation)` |
 
 A library that receives a caller's view reads the caller's correlation from it
 and copies it into its own telemetry, so the caller sets it once:
@@ -89,18 +89,18 @@ let correlation = http_gun.correlation(client)
 
 ## `http_gun/body`
 
-| Before | After |
-| --- | --- |
+| Before                            | After                               |
+| --------------------------------- | ----------------------------------- |
 | `next_within(body, wait_ms: Int)` | `next_within(body, wait: Duration)` |
 
 A zero or negative wait still polls once.
 
 ## `http_gun/deadline`
 
-| Before | After |
-| --- | --- |
-| `after(milliseconds: Int) -> Deadline` | `after(budget: Duration) -> Deadline` |
-| `remaining_ms(deadline) -> Int` | `remaining(deadline) -> Duration`, whole milliseconds, clamped to zero |
+| Before                                 | After                                                                  |
+| -------------------------------------- | ---------------------------------------------------------------------- |
+| `after(milliseconds: Int) -> Deadline` | `after(budget: Duration) -> Deadline`                                  |
+| `remaining_ms(deadline) -> Int`        | `remaining(deadline) -> Duration`, whole milliseconds, clamped to zero |
 
 ```gleam
 // Before
@@ -114,8 +114,8 @@ process.receive(control, duration.to_milliseconds(deadline.remaining(budget)))
 
 ## `http_gun/cassette`
 
-| Before | After |
-| --- | --- |
+| Before                            | After                               |
+| --------------------------------- | ----------------------------------- |
 | `finish(recording, wait_ms: Int)` | `finish(recording, wait: Duration)` |
 
 `finish(recording, duration.milliseconds(0))` still publishes at once or
@@ -126,13 +126,13 @@ returns `Busy`.
 New, additive; the default is unchanged, so webhooks and other plaintext
 callers keep working.
 
-| Before | After |
-| --- | --- |
-| — | `Plaintext { AllowPlaintext PlaintextToLoopbackOnly RequireTls }` |
-| — | `with_plaintext(policy, plaintext) -> Policy`; the default is `AllowPlaintext` |
-| — | `check_plaintext(policy, address) -> Result(Nil, Rejection)` |
-| — | `narrows(policy, within: client) -> Bool`, the rule `require_view_destination` applies |
-| `Rejection { HostNotAllowed AddressRefused(Class) }` | also `PlaintextRefused(Class)` |
+| Before                                               | After                                                                                  |
+| ---------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| —                                                    | `Plaintext { AllowPlaintext PlaintextToLoopbackOnly RequireTls }`                      |
+| —                                                    | `with_plaintext(policy, plaintext) -> Policy`; the default is `AllowPlaintext`         |
+| —                                                    | `check_plaintext(policy, address) -> Result(Nil, Rejection)`                           |
+| —                                                    | `narrows(policy, within: client) -> Bool`, the rule `require_view_destination` applies |
+| `Rejection { HostNotAllowed AddressRefused(Class) }` | also `PlaintextRefused(Class)`                                                         |
 
 `PlaintextToLoopbackOnly` admits `http://` only when every resolved address is
 loopback, including a host name such as `localhost` that resolves to it and a
@@ -231,13 +231,17 @@ to the tenant's classes or add the tenant's host list.
 
 ### Apps (oversight `apps/`)
 
-| App | File | Change |
-| --- | --- | --- |
-| checkout | `src/checkout/gateway.gleam` | `Milliseconds(5000)` to `After(duration.seconds(5))`; `deadline.after(deadline_ms)` to `deadline.after(duration.milliseconds(deadline_ms))` |
-| extractor | `src/extractor/clients.gleam` | `Milliseconds(5000)`; `with_connect_timeout(1000)` to `duration.seconds(1)`; resolver's second argument is a `Duration` |
-| research_agent | `src/research_agent/app.gleam` | `Milliseconds(5000)` |
-| sso_portal | `src/sso_portal/app.gleam`, `src/sso_portal/browser.gleam` | `Milliseconds(5000)`, `Milliseconds(10_000)`; `with_connect_timeout(1000)` |
-| support_desk | `src/support_desk/app.gleam` | `Milliseconds(10_000)`; `with_timeout(client, Milliseconds(shop_deadline_ms))` |
-| webhooks | `src/webhooks/egress.gleam` | `Milliseconds(settings.deadline_ms)`; a stored `config.Resolver` now takes a `Duration`. Plaintext stays allowed by default |
+| App            | File                                                       | Change                                                                                                                                      |
+| -------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| checkout       | `src/checkout/gateway.gleam`                               | `Milliseconds(5000)` to `After(duration.seconds(5))`; `deadline.after(deadline_ms)` to `deadline.after(duration.milliseconds(deadline_ms))` |
+| extractor      | `src/extractor/clients.gleam`                              | `Milliseconds(5000)`; `with_connect_timeout(1000)` to `duration.seconds(1)`; resolver's second argument is a `Duration`                     |
+| research_agent | `src/research_agent/app.gleam`                             | `Milliseconds(5000)`                                                                                                                        |
+| sso_portal     | `src/sso_portal/app.gleam`, `src/sso_portal/browser.gleam` | `Milliseconds(5000)`, `Milliseconds(10_000)`; `with_connect_timeout(1000)`                                                                  |
+| support_desk   | `src/support_desk/app.gleam`                               | `Milliseconds(10_000)`; `with_timeout(client, Milliseconds(shop_deadline_ms))`                                                              |
+| webhooks       | `src/webhooks/egress.gleam`                                | `Milliseconds(settings.deadline_ms)`; a stored `config.Resolver` now takes a `Duration`. Plaintext stays allowed by default                 |
 
 fabric, sinal and tool_hub use none of the converted signatures.
+
+## Round 9: validation maintenance
+
+Preserve the existing documentation and evidence formatting cleanup. No public API, runtime behavior, cassette format or provider transport changed in Round 9. Existing callers and all composition apps require no migration.

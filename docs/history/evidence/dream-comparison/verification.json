@@ -1,8 +1,6 @@
 {
   "production_inputs_unchanged_from_wave7": 19,
-  "modified_dream_original_files": [
-    "modules/http_client/manifest.toml"
-  ],
+  "modified_dream_original_files": ["modules/http_client/manifest.toml"],
   "comparison_lock_and_source_match_tested_copy": true,
   "http_gun_fast_tests_passed": 50,
   "dream_reconciled_tests_passed": 213,

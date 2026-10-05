@@ -15,13 +15,13 @@ Reviewed retention: Apache-2.0 LICENSE, the dependency manifest/package metadata
 
 Scoped design references:
 
-| Reference | Revision | Use |
-| --- | --- | --- |
-| Dream HTTP client, PR68 | `c3ae1d341b0782aa89279151cf9afd6b7731b46e` | buffered/streaming usability, empty-response scenario |
-| ReqCassette | `cb0251ca394952de46007bb32f5051feb66e896e` | sequential recording/playback scenarios |
-| Gleam HTTPc | `0f5f2fdc88d58740e8790991e7b18529ead7d85a` | small standard-HTTP interface |
-| Gun | released 2.6.0 | supported API, flow, settings notifications, TLS negotiation |
-| Cowlib | released 2.20.0 | Gun's released protocol dependency |
+| Reference               | Revision                                   | Use                                                          |
+| ----------------------- | ------------------------------------------ | ------------------------------------------------------------ |
+| Dream HTTP client, PR68 | `c3ae1d341b0782aa89279151cf9afd6b7731b46e` | buffered/streaming usability, empty-response scenario        |
+| ReqCassette             | `cb0251ca394952de46007bb32f5051feb66e896e` | sequential recording/playback scenarios                      |
+| Gleam HTTPc             | `0f5f2fdc88d58740e8790991e7b18529ead7d85a` | small standard-HTTP interface                                |
+| Gun                     | released 2.6.0                             | supported API, flow, settings notifications, TLS negotiation |
+| Cowlib                  | released 2.20.0                            | Gun's released protocol dependency                           |
 
 These original references supplied scenarios and API constraints, not copied production implementation or a parity requirement. Package versions and checksums are in `manifest.toml`; Nix inputs are pinned in `flake.lock`. Gun/Cowlib source is unmodified. No dependency parser hardening was performed. The separately requested Dream comparison below records its own exact suite results.
 
@@ -41,7 +41,6 @@ API ergonomics waves13–16 start from local commit1f53017. No donor source or d
 
 Wave17 removes compatibility for unreleased experimental fixtures under explicit owner direction. It adopts no dependency, donor source, FFI or package version change. Wave16 receipts remain historical; the single current schema and required observed limit sizes are qualified in wave17 evidence.
 
-
 ## Adoption ergonomics follow-up
 
 The generic asynchronous example was reviewed and retained from our own disposable API investigation; source hashes before adaptation are in [wave19/donor-source.json](evidence/wave19/donor-source.json). Its loopback servers/certificates continue to come from this package's attributed test infrastructure. No new upstream HTTP implementation or provider logic was copied.
@@ -50,16 +49,13 @@ The explicit downstream driver executes selected LLM Wire, json_blueprint and si
 
 The observation-storage experiment remains in a temporary directory; only its logs, precise command, source hashes and selected dependency hashes are retained in [wave21/observation-receipt.json](evidence/wave21/observation-receipt.json). No experiment bridge, ETS dependency, Gun event handler or lifecycle-observation API was added to production. The production FFI remains92 lines/4669 bytes/13 declarations; the asynchronous example adds only a4-line test mailbox measurement.
 
-
 ## Sinal observation adoption (waves22–24)
 
 The owner authorized generic corrections in Sinal, starting at `098a2d5df70ed7dfff71151a865e986fb44987eb`. Original and first candidate hashes/red-green logs are in [wave22](evidence/wave22/receipt.json); final selected source and its recorded dirty state are in [sinal.json](../dev/dependencies/sinal.json). The original Apache-2.0 LICENSE and package manifests are preserved. The source archive is a reproducible validation input for this unpublished dependency, not an independent fork. Source generation and verification are in [sinal_source.py](../dev/sinal_source.py); the [source arrangement](OBSERVATIONS.md#one-sinal-source) explains why canonical development, historical fixtures and isolated builds resolve one selected Sinal source.
 
 The generic correction couples incarnation-owned direct destinations, admission counters and coalesced drop notices. Two narrow ETS primitives replace the need for exception-wrapped named sends in Sinal. All tests/instrumentation remain outside HTTP Gun production FFI. Gun/Cowlib source is unchanged. The previously archived LLM donor is still hash-verified before its old Sinal is removed and the selected snapshot installed in the disposable workspace. No sibling other than explicitly authorized Sinal is edited.
 
-
 Local integration: the generic Sinal correction is committed as `8acec4507f23daa7f49c40cc7d39816a5a4c3d1d`. Its normal formatting hook removed one extra blank line from README.md; selected runtime source, manifests, tests and license are byte-identical to the validated source. The dependency snapshot was regenerated from that clean commit. [Integration recheck](evidence/local-integration-2026-10-01.json) records the two changed packaging hashes; the earlier qualification receipts retain their original inputs. No push or publication occurred.
-
 
 Destination policy (waves25–28) uses Warden230c6bb4171a782d5b4f4f795bbdc108cad49964 as read-only behavioral evidence. Transport source SHA2560fd3b160ecb50575a7185b4927b7010c684a218a3ba4e8fc46471d3d1de568cc; tests SHA256f079d5ee5edc04b403d281c973a203080d3328cd7291a86d0e848d5c1c0f4c36, recorded before implementation and unchanged afterward. No Warden source was copied. New IP-SAN fixtures are generated locally by dev/ip-fixture; existing certificate/server attribution is retained. Gun2.6.0/Cowlib2.20.0 and Gleam OTP/Erlang1.3.0 sources were inspected and remain unmodified. The [receipt](evidence/wave28/receipt.json) records scope, source hashes, runtime checks and the separate downstream setup experiment.
 

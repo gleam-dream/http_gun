@@ -23,7 +23,6 @@ Keep three evidence layers distinct:
 
 The normal fast/full gate remains reproducible without these checkouts. Run the downstream gate when changing public contracts, before adopting a new local HTTP Gun revision. A passing receipt applies to its recorded bytes, inputs and runtime; it is not a promise about arbitrary consumers or future revisions.
 
-
 ## Destination-policy adoption (2026-10-01)
 
 HTTP Gun now defaults to public destinations only. Local test clients need:

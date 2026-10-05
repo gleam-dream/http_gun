@@ -30,13 +30,7 @@
     "workers": 4,
     "deadline_ms": 60000,
     "trials": 3,
-    "counts": [
-      100,
-      500,
-      1000,
-      2000,
-      5000
-    ],
+    "counts": [100, 500, 1000, 2000, 5000],
     "warmup_count": 100,
     "runtime": "Gleam 1.18.1 / OTP29 ERTS17.1",
     "result": "all bytes correct; no failures; public http_gun.batch used"

@@ -54,10 +54,7 @@
   ],
   "runtimes": {
     "default": {
-      "versions": [
-        "gleam 1.18.1",
-        "OTP 29 ERTS 17.1"
-      ],
+      "versions": ["gleam 1.18.1", "OTP 29 ERTS 17.1"],
       "full_gate_exit": 0,
       "tests": {
         "0.71.0": 128,
@@ -79,10 +76,7 @@
       "log": "runtimes/default/full.log"
     },
     "otp28": {
-      "versions": [
-        "gleam 1.18.1",
-        "OTP 28 ERTS 16.4.0.6"
-      ],
+      "versions": ["gleam 1.18.1", "OTP 28 ERTS 16.4.0.6"],
       "full_gate_exit": 0,
       "tests": {
         "0.71.0": 128,
@@ -104,10 +98,7 @@
       "log": "runtimes/otp28/full.log"
     },
     "otp27": {
-      "versions": [
-        "gleam 1.18.1",
-        "OTP 27 ERTS 15.2.7.13"
-      ],
+      "versions": ["gleam 1.18.1", "OTP 27 ERTS 15.2.7.13"],
       "full_gate_exit": 0,
       "tests": {
         "0.71.0": 128,

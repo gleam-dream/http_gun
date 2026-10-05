@@ -2,27 +2,27 @@
 
 HTTP Gun enforces application admission and storage limits. These are not a bound on the Erlang VM, TLS buffers, Gun/Cowlib parsing or all incoming mailbox allocations.
 
-| Limit | Default | Enforcement point |
-| --- | ---: | --- |
-| Open connections | 16 total, 4/origin | Before resolution/Gun open; resolving and connecting reservations occupy slots |
-| H2 streams/connection | 100 | Before submission, reduced by peer SETTINGS; no H2 streams before initial SETTINGS |
-| Open body handles | 128 | Before body-owner creation; finished explicit handles count until closed/dead; an H1 readiness job reserves an open slot until admission/refusal |
-| Queued requests | 128 | Client admission; connecting reservations have separate connection-bounded slots |
-| Request body | 1 MiB | Before admission |
-| Header names + values | 16 KiB, 100 pairs | Request validation; response informational/final headers and trailers **after parsing** |
-| Buffered response bytes | 128 KiB | Before adding delivered bytes to HTTP Gun's queue; one chunk must fit |
-| Collected response body | 8 MiB | While `send` or `batch` collects; the failure carries the status |
-| Batch | 10,000 inputs, 1–1,024 workers, 64 MiB retained | Workers before creation; each collected chunk is charged to one shared counter, and positions not yet sent fail once it is exceeded |
-| Script/cassette values | 16 MiB estimated data | Before starting playback; caller supplies encoded-file read/parse limit |
-| Recording | 16 MiB encoded data, 10,000 exchanges | Before queuing each writer fragment; bodies held for body redaction count too |
-| Connect, including DNS and TLS | 5 s | One timer per new connection from resolution start; Gun's own connect and handshake timeouts get the remainder |
-| Pool wait | 5 s | From admission until a connection or stream is leased, including an H1 readiness check; a request that opens a connection may wait for the connect timeout instead |
-| Request | 30 s | From before admission through DNS, connection, sending and consumption; a view replaces it, shorter or longer; `Infinity` lifts it |
-| Idle read | 30 s | While the opener waits for the head or a reader waits with nothing buffered; reset by every delivered event; also the socket `send_timeout` |
-| Idle pooled connection | 60 s | A ready connection carrying no request is closed |
-| Shutdown drain | 5 s | `stop` waits for open bodies, then cancels them |
-| Recording staging directory | 1 per recording | Removed on publication, abort, any capture or finish failure, owner death and recorder crash; left behind only if the VM is killed mid-recording or a writer is stuck in a blocking file operation |
-| Recording finish waiter | 1 | Extra concurrent waits return Busy; timeout/death removes the waiter without aborting finalization |
+| Limit                          |                                         Default | Enforcement point                                                                                                                                                                                  |
+| ------------------------------ | ----------------------------------------------: | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Open connections               |                              16 total, 4/origin | Before resolution/Gun open; resolving and connecting reservations occupy slots                                                                                                                     |
+| H2 streams/connection          |                                             100 | Before submission, reduced by peer SETTINGS; no H2 streams before initial SETTINGS                                                                                                                 |
+| Open body handles              |                                             128 | Before body-owner creation; finished explicit handles count until closed/dead; an H1 readiness job reserves an open slot until admission/refusal                                                   |
+| Queued requests                |                                             128 | Client admission; connecting reservations have separate connection-bounded slots                                                                                                                   |
+| Request body                   |                                           1 MiB | Before admission                                                                                                                                                                                   |
+| Header names + values          |                               16 KiB, 100 pairs | Request validation; response informational/final headers and trailers **after parsing**                                                                                                            |
+| Buffered response bytes        |                                         128 KiB | Before adding delivered bytes to HTTP Gun's queue; one chunk must fit                                                                                                                              |
+| Collected response body        |                                           8 MiB | While `send` or `batch` collects; the failure carries the status                                                                                                                                   |
+| Batch                          | 10,000 inputs, 1–1,024 workers, 64 MiB retained | Workers before creation; each collected chunk is charged to one shared counter, and positions not yet sent fail once it is exceeded                                                                |
+| Script/cassette values         |                           16 MiB estimated data | Before starting playback; caller supplies encoded-file read/parse limit                                                                                                                            |
+| Recording                      |           16 MiB encoded data, 10,000 exchanges | Before queuing each writer fragment; bodies held for body redaction count too                                                                                                                      |
+| Connect, including DNS and TLS |                                             5 s | One timer per new connection from resolution start; Gun's own connect and handshake timeouts get the remainder                                                                                     |
+| Pool wait                      |                                             5 s | From admission until a connection or stream is leased, including an H1 readiness check; a request that opens a connection may wait for the connect timeout instead                                 |
+| Request                        |                                            30 s | From before admission through DNS, connection, sending and consumption; a view replaces it, shorter or longer; `Infinity` lifts it                                                                 |
+| Idle read                      |                                            30 s | While the opener waits for the head or a reader waits with nothing buffered; reset by every delivered event; also the socket `send_timeout`                                                        |
+| Idle pooled connection         |                                            60 s | A ready connection carrying no request is closed                                                                                                                                                   |
+| Shutdown drain                 |                                             5 s | `stop` waits for open bodies, then cancels them                                                                                                                                                    |
+| Recording staging directory    |                                 1 per recording | Removed on publication, abort, any capture or finish failure, owner death and recorder crash; left behind only if the VM is killed mid-recording or a writer is stuck in a blocking file operation |
+| Recording finish waiter        |                                               1 | Extra concurrent waits return Busy; timeout/death removes the waiter without aborting finalization                                                                                                 |
 
 Limits are finite integers; configuration validation rejects invalid capacities before client startup. `body.next` waits for data; the request and idle timeouts bound it. `body.next_within` adds a local wait that returns `None` and keeps the stream. A cancellation token is one plain process that each admitted pending/body owner monitors, and release removes its monitor; cancelling kills it, which latches cancellation without retaining completed-request history. Applications bound the number of token scopes they create. Completed HTTP is not retrospectively made unsuccessful because a read happens after its deadline. Capture may separately fail if it cannot finish within that budget.
 
@@ -42,12 +42,12 @@ Final response headers/statuses and trailers are preserved. Informational respon
 
 ## Responsibility and optional client features
 
-| Concern | Classification | HTTP Gun's responsibility |
-| --- | --- | --- |
-| Allocations inside Gun/Cowlib/OTP | Inherited behavior; no whole-stack memory bound or demonstrated defect | Use supported settings correctly, bound admitted data, report the point of enforcement honestly |
-| GOAWAY racing with submission | Protocol/dependency API boundary | Reuse eligible connections, clean up failures and return conservative evidence; no hidden replay |
-| Header, query and body redaction | Implemented (`config.with_redaction`) | Credential headers by default; configured headers, named query parameters and a whole-body function, applied identically to recording and playback matching |
-| Crash-durable fixture publication | Optional feature not implemented in HTTP Gun | Add file and directory synchronization with documented platform semantics if selected; atomic visibility alone is insufficient |
+| Concern                           | Classification                                                         | HTTP Gun's responsibility                                                                                                                                   |
+| --------------------------------- | ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Allocations inside Gun/Cowlib/OTP | Inherited behavior; no whole-stack memory bound or demonstrated defect | Use supported settings correctly, bound admitted data, report the point of enforcement honestly                                                             |
+| GOAWAY racing with submission     | Protocol/dependency API boundary                                       | Reuse eligible connections, clean up failures and return conservative evidence; no hidden replay                                                            |
+| Header, query and body redaction  | Implemented (`config.with_redaction`)                                  | Credential headers by default; configured headers, named query parameters and a whole-body function, applied identically to recording and playback matching |
+| Crash-durable fixture publication | Optional feature not implemented in HTTP Gun                           | Add file and directory synchronization with documented platform semantics if selected; atomic visibility alone is insufficient                              |
 
 Recording removes the configured redaction: the credential-header list by default, plus any headers, named query parameters and body function the application adds. It is not a general secret detector: unlisted headers, query parameters and unredacted bodies remain exact in fixtures. An interrupted writer may leave temporary data; only a successfully published fixture is replayable. Publication is atomic on the destination filesystem; cross-filesystem publication and survival after power loss are not promised. Neither optional feature requires modifying Gun/Cowlib.
 
@@ -144,7 +144,6 @@ When a peer closes without `close_notify`, a body accepted as EOF can be
 indistinguishable from truncation. Consumers needing completeness should use
 HTTP framing with a declared length/chunk terminator and validate their payload.
 No extra draining, parser or TLS implementation is added here.
-
 
 ## H1 readiness and error precision
 

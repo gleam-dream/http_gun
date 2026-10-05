@@ -8,18 +8,18 @@ Reviewed commit **04ef776**, created locally at the owner's request. Its pre-com
 
 ## Streaming capabilities
 
-| Required behavior | Current evidence and boundary |
-| --- | --- |
-| Pull arbitrary response bytes without collecting the whole body | `open` / `body.next`, binary H1/H2 tests, 32 MiB incremental load |
-| Scoped early termination | `with_response` closes on normal return or exception; controlled server observes closure |
-| Explicit cancellation | `body.close` is idempotent and may be called by another holder; pending reads unblock when the body owner stops |
-| Shared cursor and one consumer | Copies share actor state; wrong-owner and conflicting-read tests |
-| Read timeout distinct from request deadline | Read timeout preserves the stream; overall expiry terminates unfinished HTTP work |
-| Cleanup on caller death or client shutdown | Process monitors, pool release and existing lifecycle tests; local cancellation does not imply remote rollback |
-| H2 sibling isolation | Negotiated multiplexing and cancellation/reset tests; queued streams resume on the same connection |
-| Backpressure and finite admitted storage | Gun credit plus body chunk/queue limits, without an eager forwarding process; inherited allocations remain outside this guarantee |
-| Completion with trailers | `body.End(trailers)` and buffered collection preserve trailers |
-| LLM progress, SSE framing, tools and terminal interpretation | Belong above HTTP Gun. The current isolated example does not exercise incremental integration |
+| Required behavior                                               | Current evidence and boundary                                                                                                     |
+| --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Pull arbitrary response bytes without collecting the whole body | `open` / `body.next`, binary H1/H2 tests, 32 MiB incremental load                                                                 |
+| Scoped early termination                                        | `with_response` closes on normal return or exception; controlled server observes closure                                          |
+| Explicit cancellation                                           | `body.close` is idempotent and may be called by another holder; pending reads unblock when the body owner stops                   |
+| Shared cursor and one consumer                                  | Copies share actor state; wrong-owner and conflicting-read tests                                                                  |
+| Read timeout distinct from request deadline                     | Read timeout preserves the stream; overall expiry terminates unfinished HTTP work                                                 |
+| Cleanup on caller death or client shutdown                      | Process monitors, pool release and existing lifecycle tests; local cancellation does not imply remote rollback                    |
+| H2 sibling isolation                                            | Negotiated multiplexing and cancellation/reset tests; queued streams resume on the same connection                                |
+| Backpressure and finite admitted storage                        | Gun credit plus body chunk/queue limits, without an eager forwarding process; inherited allocations remain outside this guarantee |
+| Completion with trailers                                        | `body.End(trailers)` and buffered collection preserve trailers                                                                    |
+| LLM progress, SSE framing, tools and terminal interpretation    | Belong above HTTP Gun. The current isolated example does not exercise incremental integration                                     |
 
 The [LLM example](../examples/llm/src/http_gun_llm_consumer.gleam) calls `http_gun.send` at line73, converts the complete body to a string, then splits events. Its `main` uses one scripted OpenAI text response. It proves public provider encoding/reduction composition, not live streaming, early provider completion, tool/structured streaming, cross-provider behavior, or application cancellation through HTTP Gun.
 
@@ -53,12 +53,12 @@ No new violation of AGENTS.md's language/dependency/workspace rules was found in
 
 The state/robustness probe used only `http_gun.batch`, four workers, four H1 connections, 3-byte responses, a 60-second request budget and a warmed local server. Three fresh-VM trials completed every result correctly, with unchanged production source:
 
-| Batch size | Median ms | Range ms |
-| ---: | ---: | ---: |
-| 500 | 35.402 | 34.787–36.802 |
-| 1,000 | 119.723 | 114.789–121.915 |
-| 2,000 | 416.408 | 415.096–441.880 |
-| 5,000 | 2,422.881 | 2,412.306–2,598.869 |
+| Batch size | Median ms |            Range ms |
+| ---------: | --------: | ------------------: |
+|        500 |    35.402 |       34.787–36.802 |
+|      1,000 |   119.723 |     114.789–121.915 |
+|      2,000 |   416.408 |     415.096–441.880 |
+|      5,000 | 2,422.881 | 2,412.306–2,598.869 |
 
 Doubling 1,000 to 2,000 takes about 3.5 times as long. The capture is confirmed structurally; the measurements establish a public batch scaling problem without claiming an exact attribution percentage. The earlier Dream comparison's four-worker case uses a common harness scheduler, not this public batch function, so its 35 ms result does not cover this path. VM reduction counts in this probe grow roughly linearly and alone would miss the elapsed-time growth.
 
@@ -70,13 +70,13 @@ Modeling, interface depth and composition remain suitable for a small HTTP libra
 
 Exact revisions and reviewed file hashes are retained in [reference-sources.json](evidence/adoption-review/reference-sources.json). Downloaded source and license files remain in ignored `build/adoption-references`. No donor source was copied into HTTP Gun and none of these upstream suites was executed during this review.
 
-| Priority / reference | Useful scenarios and use in HTTP Gun |
-| --- | --- |
-| First: local LLM Wire tests, revision above | `llm_wire_provider_fragmentation_test` checks all byte split points across OpenAI/Anthropic/Google; `llm_wire_owner_test` covers read-timeout races and cleanup; integration tests cover live streams, disconnects, compression refusal and TLS. Re-express transport-level observations through HTTP Gun and run the real LLM consumer above it. Keep reducers/SSE outside HTTP Gun. |
-| First: [Finch H2 pool tests](https://github.com/sneako/finch/blob/3387d4be15d2d56ad18e878e62bea0e354385f15/test/finch/http2/pool_test.exs), [H1 pool tests](https://github.com/sneako/finch/blob/3387d4be15d2d56ad18e878e62bea0e354385f15/test/finch/http1/pool_test.exs) | Normal/abnormal caller exit, cancellation after completion, late replies after timeout, initial SETTINGS waiters, pending requests on disconnect, and in-flight responses completing after GOAWAY. Test our observable outcomes rather than copying Finch's pool internals or retry policy. |
-| First: [Gun 2.6 flow suite](https://github.com/ninenines/gun/blob/9d40b0ff2de1546e5c613205c4f25aaefffc2569/test/flow_SUITE.erl), [shutdown suite](https://github.com/ninenines/gun/blob/9d40b0ff2de1546e5c613205c4f25aaefffc2569/test/shutdown_SUITE.erl) | Exhausted credit at body end/trailers followed by keepalive reuse; one slow H2 stream beside fast streams; owner loss and GOAWAY with active work. These are direct references for correct supported-API use. |
-| Next: [Mint properties](https://github.com/elixir-mint/mint/blob/fb850d3714e4d79b9112d8056fe87cfd96b84f21/test/mint/http1/conn_properties_test.exs), [H2 connection tests](https://github.com/elixir-mint/mint/blob/fb850d3714e4d79b9112d8056fe87cfd96b84f21/test/mint/http2/conn_test.exs) | Random response segmentation should preserve bytes/trailers; cancellation followed by late frames should not disturb siblings. Use the property-testing method at our public boundary, not Mint's parser/HPACK tests or H1 pipelining architecture. |
-| Next: [ReqCassette sequential tests](https://github.com/lostbean/req_cassette/blob/cb0251ca394952de46007bb32f5051feb66e896e/test/req_cassette/sequential_matching_test.exs) | Mixed request sequences, repeated identical requests, exhausted sessions and cross-process ordering. Add binary codec roundtrip properties. Preserve HTTP Gun's stricter mismatch-without-consumption and offline-only contract; reject first-match reuse and malformed-fixture fallback. |
+| Priority / reference                                                                                                                                                                                                                                                                        | Useful scenarios and use in HTTP Gun                                                                                                                                                                                                                                                                                                                                                  |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| First: local LLM Wire tests, revision above                                                                                                                                                                                                                                                 | `llm_wire_provider_fragmentation_test` checks all byte split points across OpenAI/Anthropic/Google; `llm_wire_owner_test` covers read-timeout races and cleanup; integration tests cover live streams, disconnects, compression refusal and TLS. Re-express transport-level observations through HTTP Gun and run the real LLM consumer above it. Keep reducers/SSE outside HTTP Gun. |
+| First: [Finch H2 pool tests](https://github.com/sneako/finch/blob/3387d4be15d2d56ad18e878e62bea0e354385f15/test/finch/http2/pool_test.exs), [H1 pool tests](https://github.com/sneako/finch/blob/3387d4be15d2d56ad18e878e62bea0e354385f15/test/finch/http1/pool_test.exs)                   | Normal/abnormal caller exit, cancellation after completion, late replies after timeout, initial SETTINGS waiters, pending requests on disconnect, and in-flight responses completing after GOAWAY. Test our observable outcomes rather than copying Finch's pool internals or retry policy.                                                                                           |
+| First: [Gun 2.6 flow suite](https://github.com/ninenines/gun/blob/9d40b0ff2de1546e5c613205c4f25aaefffc2569/test/flow_SUITE.erl), [shutdown suite](https://github.com/ninenines/gun/blob/9d40b0ff2de1546e5c613205c4f25aaefffc2569/test/shutdown_SUITE.erl)                                   | Exhausted credit at body end/trailers followed by keepalive reuse; one slow H2 stream beside fast streams; owner loss and GOAWAY with active work. These are direct references for correct supported-API use.                                                                                                                                                                         |
+| Next: [Mint properties](https://github.com/elixir-mint/mint/blob/fb850d3714e4d79b9112d8056fe87cfd96b84f21/test/mint/http1/conn_properties_test.exs), [H2 connection tests](https://github.com/elixir-mint/mint/blob/fb850d3714e4d79b9112d8056fe87cfd96b84f21/test/mint/http2/conn_test.exs) | Random response segmentation should preserve bytes/trailers; cancellation followed by late frames should not disturb siblings. Use the property-testing method at our public boundary, not Mint's parser/HPACK tests or H1 pipelining architecture.                                                                                                                                   |
+| Next: [ReqCassette sequential tests](https://github.com/lostbean/req_cassette/blob/cb0251ca394952de46007bb32f5051feb66e896e/test/req_cassette/sequential_matching_test.exs)                                                                                                                 | Mixed request sequences, repeated identical requests, exhausted sessions and cross-process ordering. Add binary codec roundtrip properties. Preserve HTTP Gun's stricter mismatch-without-consumption and offline-only contract; reject first-match reuse and malformed-fixture fallback.                                                                                             |
 
 ## Benchmarks and fault coverage
 

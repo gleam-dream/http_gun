@@ -8,10 +8,10 @@ Sinal source: `098a2d5df70ed7dfff71151a865e986fb44987eb`, unchanged and clean af
 
 Two synchronized probes fail on the original source and pass on the candidate:
 
-| Scenario | Original | Candidate |
-| --- | --- | --- |
-| Startup paused before diagnostic reset; capacity1; first handler blocked | Two events accepted | Unpublished target returns unavailable; once ready, second event is rejected at capacity |
-| Producer paused before send; actor killed/restarted; replacement filled | Old reservation enters replacement mailbox:0→1 | Sender retains old direct destination: replacement mailbox0→0 |
+| Scenario                                                                 | Original                                       | Candidate                                                                                |
+| ------------------------------------------------------------------------ | ---------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Startup paused before diagnostic reset; capacity1; first handler blocked | Two events accepted                            | Unpublished target returns unavailable; once ready, second event is rejected at capacity |
+| Producer paused before send; actor killed/restarted; replacement filled  | Old reservation enters replacement mailbox:0→1 | Sender retains old direct destination: replacement mailbox0→0                            |
 
 The candidate publishes one actor-owned ETS row coupling a direct subject with fresh admission counters. The table disappears on actor death. Diagnostic counters remain separate and explicitly best effort. No new public Sinal function, HTTP Gun queue, protocol change or dependency parser patch is introduced. Two narrow ETS primitives are added to Sinal's existing bridge; orchestration stays in Gleam.
 

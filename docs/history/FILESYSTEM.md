@@ -4,12 +4,12 @@ The owner approved keeping Gun and reusing released filesystem libraries where t
 
 ## Selected libraries
 
-| Library | Decision | Verified source behavior used |
-| --- | --- | --- |
+| Library            | Decision                      | Verified source behavior used                                                                                      |
+| ------------------ | ----------------------------- | ------------------------------------------------------------------------------------------------------------------ |
 | file_streams 1.7.0 | Adopt, `>= 1.7.0 and < 2.0.0` | Explicit Raw/Read and bounded read_bytes; Raw/Write/Exclusive and Raw/Append; binary IO and Result-returning close |
-| simplifile 2.7.0 | Adopt, `>= 2.7.0 and < 3.0.0` | Directory creation, permissions, hard links, rename and file-only removal delegate to OTP filesystem operations |
-| file_streams 2.0.0 | Defer | Requires stdlib1; 1.7.0 supports the selected stdlib0.71 without an unrelated runtime-library migration |
-| fio 1.2.1 | Do not adopt for this wave | Requires stdlib1; selected libraries cover the required operations without changing the existing dependency matrix |
+| simplifile 2.7.0   | Adopt, `>= 2.7.0 and < 3.0.0` | Directory creation, permissions, hard links, rename and file-only removal delegate to OTP filesystem operations    |
+| file_streams 2.0.0 | Defer                         | Requires stdlib1; 1.7.0 supports the selected stdlib0.71 without an unrelated runtime-library migration            |
+| fio 1.2.1          | Do not adopt for this wave    | Requires stdlib1; selected libraries cover the required operations without changing the existing dependency matrix |
 
 Both libraries are used only through their public APIs, so `gleam.toml` admits their current major versions; manifest.toml locks the resolved releases and transitive filepath with checksums. [Review hashes](filesystem-review.json) identify the published archives and source inventories, including package license files. No donor source was reused. References: [file_streams](https://hex.pm/packages/file_streams/1.7.0), [simplifile](https://hex.pm/packages/simplifile/2.7.0), [fio](https://hex.pm/packages/fio/1.2.1).
 

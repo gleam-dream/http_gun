@@ -11,8 +11,8 @@ outcomes; [inputs.json](inputs.json) pins106 runtime/dependency inputs.
   [driver](remaining-matrix.sh), [logs and measurements](runtimes/).
 - Public docs: `./dev/env gleam docs build`; [log](docs-build.log).
 - Actual downstream: `./dev/env python3 dev/check_downstream.py --http-gun
-  /code/gleam-dream/http_gun --llm-wire /code/gleam-dream/llm_wire --output
-  /private/tmp/http-gun-destination-downstream-original`. It compiles but has
+/code/gleam-dream/http_gun --llm-wire /code/gleam-dream/llm_wire --output
+/private/tmp/http-gun-destination-downstream-original`. It compiles but has
   48 expected local-policy test failures; [receipt](downstream-original/receipt.json).
 - Explicit disposable test-setup adaptation:
   `./dev/env python3 docs/evidence/wave28/adapted-downstream.py`;

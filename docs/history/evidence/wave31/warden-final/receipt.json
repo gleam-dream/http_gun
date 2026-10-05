@@ -327,10 +327,7 @@
   },
   "commands": [
     {
-      "argv": [
-        "sh",
-        "scripts/test-pki"
-      ],
+      "argv": ["sh", "scripts/test-pki"],
       "exit": 0,
       "log": "pki.log"
     },
@@ -376,20 +373,12 @@
       "log": "ipv6-cert.log"
     },
     {
-      "argv": [
-        "gleam",
-        "format",
-        "src/warden/internal/transport.gleam"
-      ],
+      "argv": ["gleam", "format", "src/warden/internal/transport.gleam"],
       "exit": 0,
       "log": "format.log"
     },
     {
-      "argv": [
-        "gleam",
-        "build",
-        "--warnings-as-errors"
-      ],
+      "argv": ["gleam", "build", "--warnings-as-errors"],
       "exit": 0,
       "log": "build.log"
     },
@@ -421,26 +410,17 @@
       "log": "table.log"
     },
     {
-      "argv": [
-        "gleam",
-        "test"
-      ],
+      "argv": ["gleam", "test"],
       "exit": 1,
       "log": "fast-suite.log"
     },
     {
-      "argv": [
-        "sh",
-        "scripts/negative"
-      ],
+      "argv": ["sh", "scripts/negative"],
       "exit": 0,
       "log": "boundary.log"
     },
     {
-      "argv": [
-        "gleam",
-        "test"
-      ],
+      "argv": ["gleam", "test"],
       "exit": 0,
       "log": "consumer.log"
     }

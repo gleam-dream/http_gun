@@ -17,15 +17,15 @@
 
 ## Technology and boundary decision register
 
-| Role | Adopt / contract / first wave | Alternatives and reason | Evidence / revisit |
-| --- | --- | --- | --- |
-| Compiler/runtime | locked Gleam 1.18.1 and OTP 29, wave 1 | retain reproducible Nix rather than ambient runtime | `gleam --version`, `system_info`; OTP27/28 compatibility checked in wave6 before claims |
-| HTTP values | gleam_http 4.4.0, wave1 | custom request types rejected: duplicate facts | inspected Request/Response APIs; external consumer wave6 |
-| Orchestration | gleam_otp 1.3.0, gleam_erlang 1.3.0, wave1 | handwritten Erlang servers rejected by owner | inspected typed actors, selectors, monitors, supervision; process.call panics, so use typed monitored calls |
-| Wire | Gun 2.6.0, Cowlib 2.20.0, wave1 | HTTPc violates selected transport; old Erlang orchestration rejected | released Hex versions verified; untouched source; real socket proof wave1 and TLS/H2 wave3 |
-| Fixture codec | gleam_json 3.1.0, wave4 | raw Erlang terms rejected as portable fixture contract | selected dependency API to inspect at wave4; bounded versioned binary encoding |
-| Persistence | file_streams 1.7.0 and simplifile 2.7.0, wave7; Gleam writer retained | replaces wave5 primitives after broader ecosystem review; stdlib1-only releases deferred | bounded raw reads/exclusive writes; atomic link/rename; small bridges only for missing primitives; FILESYSTEM.md |
-| Test infrastructure | gleeunit 1.9.0 and reviewed loopback servers, wave1/3 | provider endpoints excluded | exact inherited file hashes in provenance.json; test servers use Cowlib, not a production parser |
+| Role                | Adopt / contract / first wave                                         | Alternatives and reason                                                                  | Evidence / revisit                                                                                               |
+| ------------------- | --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Compiler/runtime    | locked Gleam 1.18.1 and OTP 29, wave 1                                | retain reproducible Nix rather than ambient runtime                                      | `gleam --version`, `system_info`; OTP27/28 compatibility checked in wave6 before claims                          |
+| HTTP values         | gleam_http 4.4.0, wave1                                               | custom request types rejected: duplicate facts                                           | inspected Request/Response APIs; external consumer wave6                                                         |
+| Orchestration       | gleam_otp 1.3.0, gleam_erlang 1.3.0, wave1                            | handwritten Erlang servers rejected by owner                                             | inspected typed actors, selectors, monitors, supervision; process.call panics, so use typed monitored calls      |
+| Wire                | Gun 2.6.0, Cowlib 2.20.0, wave1                                       | HTTPc violates selected transport; old Erlang orchestration rejected                     | released Hex versions verified; untouched source; real socket proof wave1 and TLS/H2 wave3                       |
+| Fixture codec       | gleam_json 3.1.0, wave4                                               | raw Erlang terms rejected as portable fixture contract                                   | selected dependency API to inspect at wave4; bounded versioned binary encoding                                   |
+| Persistence         | file_streams 1.7.0 and simplifile 2.7.0, wave7; Gleam writer retained | replaces wave5 primitives after broader ecosystem review; stdlib1-only releases deferred | bounded raw reads/exclusive writes; atomic link/rename; small bridges only for missing primitives; FILESYSTEM.md |
+| Test infrastructure | gleeunit 1.9.0 and reviewed loopback servers, wave1/3                 | provider endpoints excluded                                                              | exact inherited file hashes in provenance.json; test servers use Cowlib, not a production parser                 |
 
 Sources: https://hex.pm/packages/gun, https://hex.pm/packages/cowlib, cached selected Gleam package source, https://gleam.run/news/. References guide scenarios only; no upstream parity claimed.
 
@@ -33,14 +33,14 @@ Sources: https://hex.pm/packages/gun, https://hex.pm/packages/cowlib, cached sel
 
 All waves use docs/DESIGN.md's corresponding numbered acceptance and Ownership and transitions contracts. Fast gate is `./dev/env sh dev/gate fast`; full is `./dev/env sh dev/gate full`. The gate is grown as its surfaces exist; absent later checks remain pending, never passing. No production substitute or removal obligation is approved. File/hash snapshots precede retained donor material.
 
-| Wave | Visible result and purpose | Core transition / real shell | First adopted / deferred libraries | Observable scenarios and exit | Risks / revisit evidence |
-| --- | --- | --- | --- | --- | --- |
-| 1 | Ordinary binary HTTP, prove independent runtime path | validate config/request; Opening -> head -> bytes -> end; real Gun socket | compiler, HTTP, OTP/Erlang, Gun/Cowlib, gleeunit; JSON deferred to4 | binary201, arbitrary methods/non2xx, empty response, duplicate head/trailer, invalid config; fast formatting/check/build/tests/FFI warnings | Gun events/flow semantics may revise body internals, never widen FFI policy |
-| 2 | Scoped and owned streaming on same bounded collection path | single consumer, shared cursor, timeout != deadline; monitor/credit/cancel | existing libraries; no new infrastructure | early/exception close, copied handle, competing read, owner death, overflow, stalled read, deadline; fast | actual H1/H2 delivery may need finite queue accounting; no eager draining |
-| 3 | Managed concurrent requests and batches, verified TLS/H2 | reuse before create, finite admission, origin scan, H1/H2 leases, per-request deadline; supported Gun settings notifications | OTP supervision API, existing Gun TLS/H2; JSON remains deferred | shared H2 socket, sibling survival, queue expiry, owner loss, origin fairness, bounded worker count, shutdown/restart; fast and targeted full checks | capacity/GOAWAY races exposed by public Gun API return truthful failures; no replay |
-| 4 | Strict offline scripts and disk replay | sequence match before advance; validate fixture version/bytes; same body owner | JSON first real codec contract; filesystem read bridge | repeated identical requests, mismatch then correct request, missing/corrupt/version/exhausted, concurrent session ordering; fast | malformed fixture ambiguity must reject, never fall back |
-| 5 | Real live recording and deterministic finish | reserve -> capture acknowledged records -> complete/fail/cancel -> publish; busy/finalized/failed | file write/publish bridge; Gleam writer actor | actual roundtrip, early cancellation no drain, HTTP vs capture failure, budget/backpressure, destination refusal/replace, interrupted recording no fixture; fast/full persistence checks | IO stalls must not block HTTP lifetime controls; no claimed fsync durability |
-| 6 | Independently consumable package and accurate practical limits | public-only apps compose; validate scaling and source boundaries | isolated LLM snapshot as dev-only reference; no production sibling dependency | external app, opacity/body rejection, LLM provider encoding/reduction above HTTP, 1/10/100/1000 and large/mixed streams, runtime matrix; full | report environment-limited cases honestly; no universal memory certification |
+| Wave | Visible result and purpose                                     | Core transition / real shell                                                                                                 | First adopted / deferred libraries                                            | Observable scenarios and exit                                                                                                                                                            | Risks / revisit evidence                                                            |
+| ---- | -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| 1    | Ordinary binary HTTP, prove independent runtime path           | validate config/request; Opening -> head -> bytes -> end; real Gun socket                                                    | compiler, HTTP, OTP/Erlang, Gun/Cowlib, gleeunit; JSON deferred to4           | binary201, arbitrary methods/non2xx, empty response, duplicate head/trailer, invalid config; fast formatting/check/build/tests/FFI warnings                                              | Gun events/flow semantics may revise body internals, never widen FFI policy         |
+| 2    | Scoped and owned streaming on same bounded collection path     | single consumer, shared cursor, timeout != deadline; monitor/credit/cancel                                                   | existing libraries; no new infrastructure                                     | early/exception close, copied handle, competing read, owner death, overflow, stalled read, deadline; fast                                                                                | actual H1/H2 delivery may need finite queue accounting; no eager draining           |
+| 3    | Managed concurrent requests and batches, verified TLS/H2       | reuse before create, finite admission, origin scan, H1/H2 leases, per-request deadline; supported Gun settings notifications | OTP supervision API, existing Gun TLS/H2; JSON remains deferred               | shared H2 socket, sibling survival, queue expiry, owner loss, origin fairness, bounded worker count, shutdown/restart; fast and targeted full checks                                     | capacity/GOAWAY races exposed by public Gun API return truthful failures; no replay |
+| 4    | Strict offline scripts and disk replay                         | sequence match before advance; validate fixture version/bytes; same body owner                                               | JSON first real codec contract; filesystem read bridge                        | repeated identical requests, mismatch then correct request, missing/corrupt/version/exhausted, concurrent session ordering; fast                                                         | malformed fixture ambiguity must reject, never fall back                            |
+| 5    | Real live recording and deterministic finish                   | reserve -> capture acknowledged records -> complete/fail/cancel -> publish; busy/finalized/failed                            | file write/publish bridge; Gleam writer actor                                 | actual roundtrip, early cancellation no drain, HTTP vs capture failure, budget/backpressure, destination refusal/replace, interrupted recording no fixture; fast/full persistence checks | IO stalls must not block HTTP lifetime controls; no claimed fsync durability        |
+| 6    | Independently consumable package and accurate practical limits | public-only apps compose; validate scaling and source boundaries                                                             | isolated LLM snapshot as dev-only reference; no production sibling dependency | external app, opacity/body rejection, LLM provider encoding/reduction above HTTP, 1/10/100/1000 and large/mixed streams, runtime matrix; full                                            | report environment-limited cases honestly; no universal memory certification        |
 
 ## Explicit deferrals
 
@@ -108,7 +108,6 @@ Entries below are append-only.
 - Redaction: authorization/proxy-authorization/cookie/set-cookie metadata excluded by default. Bodies and URL queries remain exact and may contain secrets; no per-chunk secret replacement or claim of comprehensive redaction.
 - No temporary production substitute, material adoption change or dependency patch. Remaining: independent consumer/type rejection, isolated LLM integration, practical load, runtime qualification, final docs/CI and conformance review. Next: run the separate public-only consumer and load scenarios.
 
-
 ### Wave 6 — independent consumers and practical qualification
 
 - Status: accepted and program complete, 2026-09-29 local time. All six required milestones are retained; no production substitute remains.
@@ -131,7 +130,6 @@ Entries below are append-only.
 - Sequence: existing cassette regression baseline; refactor filesystem boundary while green; red/green configured header-count regression on real H1 and H2; documentation and final full gate/runtime checks.
 - Gate: ./dev/env sh dev/gate fast; ./dev/env sh dev/gate full; sh dev/matrix for the changed dependency seam. Public-only consumers and recording fault tests must remain green.
 - Scope: no dependency patches, protocol/parser changes, redaction implementation or durability implementation. Body/query transformation and durable publication are optional HTTP Gun features, not upstream defects. Gun remains the transport.
-
 
 ### Wave 7 — acceptance
 
@@ -180,16 +178,15 @@ Entries below are append-only.
 - Acceptance rubric: requested behavior, governing ownership rules, unchanged interface, public behavioral scenarios, covered criteria, approved scope, named general conditions, design documentation, standing rules and focused quality review all pass. No issue or pending design entry needs closure. Production FFI remains72 physical lines/3,650bytes/12bindings; dependencies/manifests unchanged. Source snapshot and receipt hashes are retained; original wave8 results remain intact.
 - Evidence: docs/BURST_FIX.md and docs/evidence/wave9. Remaining required implementation distance: none identified by these accepted scenarios. No further authorized wave remains. Changes stay local and uncommitted; no sibling/oversight edits, push, publication, upstream contact or provider credentials.
 
-
 ### Authorized adoption-validation follow-up — plan revision 5
 
 The owner's request to focus on the remaining review items and external reference validation authorizes these intent-preserving waves. The public contract, Gun transport and dependency boundary remain unchanged. No further approval is needed for these scoped tests and fixes. No temporary production substitute is introduced.
 
-| Wave | Outcome / contract | Real boundary and technology | Observable exit / gate |
-| --- | --- | --- | --- |
-| 10 | Bounded batches avoid copying scheduler history into workers; asynchronous callbacks carry only needed values | Existing Gleam actors, same public batch and pool; no dependency or FFI additions | Reproduce reviewed 500/2000/5000 scaling defect, fix narrow captures, retain regression; fast gate and repeated public batch measurements |
-| 11 | Isolated public-import LLM consumer handles incremental bytes and early termination; reference-derived lifecycle scenarios strengthen streaming evidence | Existing public LLM Wire reducers in retained isolated snapshot; framing stays in example, local controlled HTTP servers | Progress before EOF, split events/UTF-8, local cancellation, live/record/replay, bounded framing; fast and independent consumer gates |
-| 12 | Independent server compatibility and practical qualification | nghttp2's nghttpd as dev-only server pinned by existing Nix lock, verified TLS/ALPN; controlled servers retain fault injection | Binary H2 responses, multiplexing, sibling cancellation, repeated workloads; full gate and OTP27/28/29 matrix, exact receipts |
+| Wave | Outcome / contract                                                                                                                                       | Real boundary and technology                                                                                                   | Observable exit / gate                                                                                                                    |
+| ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| 10   | Bounded batches avoid copying scheduler history into workers; asynchronous callbacks carry only needed values                                            | Existing Gleam actors, same public batch and pool; no dependency or FFI additions                                              | Reproduce reviewed 500/2000/5000 scaling defect, fix narrow captures, retain regression; fast gate and repeated public batch measurements |
+| 11   | Isolated public-import LLM consumer handles incremental bytes and early termination; reference-derived lifecycle scenarios strengthen streaming evidence | Existing public LLM Wire reducers in retained isolated snapshot; framing stays in example, local controlled HTTP servers       | Progress before EOF, split events/UTF-8, local cancellation, live/record/replay, bounded framing; fast and independent consumer gates     |
+| 12   | Independent server compatibility and practical qualification                                                                                             | nghttp2's nghttpd as dev-only server pinned by existing Nix lock, verified TLS/ALPN; controlled servers retain fault injection | Binary H2 responses, multiplexing, sibling cancellation, repeated workloads; full gate and OTP27/28/29 matrix, exact receipts             |
 
 Design anchors: DESIGN.md ownership, batch scheduling, incremental recording and delivery slices 2/3/5/6. References are scenario donors only: Finch timeout/cancellation, Gun flow/trailers/reuse, Mint fragmentation, ReqCassette binary/ordered matching; exact revisions and hashes are in evidence/adoption-review/reference-sources.json. Do not copy dependency parser tests. Independent nghttpd tests client interoperability, not protocol certification. Linux evidence will be reported only if executed; sibling LLM runtime migration remains outside this checkout's authority. Body/query redaction and crash durability remain optional features.
 
@@ -210,7 +207,6 @@ Design anchors: DESIGN.md ownership, batch scheduling, incremental recording and
 - Findings: initial draining test submitted fresh work before Gun's connection-down observation and received truthful ConnectionFailed/MayHaveBeenSent. The corrected test synchronizes on that supported observation; no automatic replay or stronger atomic guarantee was introduced. This test-setup correction is retained in draining-race.log.
 - Validation: fast gate passes62 tests, format/check/build/FFI warnings/boundaries; both separately built consumers and four negative type fixtures pass. Exact final.log and streaming.log are retained in docs/evidence/wave11. No temporary runtime, dependency patch or sibling mutation. Remaining distance: independent server/full runtime qualification and measured sustained load.
 
-
 ### Wave 12 — acceptance
 
 - Status: accepted, 2026-09-30. No pending required implementation or temporary production substitute in this authorized follow-up. Remaining sibling migration and optional features are distinguished from HTTP capabilities.
@@ -226,12 +222,12 @@ Design anchors: DESIGN.md ownership, batch scheduling, incremental recording and
 
 Approval: owner accepted the four concrete proposals with “apply them” on 2026-09-30. Design anchors E1–E4 in DESIGN.md. Baseline 1f53017 is clean and recoverable in Git. No additional approval cycle, dependencies, upstream patches, sibling edits or provider traffic. Existing Gleam actors/selectors/monitors/timers and filesystem libraries are retained; no temporary runtime. Design documentation stays in this package's existing Markdown format.
 
-| Wave | Observable delivery and transition | Public red/green checks and exit |
-| --- | --- | --- |
-| 13 | E1 bounded finish: Active -> Closing -> Publishing -> Finalized/Failed; finite removable waiter | Timeout seals without draining, cancellation then publication/replay, concurrent/dead waiter, abort; fast gate and ordinary consumer |
-| 14 | E2 fallible scoped callback with caller errors and identical cleanup | Opening/read/application error mapping, success/early/exception cleanup; fast and public consumers |
-| 15 | E3 monotonic deadline and scoped latched cancellation through existing admission/body ownership | Expired/queued/pre-header/reading requests, scope and creator death, H2 healthy sibling, no replay/history growth; fast and consumers |
-| 16 | E4 typed limits, bounded transport/file diagnostics, codec compatibility, public docs and final qualification | Real TLS/refusal/IO errors, every error roundtrip, strict v1/v2 decode, safe descriptions; full gate and OTP29/28/27 matrix |
+| Wave | Observable delivery and transition                                                                            | Public red/green checks and exit                                                                                                      |
+| ---- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| 13   | E1 bounded finish: Active -> Closing -> Publishing -> Finalized/Failed; finite removable waiter               | Timeout seals without draining, cancellation then publication/replay, concurrent/dead waiter, abort; fast gate and ordinary consumer  |
+| 14   | E2 fallible scoped callback with caller errors and identical cleanup                                          | Opening/read/application error mapping, success/early/exception cleanup; fast and public consumers                                    |
+| 15   | E3 monotonic deadline and scoped latched cancellation through existing admission/body ownership               | Expired/queued/pre-header/reading requests, scope and creator death, H2 healthy sibling, no replay/history growth; fast and consumers |
+| 16   | E4 typed limits, bounded transport/file diagnostics, codec compatibility, public docs and final qualification | Real TLS/refusal/IO errors, every error roundtrip, strict v1/v2 decode, safe descriptions; full gate and OTP29/28/27 matrix           |
 
 Decisions: client deadline remains the ceiling; finish timeout does not abort; cancellation applies to every request deliberately attached to one token; only one recorder completion waiter, rejected extra waits return Busy. Scope exit releases token state. Unexpected raw dependency reasons map to Unknown; no arbitrary term inspection in public errors. These are scoped implementation decisions consistent with the approved proposal. No protocol hardening, full sibling LLM migration, optional redaction or crash durability in this wave.
 
@@ -249,7 +245,6 @@ E2 delivered: try_with_response preserves caller errors, maps opening failures, 
 
 E3 delivered: opaque monotonic deadline with remaining_ms; request options for send/open/arbitrary and fallible scopes; scoped latched token through a small Gleam actor. Pending cancellation monitors have a bounded live-entry index; body owners observe token termination and remove monitors on release. No per-request worker, body forwarding, callback history or new FFI. Cancel while connecting removes unused reservations; queued peers preserve useful connections. Red/green tests cover expired admission, pre-header and queued cancellation, stalled TLS reservation cleanup. Scope/creator death, client ceiling, body deadlines and H2 sibling/reuse pass. Fast76 tests; both external consumers and six type rejections pass in wave15 logs. Options are exercised through live/record/playback. Implementation keeps existing default APIs and same pool. Wave16 active; typed diagnostics, fixture revision and final qualification remain required.
 
-
 ### Wave 16 — acceptance
 
 - Status: accepted,2026-09-30. All four approved API improvements E1–E4 are implemented; no required item remains in this follow-up. Default client calls remain; richer error constructors require the documented pattern-match migration. New fixture output is version2; valid version1 is explicitly decoded without corrupt-fixture fallback.
@@ -259,11 +254,9 @@ E3 delivered: opaque monotonic deadline with remaining_ms; request options for s
 - Boundaries: no new Dream rerun or60-second soak claimed; those are historical receipts. Host/container timing runs overlap and are qualification observations, not comparative performance claims. Remote x86_64 CI was not run. The isolated LLM example is text-oriented; sibling session-runtime migration is separate. Body/query redaction and crash durability remain optional client features.
 - Review: actor-owned lifetimes and finite admitted subscriptions/waiters, conservative submission evidence, public-only examples, explicit fixture compatibility and unmodified dependency boundaries preserved. Handwritten FFI now92 physical lines/4669 bytes/13 declarations, adding only bounded transport-reason conversion. Gun/runtime bindings and the8-line filesystem primitive bridge remain narrow. No generic framework, raw public transport terms, production substitute, donor copy or sibling write. Changes are local and uncommitted; no push or publication.
 
-
 ### Authorized pre-release cleanup — wave 17 / plan revision 7
 
 The owner confirms no released package/external consumer and explicitly permits breaking cleanup. E4 now has one strict fixture schema (marker1), mandatory observed limit sizes and no legacy decoder/OtherLimit. Invalid negative fixture budgets fail before IO; genuine unknown transport/IO causes remain. No package version bump or dependency/FFI change. Public red/green: old experimental failure layout is corrupt, current typed failures roundtrip, unknown versions/tags fail, negative budgets are configuration errors. Keep recording/live/playback consumers on this schema. Gates: ./dev/env sh dev/gate fast; ./dev/env sh dev/gate full; runtime matrix if needed for final qualification. Status: active; prior wave16 evidence remains historical.
-
 
 ### Wave 17 — acceptance
 
@@ -273,43 +266,36 @@ The owner confirms no released package/external consumer and explicitly permits 
 - Validation: fast86 tests, format/check/build, own FFI warnings/boundaries, and generated API docs pass. Six full gates on ARM64 Darwin/Linux × OTP29/28/27 pass against frozen current inputs; each includes86 tests, two isolated public consumers, six type rejections,1196 LLM split points, three batch trials through10000 inputs, seven independent nghttpd scenarios,256 recording/replay exchanges totaling8MiB and eleven controlled load scenarios. Exact receipt and logs: evidence/wave17.
 - Scope/quality: no production substitute, generic framework, dependency/parser patch or wider architecture change. Current typed data matches the design; old experimental artifacts need regeneration rather than compatibility branches. Package/toolchain/FFI unchanged (92 lines/4669 bytes/13 bindings). No sibling/oversight mutation, push, publication, credentials or commit. No pending work in this cleanup. Historical wave16 receipts remain accurate for their captured tree. Remote x86_64 CI, another Dream comparison/soak, optional redaction/durability and full sibling LLM migration are not claimed.
 
-
 ### Local integration after wave 17
 
 The owner requested committing the accepted API improvements and pre-release cleanup. They form one coherent local commit with source, examples, documentation and red/green/full-gate evidence. Before staging, all78 frozen executable/fixture inputs and all six current runtime receipt hashes were reverified; no source change invalidates the86-test qualification. Historical entries above retain their original status. No push, publication, sibling or oversight change is included.
-
 
 ### Authorized adoption ergonomics — plan revision 8
 
 The owner's “Proceed” accepts the completed API/adoption proposal reviewed against HTTP Gun ebf2b479 and migrated LLM Wire 1c0ad614. This is implementation authorization for the small additions, documentation and independent validation below; observation remains an isolated experiment, not an approved public API. Prior receipts remain historical. No commit, sibling mutation, new dependency or production FFI is needed. Design anchors A1–A4 below refine existing ownership rules.
 
-| Wave | Retained outcome | Observable exit |
-| --- | --- | --- |
-| 18 | Accurate adoption status and explicit isolated downstream gate | Current LLM Wire tests/public boundary/local H2 run against selected HTTP Gun; recorded revisions/hashes; originals unchanged; incompatible API fails |
-| 19 | Maintained generic asynchronous feed recipe using public imports | Synchronized admission/connect/header/body cancellation, ownership, exceptions/death/shutdown, modes and healthy H2 sibling; normal gate has no sibling dependency |
-| 20 | Immutable request-ceiling inspection and fallible cancellation scope | Public red/green tests; stopped/restarted client policy, all modes, success/callback error/exception/group cancellation; finite deadlines unchanged |
-| 21 | Bounded lifecycle-observation experiment and qualification | Compare bounded pull ring and per-request slots in temporary code; expose no new production API; publish ordering/loss/ingress findings; full local gate and runtime evidence |
+| Wave | Retained outcome                                                     | Observable exit                                                                                                                                                               |
+| ---- | -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 18   | Accurate adoption status and explicit isolated downstream gate       | Current LLM Wire tests/public boundary/local H2 run against selected HTTP Gun; recorded revisions/hashes; originals unchanged; incompatible API fails                         |
+| 19   | Maintained generic asynchronous feed recipe using public imports     | Synchronized admission/connect/header/body cancellation, ownership, exceptions/death/shutdown, modes and healthy H2 sibling; normal gate has no sibling dependency            |
+| 20   | Immutable request-ceiling inspection and fallible cancellation scope | Public red/green tests; stopped/restarted client policy, all modes, success/callback error/exception/group cancellation; finite deadlines unchanged                           |
+| 21   | Bounded lifecycle-observation experiment and qualification           | Compare bounded pull ring and per-request slots in temporary code; expose no new production API; publish ordering/loss/ingress findings; full local gate and runtime evidence |
 
 Current state: wave18 active,19–21 pending. The existing approved proposal is retained by SHA256 in wave18/proposal-source.json. No unbuilt item above is called a limitation or complete. The migration establishes a real current consumer; the archived text example remains historical scenario evidence. Application framing, sink blocking/idle policies and retry decisions stay outside HTTP Gun. Observation cannot establish remote receipt and must not affect correctness or persistence outcomes.
-
 
 ### Wave 18 — acceptance
 
 Accepted: opt-in current downstream driver, source closure isolation, revision/hash/runtime receipts, and current adoption wording. Missing-command red is retained; initial rejection of an in-checkout CLAUDE.md symlink was corrected to dereference only within its source root. Current LLM Wire passes223 tests, check/build, actual public consumer/six negative controls and five local H2 scenarios on Darwin ARM64/OTP29. Sources were unchanged. Removing the public with_response_with_options export only in a disposable HTTP Gun copy produces the expected downstream Unknown module value error. See evidence/wave18. No production dependency/FFI or sibling change. Wave19 active.
 
-
 ### Wave 19 — acceptance
 
 Accepted: the reviewed temporary generic feed recipe is retained as examples/async with provenance hashes, a two-job offline demo, and11 synchronized lifecycle groups. The independent package builds with warnings as errors and all groups pass on OTP29 (evidence/wave19/green.log). It covers cancellation during admission/TLS/header/body, shared cursor/conflicts, early/error/exception/death/shutdown, supervision restart, one-connection H2 sibling survival, live/scripts/strict playback/actual prefix recording and separate capture failure. Missing executable red is retained. Token startup failures now propagate through the application's startup channel rather than being reduced to WorkerStopped. No new library task abstraction, FFI, dependency or sibling change. Wave20 active.
-
 
 ### Wave 20 — acceptance
 
 Accepted: request_ceiling_ms reads only the capability's immutable startup scalar; try_with_token delegates to the existing exception-safe scope, maps startup Failure and flattens the callback Result. Defaults, deadline enforcement, actors and FFI are unchanged. The public missing-function red becomes88 passing tests, then91 with grouped/error/exception cleanup coverage. The async package checks policy across all four modes and stopped/restarted capabilities, and uses the helper in download and grouped REST workflows. Fast, all three consumers, positive compiler control/six symbol-specific rejections and API docs pass (evidence/wave20/qualification.log). Controlled token actor-startup failure injection was not attempted: mapping is a direct Result.map_error on the existing constructor; no unsafe resource-exhaustion or production test seam was added. This execution boundary is disclosed rather than claiming that fault was observed. Wave21 now active: experiment and final complete-tree qualification.
 
-
 Wave21 review correction: controlled token-startup failure is now exercised through a temporary-copy OTP boundary substitution, without a production seam. It exposed an example-only stray completion message when startup failed before a Job could be returned. The public test fails its mailbox assertion, then passes after the worker separates startup failure from callback completion. Sixty-four failures retain no messages, exact Failure mapping is checked and the callback cannot run. The ordinary with_token form is intentional for this two-channel application protocol; download/grouped REST use try_with_token. Logs: wave21/startup-red.log and startup-green.log. The initial three runtime gates and downstream rerun passed before this example/gate correction; final matrix is being repeated against fresh frozen inputs. Production source remains unchanged from those earlier runs.
-
 
 ### Wave 21 — acceptance
 
@@ -325,18 +311,17 @@ Review: typed public values and actor-owned HTTP lifecycle remain unchanged; the
 
 The owner's “Agree, proceed to sinal and simplify our system” selects Sinal for observation delivery. The target is the small instrumentation boundary in DESIGN.md, with no HTTP Gun observation actor, retained timeline or custom ingress implementation. HTTP outcomes and persistence remain independent of best-effort observations. Prior public HTTP behavior stays accepted. No commit, push, publication or provider traffic is authorized.
 
-| Wave | Retained outcome | Observable exit |
-| --- | --- | --- |
-| 22 | Verified Sinal ingress and a reviewed dependency correction | Synchronized startup and delayed-sender tests reproduce the original failures and pass the corrected source; Sinal tests/build/FFI warnings pass on selected runtimes; correction applied only within authorized checkout scope |
-| 23 | Sinal dependency and typed HTTP lifecycle instrumentation | Normal gate independent of sibling checkouts; direct forwarding/default disabled; bounded payloads and correlation; live/recorded and simulated events truthful; blocked/dead/throwing observers cannot change HTTP outcomes |
-| 24 | Adoption qualification and simplified docs/examples | Public consumer, current isolated LLM Wire, all modes, cancellation/H2 siblings and fast/full gates; exact receipts and accurate remaining limits |
+| Wave | Retained outcome                                            | Observable exit                                                                                                                                                                                                                 |
+| ---- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 22   | Verified Sinal ingress and a reviewed dependency correction | Synchronized startup and delayed-sender tests reproduce the original failures and pass the corrected source; Sinal tests/build/FFI warnings pass on selected runtimes; correction applied only within authorized checkout scope |
+| 23   | Sinal dependency and typed HTTP lifecycle instrumentation   | Normal gate independent of sibling checkouts; direct forwarding/default disabled; bounded payloads and correlation; live/recorded and simulated events truthful; blocked/dead/throwing observers cannot change HTTP outcomes    |
+| 24   | Adoption qualification and simplified docs/examples         | Public consumer, current isolated LLM Wire, all modes, cancellation/H2 siblings and fast/full gates; exact receipts and accurate remaining limits                                                                               |
 
 Wave22 is active. Sinal098a2d5 is unpublished on Hex (package API returned404). Its startup reset permits two events at capacity1; a producer paused before send can also enqueue an old reservation into a replacement process. Both are reproduced with synchronized temporary-copy hooks, never production test seams. The prepared correction publishes fresh admission counters together with a direct subject for each incarnation using a one-row actor-owned ETS table. The public Sinal API is unchanged. Diagnostic counters are explicitly best effort and do not enforce capacity. No Gun/Cowlib patch or HTTP Gun workaround is involved.
 
 The earlier instruction keeps siblings read-only. A specific clarification is pending before applying the tested correction to `/code/gleam-dream/sinal`; no sibling has been modified. The patch, regression runner and source hashes are retained in evidence/wave22. Production integration and end-to-end HTTP validation remain unfinished, not passing limitations. Packaging the unpublished source reproducibly remains part of wave23; a mutable sibling-only dependency is not an acceptable normal gate.
 
 Wave22 preparation result: both original regressions fail for their intended assertions, the candidate passes both, and93 Sinal tests plus format/check/build/FFI warnings pass on Darwin ARM64/Gleam1.18.1 with OTP29/ERTS17.1, OTP28/16.4.0.6 and OTP27/15.2.7.13. `git apply --check` passes for the retained patch. The original Sinal source hashes/status are unchanged. See evidence/wave22/receipt.json. Application and HTTP integration are still pending; no acceptance of wave22 or later waves is claimed.
-
 
 ### Wave 22 — acceptance and related regression
 
@@ -346,7 +331,6 @@ The owner explicitly authorized fixing Sinal, superseding the earlier read-only 
 
 Implemented `config.observations`, typed `telemetry.event()` and a pure `with_correlation` Client view, preserving request options/failure constructors/cassette matching. The canonical local Sinal dependency is shared with LLM Wire; independent gates materialize its verified source archive at the same relative path. No second Sinal implementation resolves in a build. Scripts/replay report Offline and no Gun call; live recording separates HTTP termination from capture failure. Public tests cover1000 requests with a capacity1 blocked handler, unavailable/dead/throwing observers, queued deadline without submission, pre-header Gun return, strict matching, recording failure and H2 cancellation with a healthy sibling. The fast gate passes98 tests. A synchronous-delivery mutation fails the blocked-observer test while the real bounded path passes. Wave24 final qualification is in progress.
 
-
 ### Waves 23–24 — acceptance
 
 Accepted, 2026-10-01. HTTP Gun uses one canonical Sinal implementation through a typed, opt-in observation surface. The dependency's generic startup, delayed-event and delayed-drop-notice corrections pass 93 tests and all three synchronized probes on Darwin ARM64/OTP29/28/27. Independent package gates use a hash-verified source archive; current downstream uses the same selected Sinal checkout. No collector/history/observation actor or production HTTP Gun FFI was added. The exact privacy, ownership, source-time ordering, best-effort loss and mode contracts are in OBSERVATIONS.md.
@@ -354,7 +338,6 @@ Accepted, 2026-10-01. HTTP Gun uses one canonical Sinal implementation through a
 Final full HTTP gates on all three runtimes pass 98 tests, three consumers, seven precise type rejections with positive control, real H1/TLS/H2 and sibling-preserving cancellation, strict scripts/replay, live recording/persistence failures, async lifecycle/startup faults and practical batch/stream/load checks. Current LLM Wire passes 223 tests, its actual public boundary and five local H2 scenarios through1000 callers; selected originals are unchanged during the isolated check. The 97 frozen executable/dependency inputs remain identical. Initial Hex rate-limit attempts are retained, followed by passing sequential reruns without a production workaround. Evidence: wave23 and wave24/receipt.json.
 
 The blocked-observer test requires a capacity1 forwarder to leave HTTP's1000-request bounded batch working, with one queued drop notice. A synchronous-delivery mutation fails the same test. All milestone integration tests remain in the ordinary suite. Sinal retains generic deterministic regressions in its own CI, using temporary-copy hooks only. HTTP Gun handwritten FFI remains92 lines/4669 bytes/13 bindings. Its selected Sinal forwarder bridge is114 lines/4135 bytes, covering atomics/routes and two narrow ETS operations; an obsolete named-send exception helper was removed. No required work remains in these waves. Linux/hosted CI, new Dream comparison/soak, enabled-telemetry overhead comparison and optional redaction/durability were not performed. No commit, push, publication, provider traffic or sibling/oversight edits beyond authorized Sinal occurred.
-
 
 ### Local integration after wave 24
 
@@ -364,12 +347,12 @@ The owner requested committing the accepted work. Sinal's generic correction is 
 
 The owner's 2026-10-01 destination-policy prompt authorizes this complete scoped program. HTTP Gun starts at 2b3656e8. Warden is read-only behavioral evidence at 230c6bb4; transport SHA256 0fd3b160ecb50575a7185b4927b7010c684a218a3ba4e8fc46471d3d1de568cc and transport-test SHA256 f079d5ee5edc04b403d281c973a203080d3328cd7291a86d0e848d5c1c0f4c36. No donor source has been copied.
 
-| Wave | Outcome | Acceptance |
-| --- | --- | --- |
-| 25 | Pure, validated destination policy and classification; secure default | Observable default refusal before a socket opens; address table and explicit loopback permission; existing local consumers opt in |
-| 26 | Bounded resolution, pinned connections and original TLS identity | One resolution per new connection, reject every mixed answer, typed pre-submission failures, cancellation/deadline/death cleanup; hostname and IP-SAN TLS tests |
-| 27 | Send deadline, mailbox and parser-boundary qualification | Controlled blocked sender and late replies; IPv6 authority; whole admitted head; raw malformed-response tests against released dependencies |
-| 28 | Documentation and complete adoption qualification | Fast/full gates, current isolated downstream check, exact evidence, truthful dependencies and unresolved requirements |
+| Wave | Outcome                                                               | Acceptance                                                                                                                                                      |
+| ---- | --------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 25   | Pure, validated destination policy and classification; secure default | Observable default refusal before a socket opens; address table and explicit loopback permission; existing local consumers opt in                               |
+| 26   | Bounded resolution, pinned connections and original TLS identity      | One resolution per new connection, reject every mixed answer, typed pre-submission failures, cancellation/deadline/death cleanup; hostname and IP-SAN TLS tests |
+| 27   | Send deadline, mailbox and parser-boundary qualification              | Controlled blocked sender and late replies; IPv6 authority; whole admitted head; raw malformed-response tests against released dependencies                     |
+| 28   | Documentation and complete adoption qualification                     | Fast/full gates, current isolated downstream check, exact evidence, truthful dependencies and unresolved requirements                                           |
 
 Decisions: retain Gun 2.6.0/Cowlib 2.20.0; policy, classification, resolution coordination and connection admission in Gleam; only native address parsing/lookup and Gun option conversion cross FFI. Resolution occupies finite connection admission capacity and cannot block the pool. Configuration is immutable for a client; checked connections are reused only within that client/origin, and replacement connections resolve again. Offline modes never resolve. Default policy becomes public-only; local tests explicitly permit loopback. No retries, dependency parser changes, Warden migration, release or commit is included. Strict parsing is an acceptance question to measure, not assume or silently waive.
 
@@ -380,7 +363,6 @@ Wave25 active. No new validation is claimed yet.
 The focused default-policy red returned MayHaveBeenSent after connecting to loopback; green refuses before a socket opens. The injected-private-answer red returned a real200 response; green returns DestinationRejected/NotSubmitted. After explicit opt-in updates to owned loopback tests,105 tests pass, including50 address classification cases, mixed/empty/failed DNS answers, exact case-insensitive allowlists, validation purity, literal bypass and checked-answer reuse. New typed reasons round-trip through the existing strict fixture codec. Logs: evidence/wave25. No source was copied from Warden and no sibling was changed. Wave26 is active: asynchronous resolution is implemented and lifetime/TLS qualification is underway.
 
 The owner accepted the experimentally confirmed reason-phrase exception on2026-10-01: keep Gun/Cowlib unmodified and document it. The local Gun probe rejects bare LF and signed lengths/chunk sizes but accepts control bytes in header values and status reason text. HTTP Gun will reject delivered invalid header values; Gun does not expose status reason text to the client. Evidence: wave27/parser-probe.log. This is a precise exception to the requested parser acceptance, not a claim of strict wire parsing.
-
 
 ### Wave 26 — acceptance
 
@@ -407,7 +389,6 @@ The owner's G1–G4 feedback continues the authorized generic adoption work from
 - Wave31: classify only facts established by released dependency events, retain ambiguous failures honestly, qualify complete gates/isolated downstream probes and document remaining Warden differences. No promise to invent five distinct error classes from indistinguishable dependency signals.
 
 Each wave starts with an observable failing case and finishes with focused green evidence, followed by the complete final gate. Existing dependency/library roles remain unchanged. The production Warden switch/release and mTLS stay outside this task.
-
 
 ### Waves29–30 — focused acceptance
 

@@ -70,7 +70,5 @@
     "delayed drop notice before restart"
   ],
   "scope": "Sinal only; public API unchanged; no HTTP-specific code",
-  "skipped": [
-    "Linux/hosted Sinal CI execution"
-  ]
+  "skipped": ["Linux/hosted Sinal CI execution"]
 }

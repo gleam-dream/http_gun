@@ -27,10 +27,10 @@ scenarios,256 actual recorded/replayed exchanges totaling8MiB, batch trials
 through10000 and eleven load scenarios including32MiB streams and slow readers.
 
 | OTP | nghttpd1000 elapsed ms | p95 ms | Peak sampled VM bytes | Largest mailbox | Connections |
-| --- | ---: | ---: | ---: | ---: | ---: |
-|29|81.321|74.456|71239164|275|1|
-|28|87.398|78.268|71205153|148|1|
-|27|89.137|80.798|70110881|167|1|
+| --- | ---------------------: | -----: | --------------------: | --------------: | ----------: |
+| 29  |                 81.321 | 74.456 |              71239164 |             275 |           1 |
+| 28  |                 87.398 | 78.268 |              71205153 |             148 |           1 |
+| 27  |                 89.137 | 80.798 |              70110881 |             167 |           1 |
 
 These are individual local samples with nghttpd1.70.0, peer stream limit8,
 client active128/waiting1024, a60-second budget and256-byte replies. The sampler
@@ -104,11 +104,11 @@ cancellation, batch scaling through10000, seven nghttpd1.70.0 scenarios,
 documentation also builds. No new Linux/hosted-CI, Dream comparison or sustained
 soak execution is claimed for this change.
 
-| OTP | nghttpd1000 elapsed ms | p95 ms | Peak sampled VM bytes | Largest mailbox | Connections |
-| --- | ---: | ---: | ---: | ---: | ---: |
-|29|114.471|102.378|69530244|39|1|
-|28|82.494|74.184|68856592|149|1|
-|27|87.016|79.239|71873942|184|1|
+| OTP | nghttpd1000 elapsed ms |  p95 ms | Peak sampled VM bytes | Largest mailbox | Connections |
+| --- | ---------------------: | ------: | --------------------: | --------------: | ----------: |
+| 29  |                114.471 | 102.378 |              69530244 |              39 |           1 |
+| 28  |                 82.494 |  74.184 |              68856592 |             149 |           1 |
+| 27  |                 87.016 |  79.239 |              71873942 |             184 |           1 |
 
 These independent-server runs use one H2 connection, peer stream limit8,
 client active128/waiting1024, a60-second budget and256-byte replies. They are
@@ -156,11 +156,11 @@ Current LLM Wire at `1c0ad614` passes 223 tests, its public consumer/boundary co
 
 Representative independent-server runs use nghttpd1.70.0, one H2 connection, peer stream limit8, client active128/waiting1024, a60-second request budget and256-byte replies. Observation is disabled for these existing load scenarios; the enabled-observation bound is tested separately above. These single local runs are not an overhead comparison or universal memory guarantee. Sampling can miss peaks and excludes the C server. The complete1/10/100/1000,32 MiB and mixed slow/fast measurements are retained beside each runtime log.
 
-| OTP |1000 callers elapsed ms|p95 ms|Peak sampled VM bytes|Largest sampled mailbox|Connections|
-|---|---:|---:|---:|---:|---:|
-|29|95.509|82.375|70027911|57|1|
-|28|82.794|72.342|67360009|140|1|
-|27|97.341|78.104|73398335|91|1|
+| OTP | 1000 callers elapsed ms | p95 ms | Peak sampled VM bytes | Largest sampled mailbox | Connections |
+| --- | ----------------------: | -----: | --------------------: | ----------------------: | ----------: |
+| 29  |                  95.509 | 82.375 |              70027911 |                      57 |           1 |
+| 28  |                  82.794 | 72.342 |              67360009 |                     140 |           1 |
+| 27  |                  97.341 | 78.104 |              73398335 |                      91 |           1 |
 
 HTTP Gun production FFI is unchanged: 92 lines/4669 bytes/13 bindings. Sinal is the only authorized sibling changed; Gun/Cowlib remain unmodified. No Linux/hosted CI, new Dream comparison, sustained soak or comparative enabled-telemetry overhead benchmark is claimed for this follow-up. Observation remains best effort, with no remote-receipt, durable-delivery or exporter-queue guarantee. The exact API and one-source dependency arrangement are in [OBSERVATIONS.md](OBSERVATIONS.md).
 
@@ -172,11 +172,11 @@ The opt-in current downstream check separately passes223 LLM Wire tests, its pub
 
 Representative independent-server qualification uses one H2 connection, peer limit8, client active128/waiting1024,60-second deadlines and256-byte responses. These are individual local observations, not a comparative benchmark or allocation guarantee. The VM sampler can miss transient peaks; it excludes the independent C server. Other1/10/100,32MiB and mixed slow/fast results are retained alongside the logs.
 
-| OTP |1000 callers elapsed ms|p95 ms|Peak sampled VM bytes|Largest sampled mailbox|Connections|
-|---|---:|---:|---:|---:|---:|
-|29|80.730|74.123|70147564|227|1|
-|28|80.644|71.606|71613137|158|1|
-|27|86.421|78.653|67822303|152|1|
+| OTP | 1000 callers elapsed ms | p95 ms | Peak sampled VM bytes | Largest sampled mailbox | Connections |
+| --- | ----------------------: | -----: | --------------------: | ----------------------: | ----------: |
+| 29  |                  80.730 | 74.123 |              70147564 |                     227 |           1 |
+| 28  |                  80.644 | 71.606 |              71613137 |                     158 |           1 |
+| 27  |                  86.421 | 78.653 |              67822303 |                     152 |           1 |
 
 Red/green evidence includes missing public functions, an intentionally incompatible downstream export, and the async example's stray completion message on token-startup failure. The controlled fault is injected only into a temporary copy at the OTP startup boundary; it checks exact Failure mapping, callback suppression and64 failed starts without mailbox retention. Normal production code contains no injection hook. See [startup red](evidence/wave21/startup-red.log) and [green](evidence/wave21/startup-green.log).
 
@@ -190,17 +190,17 @@ Run `./dev/env sh dev/gate fast` for the fast gate and `./dev/env sh dev/gate fu
 
 The fast gate runs formatting, Gleam check, build with warnings as errors, 128 observable tests, `erlc -Werror` over handwritten production/test FFI, and dependency/public-import/Dynamic boundary checks. The full gate repeats that suite on stdlib1.0.5 after resolving an independent public consumer against the actual package bounds.
 
-| Area | Executed observations |
-| --- | --- |
-| Ordinary HTTP | Real binary 201; arbitrary methods; non-2xx final status; informational head; empty 204; duplicate headers and trailers; host-only URL; invalid method/query; partial-byte rejection; configured H1/H2 header counts above Gun’s default |
-| Lifecycle | Scoped normal/exception cleanup; shared copied cursor; wrong-owner/conflicting read; local wait versus overall deadline; normal/abnormal owner death; batch owner loss; shutdown; bounded collection |
-| Pool | H1 reuse; eligible other-origin progress past a 500-caller backlog; FIFO after head/middle/tail caller death; waiting cap; queued deadlines with NotSubmitted and restored capacity; eligible-origin rotation under shared body capacity; idle eviction; standard supervisor child; warmed 500/1,000-caller work scaling |
-| TLS/H2 | Verified H1 TLS; unknown-CA and hostname rejection; ALPN H2 and required-H2 fallback refusal; same-connection multiplexing; local cancellation/reset preserving siblings and resuming queued streams; demand/window resumption; zero peer capacity; GOAWAY with an active sibling completing, then an explicit fresh request |
-| Batch | Binary requests, input-associated ordered results, independent failures, bounded workers, public batch scaling through 10,000 inputs, 1,000-request mixed-stream load |
-| Playback | Binary versioned codec; 65 generated exchanges containing all 256 byte values; ordered distinct repeated replies; queued cross-origin session order; mismatch without consumption; missing/corrupt/incompatible/exhausted fixtures; no network fallback; meaningful headers and credential exclusions; exact disk-read limits |
-| Request controls | Expired monotonic deadline, client ceiling, queued/pre-header/body cancellation, shared connecting reservation cleanup, scope/creator death, completed-HTTP preservation, H2 sibling survival, controls in live/record/playback |
-| Diagnostics | Typed limit kind and observed size; real refusal/certificate/file failures; safe formatter; exhaustive typed error codec roundtrip; single strict schema; obsolete layout/missing size/unknown marker rejection; negative budget refusal before IO |
-| Recording | Bounded finish wait, sealing, timeout without draining, waiter contention/death, abort; actual live roundtrip; prefix plus cancellation/failure; pre-header failure; concurrent recording/replay; writer backpressure; finite budget; Busy/finalized/refused states; explicit replacement; real EISDIR/FIFO persistence faults; interrupted capture never publishes; owner-only temporary permissions |
+| Area             | Executed observations                                                                                                                                                                                                                                                                                                                                                                                 |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Ordinary HTTP    | Real binary 201; arbitrary methods; non-2xx final status; informational head; empty 204; duplicate headers and trailers; host-only URL; invalid method/query; partial-byte rejection; configured H1/H2 header counts above Gun’s default                                                                                                                                                              |
+| Lifecycle        | Scoped normal/exception cleanup; shared copied cursor; wrong-owner/conflicting read; local wait versus overall deadline; normal/abnormal owner death; batch owner loss; shutdown; bounded collection                                                                                                                                                                                                  |
+| Pool             | H1 reuse; eligible other-origin progress past a 500-caller backlog; FIFO after head/middle/tail caller death; waiting cap; queued deadlines with NotSubmitted and restored capacity; eligible-origin rotation under shared body capacity; idle eviction; standard supervisor child; warmed 500/1,000-caller work scaling                                                                              |
+| TLS/H2           | Verified H1 TLS; unknown-CA and hostname rejection; ALPN H2 and required-H2 fallback refusal; same-connection multiplexing; local cancellation/reset preserving siblings and resuming queued streams; demand/window resumption; zero peer capacity; GOAWAY with an active sibling completing, then an explicit fresh request                                                                          |
+| Batch            | Binary requests, input-associated ordered results, independent failures, bounded workers, public batch scaling through 10,000 inputs, 1,000-request mixed-stream load                                                                                                                                                                                                                                 |
+| Playback         | Binary versioned codec; 65 generated exchanges containing all 256 byte values; ordered distinct repeated replies; queued cross-origin session order; mismatch without consumption; missing/corrupt/incompatible/exhausted fixtures; no network fallback; meaningful headers and credential exclusions; exact disk-read limits                                                                         |
+| Request controls | Expired monotonic deadline, client ceiling, queued/pre-header/body cancellation, shared connecting reservation cleanup, scope/creator death, completed-HTTP preservation, H2 sibling survival, controls in live/record/playback                                                                                                                                                                       |
+| Diagnostics      | Typed limit kind and observed size; real refusal/certificate/file failures; safe formatter; exhaustive typed error codec roundtrip; single strict schema; obsolete layout/missing size/unknown marker rejection; negative budget refusal before IO                                                                                                                                                    |
+| Recording        | Bounded finish wait, sealing, timeout without draining, waiter contention/death, abort; actual live roundtrip; prefix plus cancellation/failure; pre-header failure; concurrent recording/replay; writer backpressure; finite budget; Busy/finalized/refused states; explicit replacement; real EISDIR/FIFO persistence faults; interrupted capture never publishes; owner-only temporary permissions |
 
 The full gate additionally builds a separate package using public imports only. One consumer performs buffered, scoped and batch calls unchanged across live, record and playback clients. Six negative compilations must fail: constructing Client, Body, Recording, Deadline or Token, and passing a String body to `send`. The compiler does not prohibit all internal-module imports; public-import use is checked separately, and no stronger opacity claim is made.
 
@@ -228,11 +228,11 @@ This cleanup rejects obsolete fixture error layouts and removes their decoder/Ot
 
 Waves13–16 passed the then-current85-test fast gate and all six full gates on ARM64 Darwin/Linux with OTP29/28/27. [Receipt](evidence/wave16/receipt.json) records outcomes, runtime versions and artifact hashes; [frozen inputs](evidence/wave16/final-inputs.json) identify the captured wave16 source, before cleanup. [Direct fast/consumer/docs log](evidence/wave16/final-fast-consumers-docs.log) includes generated public documentation. All runtimes pass both consumers, six expected type rejections,1196 provider split points, three batch trials through10000 requests, seven independent-server scenarios,256 byte-exact recorded/replayed exchanges/8MiB and eleven load scenarios.
 
-| Runtime | Darwin ARM64 | Linux ARM64 |
-| --- | --- | --- |
-| OTP29 / ERTS17.1 | [full PASS](evidence/wave16/darwin/default.log) | [full PASS](evidence/wave16/linux/default.log) |
-| OTP28 / ERTS16.4.0.6 | [full PASS](evidence/wave16/darwin/otp28.log) | [full PASS](evidence/wave16/linux/otp28.log) |
-| OTP27 / ERTS15.2.7.13 | [full PASS](evidence/wave16/darwin/otp27.log) | [full PASS](evidence/wave16/linux/otp27.log) |
+| Runtime               | Darwin ARM64                                    | Linux ARM64                                    |
+| --------------------- | ----------------------------------------------- | ---------------------------------------------- |
+| OTP29 / ERTS17.1      | [full PASS](evidence/wave16/darwin/default.log) | [full PASS](evidence/wave16/linux/default.log) |
+| OTP28 / ERTS16.4.0.6  | [full PASS](evidence/wave16/darwin/otp28.log)   | [full PASS](evidence/wave16/linux/otp28.log)   |
+| OTP27 / ERTS15.2.7.13 | [full PASS](evidence/wave16/darwin/otp27.log)   | [full PASS](evidence/wave16/linux/otp27.log)   |
 
 The host uses the pinned Gleam1.18.1/Nix runtime. Linux runs the pinned official Nix ARM64 image with4 CPUs,4GiB and `+S4:4`, using a read-only source archive and private build copies. Host and container qualification overlap, so elapsed figures are local observations, not an isolated before/after comparison. Full per-runtime batch, load, recording and nghttpd metrics are adjacent to each log; they include sockets, sampled VM memory/mailboxes and latency. No new Dream comparison or60-second soak is claimed.
 
@@ -247,13 +247,13 @@ The final full gates pass on **Darwin ARM64 and Linux ARM64**, each on OTP 29/ER
 The independent-server1000-caller measurements below use one connection, peer concurrency 8, client active 128/waiting 1024, 60-second deadlines and 256-byte responses. Latencies include scheduling from caller arrival. These are individual qualification runs, not comparable platform benchmarks: Linux is a four-CPU/four-GiB Docker container with four Erlang schedulers; Darwin uses the host's 12 logical CPUs. The sampler includes all BEAM processes but excludes the independent C server. Verbose server logging is enabled. Fast samples can miss short-lived peaks.
 
 | Platform / OTP | Elapsed ms | Request p95 ms | Peak VM bytes | Largest sampled mailbox |
-| --- | ---: | ---: | ---: | ---: |
-| Darwin 29 | 82.914 | 76.089 | 65703538 | 138 |
-| Darwin 28 | 82.422 | 75.013 | 70238209 | 109 |
-| Darwin 27 | 87.378 | 80.194 | 71648375 | 205 |
-| Linux 29 | 255.245 | 247.184 | 61413105 | 63 |
-| Linux 28 | 268.167 | 259.932 | 62062729 | 132 |
-| Linux 27 | 267.553 | 263.117 | 67183743 | 10 |
+| -------------- | ---------: | -------------: | ------------: | ----------------------: |
+| Darwin 29      |     82.914 |         76.089 |      65703538 |                     138 |
+| Darwin 28      |     82.422 |         75.013 |      70238209 |                     109 |
+| Darwin 27      |     87.378 |         80.194 |      71648375 |                     205 |
+| Linux 29       |    255.245 |        247.184 |      61413105 |                      63 |
+| Linux 28       |    268.167 |        259.932 |      62062729 |                     132 |
+| Linux 27       |    267.553 |        263.117 |      67183743 |                      10 |
 
 Each server receipt observes one request connection and two stream resets. The mixed-scenario percentile field is labeled `local_cancel_to_empty_snapshot`; it is a single cancellation measurement, not a request latency distribution. Unmeasured new percentile fields are null. The earlier pilot/soak files use zero for unmeasured percentiles; those zeros are not measured zero latency.
 
@@ -265,11 +265,11 @@ Reproduce Linux with `sh dev/linux-gate` using an available Docker engine. It us
 
 The final wave9 source passed the direct fast gate and all three isolated full gates on 2026-09-30. Each full gate passed **57 tests**, both separate consumer packages, four expected type rejections and all eleven load scenarios. The source and executable gate inputs were unchanged throughout these runs: [frozen inputs](evidence/wave9/inputs-before-gate.json), [receipt](evidence/wave9/receipt.json), [fast log](evidence/wave9/fast.log).
 
-| Runtime | Result | Receipt |
-| --- | --- | --- |
-| OTP 29 / ERTS 17.1 | full PASS | [log](evidence/wave9/default-full.log), [measurements](evidence/wave9/default-load.jsonl) |
-| OTP 28 / ERTS 16.4.0.6 | full PASS | [log](evidence/wave9/otp28-full.log), [measurements](evidence/wave9/otp28-load.jsonl) |
-| OTP 27 / ERTS 15.2.7.13 | full PASS | [log](evidence/wave9/otp27-full.log), [measurements](evidence/wave9/otp27-load.jsonl) |
+| Runtime                 | Result    | Receipt                                                                                   |
+| ----------------------- | --------- | ----------------------------------------------------------------------------------------- |
+| OTP 29 / ERTS 17.1      | full PASS | [log](evidence/wave9/default-full.log), [measurements](evidence/wave9/default-load.jsonl) |
+| OTP 28 / ERTS 16.4.0.6  | full PASS | [log](evidence/wave9/otp28-full.log), [measurements](evidence/wave9/otp28-load.jsonl)     |
+| OTP 27 / ERTS 15.2.7.13 | full PASS | [log](evidence/wave9/otp27-full.log), [measurements](evidence/wave9/otp27-load.jsonl)     |
 
 Seven new public scenarios cover burst work, queue removal/capacity, blocked-origin progress, queued deadlines, origin fairness, playback order and H2 resumption. The work-scaling test failed on the old pool; the controlled fairness test failed without origin rotation. Final gates include all prior recording, persistence, lifecycle and transport scenarios. Only the Gleam pool and its new typed queue change production code; dependencies and the 72-line FFI remain unchanged.
 
@@ -279,10 +279,10 @@ The separate comparison checked all 15 HTTP Gun and 16 Dream public observations
 
 The authorized follow-up passed on 2026-09-29 America/Sao_Paulo, with the same pinned Gleam/runtime matrix. The direct fast gate passed 50 tests. Each full matrix run passed 50 tests, two separate consumer packages, four expected type rejections and 11 load scenarios. Executable inputs were checked unchanged during the matrix. Exact timestamp and source hashes: [receipt](evidence/wave7/receipt.json), [inputs](evidence/wave7/inputs-sha256.json).
 
-| Runtime | Result | Receipt |
-| --- | --- | --- |
-| OTP 29 / ERTS 17.1 | full PASS | [log](evidence/wave7/otp29-full.log), [measurements](evidence/wave7/otp29-load.jsonl) |
-| OTP 28 / ERTS 16.4.0.6 | full PASS | [log](evidence/wave7/otp28-full.log), [measurements](evidence/wave7/otp28-load.jsonl) |
+| Runtime                 | Result    | Receipt                                                                               |
+| ----------------------- | --------- | ------------------------------------------------------------------------------------- |
+| OTP 29 / ERTS 17.1      | full PASS | [log](evidence/wave7/otp29-full.log), [measurements](evidence/wave7/otp29-load.jsonl) |
+| OTP 28 / ERTS 16.4.0.6  | full PASS | [log](evidence/wave7/otp28-full.log), [measurements](evidence/wave7/otp28-load.jsonl) |
 | OTP 27 / ERTS 15.2.7.13 | full PASS | [log](evidence/wave7/otp27-full.log), [measurements](evidence/wave7/otp27-load.jsonl) |
 
 The filesystem refactor preserved the 48-test baseline, including actual write/stall faults, destination replacement/refusal and exact file-read bounds. Separate H1 and negotiated-H2 tests failed before correcting the supported header-count setting, then passed: [H1 red](evidence/wave7/h1-red.log), [H2 red](evidence/wave7/h2-red.log), [final fast gate](evidence/wave7/fast.log). All three runtimes retained same-connection H2 multiplexing and healthy sibling cancellation.
@@ -293,11 +293,11 @@ The wave7 OTP 29 run completed 1,000 H1 requests on 4 connections in 712.78 ms a
 
 The original six-wave full matrix passed on 2026-09-29 America/Sao_Paulo (receipt completed 2026-09-30T00:08:41Z), on Darwin 25.5.0 arm64. Each runtime used Gleam 1.18.1 and passed the then-current gate: 47 tests, two external consumers, four expected compiler rejections and eleven load scenarios.
 
-| Runtime | ERTS | Result | Receipt |
-| --- | --- | --- | --- |
-| OTP 29 | 17.1 | full PASS | [log](evidence/otp29-full.log), [measurements](evidence/otp29-load.jsonl) |
-| OTP 28 | 16.4.0.6 | full PASS | [log](evidence/otp28-full.log), [measurements](evidence/otp28-load.jsonl) |
-| OTP 27 | 15.2.7.13 | full PASS | [log](evidence/otp27-full.log), [measurements](evidence/otp27-load.jsonl) |
+| Runtime | ERTS      | Result    | Receipt                                                                   |
+| ------- | --------- | --------- | ------------------------------------------------------------------------- |
+| OTP 29  | 17.1      | full PASS | [log](evidence/otp29-full.log), [measurements](evidence/otp29-load.jsonl) |
+| OTP 28  | 16.4.0.6  | full PASS | [log](evidence/otp28-full.log), [measurements](evidence/otp28-load.jsonl) |
+| OTP 27  | 15.2.7.13 | full PASS | [log](evidence/otp27-full.log), [measurements](evidence/otp27-load.jsonl) |
 
 The final fast gate also passed directly in the owned checkout. The unknown-CA and hostname-mismatch TLS notices are expected negative-test output. OTP 29 emits deprecated-catch warnings in the released gleam_stdlib and isolated historical LLM dependencies; HTTP Gun's own Gleam build and handwritten Erlang warning gates pass. Dependencies were not modified to hide warnings. CI is configured to repeat the full gate on Linux; remote CI has not been executed or claimed.
 
@@ -305,29 +305,29 @@ The final fast gate also passed directly in the owned checkout. The unknown-CA a
 
 Original six-wave OTP 29 run; time and latency below are milliseconds, memory is sampled whole-VM MiB. See the methodology above before interpreting these numbers.
 
-| Scenario | Requests | Elapsed ms | p50 / p95 / p99 ms | Connections | VM MiB | Mailbox total / one |
-| --- | ---: | ---: | --- | ---: | ---: | --- |
-| h1-concurrent | 1 | 43.30 | 43.23 / 43.23 / 43.23 | 1 | 51.18 | 1 / 1 |
-| h2-concurrent | 1 | 50.39 | 50.34 / 50.34 / 50.34 | 1 | 55.24 | 1 / 1 |
-| h1-concurrent | 10 | 1.98 | 1.59 / 1.80 / 1.80 | 3 | 55.38 | 1 / 1 |
-| h2-concurrent | 10 | 3.77 | 3.57 / 3.65 / 3.65 | 1 | 55.55 | 0 / 0 |
-| h1-concurrent | 100 | 10.35 | 7.39 / 9.96 / 10.07 | 4 | 56.72 | 47 / 47 |
-| h2-concurrent | 100 | 9.08 | 7.50 / 8.73 / 8.80 | 1 | 57.16 | 43 / 43 |
-| h1-concurrent | 1000 | 702.24 | 522.27 / 696.35 / 698.97 | 4 | 68.63 | 642 / 642 |
-| h2-concurrent | 1000 | 662.02 | 448.16 / 655.49 / 658.75 | 1 | 70.49 | 633 / 633 |
-| large-stream | 1 | 201.22 | — | 1 | 59.31 | 2 / 1 |
-| large-slow-reader | 1 | 7341.65 | — | 1 | 59.10 | 2 / 1 |
-| h2-slow-stream-plus-batch | 1000 | 134.05 | — | 1 | 72.93 | 123 / 123 |
+| Scenario                  | Requests | Elapsed ms | p50 / p95 / p99 ms       | Connections | VM MiB | Mailbox total / one |
+| ------------------------- | -------: | ---------: | ------------------------ | ----------: | -----: | ------------------- |
+| h1-concurrent             |        1 |      43.30 | 43.23 / 43.23 / 43.23    |           1 |  51.18 | 1 / 1               |
+| h2-concurrent             |        1 |      50.39 | 50.34 / 50.34 / 50.34    |           1 |  55.24 | 1 / 1               |
+| h1-concurrent             |       10 |       1.98 | 1.59 / 1.80 / 1.80       |           3 |  55.38 | 1 / 1               |
+| h2-concurrent             |       10 |       3.77 | 3.57 / 3.65 / 3.65       |           1 |  55.55 | 0 / 0               |
+| h1-concurrent             |      100 |      10.35 | 7.39 / 9.96 / 10.07      |           4 |  56.72 | 47 / 47             |
+| h2-concurrent             |      100 |       9.08 | 7.50 / 8.73 / 8.80       |           1 |  57.16 | 43 / 43             |
+| h1-concurrent             |     1000 |     702.24 | 522.27 / 696.35 / 698.97 |           4 |  68.63 | 642 / 642           |
+| h2-concurrent             |     1000 |     662.02 | 448.16 / 655.49 / 658.75 |           1 |  70.49 | 633 / 633           |
+| large-stream              |        1 |     201.22 | —                        |           1 |  59.31 | 2 / 1               |
+| large-slow-reader         |        1 |    7341.65 | —                        |           1 |  59.10 | 2 / 1               |
+| h2-slow-stream-plus-batch |     1000 |     134.05 | —                        |           1 |  72.93 | 123 / 123           |
 
 All requested exchanges/bytes completed without retries. Both large-stream rows represent 32 MiB. H2 cancellation preserved the slow stream's healthy fast siblings on the same connection. The mixed scenario used batch concurrency 64; the 1,000 independent-call scenarios deliberately included 1,000 caller processes, while HTTP Gun admission remained finite. Exact process/port peaks and all runtime results are in the JSONL receipts.
 
 ## Handwritten production FFI
 
-| File | Physical lines | Bytes | Responsibilities |
-| --- | ---: | ---: | --- |
-| `src/http_gun_ffi.erl` | 113 | 5,469 | Native IP parsing/lookup and tuple conversion; Gun application/open/request/flow/cancel/close and advisory info calls, TLS trust/identity and finite send options, event/cause conversion, clock and exception-safe cleanup |
-| `src/http_gun_file_ffi.erl` | 8 | 431 | Unique temporary-directory candidate name and empty-directory removal |
-| Total | 121 | 5,900 | Sixteen external bindings; no pool, body, batch or cassette server |
+| File                        | Physical lines | Bytes | Responsibilities                                                                                                                                                                                                            |
+| --------------------------- | -------------: | ----: | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/http_gun_ffi.erl`      |            113 | 5,469 | Native IP parsing/lookup and tuple conversion; Gun application/open/request/flow/cancel/close and advisory info calls, TLS trust/identity and finite send options, event/cause conversion, clock and exception-safe cleanup |
+| `src/http_gun_file_ffi.erl` |              8 |   431 | Unique temporary-directory candidate name and empty-directory removal                                                                                                                                                       |
+| Total                       |            121 | 5,900 | Sixteen external bindings; no pool, body, batch or cassette server                                                                                                                                                          |
 
 These are the wave31 counts. Wave28 had113 lines/5585 bytes/15 bindings. This follow-up adds one small exception-safe `gun:info/1` binding, one cacerts option variant and one structured error mapping. All preparation workers and admission decisions remain in Gleam. file_streams and simplifile supply ordinary filesystem IO; their released code is a dependency, not counted as handwritten HTTP Gun FFI. Counts include blank/comment lines. Test-only loopback servers and instrumentation are excluded from production FFI. Gleam owns admission policy, states, deadlines, demand, monitoring, batch scheduling, matching, JSON codec, recorder coordination and finalization ordering. Internal typed bridge declarations live in Gleam; raw Dynamic is confined to event/JSON boundaries.
 

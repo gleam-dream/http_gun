@@ -11,36 +11,12 @@
   "runtime": "Darwin ARM64 / OTP29 ERTS17.1 / Gleam1.18.1",
   "results": {
     "ring_capacity": 64,
-    "requests": [
-      1,
-      100,
-      10000
-    ],
-    "ring_mailboxes": [
-      6,
-      600,
-      60000
-    ],
-    "ring_retained": [
-      6,
-      64,
-      64
-    ],
-    "slot_rows": [
-      1,
-      64,
-      64
-    ],
-    "slot_mailboxes": [
-      0,
-      0,
-      0
-    ],
-    "slot_ets_bytes": [
-      2840,
-      24512,
-      24512
-    ],
+    "requests": [1, 100, 10000],
+    "ring_mailboxes": [6, 600, 60000],
+    "ring_retained": [6, 64, 64],
+    "slot_rows": [1, 64, 64],
+    "slot_mailboxes": [0, 0, 0],
+    "slot_ets_bytes": [2840, 24512, 24512],
     "synchronized_contenders": 64,
     "cas_commits": 1,
     "cas_losses": 63

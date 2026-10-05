@@ -67,15 +67,15 @@ No sibling package (`llm_wire`, `warden`, `fabric`, `relay`, `grind`, `saga`,
 `telemetry.Id` in `src`, `test`, `integrations` or `consumers`. The apps under
 `oversight/apps` are affected:
 
-| App | Call sites |
-| --- | --- |
-| checkout | `src/checkout/app.gleam:124` (`with_correlation`); `src/checkout/telemetry.gleam:40,56,63,100,144` (`Id`, `new_id`, order-to-id table); module docs `telemetry.gleam:7-8`, `gateway.gleam:4` |
-| extractor | `src/extractor/jobs.gleam:98,99` (`with_correlation`); `src/extractor/telemetry.gleam:41,48,57,150,151,185,214` (`Id`, `new_id`, id-to-document table) |
-| research_agent | `src/research_agent/remote.gleam:38,40` (`new_id`, `with_correlation`); `src/research_agent/telemetry.gleam:12,42,58,65,76,95,296,344` (`Id`, id-to-research table, `m.correlation`) |
-| sso_portal | `src/sso_portal/web.gleam:225` (`with_correlation`); `src/sso_portal/telemetry.gleam:32,38,54,55,63,64,112,147-149` (`Id`, `new_id`, pid-to-id links) |
-| support_desk | `src/support_desk/desk.gleam:47,139,190` (`Id`, `new_id`, `with_correlation`); `src/support_desk/telemetry.gleam:14,75,76,81,106,292,299` (`Id`, id-to-ticket table, `m.correlation`) |
-| tool_hub | `src/tool_hub/assistant.gleam:44,97,101,123` (`Id`, `with_correlation`, `new_id`); `src/tool_hub/telemetry.gleam:6,30,57,62,144` (`Id`, run-to-id links); `test/tool_hub_test.gleam:428` (`new_id`) |
-| webhooks | `src/webhooks/delivery.gleam:44,117,121` (`Id`, `new_id`, `with_correlation`); `src/webhooks/telemetry.gleam:113,129,138,178,284,304` (`Id`, id-to-delivery table, `m.correlation`) |
+| App            | Call sites                                                                                                                                                                                          |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| checkout       | `src/checkout/app.gleam:124` (`with_correlation`); `src/checkout/telemetry.gleam:40,56,63,100,144` (`Id`, `new_id`, order-to-id table); module docs `telemetry.gleam:7-8`, `gateway.gleam:4`        |
+| extractor      | `src/extractor/jobs.gleam:98,99` (`with_correlation`); `src/extractor/telemetry.gleam:41,48,57,150,151,185,214` (`Id`, `new_id`, id-to-document table)                                              |
+| research_agent | `src/research_agent/remote.gleam:38,40` (`new_id`, `with_correlation`); `src/research_agent/telemetry.gleam:12,42,58,65,76,95,296,344` (`Id`, id-to-research table, `m.correlation`)                |
+| sso_portal     | `src/sso_portal/web.gleam:225` (`with_correlation`); `src/sso_portal/telemetry.gleam:32,38,54,55,63,64,112,147-149` (`Id`, `new_id`, pid-to-id links)                                               |
+| support_desk   | `src/support_desk/desk.gleam:47,139,190` (`Id`, `new_id`, `with_correlation`); `src/support_desk/telemetry.gleam:14,75,76,81,106,292,299` (`Id`, id-to-ticket table, `m.correlation`)               |
+| tool_hub       | `src/tool_hub/assistant.gleam:44,97,101,123` (`Id`, `with_correlation`, `new_id`); `src/tool_hub/telemetry.gleam:6,30,57,62,144` (`Id`, run-to-id links); `test/tool_hub_test.gleam:428` (`new_id`) |
+| webhooks       | `src/webhooks/delivery.gleam:44,117,121` (`Id`, `new_id`, `with_correlation`); `src/webhooks/telemetry.gleam:113,129,138,178,284,304` (`Id`, id-to-delivery table, `m.correlation`)                 |
 
 Each app can drop its HTTP Gun join table and pass the `Correlation` it
 already uses for the unit of work (order, document, research, request,

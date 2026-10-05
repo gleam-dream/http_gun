@@ -63,7 +63,6 @@ E4 representation: observed sizes are required Int values measured at enforcemen
 
 Pre-release cleanup (2026-09-30): the owner explicitly accepts breaking changes and confirms no external consumers or released versions. Earlier experimental fixtures may be regenerated. Retain the format marker to detect incompatible data, without introducing a package release or parallel codec. Tests and examples evolve with the API; update them in the same wave.
 
-
 ## Accepted adoption improvements (2026-09-30)
 
 A1 Current adoption: LLM Wire at1c0ad614 is a migrated downstream consumer of HTTP Gun at ebf2b479. Revalidate explicitly against selected working copies in an isolated closure, recording revisions and source hashes and checking originals unchanged. Normal package gates remain independent of sibling checkouts. Archived examples do not prove current downstream compatibility.
@@ -83,7 +82,6 @@ Observation is opt-in. HTTP Gun uses an explicitly supplied forwarder and direct
 The pool remains authoritative for admission; the request/body owner remains authoritative for local Gun-call return, accepted final response headers and HTTP termination. Observations are best effort and unsuitable for correctness or retry decisions. Gun-call return establishes only return from a local asynchronous API, not transport processing, bytes written or remote receipt. Script/playback observations must identify their simulated execution and never claim network submission. Recording persistence remains separate.
 
 Implemented through `config.observations`, `telemetry.event()` and a pure correlated Client view. Request options, HTTP failures and cassette schema are unchanged. The generic Sinal correction gives each actor incarnation its own direct destination, admission slots and drop-notice flag. No HTTP-specific server is added to Sinal. Dependency source and gate isolation are described in [OBSERVATIONS.md](OBSERVATIONS.md); exact qualification is in the current wave tracker.
-
 
 ## Destination policy and resolution ownership (2026-10-01)
 
@@ -112,7 +110,6 @@ Gun/Cowlib own wire framing. The owner accepted the experimentally verified
 reason-phrase exception because Gun discards that text. See BOUNDS.md for exact
 enforcement points and close-delimited TLS ambiguity. Warden remains read-only
 behavioral evidence; adoption/release is a separate downstream decision.
-
 
 ## Warden feedback corrections (2026-10-01)
 

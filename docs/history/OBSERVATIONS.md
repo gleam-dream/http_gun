@@ -32,11 +32,11 @@ Attach with `sinal.observe(telemetry.event(), handler)`; Sinal assigns the handl
 
 Every event's metadata carries two identities with different owners:
 
-| Key | Gleam field | Owner | Meaning |
-| --- | --- | --- | --- |
-| `correlation` | `Option(sinal/correlation.Correlation)` | Caller | The unit of work, shared with every other gleam-dream package. Written by `correlation.field()`: a UTF-8 binary of 1 to 128 bytes, and the key is omitted when the client view carries none. |
-| `request_id` | `telemetry.RequestId` | HTTP Gun | One observed invocation. All milestones of that invocation share it; invocations that reuse a correlation get distinct values. |
-| `client` | `Option(String)` | Client owner | The label set with `config.with_label`. The key is omitted for an unlabelled client. |
+| Key           | Gleam field                             | Owner        | Meaning                                                                                                                                                                                      |
+| ------------- | --------------------------------------- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `correlation` | `Option(sinal/correlation.Correlation)` | Caller       | The unit of work, shared with every other gleam-dream package. Written by `correlation.field()`: a UTF-8 binary of 1 to 128 bytes, and the key is omitted when the client view carries none. |
+| `request_id`  | `telemetry.RequestId`                   | HTTP Gun     | One observed invocation. All milestones of that invocation share it; invocations that reuse a correlation get distinct values.                                                               |
+| `client`      | `Option(String)`                        | Client owner | The label set with `config.with_label`. The key is omitted for an unlabelled client.                                                                                                         |
 
 `http_gun.with_correlation(client, correlation)` is the only way to set the correlation. Pass the value the rest of the unit of work already uses: an order id or job id through `correlation.from_string`, a value received from an upstream package, or a fresh `correlation.unique()`. A handler then joins HTTP events with other packages' events by `metadata.correlation`, without a lookup table; an Erlang or Elixir handler reads the same `correlation` key. A correlation identifies one unit of work, so never use it as a metric tag.
 
@@ -71,14 +71,14 @@ Applications see their own HTTP without setup: an unlabelled client still emits 
 
 ## Exact milestones
 
-| Milestone | Producer | Established fact |
-| --- | --- | --- |
-| `AdmissionEntered` | Pool | The pool received a validated invocation, before capture reservation/admission. Calls rejected before this point may have no events. |
-| `AdmissionWaiting` | Pool | This invocation entered the finite pending queue, awaiting capacity or connection establishment. Emitted once, not on every recheck. |
-| `AdmissionGranted` | Pool | An eligible live connection/stream was selected, or an offline exchange matched. It precedes body-owner startup and can therefore be followed by startup failure. |
-| `GunCallReturned` | Body owner | The supported asynchronous Gun request call returned. This does **not** prove Gun processed the message, a socket write succeeded, the server received anything or an application effect happened. |
-| `ResponseHeaders(status)` | Body owner | Final headers passed HTTP Gun's admission checks. Non-2xx statuses remain ordinary responses. |
-| `HttpTerminated(outcome)` | Pool before handoff; body owner afterward | HTTP settled as Complete, LocallyCancelled, DeadlineExpired or Failed. Complete means HTTP EOF, not that the caller consumed or accepted the buffered data. |
+| Milestone                 | Producer                                  | Established fact                                                                                                                                                                                   |
+| ------------------------- | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `AdmissionEntered`        | Pool                                      | The pool received a validated invocation, before capture reservation/admission. Calls rejected before this point may have no events.                                                               |
+| `AdmissionWaiting`        | Pool                                      | This invocation entered the finite pending queue, awaiting capacity or connection establishment. Emitted once, not on every recheck.                                                               |
+| `AdmissionGranted`        | Pool                                      | An eligible live connection/stream was selected, or an offline exchange matched. It precedes body-owner startup and can therefore be followed by startup failure.                                  |
+| `GunCallReturned`         | Body owner                                | The supported asynchronous Gun request call returned. This does **not** prove Gun processed the message, a socket write succeeded, the server received anything or an application effect happened. |
+| `ResponseHeaders(status)` | Body owner                                | Final headers passed HTTP Gun's admission checks. Non-2xx statuses remain ordinary responses.                                                                                                      |
+| `HttpTerminated(outcome)` | Pool before handoff; body owner afterward | HTTP settled as Complete, LocallyCancelled, DeadlineExpired or Failed. Complete means HTTP EOF, not that the caller consumed or accepted the buffered data.                                        |
 
 All timestamps use monotonic VM-local milliseconds taken at emission. Same-producer delivery is FIFO; different producers can arrive out of lifecycle order. Compare source timestamps and milestone meaning, never arrival order. Millisecond ties are valid. Missing timestamps cannot support a duration measurement. Entered-to-granted includes capture reservation, queuing and connection work; it is not a pure socket-connect measurement. A request with no capacity wait need not emit AdmissionWaiting.
 
