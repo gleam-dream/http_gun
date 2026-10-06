@@ -9,6 +9,7 @@ import http_gun
 import http_gun/body
 import http_gun/cancellation
 import http_gun/config
+import http_gun/deadline
 import http_gun/error
 
 @external(erlang, "http_gun_h2_server", "start")
@@ -150,24 +151,44 @@ pub fn goaway_drains_then_explicit_request_opens_fresh_connection_test() {
   let assert Ok(client) = http_gun.start(settings())
   let assert Ok(first) = http_gun.send(client, req(port, "/goaway"))
   first.response.body |> should.equal(<<"done":utf8>>)
-  await_no_connections(client, 1000) |> should.be_true
+  case await_no_connections(client, 1000) {
+    True -> Nil
+    False ->
+      panic as "GOAWAY test did not observe connection shutdown before its deadline"
+  }
   let assert Ok(fresh) = http_gun.send(client, req(port, "/fast"))
-  {
+  let reused =
     response_header(first.response.headers, "x-connection")
     == response_header(fresh.response.headers, "x-connection")
+  case reused {
+    False -> Nil
+    True ->
+      panic as "GOAWAY test reused the draining connection for a fresh request"
   }
-  |> should.be_false
   http_gun.stop(client)
 }
 
-fn await_no_connections(client: http_gun.Client, tries: Int) -> Bool {
-  case tries {
-    0 -> False
-    _ -> {
-      let assert Ok(stats) = http_gun.stats(client)
-      case stats.connections == 0 {
-        True -> True
-        False -> await_no_connections(client, tries - 1)
+fn await_no_connections(client: http_gun.Client, wait_ms: Int) -> Bool {
+  await_no_connections_until(
+    client,
+    deadline.after(duration.milliseconds(wait_ms)),
+  )
+}
+
+fn await_no_connections_until(
+  client: http_gun.Client,
+  budget: deadline.Deadline,
+) -> Bool {
+  let assert Ok(stats) = http_gun.stats(client)
+  case stats.connections == 0 {
+    True -> True
+    False -> {
+      case duration.to_milliseconds(deadline.remaining(budget)) <= 0 {
+        True -> False
+        False -> {
+          process.sleep(1)
+          await_no_connections_until(client, budget)
+        }
       }
     }
   }
@@ -254,13 +275,20 @@ pub fn goaway_allows_existing_sibling_to_finish_without_replay_test() {
   rest.bytes |> should.equal(<<"tail":utf8>>)
   body.close(slow.body)
   // Gun does not expose atomic GOAWAY admission; await observed shutdown.
-  await_no_connections(client, 1000) |> should.be_true
+  case await_no_connections(client, 1000) {
+    True -> Nil
+    False ->
+      panic as "GOAWAY sibling test did not observe connection shutdown before its deadline"
+  }
   let assert Ok(fresh) = http_gun.send(client, req(port, "/fast"))
-  {
+  let fresh_connection =
     response_header(fresh.response.headers, "x-connection")
     != response_header(slow.headers, "x-connection")
+  case fresh_connection {
+    True -> Nil
+    False ->
+      panic as "GOAWAY sibling test reused the draining connection for a fresh request"
   }
-  |> should.be_true
   http_gun.stop(client)
 }
 
