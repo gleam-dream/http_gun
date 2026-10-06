@@ -41,7 +41,8 @@ open(Address, ServerName, Port, Tls, Protocol, Trust, Timeout, SendTimeout, Head
             {true, prefer_http2} -> [http2, http];
             _ -> [http]
         end,
-        Base = #{retry => 0, protocols => Protocols, connect_timeout => Timeout,
+        Base = #{event_handler => {http_gun_event_h, self()},
+            retry => 0, protocols => Protocols, connect_timeout => Timeout,
             domain_lookup_timeout => Timeout, tls_handshake_timeout => Timeout,
             tcp_opts => [{send_timeout, Send}, {send_timeout_close, true}],
             http_opts => #{flow => 1, max_headers => HeaderCount},

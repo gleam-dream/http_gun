@@ -48,6 +48,7 @@ sh dev/matrix
 
 ## Local fixtures and evidence
 
+- A native connection-refusal regression waits for Gun to exit before installing a second monitor. It proves that the monitor reports `noproc` while the preceding terminal event retains `ConnectionRefused`; ordinary public refusal, TLS/protocol failures and established close remain separate behavior tests.
 - Tests use local Erlang HTTP/H2/TLS servers and [test certificates](../test/fixtures/README.md). `dev/ip-fixture` generates the IP-SAN case. Loopback access is explicitly enabled by each local test client.
 - `dev/nghttpd.py` uses the development nghttpd package for real peer-capacity and trailer checks. Local interop owns no provider semantics or public Internet requirement.
 - `build/evidence` contains current runtime outputs. `docs/history/evidence` preserves raw source/hash/receipt/log inputs from earlier qualification, including Dream comparison, Sinal source selection and destination/Warden scenarios. These retained paths are evidence storage; they do not carry a competing design contract or current completion diary.

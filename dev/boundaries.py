@@ -59,6 +59,7 @@ for path in (root / "examples").rglob("*.gleam"):
     assert "import http_gun/internal/" not in path.read_text(), path
 assert {p.name for p in (root / "src").glob("*.erl")} == {
     "http_gun_ffi.erl",
+    "http_gun_event_h.erl",
     "http_gun_file_ffi.erl",
 }
 print(

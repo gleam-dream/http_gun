@@ -631,3 +631,12 @@ pub fn limit_fixture_requires_an_observed_size_test() {
   )
   |> should.equal(Error(cassette.UnsupportedVersion(3)))
 }
+
+@external(erlang, "http_gun_test_server", "late_monitor_refusal")
+fn late_monitor_refusal(port: Int) -> #(error.TransportCause, Bool)
+
+pub fn connection_refusal_survives_monitor_after_gun_exit_test() {
+  let #(cause, monitored_after_exit) = late_monitor_refusal(unused_port())
+  monitored_after_exit |> should.be_true
+  cause |> should.equal(error.ConnectionRefused)
+}

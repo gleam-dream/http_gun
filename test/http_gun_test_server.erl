@@ -1,6 +1,6 @@
 -module(http_gun_test_server).
 
--export([unused_port/0]).
+-export([unused_port/0, late_monitor_refusal/1]).
 -export([remove_fixture/1]).
 
 -export([start/0,
@@ -173,3 +173,19 @@ unused_port() ->
     {ok, {_, Port}} = inet:sockname(Socket),
     ok = gen_tcp:close(Socket),
     Port.
+
+%% Deliberately monitor only after Gun has exited. The first monitor merely
+%% waits for that precondition; the second proves the lost-reason noproc case.
+late_monitor_refusal(Port) ->
+    {ok, nil} = http_gun_ffi:start(),
+    {ok, Pid} = http_gun_ffi:open({ipv4,127,0,0,1}, none, Port, false,
+                                http1, system_trust, 1000, {send_within, 1000}, 100),
+    Ref = erlang:monitor(process, Pid),
+    receive {'DOWN', Ref, process, Pid, _} -> ok
+    after 2000 -> gun:close(Pid), erlang:error(startup_connection_did_not_exit) end,
+    LateRef = erlang:monitor(process, Pid),
+    LateReason = receive {'DOWN', LateRef, process, Pid, Reason} -> Reason
+    after 2000 -> erlang:error(late_monitor_did_not_complete) end,
+    Cause = receive {gun_error, Pid, TerminalReason} -> http_gun_ffi:cause(TerminalReason)
+    after 0 -> unknown_transport end,
+    {Cause, LateReason =:= noproc}.
