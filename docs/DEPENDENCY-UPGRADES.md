@@ -14,11 +14,11 @@
 | Settings-change notification and peer stream capacity                            | `decode/1`, `internal/pool.gleam`                | No H2 streams before initial SETTINGS; reduction blocks new admission            |
 | Test-only `cow_http2` and `cow_hpack` operations                                 | `test/http_gun_h2_server.erl`                    | Requalify the test server before claiming H2 behavior                            |
 
-- Run the package's full gate on the committed minimum and newest admitted patches through the isolated environment. CI uses `HTTP_GUN_DEPENDENCIES=latest` for patch selection. Keep selected manifests and native-source audit evidence reviewable.
+- Run the package's full gate on the committed minimum and newest admitted patches through the isolated environment. CI uses `HTTP_GUN_DEPENDENCIES=latest` for patch selection. The selected root Gun/Cowlib versions are imposed on disposable ordinary/async and stdlib consumer copies. The gate fails if a resolved consumer differs, and retains their manifests under `build/evidence/manifests`; keep native-source audit evidence reviewable.
 - Requalify ordinary/async public consumers and explicitly selected downstream checkouts when public contracts change. Follow [TESTING.md](TESTING.md). Avoid provider credentials and dependency patches.
 
 ## Runtime and filesystem libraries
 
-- Use the pinned Nix shell and runtime matrix. Gleam OTP/Erlang process APIs own native lifetime; public stdlib boundary checks qualify admitted versions.
+- Use the pinned Nix shell and runtime matrix. Gleam OTP/Erlang process APIs own native lifetime; public stdlib boundary checks compile a separate consumer and run the complete fast suite at the advertised lower bound (0.71.0) and selected current version. The disposable lower-bound package resolves a compatible Gleeunit within the existing dev-dependency range (0.71.0 selects Gleeunit 1.9.0); its test manifest is retained. Authored Erlang warning rejection remains separate from upstream diagnostics; stdlib 0.71.0 can emit OTP 29 deprecation diagnostics while the package-owned source still passes `erlc -Werror`.
 - file_streams must preserve explicit Raw reads without read-ahead, Exclusive writes and close error reporting. simplifile must preserve hard-link/rename publication and permission semantics. Do not substitute a check-before-create helper for exclusivity.
 - Any new durability promise requires a separate supported-platform contract. File sync alone is insufficient evidence of directory-entry persistence.

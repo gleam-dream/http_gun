@@ -1,34 +1,57 @@
 #!/bin/sh
 set -eu
 mode=${1:-fast}
-case "$mode" in fast|full) ;; *) echo 'Usage: dev/gate fast|full' >&2; exit 2;; esac
+case "$mode" in fast|full|soak) ;; *) echo 'Usage: dev/gate fast|full|soak' >&2; exit 2;; esac
 if [ "${HTTP_GUN_ISOLATED_GATE:-0}" != 1 ]; then
+  rm -rf build/evidence
+fi
+mkdir -p build/evidence/logs
+step() {
+  label=$1
+  shift
+  printf '%s\n' "$@" > "build/evidence/logs/$label.command"
+  if "$@" > "build/evidence/logs/$label.log" 2>&1; then
+    echo "$label passed"
+  else
+    code=$?
+    cat "build/evidence/logs/$label.log"
+    return "$code"
+  fi
+}
+json_step() {
+  label=$1
+  shift
+  printf '%s\n' "$@" > "build/evidence/logs/$label.command"
+  if "$@" > "build/evidence/$label.jsonl" 2> "build/evidence/logs/$label.stderr"; then
+    echo "$label observations retained"
+  else
+    code=$?
+    cat "build/evidence/logs/$label.stderr"
+    return "$code"
+  fi
+}
+if [ "${HTTP_GUN_ISOLATED_GATE:-0}" != 1 ]; then
+  step tooling nix flake check --print-build-logs
+  step gate-controls python3 dev/test_gate.py
   exec python3 dev/isolated_gate.py "$mode"
 fi
-gleam format --check src test dev examples
-gleam check
-gleam build --warnings-as-errors
-gleam test
-out=$(mktemp -d)
-trap 'rm -rf "$out"' EXIT HUP INT TERM
-erlc -Werror -o "$out" src/*.erl test/*.erl
-python3 dev/boundaries.py
+step runtime erl -noshell -eval 'io:format("OTP ~s ERTS ~s~n",[erlang:system_info(otp_release),erlang:system_info(version)]),halt().'
+step gleam-version gleam --version
+step format gleam format --check src test dev examples
+step check gleam check
+step build gleam build --warnings-as-errors
+step native python3 dev/check_native.py
+step package-tests gleam test
+python3 dev/check_results.py tests build/evidence/logs/package-tests.log
+step boundaries python3 dev/boundaries.py
 if [ "$mode" = full ]; then
-  python3 dev/check_stdlib.py
-  sh dev/consumers
-  python3 dev/check_batch.py
-  python3 dev/nghttpd.py
-  gleam run -m http_gun_recording_benchmark > build/evidence/recording.jsonl
-  mkdir -p build/evidence
-  gleam run -m http_gun_benchmark > build/evidence/load.jsonl
-  python3 - <<'PY'
-import json,pathlib
-rows=[json.loads(line) for line in pathlib.Path('build/evidence/load.jsonl').read_text().splitlines()]
-assert len(rows)==11
-for row in rows:
-    if row['scenario']=='h2-concurrent': assert row['connections']==1
-    if row['scenario']=='h1-concurrent': assert 1<=row['connections']<=4
-    if row['scenario'].startswith('large'): assert row['bytes']==33554432
-print('All 11 load scenarios passed; measurements: build/evidence/load.jsonl')
-PY
+  step stdlib python3 dev/check_stdlib.py
+  step consumers sh dev/consumers
+  step batch python3 dev/check_batch.py
+  step nghttpd python3 dev/nghttpd.py
+  json_step recording gleam run -m http_gun_recording_benchmark
+  json_step load gleam run -m http_gun_benchmark
+  python3 dev/check_results.py load build/evidence/load.jsonl
+elif [ "$mode" = soak ]; then
+  step nghttpd-soak python3 dev/nghttpd.py --soak-seconds 600
 fi

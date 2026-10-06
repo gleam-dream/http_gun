@@ -9,9 +9,10 @@ python3 dev/sinal_source.py "$work/sinal"
 cp -R examples/async "$work/async"
 cp test/http_gun_test_server.erl test/http_gun_h2_server.erl "$work/async/test/"
 cp -R test/fixtures "$work/async/test/"
-mkdir "$work/ffi"
-erlc -Werror -o "$work/ffi" examples/async/test/*.erl
+python3 dev/consumer_dependencies.py prepare "$work/async" async
 (cd "$work/async" && gleam build --warnings-as-errors && gleam run && gleam run -m http_gun_async_test)
+python3 dev/check_native.py --source "$work/async"
+python3 dev/consumer_dependencies.py retain "$work/async" async
 if [ "${UPDATE_CONSUMER_LOCKS:-0}" = 1 ]; then cp "$work/async/manifest.toml" "$root/examples/async/manifest.toml"; fi
 # Controlled fault at the OTP startup boundary in the DISPOSABLE source copy.
 # No production fault switch or VM resource exhaustion. Preserve the real error

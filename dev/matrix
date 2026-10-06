@@ -1,17 +1,26 @@
 #!/bin/sh
-# Every runtime receives a separate build tree, including independent consumers.
+# The isolated gate gives every runtime a separate source/build/consumer tree.
 set -eu
 root=$(pwd)
 work=$(mktemp -d)
-trap 'rm -rf "$work"' EXIT HUP INT TERM
-mkdir -p build/evidence
+trap 'mkdir -p build/evidence/matrix; cp -R "$work/." build/evidence/matrix/; rm -rf "$work"' EXIT
 for runtime in default otp28 otp27; do
-  mkdir "$work/$runtime"
-  cp -R src test examples dev gleam.toml manifest.toml "$work/$runtime/"
-  nix develop "path:$root#$runtime" --command sh -c 'cd "$1"; gleam --version; erl -noshell -eval '\''io:format("OTP ~s ERTS ~s~n",[erlang:system_info(otp_release),erlang:system_info(version)]),halt().'\''; sh dev/gate full' sh "$work/$runtime" > "build/evidence/$runtime.log" 2>&1
-  cp "$work/$runtime/build/evidence/load.jsonl" "build/evidence/$runtime-load.jsonl"
-  cp "$work/$runtime/build/evidence/recording.jsonl" "build/evidence/$runtime-recording.jsonl"
-  cp "$work/$runtime/build/evidence/batch.jsonl" "build/evidence/$runtime-batch.jsonl"
-  cp -R "$work/$runtime/build/evidence/nghttpd/." "build/evidence/$runtime-nghttpd"
-  echo "$runtime full gate passed"
+  scope="$work/$runtime"
+  mkdir -p "$scope"
+  if nix develop "$root#$runtime" --command sh dev/gate full > "$scope/gate.log" 2>&1; then
+    code=0
+  else
+    code=$?
+  fi
+  for name in load.jsonl recording.jsonl batch.jsonl summary.json manifests nghttpd logs; do
+    if [ "$code" = 0 ] || [ -e "build/evidence/$name" ]; then
+      cp -R "build/evidence/$name" "$scope/"
+    fi
+  done
+  if [ "$code" = 0 ]; then
+    echo "$runtime full gate passed"
+  else
+    cat "$scope/gate.log"
+    exit "$code"
+  fi
 done

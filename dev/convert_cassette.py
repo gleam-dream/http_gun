@@ -8,6 +8,7 @@ unchanged. Usage:
 
     python3 dev/convert_cassette.py OLD.json [NEW.json]
 """
+
 import base64
 import json
 import sys
@@ -49,7 +50,9 @@ def chunk(value):
 
 def failure(value):
     tag, detail = value["reason"], value["detail"]
-    evidence = {"not_submitted": "not_sent", "may_have_been_sent": "maybe_sent"}[value["evidence"]]
+    evidence = {"not_submitted": "not_sent", "may_have_been_sent": "maybe_sent"}[
+        value["evidence"]
+    ]
     out = {"evidence": evidence}
     if tag in PLAIN:
         out["name"] = PLAIN[tag]
@@ -99,15 +102,17 @@ def convert(document):
     exchanges = []
     for exchange in document["exchanges"]:
         request = exchange["request"]
-        exchanges.append({
-            "request": {
-                "method": request["method"],
-                "url": request["url"],
-                "headers": request["headers"],
-                "body": chunk(request["body"]),
-            },
-            "reply": reply(exchange["reply"]),
-        })
+        exchanges.append(
+            {
+                "request": {
+                    "method": request["method"],
+                    "url": request["url"],
+                    "headers": request["headers"],
+                    "body": chunk(request["body"]),
+                },
+                "reply": reply(exchange["reply"]),
+            }
+        )
     return {"http_gun": 2, "exchanges": exchanges}
 
 

@@ -1,0 +1,60 @@
+name: Extended qualification
+on:
+  schedule:
+    - cron: "37 4 * * 1"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: qualification-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  qualification:
+    name: ${{ matrix.check }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - check: h2-soak
+            runner: ubuntu-latest
+            command: sh dev/gate soak
+          - check: arm-native
+            runner: ubuntu-24.04-arm
+            command: sh dev/gate full
+          - check: comparison
+            runner: ubuntu-latest
+            command: python3 dev/comparison/run.py all --trials 3 --output build/evidence/comparison
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31
+        with:
+          extra_nix_config: experimental-features = nix-command flakes
+      - name: Run local qualification
+        env:
+          QUALIFICATION_COMMAND: ${{ matrix.command }}
+        run: |
+          mkdir -p build/evidence
+          set -o pipefail
+          trap 'mkdir -p build/evidence; cp build/qualification.log build/evidence/qualification.log' EXIT
+          nix develop --command sh -c "$QUALIFICATION_COMMAND" 2>&1 | tee build/qualification.log
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: http-gun-${{ matrix.check }}-${{ github.run_attempt }}
+          path: build/evidence/
+          if-no-files-found: error
+          retention-days: 30
+  result:
+    name: Extended qualification
+    if: always()
+    needs: [qualification]
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - env:
+          QUALIFICATION_RESULT: ${{ needs.qualification.result }}
+        run: test "$QUALIFICATION_RESULT" = success

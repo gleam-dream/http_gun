@@ -1,0 +1,4 @@
+include = ["dev/**/*.py"]
+
+[lint]
+select = ["E9", "F"]

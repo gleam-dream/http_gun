@@ -1,39 +1,71 @@
-name: Local contracts
-on: [push, pull_request]
+name: CI
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: ci-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   gate:
     runs-on: ubuntu-latest
+    timeout-minutes: 35
     strategy:
       fail-fast: false
       matrix:
         runtime: [default, otp28, otp27]
-        # gun and cowlib are patch ranges (docs/DEPENDENCY-UPGRADES.md): test the
-        # committed minimum and the newest patch inside each range.
         dependencies: [minimum, latest]
     steps:
-      - uses: actions/checkout@v4
-      - uses: cachix/install-nix-action@v31
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31
         with:
           extra_nix_config: experimental-features = nix-command flakes
-      - run: nix develop "path:.#${{ matrix.runtime }}" --command sh dev/gate full
+      - run: nix develop ".#${{ matrix.runtime }}" --command sh dev/gate full
         env:
           HTTP_GUN_DEPENDENCIES: ${{ matrix.dependencies }}
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
-          name: load-${{ matrix.runtime }}-${{ matrix.dependencies }}
-          path: build/evidence
-
+          name: http-gun-${{ matrix.runtime }}-${{ matrix.dependencies }}-${{ github.run_attempt }}
+          path: build/evidence/
+          if-no-files-found: error
+          retention-days: 14
   design:
     name: Design layer
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: cachix/install-nix-action@v31
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31
         with:
           extra_nix_config: experimental-features = nix-command flakes
-      - run: nix run .#design-gate-check -- docs/design .
+      - name: Check design layer
+        run: |
+          mkdir -p build/evidence/design
+          set -o pipefail
+          nix run .#design-gate-check -- docs/design . 2>&1 | tee build/evidence/design/check.log
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: http-gun-design-${{ github.run_attempt }}
+          path: build/evidence/design/
+          if-no-files-found: error
+          retention-days: 14
+  ci:
+    name: CI
+    if: always()
+    needs: [gate, design]
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Require every mandatory result
+        env:
+          GATE_RESULT: ${{ needs.gate.result }}
+          DESIGN_RESULT: ${{ needs.design.result }}
+        run: test "$GATE_RESULT" = success && test "$DESIGN_RESULT" = success
