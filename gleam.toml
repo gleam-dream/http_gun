@@ -17,7 +17,7 @@ file_streams = ">= 1.7.0 and < 2.0.0"
 simplifile = ">= 2.7.0 and < 3.0.0"
 # Patch ranges, not the next minor: src/http_gun_ffi.erl relies on Gun and
 # Cowlib terms that their manuals leave undocumented, so a minor release may
-# change them without notice. docs/GUN_AUDIT.md lists each one: gun:info/1's
+# change them without notice. docs/DEPENDENCY-UPGRADES.md lists each one: gun:info/1's
 # state_name key (HTTP/1.1 readiness), the error terms that gun_error and
 # gun_down carry ({stream_error, _, _}, {connection_error, limit_reached, _},
 # closing, ...), and the submission evidence rules, which rest on reviewed Gun

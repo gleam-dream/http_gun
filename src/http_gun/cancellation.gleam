@@ -31,9 +31,9 @@ pub fn with_token(run: fn(Token) -> value) -> value {
   bridge.scoped(fn() { run(token) }, fn() { token.cancel(token) })
 }
 
-/// Cancel. Idempotent, and returns at once: requests release their
-/// resources asynchronously. A request started afterwards through a view
-/// with this token fails with `Cancelled` and `NotSent`.
+/// Cancel this token. Repeated cancellation is harmless and returns at once;
+/// attached requests release their resources asynchronously. A request started
+/// afterwards through a view with this token fails with `Cancelled` and `NotSent`.
 pub fn cancel(token: Token) -> Nil {
   token.cancel(token)
 }

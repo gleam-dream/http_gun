@@ -2,3 +2,5 @@ pre-commit:
   commands:
     fast:
       run: ./dev/env sh dev/gate fast
+    design-gate:
+      run: nix run .#design-gate-check -- docs/design .

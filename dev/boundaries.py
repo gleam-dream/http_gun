@@ -12,7 +12,7 @@ lock = tomllib.loads((root / "manifest.toml").read_text())
 versions = {p["name"]: p["version"] for p in lock["packages"]}
 def version(text):
     return tuple(int(part) for part in text.split("."))
-# Patch ranges (docs/GUN_AUDIT.md); the committed lock holds the minimum.
+# Patch ranges (docs/DEPENDENCY-UPGRADES.md); the committed lock holds the minimum.
 assert config["dependencies"]["gun"] == ">= 2.6.0 and < 2.7.0"
 assert config["dependencies"]["cowlib"] == ">= 2.20.0 and < 2.21.0"
 assert (2, 6, 0) <= version(versions["gun"]) < (2, 7, 0)

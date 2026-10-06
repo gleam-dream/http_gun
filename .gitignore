@@ -5,3 +5,5 @@
 /dev/results/
 /.archive/
 __pycache__/
+.render/
+**/.render/

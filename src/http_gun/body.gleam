@@ -71,8 +71,8 @@ pub fn next_within(
 }
 
 /// End the stream and cancel the request locally if it is unfinished.
-/// Idempotent; another holder of a copy may close it too. Says nothing about
-/// what the server did.
+/// Closing is idempotent, and any holder of a copy may close it. Local
+/// cancellation does not establish what the server did.
 pub fn close(body: Body) -> Nil {
   owner.close(body)
 }

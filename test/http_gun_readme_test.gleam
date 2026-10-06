@@ -1,4 +1,4 @@
-//// The README's examples, compiled and run against local servers.
+//// README and usage guide examples compiled and run against local servers.
 
 import gleam/bit_array
 import gleam/erlang/process
