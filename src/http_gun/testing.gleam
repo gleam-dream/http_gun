@@ -150,6 +150,11 @@ pub fn matching(
 /// Start an offline client that answers from `script`. The script is checked
 /// first: statuses must be 200..599, bodies whole bytes, and the whole
 /// script within 16 MiB.
+///
+/// Each call starts a client with its own cursor at the first exchange.
+/// The immutable `Script` can be reused to start independent clients. Views
+/// made from one client share its cursor; changing correlation does not create
+/// another replay or affect matching. Stop each started client separately.
 pub fn playback(
   script: Script,
   settings: config.Config,

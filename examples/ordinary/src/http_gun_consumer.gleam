@@ -215,9 +215,22 @@ fn record_and_replay(req: request.Request(BitArray)) -> Nil {
   let assert True = path == saved
   http_gun.stop(client)
   let assert Ok(script) = cassette.load(path, 1_000_000)
-  let assert Ok(playback) = testing.playback(script, local_config())
-  consume(playback, req)
-  http_gun.stop(playback)
+  // One immutable capture, two independent client cursors.
+  let assert Ok(first) = testing.playback(script, local_config())
+  let assert Ok(second) = testing.playback(script, local_config())
+  let first_run =
+    http_gun.with_correlation(first, correlation.from_key("replay-a"))
+  let second_run =
+    http_gun.with_correlation(second, correlation.from_key("replay-b"))
+  consume(first_run, req)
+  // A new correlation view still shares the exhausted first cursor.
+  let shared =
+    http_gun.with_correlation(first, correlation.from_key("replay-c"))
+  let assert Error(exhausted) = http_gun.send(shared, req)
+  let assert error.PlaybackExhausted = error.reason(exhausted)
+  consume(second_run, req)
+  http_gun.stop(first)
+  http_gun.stop(second)
   remove_fixture(path)
 }
 

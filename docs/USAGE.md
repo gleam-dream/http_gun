@@ -327,6 +327,40 @@ finalization running; call finish again to observe the eventual result, or abort
 capture explicitly. [Recording operation](TESTING.md#recording-operation)
 describes publication and staging cleanup limits.
 
+### Independent replay runs
+
+- A loaded `testing.Script` is immutable input. Each `testing.playback` call
+  starts a separate client at its first exchange. Reuse the script when two
+  acquisitions should independently read the same recorded history.
+- Client views share their client's cursor. `http_gun.with_correlation` changes
+  observation metadata; it does not select a recording, reset playback or route
+  requests to a different sequence. Concurrent requests on one client still
+  consume its exchanges in admission order.
+
+```gleam
+let assert Ok(script) = cassette.load("test/orders.json", 1_048_576)
+let assert Ok(first) = testing.playback(script, settings)
+let assert Ok(second) = testing.playback(script, settings)
+let first_run = http_gun.with_correlation(first, correlation.from_key("replay-a"))
+let second_run = http_gun.with_correlation(second, correlation.from_key("replay-b"))
+let first_reply = http_gun.send(first_run, req)
+let second_reply = http_gun.send(second_run, req)
+http_gun.stop(first)
+http_gun.stop(second)
+#(first_reply, second_reply)
+```
+
+- The snippet uses `sinal/correlation` alongside the HTTP Gun modules above.
+  Each request receives its client's first exchange, and each owner is stopped
+  after either request result. The
+  [compiled ordinary consumer](../examples/ordinary/src/http_gun_consumer.gleam)
+  also verifies that a new view of an exhausted client remains exhausted while
+  another client over the same script can still consume the capture.
+- Keep the recorded HTTP history separate from application decoding policy.
+  A new schema can reject old response bytes without changing the cassette.
+  Transport collection, JSON parsing and cassette capture protect different
+  resources and therefore need their own appropriate bounds.
+
 ## Redaction
 
 Cassettes never store the credential headers `authorization`,
