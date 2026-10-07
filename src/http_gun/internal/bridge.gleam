@@ -2,6 +2,7 @@ import gleam/dynamic.{type Dynamic}
 import gleam/erlang/process.{type Pid}
 import gleam/option
 import gleam/string
+import http_gun/client_identity
 import http_gun/destination
 import http_gun/error
 import http_gun/internal/settings.{type Negotiated, type Protocol, type Trust}
@@ -53,6 +54,7 @@ pub fn open(
   tls: Bool,
   protocol: Protocol,
   trust: Trust,
+  identity: option.Option(client_identity.Identity),
   connect_timeout: Int,
   send_timeout: SendTimeout,
   header_count: Int,

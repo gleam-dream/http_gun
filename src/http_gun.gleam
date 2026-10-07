@@ -191,10 +191,14 @@ pub fn named(name: process.Name(Message)) -> Client {
 }
 
 /// Refuse new requests, fail queued ones with `ClientClosed` and `NotSent`,
-/// let open responses finish within the shutdown timeout, then cancel them
-/// and close every connection. Returns when the client has stopped;
-/// stopping a stopped client returns at once. Meant for clients from
-/// `start`: a supervisor restarts a supervised client that stops.
+/// let active HTTP exchanges finish within the shutdown timeout, then cancel
+/// them and close every connection. Stopping ends access to retained response
+/// bodies, including unread bytes after HTTP EOF. Callers needing old application
+/// results must await and consume them before stopping the client.
+///
+/// Returns when the client has stopped; stopping a stopped client returns at
+/// once. Meant for clients from `start`: a supervisor restarts a supervised
+/// client that stops.
 pub fn stop(client: Client) -> Nil {
   pool.stop(client)
 }

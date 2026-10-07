@@ -99,6 +99,7 @@
             shellcheck
             ruff
             nghttp2
+            openssl
             ripgrep
           ];
         };
@@ -113,6 +114,7 @@
             shellcheck
             ruff
             nghttp2
+            openssl
             ripgrep
           ];
         };
@@ -127,6 +129,7 @@
             shellcheck
             ruff
             nghttp2
+            openssl
             ripgrep
           ];
         };
@@ -146,7 +149,7 @@
             ''
               cd ${./.}
               actionlint -shellcheck=${pkgs.shellcheck}/bin/shellcheck .github/workflows/*.yml
-              shellcheck --shell=sh dev/env dev/gate dev/matrix dev/linux-gate dev/consumers dev/async-consumer dev/ip-fixture .envrc
+              shellcheck --shell=sh dev/env dev/gate dev/matrix dev/linux-gate dev/consumers dev/async-consumer dev/mtls-consumer dev/mtls-fixtures dev/ip-fixture .envrc
               ruff check --no-cache dev
               touch "$out"
             '';

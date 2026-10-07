@@ -68,12 +68,13 @@ batching, destination rules, failure handling, record/playback, redaction and
 observations. The [ordinary consumer](examples/ordinary/src/http_gun_consumer.gleam)
 demonstrates these through public imports in a separate package. The
 [asynchronous feed recipe](examples/async/README.md) adds application-owned jobs,
-sinks and cancellation.
+sinks and cancellation. The [mTLS consumer](examples/mtls/README.md) demonstrates
+client identities, independent server trust, recovery and explicit rotation.
 
 [Historical local benchmarks](examples/comparison/README.md#retained-measurements)
 include elapsed times, workloads, environment receipts and reproduction commands.
 
-Streamed uploads, redirect following, decompression, proxies, mTLS, cookie/cache
+Streamed uploads, redirect following, decompression, proxies, cookie/cache
 adapters and generic SSE parsing remain pending capabilities in the
 [design](docs/design/design.typ); this checkout does not expose those APIs.
 

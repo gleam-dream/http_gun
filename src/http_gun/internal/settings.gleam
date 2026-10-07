@@ -3,11 +3,12 @@
 
 import gleam/option.{type Option}
 import gleam/time/duration.{type Duration}
+import http_gun/client_identity
 import http_gun/destination
 import http_gun/redaction
 import sinal/forwarder
 
-// Constructor names match the atoms http_gun_ffi:open/9 expects.
+// Constructor names match the atoms http_gun_ffi:open/10 expects.
 pub type Protocol {
   Http1
   PreferHttp2
@@ -65,6 +66,7 @@ pub type Settings {
   Settings(
     protocol: Protocol,
     trust: Trust,
+    client_identity: Option(client_identity.Identity),
     connect_timeout: Int,
     pool_timeout: Int,
     request_timeout: Bound,

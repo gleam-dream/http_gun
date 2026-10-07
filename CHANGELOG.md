@@ -8,6 +8,8 @@ This package uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - A supervised Gun client owns bounded connection admission, streamed body lifetimes, response collection and batches.
 - Caller-built views select request budgets, cancellation, correlation and narrowing destination policy. Address checks preserve the original TLS authority through resolution and reuse.
 - Cassettes provide bounded recording, redaction, atomic publication and deterministic offline playback through the same client boundary.
+- Immutable PEM client identities support mutual TLS through client-local pools. Rotation starts a new client and drains the old client; server trust and destination checks remain independent.
+- TLS Certificate Required alerts retain the existing `CertificateRejected` transport cause and conservative submission evidence.
 - Typed failures retain exchange progress and remote-effect uncertainty; Sinal observations remain application-controlled.
 
 The [README](README.md) documents current usage. The [design layer](docs/design/design.typ) records current guarantees and unresolved limits. [ADRs](docs/adr/0001-gleam-owns-exchange-state.md) retain the pre-release decisions. In particular, [ADR 0010](docs/adr/0010-consolidate-design-and-expose-cleanup-gap.md) records the cleanup guarantee that the implementation does not yet establish; the earlier changelog's stronger abort claim is withdrawn.

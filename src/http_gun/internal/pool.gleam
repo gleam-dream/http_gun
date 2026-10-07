@@ -1371,6 +1371,7 @@ fn resolved(
                   p.origin.tls,
                   state.config.protocol,
                   state.config.trust,
+                  state.config.client_identity,
                   int.max(
                     1,
                     int.min(connection.connect_until - bridge.now(), remaining),

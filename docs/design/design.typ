@@ -50,8 +50,8 @@
       pending-entry(title: "Explicit redirect and decompression policies", kind: "build", adr: 9)[
         Redirects require hop/deadline bounds, method/body transitions, origin/downgrade policy and credential stripping. Decompression requires encoded and decoded limits, incremental expansion bounds and truthful response headers.
       ],
-      pending-entry(title: "Proxy and client certificate pool identity", kind: "build", adr: 9)[
-        Retain explicit proxy routing, tunnel/proxy credentials and mTLS identity in connection keys. Every supported path requires independent policy, TLS and lifecycle tests.
+      pending-entry(title: "Proxy route and credential identity", kind: "build", adr: 9)[
+        Retain explicit proxy routing and tunnel/proxy credentials in connection keys. Every supported path requires independent destination, TLS and lifecycle tests.
       ],
       pending-entry(title: "Optional cookie cache and SSE helpers", kind: "build", adr: 9)[
         Cookie/cache adapters have caller-owned policy, storage, capacity and lifetime. A generic SSE helper is pure framing over HTTP bytes. Provider framing remains in its provider package until this helper exists.
@@ -200,13 +200,36 @@
         #then[no usable client capability is returned]
       ]
     ])
+    #subsection(title: "Client certificate identity", [
+      #points(
+        [`client_identity.from_pem` admits a nonempty leaf-first PEM certificate chain and exactly one unencrypted PEM private key into an opaque immutable snapshot. It performs no filesystem or network operation. Malformed certificate/key input and encrypted private keys produce typed errors without retaining the input in diagnostics. OTP owns PEM/DER parsing and TLS algorithm support. #adr(11)],
+        [`config.with_client_identity` selects that snapshot for the client's TLS connections. Identity omission preserves ordinary server-authenticated TLS. Server trust and HTTPS hostname verification remain independent of client authentication. Plaintext connections never transmit certificate/key material.],
+        [Each client has its own pool and one immutable identity. The client pool plus canonical origin partitions authenticated connections. Views share that identity and cannot replace it. Every reconnect uses the same admitted bytes; replacing an application file cannot change an existing client's identity.],
+        [Rotation starts a new client with a newly admitted identity, directs new application work to that client, and stops the old client under its existing drain contract. In-flight old-client work uses its old authenticated connection until completion or drain expiry. Applications that need old results await and consume them before stop; shutdown grace covers active HTTP leases, and pool exit ends retained body access. Applications own overlap capacity and credential acquisition; HTTP Gun owns no file watcher or credential registry.],
+        [PEM admission establishes decoding, not certificate trust, expiry, permitted usage or certificate/key pairing. TLS establishes those connection properties. TLS refusals retain existing typed transport causes and submission evidence. TLS 1.3 can reject authentication after the client considers its handshake complete, so a refusal can be MaybeSent after the Gun request call. No request is replayed.],
+        [Identity material remains only in caller-owned input/configuration and the native TLS state that needs it. HTTP Gun error descriptions, observations and cassettes contain no configured certificate or private key. Opaque values are not encrypted memory; callers must not print arbitrary configuration/runtime state.],
+      )
+      #behavior(title: "TLS presents only the configured client identity", level: "boundary", area: "Client identity")[
+        #given[a server requires a trusted client certificate]
+        #when[a configured client performs a secure request]
+        #then[the server observes that client's admitted certificate and returns its ordinary response]
+        #then[missing or rejected identity produces a typed failure without automatic retry]
+      ]
+      #behavior(title: "Rotation preserves in-flight identity", level: "boundary", area: "Client identity")[
+        #given[an old client has an active exchange and a new client has a different identity]
+        #when[application work switches to the new client and the old client drains]
+        #then[new-client requests authenticate with the new identity on separate connections]
+        #then[the active old-client exchange retains its old identity until completion or drain expiry]
+        #then[reconnection by an unstopped client retains its original identity snapshot]
+      ]
+    ])
     #subsection(title: "View composition and time authority", [
       #points(
         [A #term("term-client-view") copies only a handle and its view values. Scalar setters replace their prior value. Destination setters append policies whose intersection applies at every operation. Later correlation replaces earlier correlation.],
         [`cancellation.with_token` creates one token process for its lexical scope. Cancellation kills the token process, which makes every copy remain cancelled. Current pending and body owners receive their monitors' death signal; a later attempt sees the dead token before submission. Completion removes monitors. Callback return, exception or creator death ends the token. Applications bound the number and lifetime of token scopes.],
         [A view's relative request timeout or absolute deadline replaces the startup request timeout, whether shorter or longer. With both supplied, the earlier applies. With neither, the startup timeout starts from the invocation's monotonic entry instant before admission.],
         [The absolute Deadline is VM-local and cannot be serialized as durable policy. Reading remaining duration never renews it. Every public duration is converted to whole milliseconds with sub-millisecond remainders rounded away from zero. Nonpositive Deadline creation is immediately expired.],
-        [Views do not change immutable connection trust, protocol, resolver or startup socket timeout options. Idle read can be replaced per view; pooled socket send settings continue to use startup idle timeout. The body owner's independent overall timer still cancels an earlier request budget.],
+        [Views do not change immutable client identity, connection trust, protocol, resolver or startup socket timeout options. Idle read can be replaced per view; pooled socket send settings continue to use startup idle timeout. The body owner's independent overall timer still cancels an earlier request budget.],
         [`with_body_limit` replaces collection policy only. Negative view collection limits fail before submission. A zero limit permits an empty body; Truncate can return an empty prefix on overflow.],
       )
     ])
@@ -556,7 +579,7 @@
     #facts(([Bridge], [Allowed responsibility], [Upgrade-sensitive contract]), (
       ([Gun bindings], [Start/open/request/update_flow/cancel/close, supported info lookup and terminal event forwarding], [Asynchronous request submission; protocol choice; no replay; H1 state_name inspection; terminal cause sent to the original owner before Gun exits]),
       ([Event conversion], [Up/down/head/data/trailers/inform/upgrade/settings conversion to typed events], [Structured error shapes; H2 pseudo-header counting; initial capacity changes]),
-      ([Runtime primitives], [Monotonic time, atomic batch counter, exception-safe scopes and address/DNS conversion], [VM-local clocks; whole-byte/IP conversion; narrow trusted boundaries]),
+      ([Runtime primitives], [Monotonic time, atomic batch counter, exception-safe scopes and address/DNS conversion and OTP PEM/DER identity admission], [VM-local clocks; whole-byte/IP conversion; narrow trusted boundaries]),
       ([Filesystem primitives], [Unique directory candidate, empty-directory/direct-entry cleanup], [Exclusive creation remains in Gleam; nonrecursive best-effort removal]),
     ))
     #points(
@@ -571,7 +594,7 @@
     #subsection(title: "Evidence and tests by boundary", [
       #facts(([Boundary], [Executable evidence], [What it establishes]), (
         ([Ordinary and API adoption], [`examples/ordinary`, README tests, type rejection in dev/consumers], [Common calls, advanced views, caller errors, opaque capability use through public imports]),
-        ([HTTP/H1/TLS], [test request/stream/reuse/trust/destination wire suites; local Erlang servers], [Binary/status/header/trailer fidelity, reuse, deadlines, policy, write cleanup]),
+        ([HTTP/H1/TLS], [test request/stream/reuse/trust/destination wire suites; local Erlang servers; separate mTLS consumer], [Binary/status/header/trailer fidelity, reuse, deadlines, policy, write cleanup]),
         ([H2], [Controlled H2 server plus dev/nghttpd], [Actual negotiation/shared socket, peer capacity, cancellation and GOAWAY boundaries]),
         ([Lifecycle and async], [Timeout/pool/adoption suites; examples/async], [Read conflicts, owner death, supervision, local wait, blocked sink and cancellation]),
         ([Cassette and capture], [Cassette/recording/fault suites], [Strict order, byte codec, terminal failures, redaction, capture independence and atomic publication]),
@@ -586,7 +609,7 @@
     ])
     #subsection(title: "Retained extensions and explicit exclusions", [
       #points(
-        [Streamed uploads, redirect following, decompression, proxies/mTLS, cookie/cache adapters and generic SSE framing remain intended extensions with their contracts in Pending updates. The present facade returns buffered uploads, redirect statuses and encoded response bytes directly. #adr(9)],
+        [Streamed uploads, redirect following, decompression, proxies, cookie/cache adapters and generic SSE framing remain intended extensions with their contracts in Pending updates. The present facade returns buffered uploads, redirect statuses and encoded response bytes directly. #adr(9)],
         [WebSocket, HTTP/3, server-framework, automatic application retry, transfer recovery and agent continuation remain outside package ownership. Gun's broader capability does not expand this facade implicitly.],
         [A broader extension must preserve process/body ownership, address checks on new routes, one-attempt evidence, finite admission and independently reported capture. Cross-package consumers prove the public extension from their own package before facade acceptance.],
       )

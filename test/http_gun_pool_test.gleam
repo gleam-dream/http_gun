@@ -318,6 +318,8 @@ pub fn stop_lets_open_body_finish_within_shutdown_timeout_test() {
       |> config.with_shutdown_timeout(duration.milliseconds(5000)),
     )
   let assert Ok(open) = http_gun.open(client, req(port))
+  let #(guard_port, _) = controlled()
+  let assert Ok(guard) = http_gun.open(client, req(guard_port))
   let started = now_us()
   let stopped = spawn_stop(client)
   let assert Ok(_) = await_draining(client, persistent(), 200)
@@ -328,10 +330,14 @@ pub fn stop_lets_open_body_finish_within_shutdown_timeout_test() {
   |> should.equal(Ok(Some(body.Chunk(<<"abc":utf8>>))))
   body.next_within(open.body, duration.milliseconds(1000))
   |> should.equal(Ok(Some(body.End([]))))
-  // The finished body ends the drain long before the shutdown timeout.
+  // EOF releases the HTTP lease. Keep another exchange active until the
+  // completed body is consumed: stopping the pool ends retained body access.
+  process.receive(stopped, 0) |> should.equal(Error(Nil))
+  body.close(open.body)
+  body.close(guard.body)
+  // Closing the final active exchange ends the drain before its timeout.
   process.receive(stopped, 1000) |> should.equal(Ok(Nil))
   { now_us() - started < 3_000_000 } |> should.be_true
-  body.close(open.body)
 }
 
 pub fn stop_fails_queued_requests_not_sent_test() {

@@ -25,6 +25,7 @@ timeout is requested explicitly with `config.Infinity`; a bounded one is
 | destinations                      | public addresses only                             | `config.allow_loopback`, `config.with_destination`                                           |
 | plaintext `http://`               | allowed                                           | `destination.with_plaintext`                                                                 |
 | destination on every view         | not required                                      | `config.require_view_destination`                                                            |
+| TLS client identity               | none                                              | `config.with_client_identity`                                                                |
 | protocol / TLS                    | HTTP/1.1, system CAs, peer and host name verified | `config.with_protocol`, `config.with_trust`                                                  |
 | connections                       | 16, 4 per origin, 100 HTTP/2 streams each         | `with_max_connections`, `with_max_connections_per_origin`, `with_max_streams_per_connection` |
 | open bodies / queued requests     | 128 / 128                                         | `with_max_open_bodies`, `with_max_queued_requests`                                           |
@@ -57,6 +58,50 @@ let settings =
 
 `http_gun.start` validates it and returns `InvalidConfig(ConfigError)` for an
 out-of-range value; `config.validate` checks it without starting anything.
+
+## TLS client identity
+
+Read certificate/key PEM through the application's credential boundary, then admit
+the in-memory values before client startup:
+
+```gleam
+let assert Ok(identity) =
+  client_identity.from_pem(certificate_chain_pem, private_key_pem)
+let assert Ok(client) =
+  config.default()
+  |> config.with_client_identity(identity)
+  |> http_gun.start
+```
+
+Import `http_gun/client_identity`. The certificate chain is leaf first and the
+key is unencrypted PEM. Admission performs no file or network access and returns
+typed errors for malformed input or an encrypted key. It establishes decoding;
+TLS still checks certificate/key pairing, validity, usage and peer acceptance.
+`client_identity.describe_error` contains no credential input.
+
+`config.with_trust` still controls independent server trust. Hostname verification
+and destination admission remain enabled. Client authentication failures retain
+typed transport causes and actual submission evidence. A TLS 1.3 authentication
+refusal can arrive after submission and therefore carry `MaybeSent`; no failure
+authorizes automatic replay of an external effect.
+
+Each client owns one immutable identity and its own pool. Replacing a source file
+cannot change established connections or later reconnects. To rotate, start a
+new client with new admitted bytes, direct new work to it, then stop the old
+client under its existing shutdown grace. Await and consume old application
+results before stopping when they must be retained: grace covers active HTTP
+leases, and pool exit ends retained body access even after HTTP EOF. Account for
+both clients' capacities during overlap. Old in-flight exchanges retain the old
+identity. Client views cannot switch identity.
+
+Configuration now can contain private key material. Do not log arbitrary
+configuration or runtime state. HTTP Gun error descriptions, lifecycle events
+and cassettes do not retain configured identity material. Application request or
+response data remains governed by its separate redaction policy.
+
+The [separate executable consumer](../examples/mtls/README.md) demonstrates native
+H1/H2 authentication, application-native result handling, rejection and recovery,
+identity isolation, rotation, lost responses and recording without live services.
 
 ## Client views
 

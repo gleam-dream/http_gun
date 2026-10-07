@@ -1,0 +1,40 @@
+#!/bin/sh
+# Test-only identities in a caller-owned temporary directory. Never installed.
+set -eu
+out=$1
+mkdir -p "$out"
+ca() {
+  openssl req -x509 -newkey rsa:2048 -nodes -keyout "$out/$1.key" -out "$out/$1.crt" \
+    -days 2 -subj "/CN=http-gun-test-$1" -addext basicConstraints=critical,CA:TRUE \
+    -addext keyUsage=critical,keyCertSign,cRLSign
+}
+ca server-ca
+ca client-ca
+ca wrong-ca
+openssl req -new -newkey rsa:2048 -nodes -keyout "$out/intermediate.key" -out "$out/intermediate.csr" -subj /CN=http-gun-test-intermediate
+cat > "$out/intermediate.ext" <<'EXT'
+basicConstraints=critical,CA:TRUE,pathlen:0
+keyUsage=critical,keyCertSign,cRLSign
+EXT
+openssl x509 -req -in "$out/intermediate.csr" -CA "$out/client-ca.crt" -CAkey "$out/client-ca.key" -set_serial 10 -days 2 -extfile "$out/intermediate.ext" -out "$out/intermediate.crt"
+leaf() {
+  name=$1
+  issuer=$2
+  purpose=$3
+  openssl req -new -newkey "$4" -nodes -keyout "$out/$name.key" -out "$out/$name.csr" -subj "/CN=$name"
+  cat > "$out/$name.ext" <<EXT
+basicConstraints=critical,CA:FALSE
+keyUsage=critical,digitalSignature,keyEncipherment
+extendedKeyUsage=$purpose
+subjectAltName=DNS:localhost,IP:127.0.0.1
+EXT
+  openssl x509 -req -in "$out/$name.csr" -CA "$out/$issuer.crt" -CAkey "$out/$issuer.key" -set_serial "$5" -days 2 -extfile "$out/$name.ext" -out "$out/$name.crt"
+}
+leaf server server-ca serverAuth rsa:2048 20
+leaf a intermediate clientAuth rsa:2048 21
+openssl ecparam -name prime256v1 -out "$out/ec.params"
+leaf b client-ca clientAuth "ec:$out/ec.params" 22
+leaf wrong wrong-ca clientAuth rsa:2048 23
+cat "$out/a.crt" "$out/intermediate.crt" > "$out/a-chain.crt"
+openssl rsa -in "$out/a.key" -traditional -out "$out/a-rsa.key"
+openssl pkcs8 -topk8 -in "$out/a.key" -passout pass:test-only -out "$out/encrypted.key"

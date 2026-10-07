@@ -1,8 +1,8 @@
 %% Narrow transport/runtime boundary. No client state or server loops.
 -module(http_gun_ffi).
--export([start/0, open/9, request/5, credit/3, cancel/2, close/1, now/0, scoped/2, decode/1]).
+-export([start/0, open/10, request/5, credit/3, cancel/2, close/1, now/0, scoped/2, decode/1]).
 -export([on_exception/2, cause/1]).
--export([parse_address/1, lookup/3]).
+-export([parse_address/1, lookup/3, client_identity/2]).
 -export([reusable/1]).
 -export([counter_new/0, counter_add/2]).
 counter_new() -> atomics:new(1, [{signed, true}]).
@@ -32,7 +32,7 @@ lookup(Host, Family, Timeout) ->
     end.
 ip({ipv4,A,B,C,D}) -> {A,B,C,D};
 ip({ipv6,A,B,C,D,E,F,G,H}) -> {A,B,C,D,E,F,G,H}.
-open(Address, ServerName, Port, Tls, Protocol, Trust, Timeout, SendTimeout, HeaderCount) ->
+open(Address, ServerName, Port, Tls, Protocol, Trust, Identity, Timeout, SendTimeout, HeaderCount) ->
     try
         Send = case SendTimeout of {send_within, Ms} -> Ms; send_unbounded -> infinity end,
         Protocols = case {Tls, Protocol} of
@@ -59,13 +59,17 @@ open(Address, ServerName, Port, Tls, Protocol, Trust, Timeout, SendTimeout, Head
                     {custom_ca, Path} -> {cacertfile, binary_to_list(Path)};
                     {anchors, Certificates} -> {cacerts, Certificates}
                 end,
+                Credentials = case Identity of
+                    none -> [];
+                    {some, Snapshot} -> [{certs_keys, [Snapshot]}]
+                end,
                 Name = case ServerName of
                     none -> [];
                     {some, Host} -> [{server_name_indication, binary_to_list(Host)}]
                 end,
                 Base#{transport => tls, tls_opts => [Ca, {verify, verify_peer},
                     {send_timeout, Send}, {send_timeout_close, true},
-                    {customize_hostname_check, [{match_fun, public_key:pkix_verify_hostname_match_fun(https)}]} | Name]}
+                    {customize_hostname_check, [{match_fun, public_key:pkix_verify_hostname_match_fun(https)}]} | Name ++ Credentials]}
         end,
         case gun:open(ip(Address), Port, Options) of
             {ok, Pid} -> {ok, Pid};
@@ -99,6 +103,8 @@ decode(_) -> ignore.
 %% Classify supported runtime reasons; never format arbitrary peer/runtime terms.
 cause({shutdown, Reason}) -> cause(Reason);
 cause({error, Reason}) -> cause(Reason);
+%% Gun H1/H2 wrap stream failures after TLS completion in {closed, Reason}.
+cause({closed, Reason}) -> cause(Reason);
 cause(nxdomain) -> name_resolution_failed;
 cause(econnrefused) -> connection_refused;
 cause(econnreset) -> connection_reset;
@@ -109,10 +115,44 @@ cause(timeout) -> transport_timeout;
 cause(etimedout) -> transport_timeout;
 cause({tls_alert, {Alert, _}}) when Alert =:= unknown_ca; Alert =:= bad_certificate;
     Alert =:= certificate_expired; Alert =:= certificate_revoked;
-    Alert =:= certificate_unknown -> certificate_rejected;
+    Alert =:= certificate_unknown; Alert =:= certificate_required -> certificate_rejected;
 cause({tls_alert, _}) -> tls_failed;
 cause({bad_cert, _}) -> certificate_rejected;
 cause({stream_error, _, _}) -> protocol_error;
 cause({connection_error, limit_reached, _}) -> header_limit_reached;
 cause({connection_error, _, _}) -> protocol_error;
 cause(_) -> unknown_transport.
+
+%% Native PEM/DER admission only; callers own credential IO and rotation.
+client_identity(CertificatePem, KeyPem) ->
+    case certificates(CertificatePem) of
+        {ok, Chain} ->
+            case private_key(KeyPem) of
+                {ok, Key} -> {ok, #{cert => Chain, key => Key}};
+                Error -> Error
+            end;
+        Error -> Error
+    end.
+certificates(Pem) ->
+    try
+        Entries = public_key:pem_decode(Pem),
+        true = Entries =/= [],
+        Chain = lists:map(fun({'Certificate', Der, not_encrypted}) ->
+            _ = public_key:pkix_decode_cert(Der, otp),
+            Der
+        end, Entries),
+        {ok, Chain}
+    catch _:_ -> {error, invalid_certificate_chain} end.
+private_key(Pem) ->
+    try
+        case public_key:pem_decode(Pem) of
+            [{'EncryptedPrivateKeyInfo', _, _}] -> {error, encrypted_private_key};
+            [{_, _, Encryption}] when Encryption =/= not_encrypted -> {error, encrypted_private_key};
+            [{Type, Der, not_encrypted} = Entry] when
+                Type =:= 'RSAPrivateKey'; Type =:= 'DSAPrivateKey';
+                Type =:= 'ECPrivateKey'; Type =:= 'PrivateKeyInfo' ->
+                _ = public_key:pem_entry_decode(Entry),
+                {ok, {Type, Der}};
+            _ -> {error, invalid_private_key}
+        end
+    catch _:_ -> {error, invalid_private_key} end.

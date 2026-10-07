@@ -1,0 +1,14 @@
+#!/bin/sh
+set -eu
+work=$(mktemp -d)
+trap 'rm -rf "$work"' EXIT HUP INT TERM
+mkdir "$work/http_gun"
+cp -R src gleam.toml manifest.toml "$work/http_gun/"
+python3 dev/sinal_source.py "$work/sinal"
+cp -R examples/mtls "$work/mtls"
+python3 dev/consumer_dependencies.py prepare "$work/mtls" mtls
+sh dev/mtls-fixtures "$work/fixtures" > "$work/fixtures.log" 2>&1
+export HTTP_GUN_MTLS_FIXTURES="$work/fixtures"
+(cd "$work/mtls" && gleam build --warnings-as-errors && gleam run)
+python3 dev/check_native.py --source "$work/mtls"
+python3 dev/consumer_dependencies.py retain "$work/mtls" mtls

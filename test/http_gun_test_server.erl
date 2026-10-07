@@ -179,7 +179,7 @@ unused_port() ->
 late_monitor_refusal(Port) ->
     {ok, nil} = http_gun_ffi:start(),
     {ok, Pid} = http_gun_ffi:open({ipv4,127,0,0,1}, none, Port, false,
-                                http1, system_trust, 1000, {send_within, 1000}, 100),
+                                http1, system_trust, none, 1000, {send_within, 1000}, 100),
     Ref = erlang:monitor(process, Pid),
     receive {'DOWN', Ref, process, Pid, _} -> ok
     after 2000 -> gun:close(Pid), erlang:error(startup_connection_did_not_exit) end,

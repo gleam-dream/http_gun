@@ -24,8 +24,9 @@ compile_probe() {
 printf '%s\n' 'import http_gun' 'pub fn valid(client: http_gun.Client) { http_gun.stats(client) }' > "$work/negative/src/probe.gleam"
 compile_probe
 # Compile-time rejection from a separate package, never same-package visibility.
-for check in client body wrong_body recording deadline cancellation request_id config failure policy redaction; do
+for check in identity client body wrong_body recording deadline cancellation request_id config failure policy redaction; do
   case "$check" in
+    identity) source='import http_gun/client_identity\npub fn invalid() { client_identity.Identity }'; expected='Unknown module value';;
     request_id) source='import http_gun/telemetry\npub fn invalid() { telemetry.RequestId("x") }'; expected='Unknown module value';;
     client) source='import http_gun\npub fn invalid() { http_gun.Client }'; expected='Unknown module value';;
     body) source='import http_gun/body\npub fn invalid() { body.Body }'; expected='Unknown module value';;
@@ -39,6 +40,7 @@ for check in client body wrong_body recording deadline cancellation request_id c
     redaction) source='import http_gun/redaction\npub fn invalid() { redaction.Redaction }'; expected='Unknown module value';;
   esac
   case "$check" in
+    identity) symbol='Identity';;
     request_id) symbol='RequestId';;
     client) symbol='Client';; body) symbol='Body';; recording) symbol='Recording';;
     deadline) symbol='Deadline';; cancellation) symbol='Token';; wrong_body) symbol='BitArray';;
@@ -54,4 +56,5 @@ for check in client body wrong_body recording deadline cancellation request_id c
   echo "Confirmed public type rejection: $check"
 done
 sh dev/async-consumer
-echo 'Ordinary and async consumers; eleven rejection fixtures passed.'
+sh dev/mtls-consumer
+echo 'Ordinary, async and mTLS consumers; twelve rejection fixtures passed.'

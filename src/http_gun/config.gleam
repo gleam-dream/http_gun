@@ -19,7 +19,8 @@
 ////
 //// A `Config` is opaque, so a new option never breaks your code. `validate`
 //// checks it without starting processes; `http_gun.start` validates it too
-//// and returns the same `ConfigError`. A `Config` holds no credentials.
+//// and returns the same `ConfigError`. A configured client identity contains
+//// private key material; never log arbitrary configuration values.
 ////
 //// ## Defaults
 ////
@@ -28,6 +29,7 @@
 //// | destinations | public addresses only | `allow_loopback`, `with_destination` |
 //// | destination on every view | not required | `require_view_destination` |
 //// | protocol | HTTP/1.1 | `with_protocol` |
+//// | TLS client identity | none | `with_client_identity` |
 //// | TLS trust | system CA store, peer and host name verified | `with_trust` |
 //// | connect, including DNS and TLS | `duration.seconds(5)` | `with_connect_timeout` |
 //// | waiting for a pooled connection | `duration.seconds(5)` | `with_pool_timeout` |
@@ -54,6 +56,7 @@ import gleam/list
 import gleam/option.{None, Some}
 import gleam/result
 import gleam/time/duration.{type Duration}
+import http_gun/client_identity
 import http_gun/destination
 import http_gun/internal/settings.{type Settings, Limits, Settings}
 import http_gun/redaction
@@ -149,6 +152,7 @@ pub fn default() -> Config {
   Settings(
     protocol: settings.Http1,
     trust: settings.SystemTrust,
+    client_identity: None,
     connect_timeout: 5000,
     pool_timeout: 5000,
     request_timeout: settings.Within(30_000),
@@ -240,6 +244,19 @@ pub fn with_trust(config: Config, trust: Trust) -> Config {
     CustomCa(path) -> settings.CustomCa(path)
     Anchors(certificates) -> settings.Anchors(certificates)
   })
+}
+
+/// Present this immutable identity when a TLS server requests client
+/// authentication. Trust and hostname verification remain independent.
+/// Every connection in this client uses the same snapshot, including reconnects.
+/// Views cannot replace it. Rotate by starting a new client and draining/stopping
+/// the old client; in-flight old-client exchanges retain their old identity.
+/// The setter is pure. Plaintext connections send no identity material.
+pub fn with_client_identity(
+  config: Config,
+  identity: client_identity.Identity,
+) -> Config {
+  Settings(..config, client_identity: Some(identity))
 }
 
 /// Choose what cassettes never store. See `http_gun/redaction`.
