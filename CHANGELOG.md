@@ -5,6 +5,7 @@ This package uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased — initial release
 
+- Cowlib 2.21.0 is the minimum after its cookie-encoder fix and native contract audit; later minor releases remain excluded.
 - A supervised Gun client owns bounded connection admission, streamed body lifetimes, response collection and batches.
 - Caller-built views select request budgets, cancellation, correlation and narrowing destination policy. Address checks preserve the original TLS authority through resolution and reuse.
 - Cassettes provide bounded recording, redaction, atomic publication and deterministic offline playback through the same client boundary.

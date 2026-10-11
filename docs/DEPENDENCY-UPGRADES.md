@@ -2,7 +2,7 @@
 
 ## Gun and Cowlib
 
-- Current ranges are Gun `>= 2.6.0 and < 2.7.0` and Cowlib `>= 2.20.0 and < 2.21.0`. The committed manifest resolves the minimum. The [range decision](adr/0007-patch-ranges-require-native-contract-audits.md) owns rationale.
+- Current ranges are Gun `>= 2.6.0 and < 2.7.0` and Cowlib `>= 2.21.0 and < 2.22.0`. The committed manifest resolves the minimum. The [range decision](adr/0007-patch-ranges-require-native-contract-audits.md) owns rationale.
 - Before widening a minor range, inspect the candidate source for each assumption below. Preserve failure evidence and update typed conversion only under an accepted contract.
 
 | Assumption                                                                       | Source                                                    | If changed                                                                                     |
@@ -18,6 +18,8 @@
 - Gun 2.6.0 `gun_http:close_reason/1` and `gun_http2:close_reason/1` wrap a post-handshake TLS alert as `{closed, {tls_alert, {Alert, Detail}}}` for stream owners. Decode the nested recognized cause without exposing `Detail`; preserve `MaybeSent` after submission. The mTLS consumer exercises native missing/unknown client certificate failures and the connection/stream timing distinction.
 - Run the package's full gate on the committed minimum and newest admitted patches through the isolated environment. CI uses `HTTP_GUN_DEPENDENCIES=latest` for patch selection. The selected root Gun/Cowlib versions are imposed on disposable ordinary/async/mTLS and stdlib consumer copies. The gate fails if a resolved consumer differs, and retains their manifests under `build/evidence/manifests`; keep native-source audit evidence reviewable.
 - Requalify ordinary/async/mTLS public consumers and explicitly selected downstream checkouts when public contracts change. Follow [TESTING.md](TESTING.md). Avoid provider credentials and dependency patches.
+
+The [Cowlib 2.21 audit](cowlib-2.21-audit.md) records the new minimum, exact upstream sources and qualification results.
 
 ## Runtime and filesystem libraries
 

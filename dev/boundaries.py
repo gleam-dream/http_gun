@@ -35,9 +35,9 @@ def version(text):
 
 # Patch ranges (docs/DEPENDENCY-UPGRADES.md); the committed lock holds the minimum.
 assert config["dependencies"]["gun"] == ">= 2.6.0 and < 2.7.0"
-assert config["dependencies"]["cowlib"] == ">= 2.20.0 and < 2.21.0"
+assert config["dependencies"]["cowlib"] == ">= 2.21.0 and < 2.22.0"
 assert (2, 6, 0) <= version(versions["gun"]) < (2, 7, 0)
-assert (2, 20, 0) <= version(versions["cowlib"]) < (2, 21, 0)
+assert (2, 21, 0) <= version(versions["cowlib"]) < (2, 22, 0)
 assert versions["file_streams"] == "1.7.0" and versions["simplifile"] == "2.7.0"
 # Owner decision: every public timeout is a gleam_time Duration, major-bounded.
 assert config["dependencies"]["gleam_time"] == ">= 1.11.0 and < 2.0.0"

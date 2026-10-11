@@ -25,7 +25,7 @@ simplifile = ">= 2.7.0 and < 3.0.0"
 # cow_http2 and cow_hpack modules. CI runs the full gate on the minimum and on
 # the newest patch of both; re-run the audit before widening either range.
 gun = ">= 2.6.0 and < 2.7.0"
-cowlib = ">= 2.20.0 and < 2.21.0"
+cowlib = ">= 2.21.0 and < 2.22.0"
 gleam_time = ">= 1.11.0 and < 2.0.0"
 
 [dev-dependencies]

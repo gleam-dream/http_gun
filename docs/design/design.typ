@@ -584,7 +584,7 @@
     ))
     #points(
       [No handwritten Erlang pool, body server, recorder server, DNS admission server or protocol parser exists. Native exception classification returns bounded recognized causes and UnknownTransport. Internal module visibility is documentation organization rather than an import-security boundary; opaque capability construction and actors enforce authority.],
-      [Gun range is 2.6.0 inclusive to 2.7.0 exclusive. Cowlib range is 2.20.0 inclusive to 2.21.0 exclusive. Patch ranges permit security updates while minor changes require deliberate audit. The committed manifest selects the tested minimum; latest-patch isolated resolution exercises the other end. #adr(7)],
+      [Gun range is 2.6.0 inclusive to 2.7.0 exclusive. Cowlib range is 2.21.0 inclusive to 2.22.0 exclusive. Patch ranges permit security updates while minor changes require deliberate audit. The committed manifest selects the tested minimum; latest-patch isolated resolution exercises the other end. #adr(7)],
       [Undocumented assumptions are H1 `gun:info` state_name connected; reason terms inside gun_error/gun_down; Gun terminal event callback before process exit; source-reviewed request return timing; H2 max_headers including status; and test-only cow_http2/cow_hpack calls. Unknown state rejects reuse; unknown reasons lose precision rather than becoming safe-retry evidence.],
       [Widening a range requires inspecting each assumption, updating decoding only under an accepted contract, running minimum/latest full gates and qualifying public consumers. A changed test helper API can break H2 evidence and must not be mistaken for a production protocol change. `docs/DEPENDENCY-UPGRADES.md` holds the operational procedure.],
     )
