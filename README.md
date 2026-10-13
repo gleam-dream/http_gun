@@ -6,9 +6,9 @@ playback and live recording through one client type.
 
 ## Use the current checkout
 
-HTTP Gun is unreleased. Keep the `http_gun` and `sinal` checkouts beside each
-other because this checkout depends on `../sinal`. In an application beside
-those directories, add:
+HTTP Gun is unreleased. Gleam fetches Sinal from its pinned Git revision; no
+sibling Sinal checkout is needed. To use a local HTTP Gun checkout from
+an adjacent application, add:
 
 ```toml
 [dependencies]

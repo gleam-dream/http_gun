@@ -2,6 +2,7 @@
 
 from pathlib import Path
 import tomllib
+import re
 
 root = Path(__file__).resolve().parent.parent
 config = tomllib.loads((root / "gleam.toml").read_text())
@@ -19,7 +20,10 @@ allowed = {
     "sinal",
 }
 assert set(config["dependencies"]) == allowed
-assert config["dependencies"]["sinal"] == {"path": "../sinal"}
+sinal = config["dependencies"]["sinal"]
+assert set(sinal) == {"git", "ref"}
+assert sinal["git"] == "https://github.com/gleam-dream/sinal.git"
+assert re.fullmatch(r"[0-9a-f]{40}", sinal["ref"])
 assert all(
     isinstance(value, str)
     for name, value in config["dependencies"].items()

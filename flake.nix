@@ -89,6 +89,7 @@
 
         devShells.default = pkgs.mkShell {
           packages = with pkgs; [
+            git
             lefthook
             gleam
             beam29Packages.erlang
@@ -106,6 +107,7 @@
 
         devShells.otp28 = pkgs.mkShell {
           packages = with pkgs; [
+            git
             gleam
             beam28Packages.erlang
             beam28Packages.rebar3
@@ -121,6 +123,7 @@
 
         devShells.otp27 = pkgs.mkShell {
           packages = with pkgs; [
+            git
             gleam
             beam27Packages.erlang
             beam27Packages.rebar3
