@@ -65,7 +65,9 @@ pub fn main() {
             )
         )
         subprocess.run(
-            ["gleam", "update", "gleam_stdlib", "gleeunit"], cwd=package, check=True
+            ["gleam", "update", "gleam_stdlib", "gleeunit", "gleam_crypto"],
+            cwd=package,
+            check=True,
         )
         try:
             subprocess.run(

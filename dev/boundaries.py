@@ -18,6 +18,7 @@ allowed = {
     "file_streams",
     "simplifile",
     "sinal",
+    "youid",
 }
 assert set(config["dependencies"]) == allowed
 sinal = config["dependencies"]["sinal"]

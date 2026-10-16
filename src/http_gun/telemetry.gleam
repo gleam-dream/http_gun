@@ -44,24 +44,23 @@
 
 import gleam/dynamic
 import gleam/dynamic/decode
-import gleam/erlang/reference
 import gleam/option.{type Option}
-import gleam/string
 import sinal
 import sinal/correlation.{type Correlation}
 import sinal/fields
+import youid/uuid
 
-/// The identity HTTP Gun assigns to one observed invocation. Equality is meaningful within one VM lifetime; it is not a
-/// durable identifier, a credential or a network reference. Erlang handlers
+/// A random UUID v4 identifying one observed invocation. It is not a
+/// credential, a durable receipt or a network reference. Erlang handlers
 /// see it as a binary under the `request_id` key.
 pub opaque type RequestId {
   RequestId(value: String)
 }
 
-/// A fresh identity, unique within this VM. HTTP Gun creates one per
+/// A fresh random UUID v4, probabilistically unique across nodes and restarts. HTTP Gun creates one per
 /// request; a test double that emits HTTP Gun events can create its own.
 pub fn new_request_id() -> RequestId {
-  RequestId(string.inspect(reference.new()))
+  RequestId(uuid.v4_string())
 }
 
 /// The identity as text, for logs.

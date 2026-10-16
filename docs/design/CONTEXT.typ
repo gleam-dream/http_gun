@@ -15,7 +15,7 @@
   (slug: "term-recording-session", title: [Recording session], body: [An owner of bounded captured exchanges and the authority to finalize their fixture. Its result is independent of the live HTTP result.]),
   (slug: "term-cassette", title: [Cassette], body: [A versioned JSON value containing ordered HTTP request and reply observations. It is data rather than a live network or playback capability.]),
   (slug: "term-publication", title: [Publication], body: [The atomic filesystem operation making a complete cassette visible at its destination. Visibility does not establish persistence through power loss.]),
-  (slug: "term-request-id", title: [Request id], body: [An opaque identity for one observed invocation within one VM lifetime. It is distinct from the caller's correlation and from a durable remote request identifier.]),
+  (slug: "term-request-id", title: [Request id], body: [An opaque random UUID v4 for one observed invocation, probabilistically unique across nodes and restarts. It is distinct from the caller's correlation and from a durable remote request identifier.]),
   (slug: "term-http-termination", title: [HTTP termination], body: [The response owner's terminal HTTP observation: completion, local cancellation, deadline expiry or failure. It does not certify application consumption or capture publication.]),
   (slug: "term-redaction", title: [Redaction], body: [The selected removal or rewriting of data retained in fixtures and failure headers. It preserves the live request and does not detect all secrets.]),
 )

@@ -6,6 +6,7 @@ import gleam/int
 import gleam/list
 import gleam/option.{None, Some}
 import gleam/result
+import gleam/string
 import gleam/time/duration
 import gleeunit/should
 import http_gun
@@ -862,4 +863,20 @@ fn receive_native_tagged(
 
 fn local_config() -> config.Config {
   config.default() |> config.allow_loopback
+}
+
+pub fn request_ids_are_distinct_uuid_v4_values_test() {
+  let ids =
+    list.map(list.repeat(Nil, 100), fn(_) {
+      telemetry.new_request_id() |> telemetry.request_id_to_string
+    })
+  list.length(list.unique(ids)) |> should.equal(100)
+  list.each(ids, fn(id) {
+    let parts = string.split(id, "-")
+    list.map(parts, string.length) |> should.equal([8, 4, 4, 4, 12])
+    string.slice(id, 14, 1) |> should.equal("4")
+    list.contains(["8", "9", "a", "b"], string.slice(id, 19, 1))
+    |> should.be_true
+    let assert Ok(_) = int.base_parse(string.replace(id, "-", ""), 16)
+  })
 }

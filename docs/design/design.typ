@@ -114,7 +114,7 @@
         ([Failure], [Opaque reason, submission evidence, optional final status and retained response headers. Kind is closed; detailed reason/cause unions may grow.], [Boundary that detects failure]),
         ([Deadline and token], [Opaque VM-local monotonic instant; shared latched cancellation capability. Neither is durable or part of cassette matching.], [Caller owns scope]),
         ([Script and cassette], [Ordered request/reply values with bytes, heads, trailers or typed terminal failure. A script's finite estimated data budget differs from file bytes.], [Caller or file decoder supplies]),
-        ([Request id and correlation], [Fresh VM-local invocation identity and independently supplied caller correlation. Neither grants retry permission.], [HTTP Gun derives id; caller supplies correlation]),
+        ([Request id and correlation], [Fresh UUID v4 invocation identity and independently supplied caller correlation. Neither grants retry permission.], [HTTP Gun derives id; caller supplies correlation]),
       ))
       #points(
         [Authority is held by process destinations and opaque capabilities. Names identify a supervised client's current incarnation. They are not credentials or durable exchange identifiers.],
