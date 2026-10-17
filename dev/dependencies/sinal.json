@@ -1,10 +1,10 @@
 {
   "name": "sinal",
-  "revision": "4aee4c3b920bd7241da7659995dfc0a0b5767348",
+  "revision": "9727f9baab6ed4f796780a0c3a1027c3292c5fc7",
   "status": "",
   "files": {
     "LICENSE": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
-    "README.md": "a423d5daeafd054f659be4b5b152016f6f81e108071cdc5f3c51eae24301775b",
+    "README.md": "a05c823be848090fe09d01981982ca14a85f0acaa73bcf615440084fd7685c7d",
     "gleam.toml": "92ba7d884c80dc33c506e24467be9be10cf2133f247f803972d07e798e9c6af1",
     "manifest.toml": "50e749ddc80f019e0499cb2144a9bf537e51d1d00570eba07440dea416e9fa09",
     "src/sinal.gleam": "897929cfa9b6d8356feeb4578b718c2d0921378c2e4ed88f313560b2f098f785",
@@ -22,5 +22,5 @@
   },
   "license": "Apache-2.0; original LICENSE and manifest preserved",
   "source": "Canonical local Sinal checkout, including owner-authorized generic forwarder correction; no HTTP-specific code.",
-  "archive_sha256": "4852c3d5a71387d3f0e8bf0ba8d835b7bf1f40586a8d15ba849cfabf044cfb9f"
+  "archive_sha256": "9e306536f56894fc9354cbbcfbba3003dc2e8db0c411f528089e694ebd8b1b1d"
 }
