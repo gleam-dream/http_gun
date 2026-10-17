@@ -2,6 +2,7 @@
 //// request first, then client views, a supervised client, failure handling,
 //// observations and record/replay.
 
+import cancellation_checks
 import gleam/erlang/process
 import gleam/http/request
 import gleam/int
@@ -55,6 +56,7 @@ pub fn main() {
   failures(req)
   observed(req)
   record_and_replay(req)
+  cancellation_checks.main()
 }
 
 // The application's own error type; `with_response` maps an opening failure

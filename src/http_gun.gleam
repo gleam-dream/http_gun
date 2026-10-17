@@ -362,11 +362,28 @@ pub fn with_idle_timeout(client: Client, timeout: config.Timeout) -> Client {
   pool.with_view(client, pool.View(..view, idle: Some(bound(timeout))))
 }
 
-/// Cancel unfinished requests made through this view when `token` is
-/// cancelled. Cancellation never enters cassette matching.
+/// Replace this view's cancellation tokens with `token`. Unfinished requests
+/// through the resulting view cancel when that token is cancelled. Other views
+/// and tokens remain unchanged. Cancellation never enters cassette matching.
 pub fn with_cancellation(client: Client, token: cancellation.Token) -> Client {
   let view = pool.view(client)
-  pool.with_view(client, pool.View(..view, token: Some(token)))
+  pool.with_view(client, pool.View(..view, tokens: [token]))
+}
+
+/// Add an independent cancellation token while retaining this view's tokens.
+/// Cancellation by any retained token ends unfinished requests through this
+/// view. Adding the same token twice has no additional effect. This pure view
+/// operation starts no process, changes no other view and never cancels a token.
+pub fn with_additional_cancellation(
+  client: Client,
+  token: cancellation.Token,
+) -> Client {
+  let view = pool.view(client)
+  case list.contains(view.tokens, token) {
+    True -> client
+    False ->
+      pool.with_view(client, pool.View(..view, tokens: [token, ..view.tokens]))
+  }
 }
 
 /// Collect at most `bytes` of each response body in `send` and `batch`

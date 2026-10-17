@@ -92,7 +92,7 @@ type State {
     idle: settings.Bound,
     idle_ref: Option(reference.Reference),
     activity: Int,
-    cancellation_monitor: Option(process.Monitor),
+    cancellation_monitors: List(process.Monitor),
     limits: settings.Limits,
     phase: Phase,
     status: Option(Int),
@@ -225,7 +225,7 @@ pub fn start(
   release: fn(Bool) -> Nil,
   closed: fn() -> Nil,
   capture: Option(recorder.Capture),
-  token: Option(token.Token),
+  tokens: List(token.Token),
   observation: lifecycle.Context,
 ) -> actor.StartResult(Body) {
   actor.new_with_initialiser(1000, fn(subject) {
@@ -285,7 +285,7 @@ pub fn start(
         idle: timing.idle,
         idle_ref: None,
         activity: bridge.now(),
-        cancellation_monitor: option.map(token, token.monitor),
+        cancellation_monitors: list.map(tokens, token.monitor),
         limits:,
         phase: Opening(reply),
         status: None,
@@ -393,29 +393,33 @@ fn handle(state: State, message: Message) -> actor.Next(State, Message) {
       actor.stop()
     }
     Lost(process.PortDown(..)) -> continue(state)
-    Lost(process.ProcessDown(monitor: monitor, ..))
-      if state.cancellation_monitor == Some(monitor)
-    -> continue(deliver(finish(state, Error(failure(state, error.Cancelled)))))
-    Lost(process.ProcessDown(pid: pid, reason: reason, ..)) ->
-      case pid == state.owner || pid == state.client {
-        True -> {
-          let state = finish(state, Error(failure(state, error.Closed)))
-          flush_capture(state.capture)
-          actor.stop()
-        }
+    Lost(process.ProcessDown(monitor: monitor, pid: pid, reason: reason)) ->
+      case list.contains(state.cancellation_monitors, monitor) {
+        True ->
+          continue(
+            deliver(finish(state, Error(failure(state, error.Cancelled)))),
+          )
         False ->
-          case is_capture_owner(state.capture, pid) {
-            True -> continue(State(..state, capture: NoCapture))
+          case pid == state.owner || pid == state.client {
+            True -> {
+              let state = finish(state, Error(failure(state, error.Closed)))
+              flush_capture(state.capture)
+              actor.stop()
+            }
             False ->
-              continue(
-                deliver(finish(
-                  state,
-                  Error(failure(
-                    state,
-                    error.ConnectionFailed(bridge.exit_cause(reason)),
-                  )),
-                )),
-              )
+              case is_capture_owner(state.capture, pid) {
+                True -> continue(State(..state, capture: NoCapture))
+                False ->
+                  continue(
+                    deliver(finish(
+                      state,
+                      Error(failure(
+                        state,
+                        error.ConnectionFailed(bridge.exit_cause(reason)),
+                      )),
+                    )),
+                  )
+              }
           }
       }
     Deadline -> continue(deliver(state))
@@ -753,10 +757,7 @@ fn finish(
 }
 
 fn release(state: State, outcome: Result(a, Failure)) -> Nil {
-  case state.cancellation_monitor {
-    Some(monitor) -> process.demonitor_process(monitor)
-    None -> Nil
-  }
+  list.each(state.cancellation_monitors, process.demonitor_process)
   case capture_busy(state.capture) {
     False -> cancel_timer(state.deadline_timer)
     True -> Nil

@@ -34,14 +34,14 @@ import http_gun/redaction
 import http_gun/telemetry
 import sinal/correlation.{type Correlation}
 
-/// Per-handle settings. Every field is optional and falls back to the
-/// client's configuration.
+/// Per-handle settings. Optional scalar fields fall back to configuration;
+/// token and destination lists retain independent view constraints.
 pub type View {
   View(
     timeout: Option(settings.Bound),
     deadline: Option(Int),
     idle: Option(settings.Bound),
-    token: Option(token.Token),
+    tokens: List(token.Token),
     body_limit: Option(#(Int, Bool)),
     policies: List(destination.Policy),
     correlation: Option(Correlation),
@@ -52,7 +52,7 @@ pub opaque type Client {
   Client(subject: process.Subject(Message), view: View)
 }
 
-const no_view = View(None, None, None, None, None, [], None)
+const no_view = View(None, None, None, [], None, [], None)
 
 type Status {
   Resolving
@@ -173,13 +173,9 @@ pub fn open(
 ) -> Result(Opened, Failure) {
   let view = client.view
   let entered = bridge.now()
-  use Nil <- result.try(case view.token {
-    Some(token) ->
-      case token.is_cancelled(token) {
-        True -> Error(error.new(error.Cancelled, NotSent))
-        False -> Ok(Nil)
-      }
-    None -> Ok(Nil)
+  use Nil <- result.try(case list.any(view.tokens, token.is_cancelled) {
+    True -> Error(error.new(error.Cancelled, NotSent))
+    False -> Ok(Nil)
   })
   use Nil <- result.try(case view.deadline {
     Some(at) if at <= entered ->
@@ -586,10 +582,7 @@ fn reject_with(p: Pending, failure: Failure) -> Nil {
     None -> Nil
   }
   let _ = process.cancel_timer(p.timer)
-  case p.cancel_monitor {
-    Some(monitor) -> process.demonitor_process(monitor)
-    None -> Nil
-  }
+  list.each(p.cancel_monitors, process.demonitor_process)
   process.demonitor_process(p.monitor)
   p.reply(Error(failure))
 }
@@ -882,20 +875,14 @@ fn launch(state: State, p: Pending, connection: Connection) -> State {
 
 // The body owner now answers the caller; stop watching for its death here.
 fn settle(p: Pending) -> Nil {
-  case p.cancel_monitor {
-    Some(monitor) -> process.demonitor_process(monitor)
-    None -> Nil
-  }
+  list.each(p.cancel_monitors, process.demonitor_process)
   process.demonitor_process(p.monitor)
   let _ = process.cancel_timer(p.timer)
   Nil
 }
 
 fn admit(state: State, p: Pending) -> Admission {
-  let cancelled = case p.cancellation {
-    None -> False
-    Some(token) -> token.is_cancelled(token)
-  }
+  let cancelled = list.any(p.cancellation, token.is_cancelled)
   let expired = case p.deadline {
     Some(at) -> bridge.now() >= at
     None -> False
@@ -1140,8 +1127,8 @@ fn open_request(
           timer:,
           reservation: None,
           capture:,
-          cancellation: view.token,
-          cancel_monitor: option.map(view.token, token.monitor),
+          cancellation: view.tokens,
+          cancel_monitors: list.map(view.tokens, token.monitor),
           observation:,
         )
       let group = group(state, p)

@@ -5,6 +5,8 @@ This package uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased — initial release
 
+- `with_additional_cancellation` retains independent cancellation tokens on a client view. Any retained token can end its requests; `with_cancellation` keeps its explicit replacement behavior.
+
 - Cowlib 2.21.0 is the minimum after its cookie-encoder fix and native contract audit; later minor releases remain excluded.
 - A supervised Gun client owns bounded connection admission, streamed body lifetimes, response collection and batches.
 - Caller-built views select request budgets, cancellation, correlation and narrowing destination policy. Address checks preserve the original TLS authority through resolution and reuse.

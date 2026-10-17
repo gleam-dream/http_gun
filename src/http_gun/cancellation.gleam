@@ -1,7 +1,9 @@
 //// Cancels in-flight requests from another part of the program.
 ////
 //// `with_token` runs a callback with a `Token`; attach it to a client view
-//// with `http_gun.with_cancellation`. `cancel` stops every request made
+//// with `http_gun.with_cancellation`, which replaces existing tokens, or
+//// `http_gun.with_additional_cancellation`, which preserves them.
+//// `cancel` stops every request made
 //// through such a view that has not finished, before its headers or while
 //// its body is read, and the token stays cancelled. Returning from the
 //// callback, an exception and the creator's exit also cancel.

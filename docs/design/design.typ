@@ -226,12 +226,21 @@
     #subsection(title: "View composition and time authority", [
       #points(
         [A #term("term-client-view") copies only a handle and its view values. Scalar setters replace their prior value. Destination setters append policies whose intersection applies at every operation. Later correlation replaces earlier correlation.],
-        [`cancellation.with_token` creates one token process for its lexical scope. Cancellation kills the token process, which makes every copy remain cancelled. Current pending and body owners receive their monitors' death signal; a later attempt sees the dead token before submission. Completion removes monitors. Callback return, exception or creator death ends the token. Applications bound the number and lifetime of token scopes.],
+        [with_cancellation replaces the view's cancellation tokens with one token. with_additional_cancellation retains existing tokens and adds a distinct token. Any retained token can cancel requests through that view without cancelling another token or changing another view.],
+        [`cancellation.with_token` creates one token process for its lexical scope. Cancellation kills the token process, which makes every copy remain cancelled. Current pending and body owners receive their monitors' death signal; a later attempt sees the dead token before submission. Pending rejection, admission handoff and body termination remove every owned token monitor. Adding cancellation creates no process and takes no token lifetime ownership. #adr(12) records the library-composition requirement. Callback return, exception or creator death ends the token. Applications bound the number and lifetime of token scopes.],
         [A view's relative request timeout or absolute deadline replaces the startup request timeout, whether shorter or longer. With both supplied, the earlier applies. With neither, the startup timeout starts from the invocation's monotonic entry instant before admission.],
         [The absolute Deadline is VM-local and cannot be serialized as durable policy. Reading remaining duration never renews it. Every public duration is converted to whole milliseconds with sub-millisecond remainders rounded away from zero. Nonpositive Deadline creation is immediately expired.],
         [Views do not change immutable client identity, connection trust, protocol, resolver or startup socket timeout options. Idle read can be replaced per view; pooled socket send settings continue to use startup idle timeout. The body owner's independent overall timer still cancels an earlier request budget.],
         [`with_body_limit` replaces collection policy only. Negative view collection limits fail before submission. A zero limit permits an empty body; Truncate can return an empty prefix on overflow.],
       )
+      #behavior(title: "Independent cancellation authorities remain effective", level: "boundary", area: "Client views")[
+      #given[a client view retains application cancellation and additional operation cancellation]
+      #when[either cancellation is requested]
+      #then[unfinished requests through that view terminate with cancellation and their existing submission evidence]
+      #then[a later attempt through that view fails before submission]
+      #then[the other cancellation authority and other client views remain unchanged]
+      #then[the request removes all cancellation monitors when its ownership ends]
+      ]
     ])
     #subsection(title: "Supervision shutdown and mailbox lifetime", [
       #points(

@@ -43,8 +43,8 @@ pub type Pending {
     timer: process.Timer,
     reservation: Option(process.Pid),
     capture: Option(recorder.Capture),
-    cancellation: Option(token.Token),
-    cancel_monitor: Option(process.Monitor),
+    cancellation: List(token.Token),
+    cancel_monitors: List(process.Monitor),
     observation: lifecycle.Context,
   )
 }
@@ -151,10 +151,9 @@ pub fn push(queue: Queue, group: Group, p: Pending) -> Queue {
       None -> list.append(queue.order, [group])
       Some(_) -> queue.order
     },
-    case p.cancel_monitor {
-      None -> queue.cancellations
-      Some(monitor) -> dict.insert(queue.cancellations, monitor, p.id)
-    },
+    list.fold(p.cancel_monitors, queue.cancellations, fn(index, monitor) {
+      dict.insert(index, monitor, p.id)
+    }),
   )
 }
 
@@ -205,10 +204,11 @@ pub fn remove(queue: Queue, id: Reference) -> #(Option(Pending), Queue) {
             None, None -> list.filter(queue.order, fn(g) { g != entry.group })
             _, _ -> queue.order
           },
-          case entry.value.cancel_monitor {
-            None -> queue.cancellations
-            Some(monitor) -> dict.delete(queue.cancellations, monitor)
-          },
+          list.fold(
+            entry.value.cancel_monitors,
+            queue.cancellations,
+            fn(index, monitor) { dict.delete(index, monitor) },
+          ),
         ),
       )
     }
