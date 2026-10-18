@@ -8,7 +8,7 @@
 - The two documents link each other, the design's validation section and the decision records. `AGENTS.md` and the README link both, so an agent changing a reference or a measurement finds them.
 - Retain the HTTP Gun and Dream comparison as a runnable harness with a behavior contract suite and a separate timing run. Report each timing with its workload, runtime, hardware and source hashes.
 - State no performance ranking, latency promise or allocation guarantee from these measurements. Rerunning the harness produces new evidence for the current source and never reproduces retained hashes automatically.
-- Keep raw receipts under `docs/history/evidence` as non-markdown data. The design states the method rules and never a result.
+- Keep raw receipts under `docs/evidence` as non-markdown data. The design states the method rules and never a result.
 
 ## Rationale and alternatives
 
@@ -21,5 +21,5 @@
 ## Evidence
 
 - The retained run accompanies the 2026-09-30 scheduling correction in ADR 0003. Environment, results, the failed Dream trial and the Dream pin are in `docs/BENCHMARKS.md`.
-- Pins, comparison cases and classification rules are in `docs/ORACLE.md`. The Cowlib 2.21 source audit that qualified the native range is summarized there and in ADR 0007, with its sources and receipt in `docs/history/evidence/cowlib-2.21`.
-- Receipts: `docs/history/evidence/wave9/comparison` (inputs, raw measurements, summary, failed-trial observation) and `docs/history/evidence/dream-comparison/source.json`.
+- Pins, comparison cases and classification rules are in `docs/ORACLE.md`. The Cowlib 2.21 source audit that qualified the native range is summarized there and in ADR 0007, with its sources and receipt in `docs/evidence/cowlib-2.21`.
+- Receipts: `docs/evidence/comparison` (inputs, raw measurements, summary, failed-trial observation) and `docs/evidence/dream-comparison/source.json`.

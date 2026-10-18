@@ -58,7 +58,7 @@
             ".render/**"
             "build/**"
             "examples/*/build/**"
-            "docs/history/**"
+            "docs/evidence/**"
             "dev/dependencies/**"
             "dev/results/**"
           ];

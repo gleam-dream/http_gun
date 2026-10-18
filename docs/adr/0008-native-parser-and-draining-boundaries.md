@@ -19,4 +19,4 @@
 
 - docs/DESIGN and BOUNDS record owner acceptance of reason-phrase limits on 2026-10-01. `369da4f` records Warden feedback corrections; exact approval transcript is not tracked.
 - `http_gun_ffi.erl:reusable/1,cause/1,decode/1`, `internal/preparation.gleam`, `pool.gleam:checked`, `owner.gleam:check_headers`, wire/reuse/H2 tests.
-- Parser and send-deadline receipts remain in `docs/history/evidence/wave27` and Warden-feedback qualification receipts. Accepting this boundary does not turn an independently stricter downstream framing expectation into a passing claim.
+- The parser and send-deadline receipts and the Warden-feedback qualification receipts are retained in repository history at commit `1549541` and earlier. Accepting this boundary does not turn an independently stricter downstream framing expectation into a passing claim.

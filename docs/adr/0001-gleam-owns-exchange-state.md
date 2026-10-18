@@ -20,5 +20,5 @@
 
 - Current authorities: `src/http_gun/internal/{pool,owner,recorder,pending,batch,script,codec}.gleam`; foreign bindings: `src/http_gun_ffi.erl`, `src/http_gun_event_h.erl`, `src/http_gun_file_ffi.erl`.
 - Original restart recovery evidence lives in `.archive`; preserve it. Recorded snapshots were the pre-restart checkout and previous implementation at `a1ad984a9249389988bbc936a9af71002419fe79`. Their provenance hashes remain recoverable from Git history; this migration does not requalify their contents.
-- `NOTICE`, test certificate attribution, `docs/history/evidence/adoption-review/reference-sources.json` and Dream comparison source receipts retain license and reference evidence. Dream, ReqCassette, Gleam HTTPc, Mint and Finch supply scoped scenarios rather than full parity.
-- This record consolidates architecture/rationale from docs/DESIGN.md and docs/history/PROVENANCE.md. Historical test counts and completion diaries are retired; executable/raw receipts remain at their original paths.
+- `NOTICE`, test certificate attribution, `docs/evidence/adoption-review/reference-sources.json` and Dream comparison source receipts retain license and reference evidence. Dream, ReqCassette, Gleam HTTPc, Mint and Finch supply scoped scenarios rather than full parity.
+- This record consolidates architecture/rationale from the retired DESIGN and PROVENANCE documents. Historical test counts and completion diaries are retired and remain in Git history; the raw evidence that current documents cite remains under `docs/evidence`.

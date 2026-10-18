@@ -17,7 +17,7 @@ comparison and how outcomes are classified are in [ORACLE.md](ORACLE.md).
 - Requests are GETs with empty bodies. Small responses are status 200 and three bytes. Request and connect settings are 60 and 5 seconds.
 - HTTP Gun uses a four-connection cap except where the setting is 100, and admits 1,024 open bodies and 1,024 queued requests. Dream's persistent-session setting has different connection semantics, so the four-worker case gives both clients the same application concurrency.
 - The slow reader waits 2 ms per accumulated 64 KiB.
-- Source hashes for HTTP Gun and the harness are recorded in `docs/history/evidence/wave9/comparison/inputs.json`. They do not include a separate HTTP Gun commit id.
+- Source hashes for HTTP Gun and the harness are recorded in `docs/evidence/comparison/inputs.json`. They do not include a separate HTTP Gun commit id.
 
 ## Run
 
@@ -35,7 +35,7 @@ comparison and how outcomes are classified are in [ORACLE.md](ORACLE.md).
 Retained run of 2026-09-30, accompanying the scheduling correction in [ADR 0003](adr/0003-origin-lanes-and-minimal-process-captures.md). It predates the current checkout and has not been rerun for it.
 
 - **Environment:** Gleam 1.18.1, OTP 29 (ERTS 17.1), macOS 26.5.2 ARM64, Apple M2 Max, 12 logical CPUs and schedulers, 32 GiB RAM.
-- **Dream pin:** `bbc4b5402a7e0cb5247829c8f4be8fb273afc2a5`, source receipt `docs/history/evidence/dream-comparison/source.json`.
+- **Dream pin:** `bbc4b5402a7e0cb5247829c8f4be8fb273afc2a5`, source receipt `docs/evidence/dream-comparison/source.json`.
 
 Median elapsed milliseconds with minimum and maximum across successful trials:
 
@@ -53,7 +53,7 @@ Median elapsed milliseconds with minimum and maximum across successful trials:
 
 - The mixed case's elapsed time includes the slow stream. The median trial p95 of its small requests alone is 45.283 ms for HTTP Gun and 30.585 ms for Dream. Stream-only percentile fields in the raw output are unmeasured.
 - One Dream burst trial failed and is excluded from the aggregate: 48 connection-timeout failures, 393 distinct connections and 5,013.866 ms elapsed. The successful Dream burst trials used 6 and 30 distinct connections and HTTP Gun used 4 in each. The observations do not identify the cause.
-- Raw data stays beside the receipts as non-markdown files: `docs/history/evidence/wave9/comparison/benchmark.jsonl`, `summary.json`, `inputs.json` and `failed-trial-observation.json`.
+- Raw data stays beside the receipts as non-markdown files: `docs/evidence/comparison/benchmark.jsonl`, `summary.json`, `inputs.json` and `failed-trial-observation.json`.
 
 ## Limits
 

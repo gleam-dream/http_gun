@@ -1,5 +1,5 @@
 //// Scenarios inspired by Gun flow_SUITE and Finch lifecycle tests.
-//// Reference revisions/hashes: docs/history/evidence/adoption-review/reference-sources.json.
+//// Reference revisions/hashes: docs/evidence/adoption-review/reference-sources.json.
 
 import gleam/bit_array
 import gleam/erlang/process

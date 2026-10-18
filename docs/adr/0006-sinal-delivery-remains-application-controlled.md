@@ -19,4 +19,4 @@
 
 - `2b3656e` (2026-10-01) records Sinal adoption. `c45adfe` and `056536b` (2026-10-02) adopt caller correlation/builders. `e55fa1d` selects default emission; `1a5f5ef` adds labels and silence.
 - `telemetry.gleam`, `internal/lifecycle.gleam`, `config.gleam`, telemetry tests and ordinary consumer route setup.
-- Sinal source receipts, generic forwarder qualification and rejected fixed-slot experiment evidence remain under `docs/history/evidence/wave18`, `wave22`, `wave23` and `wave24`; `dev/dependencies` owns the reproducible validation archive. Exact historical source selection remains with receipts rather than a second design contract.
+- The Sinal source receipts, the generic forwarder qualification and the rejected fixed-slot experiment evidence are retained in repository history at commit `1549541` and earlier; `dev/dependencies` owns the reproducible validation archive. Historical source selection stays with those receipts rather than a second design contract.

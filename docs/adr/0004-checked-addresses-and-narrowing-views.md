@@ -19,4 +19,4 @@
 
 - `b517725` (2026-10-01) records policy/DNS pinning; `369da4f` records trust/reuse corrections. `0bf369f` (2026-10-02) adds required views; `4a6eeb0` (2026-10-03) makes narrowing selection precise.
 - `destination.gleam`, `internal/resolution.gleam`, `pool.gleam:admit_connection`, `http_gun_ffi.erl:open/9`, destination/trust/wire tests and external consumer view cases.
-- Warden at `230c6bb4171a782d5b4f4f795bbdc108cad49964` was a read-only scenario input; no Warden source was copied. Receipts remain in `docs/history/evidence/wave28` and `wave31`.
+- Warden at `230c6bb4171a782d5b4f4f795bbdc108cad49964` was a read-only scenario input; no Warden source was copied. The qualification receipts for the checked-address boundary are retained in repository history at commit `1549541` and earlier, not in the working tree.

@@ -54,9 +54,7 @@ def inputs(root):
         if credential_name(name):
             continue
         path = root / name
-        if name.startswith(
-            (".archive/", "docs/history/evidence/", "build/", ".direnv/")
-        ):
+        if name.startswith((".archive/", "docs/evidence/", "build/", ".direnv/")):
             continue
         if path.is_symlink() and not path.resolve().is_relative_to(root):
             raise ValueError(f"Source symlink leaves its checkout: {path}")

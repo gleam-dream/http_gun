@@ -4,12 +4,12 @@ This package is distributed under the Apache License, Version 2.0; see LICENSE.
 Reviewed loopback test servers, certificates and original package metadata
 came from the prior local HTTP Gun implementation at
  a1ad984a9249389988bbc936a9af71002419fe79.
-Original revisions and file hashes are preserved in docs/history/provenance.json.
+Original revisions and file hashes are preserved in docs/evidence/provenance.json.
 
 The development-only Sinal source snapshot in dev/dependencies keeps Sinal's
 license file. It is not an HTTP Gun production dependency. An archived LLM Wire
-consumer snapshot was used by the gate until wave 3; it is retired, and its
-provenance remains in git history and docs/history/PROVENANCE.md.
+consumer snapshot was once used by the gate; it is retired, and its
+provenance remains in git history.
 
 Gun, Cowlib and the Gleam packages remain unmodified released dependencies.
 Their own licenses apply; versions and checksums are locked in manifest.toml.
