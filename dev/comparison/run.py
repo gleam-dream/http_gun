@@ -9,6 +9,7 @@ from sinal_source import extract
 
 ROOT = Path(__file__).resolve().parents[2]
 WORK = ROOT / "build/dream-comparison"
+LOGS = WORK / "logs"
 OUT = ROOT / "docs/evidence/dream-comparison"
 SHA = "bbc4b5402a7e0cb5247829c8f4be8fb273afc2a5"
 ARCHIVE_SHA = "d518ec13f566dd8d60482eef0076fa562625fed4f1f2ffcbb38c4cbc1d8735fd"
@@ -76,6 +77,7 @@ def run(args, cwd, stem, timeout=180):
 
 def prepare():
     WORK.mkdir(parents=True, exist_ok=True)
+    LOGS.mkdir(parents=True, exist_ok=True)
     OUT.mkdir(parents=True, exist_ok=True)
     archive = WORK / f"dream-{SHA}.tar.gz"
     if not archive.exists():
@@ -181,7 +183,7 @@ def contracts():
             timeout=100,
         )
         (OUT / f"{name}-contracts.jsonl").write_text(result.stdout)
-        (OUT / f"{name}-contracts.stderr").write_text(result.stderr)
+        (LOGS / f"{name}-contracts.stderr").write_text(result.stderr)
         assert result.returncode == 0, result.stderr
         rows = [
             json.loads(line)
@@ -229,7 +231,7 @@ def benchmark(trials):
                             timeout=100,
                         )
                         stem = f"bench-{trial}-{name}-{scenario}-{count}-{cap}"
-                        (OUT / f"{stem}.stderr").write_text(done.stderr)
+                        (LOGS / f"{stem}.stderr").write_text(done.stderr)
                         rows = [
                             json.loads(line)
                             for line in done.stdout.splitlines()

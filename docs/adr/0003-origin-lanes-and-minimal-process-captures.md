@@ -18,4 +18,4 @@
 
 - `1f53017` (2026-09-30) records pool/batch scaling and streaming-adoption correction after baseline `04ef776`. The exact tracked acceptance date is 2026-09-30; benchmark values are workload evidence, not general latency promises.
 - Current implementation: `internal/pending.gleam`, `pool.gleam:dispatch_group`, `batch.gleam:advance`, `recorder.gleam` writer dispatch and `owner.gleam` capture callbacks.
-- The raw burst diagnosis and the comparison measurements remain under `docs/evidence`; the adoption reference sources remain there too. This record replaces the causal decisions in BURST_DIAGNOSIS, BURST_FIX, ADOPTION_REVIEW and ADOPTION_VALIDATION. The retired reports' original text remains in Git.
+- The comparison measurements and the adoption reference sources remain under `docs/evidence`. The raw burst diagnosis (profiles, call counts and probe runs behind the controlled probes above) is retained in Git history at `326296d`, under `docs/evidence/burst-diagnosis`. This record replaces the causal decisions in BURST_DIAGNOSIS, BURST_FIX, ADOPTION_REVIEW and ADOPTION_VALIDATION. The retired reports' original text remains in Git.
