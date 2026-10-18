@@ -2,7 +2,6 @@
 /examples/*/build/
 /.direnv/
 /.env
-/dev/results/
 /.archive/
 __pycache__/
 .render/

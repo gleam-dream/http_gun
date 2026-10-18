@@ -60,7 +60,6 @@
             "examples/*/build/**"
             "docs/evidence/**"
             "dev/dependencies/**"
-            "dev/results/**"
           ];
           programs.gleam = {
             enable = true;
