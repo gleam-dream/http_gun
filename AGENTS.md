@@ -1,20 +1,35 @@
 # HTTP Gun
 
-Read docs/design/design.typ, docs/design/CONTEXT.typ, docs/COVERAGE.md and the relevant docs/adr record before changing this package. The design captures current contracts; ADRs retain rationale. Use progressive implementation for follow-up work and preserve accepted behavior. Retired construction plans and wave trackers are not current authority.
+HTTP Gun is an Erlang/OTP HTTP client written in Gleam. Read `docs/design/design.typ`, `docs/design/CONTEXT.typ`, `docs/COVERAGE.md` and the relevant `docs/adr` record before changing this package. The design states current contracts; ADRs retain rationale.
 
-Implement public API, domain state, pool admission, body ownership, batching, matching, codecs and recording coordination in Gleam. Use pinned gleam_otp and gleam_erlang APIs. Handwritten Erlang is restricted to Gun bindings/message conversion, genuinely missing filesystem/runtime operations and exception-safe scope cleanup. No Erlang pool, body-owner or cassette-session servers.
+## Commands
 
-Gun/Cowlib own wire protocols. Do not patch dependencies, implement parsers or pursue whole-stack memory certification. Document post-parse admission limits honestly. No retries, redirects or decompression. Generic HTTP bytes, statuses, duplicate headers and trailers are required.
+- Fast gate: `./dev/env sh dev/gate fast`.
+- Full gate: `./dev/env sh dev/gate full`.
+- Runtime matrix: `sh dev/matrix`.
+- Separate public consumers: `./dev/env sh dev/consumers`, `./dev/env sh dev/async-consumer`, `./dev/env sh dev/mtls-consumer`.
+- Downstream qualification is an explicit, isolated command, `dev/check_downstream.py`. Run it when a public contract changes, and inspect its arguments first.
+- Dependency range changes follow the design's native assumption inventory.
 
-Change only this repository unless the task names a sibling; /code/gleam-dream/oversight and sibling repositories are otherwise read-only. Push to master after the full gate passes and the change is validated against the packages and apps that use it. Hex publication, upstream contact and provider credentials need explicit owner approval. Never alter another task's checkout.
+## Constraints
 
-Use observable public tests, one failing scenario at a time, followed by minimal implementation and refactoring while green. Fast: ./dev/env sh dev/gate fast. Full: ./dev/env sh dev/gate full. Missing functionality is unfinished, not a passing limitation. Retain exact qualification evidence; do not claim completion of unexecuted workflows. Use docs/TESTING.md for current commands and docs/DEPENDENCY-UPGRADES.md before widening native dependency ranges.
+- Implement public API, domain state, pool admission, body ownership, batching, matching, codecs and recording coordination in Gleam on pinned `gleam_otp` and `gleam_erlang` APIs. Handwritten Erlang is limited to Gun bindings and message conversion, missing filesystem or runtime operations and exception-safe scope cleanup. No Erlang pool, body-owner or cassette-session servers.
+- Gun and Cowlib own wire protocols. Do not patch dependencies, implement parsers or pursue whole-stack memory certification. No retries, redirects or decompression. Reuse `file_streams` and `simplifile` where their semantics preserve bounded reads, exclusive creation, atomic publication and cleanup.
+- Local network tests and examples set `destination.allow_loopback` explicitly. Never use `SNI=disable` for IP literals or bypass destination policy on connection replacement.
+- Use observable public tests, one failing scenario at a time, then minimal implementation and refactoring while green. Missing functionality is unfinished. Retain exact qualification evidence and claim no unexecuted workflow.
+- The package is unreleased. Breaking API and schema cleanup is authorized; update owned tests and examples together, add no compatibility layers and keep one strict, version-marked fixture schema.
 
-Reuse file_streams and simplifile where their verified semantics preserve bounded reads, exclusive creation, atomic publication and cleanup. Keep custom filesystem FFI restricted to missing primitives. Body/query redaction is implemented. Crash-durable publication remains an optional owner decision; do not mislabel its absence as a Gun/Cowlib limitation. Inherited allocations and GOAWAY races require honest boundaries and correct supported-API use, not dependency patches.
+## References
 
-This package is unreleased. Use the explicit isolated downstream gate in docs/TESTING.md when changing public contracts. ADR 0010 records downstream migration evidence; archived examples do not qualify a current consumer. Breaking API/schema cleanup is authorized; update owned tests/examples together. Do not add compatibility layers or migration-only variants for earlier experiments. Keep one strict, version-marked fixture schema; a format marker is not a package release.
+- `docs/ORACLE.md` pins the external references compared with HTTP Gun (the Dream client commit, the Gun and Cowlib archives, `nghttpd`), says what is compared and how outcomes are classified, and states the limits of each claim.
+- `docs/BENCHMARKS.md` holds the comparison method, the run commands and the dated retained measurements. The two documents link each other, the design's validation section and ADRs 0007, 0013 and 0014.
+- Usage lives as compiled examples in `examples/ordinary/src/usage_*.gleam` plus the consumers in `examples/`. The gate compiles and runs them, so change an example together with any public API it uses.
 
-Clients default to public destinations only. Local network tests/examples must explicitly set destination.allow_loopback; private-network use requires its own opt-in. Resolve and check the complete A/AAAA answer before opening each connection, then connect to that IP with original TLS identity. Never use SNI=disable for IP literals or bypass policy on connection replacement. DNS workers and admission remain in Gleam. Gun's unexposed status reason phrase is an explicitly accepted, documented parser boundary; do not patch the dependency to change it.
+## Workflow
+
+- Change only this repository unless the task names a sibling; sibling repositories are otherwise read-only, and another task's checkout is never altered.
+- Push to master after the full gate passes and the change is validated against the packages and apps that use it.
+- Hex publication, upstream contact and provider credentials need explicit owner approval.
 
 <!-- agent-skills:begin -->
 <!-- framework-commit: cab7c0590036edaa66d8430cc5016399a9fd2c71 origin: git@github.com:lostbean/skills.git -->

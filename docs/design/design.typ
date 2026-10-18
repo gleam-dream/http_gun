@@ -44,23 +44,23 @@
 
   #pagebreak(weak: true)
   #pending-ledger(
-      pending-entry(title: "Streamed upload producer contract", kind: "build", adr: 9)[
+      pending-entry(title: "Streamed upload producer contract", kind: "build", since: "2026-09-29", adr: 9)[
         Retain bounded producer demand, finish/abort, early response, producer failure and request replayability. Buffered uploads are the current path. An arbitrary enumerable is insufficient evidence of backpressure.
       ],
-      pending-entry(title: "Explicit redirect and decompression policies", kind: "build", adr: 9)[
+      pending-entry(title: "Explicit redirect and decompression policies", kind: "build", since: "2026-09-29", adr: 9)[
         Redirects require hop/deadline bounds, method/body transitions, origin/downgrade policy and credential stripping. Decompression requires encoded and decoded limits, incremental expansion bounds and truthful response headers.
       ],
-      pending-entry(title: "Proxy route and credential identity", kind: "build", adr: 9)[
+      pending-entry(title: "Proxy route and credential identity", kind: "build", since: "2026-09-29", adr: 9)[
         Retain explicit proxy routing and tunnel/proxy credentials in connection keys. Every supported path requires independent destination, TLS and lifecycle tests.
       ],
-      pending-entry(title: "Optional cookie cache and SSE helpers", kind: "build", adr: 9)[
+      pending-entry(title: "Optional cookie cache and SSE helpers", kind: "build", since: "2026-09-29", adr: 9)[
         Cookie/cache adapters have caller-owned policy, storage, capacity and lifetime. A generic SSE helper is pure framing over HTTP bytes. Provider framing remains in its provider package until this helper exists.
       ],
-      pending-entry(title: "Choose crash-durable fixture publication", kind: "ruling", adr: 5)[
+      pending-entry(title: "Choose crash-durable fixture publication", kind: "ruling", since: "2026-10-06", adr: 5)[
         Atomic visibility is implemented. A power-loss durability promise would require file and directory synchronization with explicit supported-platform semantics. It has no accepted implementation contract.
       ],
-      pending-entry(title: "Resolve recording cleanup promise strength", kind: "ruling", adr: 10)[
-        Public prose promises removed staging data on abort and failure. The implementation ignores removal failures and can return while a blocked writer's cleaner waits. Decide whether best-effort cleanup is the public contract or whether typed cleanup completion is required.
+      pending-entry(title: "Resolve recording cleanup promise strength", kind: "ruling", since: "2026-10-06", adr: 10)[
+        Abort and failure attempt staging removal. The implementation ignores removal failures and can return while a blocked writer's cleaner waits. The public contract is either best-effort cleanup or typed cleanup completion; the owner has not ruled.
       ],
   )
 
@@ -200,9 +200,25 @@
         #then[no usable client capability is returned]
       ]
     ])
+    #subsection(title: "Default settings", [
+      #points(
+        [Every timeout, deadline and wait is a `gleam/time/duration.Duration` held as whole milliseconds; a sub-millisecond remainder rounds away from zero. Unbounded request or idle timeout is `config.Infinity`; a bounded one is `config.After(duration)`. Lifting the request timeout never lifts the connect, pool or idle timeout, and each request phase is also capped by the time left in the request.],
+        [`config.validate` checks settings without starting a process. `start` returns InvalidConfig for an out-of-range value. Capacity and timeout defaults appear in Budgets and effect timing.],
+      )
+      #facts(([Setting], [Default], [Selected with]), (
+        ([Destinations], [Public addresses only], [`config.allow_loopback`, `config.with_destination`]),
+        ([Plaintext `http://`], [AllowPlaintext], [`destination.with_plaintext`]),
+        ([Destination per view], [Not required], [`config.require_view_destination`]),
+        ([TLS client identity], [None], [`config.with_client_identity`]),
+        ([Protocol and server trust], [HTTP/1.1; system CAs; peer and host name verified], [`config.with_protocol`, `config.with_trust`]),
+        ([Cassette redaction], [Credential headers `authorization`, `proxy-authorization`, `cookie`, `set-cookie`, `x-api-key`, `api-key`, `x-goog-api-key`], [`config.with_redaction`]),
+        ([Observations], [`sinal.emit`, following the application's routes], [`config.with_observations`, `config.without_observations`]),
+        ([Client label in events], [None], [`config.with_label`]),
+      ))
+    ])
     #subsection(title: "Client certificate identity", [
       #points(
-        [`client_identity.from_pem` admits a nonempty leaf-first PEM certificate chain and exactly one unencrypted PEM private key into an opaque immutable snapshot. It performs no filesystem or network operation. Malformed certificate/key input and encrypted private keys produce typed errors without retaining the input in diagnostics. OTP owns PEM/DER parsing and TLS algorithm support. #adr(11)],
+        [`client_identity.from_pem` admits a nonempty leaf-first PEM certificate chain and exactly one unencrypted PEM private key into an opaque immutable #term("term-client-identity") snapshot. It performs no filesystem or network operation. Malformed certificate/key input and encrypted private keys produce typed errors without retaining the input in diagnostics. OTP owns PEM/DER parsing and TLS algorithm support. #adr(11)],
         [`config.with_client_identity` selects that snapshot for the client's TLS connections. Identity omission preserves ordinary server-authenticated TLS. Server trust and HTTPS hostname verification remain independent of client authentication. Plaintext connections never transmit certificate/key material.],
         [Each client has its own pool and one immutable identity. The client pool plus canonical origin partitions authenticated connections. Views share that identity and cannot replace it. Every reconnect uses the same admitted bytes; replacing an application file cannot change an existing client's identity.],
         [Rotation starts a new client with a newly admitted identity, directs new application work to that client, and stops the old client under its existing drain contract. In-flight old-client work uses its old authenticated connection until completion or drain expiry. Applications that need old results await and consume them before stop; shutdown grace covers active HTTP leases, and pool exit ends retained body access. Applications own overlap capacity and credential acquisition; HTTP Gun owns no file watcher or credential registry.],
@@ -225,9 +241,9 @@
     ])
     #subsection(title: "View composition and time authority", [
       #points(
-        [A #term("term-client-view") copies only a handle and its view values. Scalar setters replace their prior value. Destination setters append policies whose intersection applies at every operation. Later correlation replaces earlier correlation.],
+        [A #term("term-client-view") copies only a handle and its view values. Scalar setters replace their prior value. Destination setters append policies whose intersection is the #term("term-destination-policy") applied at every operation. Later correlation replaces earlier correlation.],
         [with_cancellation replaces the view's cancellation tokens with one token. with_additional_cancellation retains existing tokens and adds a distinct token. Any retained token can cancel requests through that view without cancelling another token or changing another view.],
-        [`cancellation.with_token` creates one token process for its lexical scope. Cancellation kills the token process, which makes every copy remain cancelled. Current pending and body owners receive their monitors' death signal; a later attempt sees the dead token before submission. Pending rejection, admission handoff and body termination remove every owned token monitor. Adding cancellation creates no process and takes no token lifetime ownership. #adr(12) records the library-composition requirement. Callback return, exception or creator death ends the token. Applications bound the number and lifetime of token scopes.],
+        [`cancellation.with_token` creates one #term("term-cancellation-token") process for its lexical scope. Cancellation kills the token process, which makes every copy remain cancelled. Current pending and body owners receive their monitors' death signal; a later attempt sees the dead token before submission. Pending rejection, admission handoff and body termination remove every owned token monitor. Adding cancellation creates no process and takes no token lifetime ownership. #adr(12) records the library-composition requirement. Callback return, exception or creator death ends the token. Applications bound the number and lifetime of token scopes.],
         [A view's relative request timeout or absolute deadline replaces the startup request timeout, whether shorter or longer. With both supplied, the earlier applies. With neither, the startup timeout starts from the invocation's monotonic entry instant before admission.],
         [The absolute Deadline is VM-local and cannot be serialized as durable policy. Reading remaining duration never renews it. Every public duration is converted to whole milliseconds with sub-millisecond remainders rounded away from zero. Nonpositive Deadline creation is immediately expired.],
         [Views do not change immutable client identity, connection trust, protocol, resolver or startup socket timeout options. Idle read can be replaced per view; pooled socket send settings continue to use startup idle timeout. The body owner's independent overall timer still cancels an earlier request budget.],
@@ -245,7 +261,7 @@
     #subsection(title: "Supervision shutdown and mailbox lifetime", [
       #points(
         [`start` links the pool to its caller. `supervised(config, name)` supplies a child specification; `named(name)` is pure and targets the current registered process. During restart absence, operations return ClientClosed with NotSent. An old body is never revived by pool restart.],
-        [`stop` refuses new admission, fails queued work with ClientClosed/NotSent and waits for active leases within shutdown grace. Grace expiry locally closes unfinished bodies and native connections. Completed retained body actors lose the client authority when the pool exits. Repeated stop is harmless.],
+        [`stop` refuses new admission, fails queued work with ClientClosed/NotSent and waits for active leases within the #term("term-shutdown-grace"). Grace expiry locally closes unfinished bodies and native connections. Completed retained body actors lose the client authority when the pool exits. Repeated stop is harmless.],
         [Shutdown grace bounds the planned drain. Serial body close calls, actor scheduling and synchronous observation handlers are additional work; this is not a hard real-time stop bound.],
         [Pool notifications go to the pool actor. Gun replies go directly to the body owner. Public calls monitor only their own target, consume the typed result and flush that monitor on completion. Response data and stale monitor notifications are not forwarded to the HTTP caller.],
       )
@@ -290,6 +306,7 @@
       #points(
         [A host list entry is host, host:port, bracketed IPv6 or bracketed IPv6:port. An empty list admits no host. Whitespace, URI delimiters, empty names and invalid ports fail validation. `destination.check` checks literal addresses and the host list without resolving hostname answers.],
         [Plaintext is AllowPlaintext, PlaintextToLoopbackOnly or RequireTls. A loopback-only plaintext choice checks every address in the complete answer, including reuse. HTTPS remains subject to address policy and verified TLS.],
+        [A client shared by tenants with different destinations must admit the union of their destinations. A call that holds the client without a tenant view reaches that union, so `require_view_destination` makes the client policy only bound what a view may narrow to. A view that admits more than the client receives only what both admit.],
         [Every startup policy and appended view policy must admit the original host/port and every resolved address. No view can widen the client. For `require_view_destination`, one policy must have a host list or refuse an address class admitted by the client. A scheme-only restriction never satisfies it. The required-view check also runs offline. #adr(4)],
       )
       #behavior(title: "A view must select its own destination", level: "boundary", area: "Destination policy")[
@@ -327,7 +344,7 @@
     ))
     #subsection(title: "FIFO lanes and bounded preparation", [
       #points(
-        [Live/recording scheduling uses one FIFO lane per canonical origin. An admission pass stops at a blocked lane head and considers other lanes. Lanes that make progress rotate their position. Playback uses one global session lane to preserve matching order.],
+        [Live/recording scheduling uses one FIFO #term("term-origin-lane") per canonical origin. An admission pass stops at a blocked lane head and considers other lanes. Lanes that make progress rotate their position. Playback uses one global session lane to preserve matching order.],
         [Reuse comes before opening another connection. If global capacity is full, an unused ready connection for another origin may be evicted when that origin has no waiter. Idle sockets are a cache rather than a permanent capacity claim. #adr(3)],
         [Resolving/connecting/checking slots are finite. Only one new preparation exists per origin while that origin already prepares a connection. At most one H1 readiness job exists per connection. A readiness job also reserves an open body slot to preserve admission order at capacity one.],
         [Work crossing process boundaries captures only required values. A batch worker captures one input and its operation. Release/capture callbacks capture message destinations. They do not capture pool pending queues or completed batch results.],
@@ -454,7 +471,7 @@
     ])
     #subsection(title: "Bounded batch lifecycle", [
       #points(
-        [Batch validates input count and concurrency before scheduler startup. Workers own one request's open/read/close lifecycle. At most requested concurrency workers run. Caller death kills its workers; body ownership then releases their HTTP resources.],
+        [A #term("term-batch") validates input count and concurrency before scheduler startup. Workers own one request's open/read/close lifecycle. At most requested concurrency workers run. Caller death kills its workers; body ownership then releases their HTTP resources.],
         [Results preserve input order regardless of completion order. One request failure occupies only its position. Worker crash conservatively yields RequestFailed(UnknownTransport)/MaybeSent at that position and releases its worker slot.],
         [One shared atomic counter charges retained body bytes before collection keeps a chunk. Overflow fails the crossing response. Once crossed, positions not yet sent fail with BatchBytes/NotSent. Existing workers can settle independently. The counter is monotonic and does not refund failed-response bytes.],
         [The 64 MiB budget measures charged body bytes, not headers, input values, worker stacks or transient concatenation copies. The rejected crossing chunk has already been delivered to a worker. It is not a whole-batch VM allocation certificate.],
@@ -477,6 +494,7 @@
       ))
       #points(
         [Only Unavailable, Network and TimedOut are retryable through `is_retryable`. NotSent permits another attempt; MaybeSent requires caller-declared idempotency. This helper does not schedule retries, interpret Retry-After or validate business idempotency.],
+        [`error.Reason`, `error.TransportCause`, `error.LimitKind` and `error.RequestProblem` may gain variants in a minor release, so a caller matches them with a catch-all arm. `Kind` is closed. #adr(15)],
         [Known transport categories include name resolution, refused/reset/closed/draining connections, certificate/TLS rejection, protocol, dependency header limit, timeout and unexpected protocol. Unknown terms remain UnknownTransport without exposing raw dependency text or stack traces.],
         [`name` is a stable machine identifier; `describe` omits free-form request/config/fixture data. Failure never contains request headers, URL, query or body. Collection may retain response headers after redaction; serialization stores those retained headers. Explicit `with_headers` authors safe data and does not automatically apply a redaction policy.],
         [`to_json` and `decoder` round-trip typed diagnostic data and evidence. Required measured sizes stay distinct from unavailable parser measurements. StartError, request Failure, cassette I/O, RecordError and FinishError remain separate boundaries.],
@@ -490,6 +508,7 @@
         [`testing.playback` validates complete configuration, whole-byte request/chunk bodies, final statuses 200–599 and estimated script size before starting. It creates a #term("term-playback-session") with one global admission-ordered cursor. Concurrency does not define a reusable first-match lookup.],
         [Exact match keys apply configured redaction to both expected and actual requests. Host and header names become lowercase, empty path becomes slash, ignored headers disappear and remaining headers sort by name while duplicate-name order remains. Method, URI fields and bytes otherwise remain exact.],
         [An explicit custom matcher receives these normalized forms. It owns only equality; common validation, lifetime and response admission still run. A mismatch reports the zero-based position and consumes nothing. Exhaustion fails without network fallback. Custom callbacks are trusted code and can block the pool.],
+        [A loaded `testing.Script` (#term("term-script")) is immutable input. Each `testing.playback` call starts a separate client at its first exchange, so one script serves independent runs. Client views share their client's cursor; `with_correlation` changes observation metadata and selects no sequence. Concurrent requests on one client consume exchanges in admission order.],
         [Offline requests skip destination resolution/address authorization and open no network socket. Required-view selection still applies. Bodies pass the same post-delivery header/byte admission and collection logic with negotiated protocol Offline.],
       )
       #behavior(title: "Playback mismatch preserves the next exchange", level: "boundary", area: "Playback matching")[
@@ -549,7 +568,7 @@
         [Write failure, capture overflow, abandoned reservation, failed publication, abort, owner loss and recorder crash trigger staging cleanup. A janitor monitors recorder death. Cleanup kills the active writer and waits up to 200 milliseconds before allowing a separate cleaner to wait for its exit.],
         [The actual removal primitive deletes only direct files or empty child directories, then the staging directory. It never recursively traverses unknown nested data. Removal errors are ignored. Unremovable entries, a blocked writer and VM termination can leave data behind. The cleanup promise strength is unresolved in Pending updates. #adr(10)],
         [file_streams supplies explicit Raw/Exclusive writes and bounded raw reads. simplifile supplies permission, hard-link, rename and file deletion. Scope helpers close handles on exceptions before re-raising. When both normal operation and close fail, the primary operation failure takes precedence.],
-        [Runtime leftovers named with the destination's `.http-gun-` staging suffix are safe to remove after the writer/recorder no longer owns them. Applications decide artifact retention and privacy. No directory sync or remote object-store publication port exists.],
+        [Runtime leftovers in a #term("term-staging-directory"), named with the destination's `.http-gun-` staging suffix are safe to remove after the writer/recorder no longer owns them. Applications decide artifact retention and privacy. No directory sync or remote object-store publication port exists.],
       )
     ])
   ])
@@ -576,6 +595,7 @@
     ])
     #subsection(title: "Caller and extension obligations", [
       #points(
+        [An application routes the `http_gun` event prefix to a forwarder at startup so handlers never run inside the pool. A node-wide handler sees the events of every client, including those libraries own, and filters on the client label.],
         [A library receiving a view reads `http_gun.correlation` and copies it into its own event vocabulary. It preserves caller settings. A library owning a private client labels it with the library name; silence is an explicit alternative. Application startup owns route installation and removal.],
         [Resolver, body redactor, playback matcher and scoped response callback are the variable-behavior ports. Common client admission, failure evidence and actor cleanup remain local to HTTP Gun. Callback authors own finite captured state and resources they spawn; custom matcher/redactor execution is not isolated by a timer.],
         [Provider adapters own authentication, request encoding, expected status/media type, cumulative semantic response bounds, SSE/provider framing and outcome reduction. MCP clients own MCP correlation/protocol semantics. OIDC clients own URL/trust restrictions and identity validation. No shared retry/runtime/error/durability abstraction is introduced.],
@@ -595,8 +615,26 @@
       [No handwritten Erlang pool, body server, recorder server, DNS admission server or protocol parser exists. Native exception classification returns bounded recognized causes and UnknownTransport. Internal module visibility is documentation organization rather than an import-security boundary; opaque capability construction and actors enforce authority.],
       [Gun range is 2.6.0 inclusive to 2.7.0 exclusive. Cowlib range is 2.21.0 inclusive to 2.22.0 exclusive. Patch ranges permit security updates while minor changes require deliberate audit. The committed manifest selects the tested minimum; latest-patch isolated resolution exercises the other end. #adr(7)],
       [Undocumented assumptions are H1 `gun:info` state_name connected; reason terms inside gun_error/gun_down; Gun terminal event callback before process exit; source-reviewed request return timing; H2 max_headers including status; and test-only cow_http2/cow_hpack calls. Unknown state rejects reuse; unknown reasons lose precision rather than becoming safe-retry evidence.],
-      [Widening a range requires inspecting each assumption, updating decoding only under an accepted contract, running minimum/latest full gates and qualifying public consumers. A changed test helper API can break H2 evidence and must not be mistaken for a production protocol change. `docs/DEPENDENCY-UPGRADES.md` holds the operational procedure.],
+      [Widening a range requires inspecting each assumption, updating decoding only under an accepted contract, running minimum/latest full gates and qualifying public consumers. A changed test helper API can break H2 evidence and must not be mistaken for a production protocol change.],
     )
+    #subsection(title: "Native assumption inventory", [
+      #facts(([Assumption], [Source], [Behavior if it changes]), (
+        ([`gun:info/1` returns `state_name: connected` and protocol `http` for a reusable H1 connection], [`src/http_gun_ffi.erl:reusable/1`], [A missing or unknown state refuses reuse; the replacement connection stays before submission]),
+        ([Structured `gun_error` and `gun_down` reasons], [`cause/1`, `decode/1`], [UnknownTransport loses detail; an unknown reason never yields NotSent]),
+        ([Gun calls its event handler with the terminal reason before process exit], [`src/http_gun_event_h.erl:terminate/2`; Gun `terminate/3`], [The original owner and typed reason are retained when the owner installs its monitor after Gun exits]),
+        ([The request call returns asynchronously before socket processing], [`request/5`; reviewed Gun request implementation], [MaybeSent begins at invocation; no hidden retry]),
+        ([H2 header count includes `:status`], [`open/10`; Gun and Cowlib source], [Ordinary-header admission stays exact after parsing]),
+        ([Settings-change notification and peer stream capacity], [`decode/1`; `internal/pool.gleam`], [No H2 stream opens before initial SETTINGS; a reduction blocks new admission]),
+        ([Test-only `cow_http2` and `cow_hpack` operations], [`test/http_gun_h2_server.erl`], [The H2 test server is requalified before any H2 behavior claim]),
+        ([Gun wraps a post-handshake TLS alert as `{closed, {tls_alert, {Alert, Detail}}}` for stream owners], [Gun `gun_http:close_reason/1`, `gun_http2:close_reason/1`], [The nested recognized cause is decoded without exposing `Detail`; MaybeSent is preserved after submission]),
+      ))
+      #points(
+        [A range widening runs the full gate on the committed minimum and on the newest admitted patches through the isolated environment. CI selects latest patches with `HTTP_GUN_DEPENDENCIES=latest`. The selected root Gun and Cowlib versions are imposed on the disposable ordinary, async, mTLS and stdlib consumer copies; the gate fails when a resolved consumer differs and retains the manifests under `build/evidence/manifests`.],
+        [Public consumers and explicitly selected downstream checkouts are requalified when a public contract changes. Qualification uses no provider credential and patches no dependency.],
+        [The runtime matrix qualifies the Gleam OTP and Erlang process APIs that own native lifetime. A separate consumer build and the complete fast suite run at the advertised stdlib lower bound and at the selected current version. The disposable lower-bound package resolves a Gleeunit version compatible with its stdlib inside the existing dev-dependency range and retains that manifest. Authored Erlang warning rejection stays separate from upstream diagnostics, so an older stdlib can emit OTP deprecation diagnostics while package-owned source still passes `erlc -Werror`.],
+        [`file_streams` preserves explicit Raw reads without read-ahead, Exclusive writes and close error reporting. `simplifile` preserves hard-link and rename publication and permission semantics. A check-before-create helper never substitutes for exclusivity. A durability promise beyond atomic visibility requires its own supported-platform contract, because file sync alone does not establish directory-entry persistence.],
+      )
+    ])
   ])
 
   #section(title: "Validation and retained capability scope", lead: "Observable tests establish boundaries; preserved intent remains visible.", body: [
@@ -611,9 +649,45 @@
         ([Dependency boundary], [FFI warning build, min/latest CI, stdlib boundary checks], [Supported source compatibility and native helper assumptions]),
       ))
       #points(
-        [Gun/Cowlib source and protocol behavior are authoritative for transport mechanics. Dream, ReqCassette, Gleam HTTPc, Mint and Finch supply scoped scenarios and comparison methods. They are not complete parity oracles. Attribution, hashes and raw receipts remain with executable evidence. #adr(1)],
+        [Gun/Cowlib source and protocol behavior are authoritative for transport mechanics. Dream, ReqCassette, Gleam HTTPc, Mint and Finch supply scoped scenarios and comparison methods. They are not complete parity oracles. #lnk("../ORACLE.md")[The oracle document] pins each reference and states what is compared; attribution, hashes and raw receipts remain with executable evidence. #adr(1)],
         [Source inspection, inspired tests, faithful ports and differential execution are distinct evidence classes. Real H2 sharing cannot be proven by two H1 sockets or script playback. Performance samples establish only their workload/runtime measurements.],
-        [The fast/full gate, runtime matrix, ordinary and async consumers, isolated downstream selection and local test-server procedures remain in `docs/TESTING.md`. Normal gates use local HTTP/TLS/H2, temporary files and no provider credentials.],
+        [Normal gates use local HTTP/TLS/H2 servers, temporary files and no provider credentials. Loopback access is enabled explicitly by each local test client.],
+      )
+    ])
+    #subsection(title: "Validation profiles and gates", [
+      #facts(([Profile], [Command], [Content]), (
+        ([Fast], [`./dev/env sh dev/gate fast`], [Formatting, Gleam check/build/tests, native warnings, ownership and dependency boundaries]),
+        ([Full], [`./dev/env sh dev/gate full`], [Fast plus stdlib edge versions, ordinary/async/mTLS consumers, real nghttpd HTTP/2, shared batch budgets, recording and load observations]),
+        ([Matrix], [`sh dev/matrix`], [Each selected runtime shell qualifies in isolation]),
+        ([Soak], [`sh dev/gate soak`], [Ten-minute local nghttpd soak in the extended workflow]),
+      ))
+      #points(
+        [`dev/env` enters the pinned Nix shell. A #term("term-validation-profile") selects the checks and evidence of one gate run. `dev/gate` builds an isolated validation copy unless it already runs inside that gate; normal gates consume no sibling working copy. The outer invocation checks the original Git tree with `nix flake check --print-build-logs` and runs gate controls before creating the copy. Ignored local credential files never enter Nix source snapshots. #adr(14)],
+        [The Nix checks enforce canonical Gleam, Nix, Elixir, Markdown, YAML and Python formatting and authored-tooling lint (actionlint, ShellCheck, Ruff restricted to E9/F rules on authored `dev/**/*.py`). Formatting excludes generated build, render and PDF output, retained `docs/history` evidence, frozen `dev/dependencies` bytes and disposable `dev/results`. Compiler-negative fixtures live only in temporary consumer copies.],
+        [`dev/check_native.py` compiles authored Erlang, including both consumers' FFI and copied local servers, with `erlc -Werror`, dependency include paths and generated dependency BEAM paths. A valid native module and an intended unused-variable rejection test qualify this check separately from Gleam's warning flag.],
+        [`dev/check_results.py` rejects missing, empty, failed, skipped or ambiguous test summaries and requires all eleven distinct load workloads with their H1/H2 connection and large-byte assertions. Controls reject malformed JSON, duplicate or missing workloads and stale consumer dependency resolution. A timeout control proves isolated gate descendants stop before workspace cleanup.],
+        [Each gate run replaces `build/evidence`, so a failed run cannot export an earlier success receipt. `build/evidence/logs` keeps commands and raw per-check logs, `build/evidence/manifests` keeps the resolved root and consumer manifests, and `summary.json` records the profile, selected dependencies, elapsed time, outcome and exit code, failed runs included.],
+        [CI runs six full-gate lanes (OTP 27, 28 and the default OTP 29 shell, each with the committed minimum and the newest admitted Gun/Cowlib patch) and a separate design job. The final CI job accepts only successful matrix and design results. Every push, pull request and manual dispatch runs it with pinned actions, read-only repository permission, superseded-run cancellation and bounded job times; failure evidence is retained for 14 days.],
+        [A weekly or manual extended workflow runs the soak, native ARM64 full qualification and the pinned public comparison harness, retains results for 30 days and reports its own final status. The batch scaling guard is `5000 requests < 15 × 500-request median + 50 ms`; measurements add no absolute latency promise.],
+      )
+    ])
+    #subsection(title: "Public consumers and local fixtures", [
+      #points(
+        [`examples/ordinary` compiles as its own package. One runnable module per topic is the usage reference: configuration and validation, client views with streamed bodies, limits and batches, destination policies and tenants, scripted playback with redaction, and the supervision, failure, observation and record/replay flow. The full gate builds and runs them, and README snippets compile in the fast gate, so a changed name or behavior fails a gate. Its cancellation checks exercise retained application and operation tokens before submission, while queued and during a live response; duplicate addition, replacement, source-token independence and borrowed-client reuse are separate assertions.],
+        [`examples/mtls` runs ephemeral RSA and EC identities against a real local TLS peer. It qualifies H1/H2 authentication, rejection, recovery, per-client connection isolation, snapshot reconnection, rotation, unchanged server and destination checks and credential-free capture. This is local native evidence, not provider certification.],
+        [`examples/async` owns the bounded application job recipe: worker lifetime, synchronous sinks and cancellation. Its worker opens and reads the body through `with_response` in one process, runs the sink before the next read and holds no forwarding loop or body mailbox. Early Stop returns the observed prefix, a guardian kills the worker when its creator dies, and shutdown cancels, waits a finite grace and kills only that worker.],
+        [`dev/check_downstream.py` runs explicitly selected, isolated LLM Wire qualification and records source identity. It writes to a fresh receipt directory, excludes credential names before reading or copying source and stays outside the ordinary gate. Archived consumers prove only their recorded revisions; a current consumer requires selecting current source and checking that the originals remain unchanged. No normal gate modifies a sibling checkout.],
+        [Local Erlang HTTP, H2 and TLS servers use the test certificates; `dev/ip-fixture` generates the IP-SAN case. `dev/nghttpd.py` drives the development nghttpd package for real peer-capacity and trailer checks and owns no provider semantics. A native connection-refusal regression waits for Gun to exit before installing a second monitor, so the monitor reports `noproc` while the preceding terminal event retains ConnectionRefused.],
+        [`build/evidence` holds current runtime output. `docs/history/evidence` preserves raw source, hash, receipt and log inputs from earlier qualification as evidence storage; those paths carry no design contract. `NOTICE`, dependency licenses and fixture attribution remain authoritative for source reuse.],
+        [`dev/convert_cassette.py` is an explicit offline schema-1-to-2 conversion tool. Runtime playback has one decoder and never migrates or rerecords.],
+      )
+    ])
+    #subsection(title: "Comparison and benchmark method", [
+      #points(
+        [The comparison harness in `examples/comparison` contrasts the HTTP Gun and Dream public APIs over local HTTP/1.1 servers. Its adapter retains status, error and body differences and gives the workload driver one call shape. Its contract suite covers binary responses, status handling, duplicate headers, trailers, local TLS, early closure, owner exit, explicit callback cancellation and disk record/playback; these are behavior observations separate from timing.],
+        [Each timing case uses three fresh BEAM VMs, warms the transport and alternates client order. Elapsed time excludes compilation and VM startup. The sampler reads whole-VM memory, mailboxes, processes and ports about every 10 ms and can miss short peaks; connection counts are distinct server-side identities, not peak simultaneous sockets.],
+        [The harness runs the current HTTP Gun source, so a rerun produces new evidence rather than reproducing retained source hashes. Three local H1 trials establish neither a performance ranking nor a latency or allocation guarantee. #adr(13)],
+        [#lnk("../ORACLE.md")[The oracle document] holds the pinned references and the comparison classification, and #lnk("../BENCHMARKS.md")[the benchmark document] holds the run commands and the dated retained measurements. The two link each other; this design states the method rules and never a result.],
       )
     ])
     #subsection(title: "Retained extensions and explicit exclusions", [

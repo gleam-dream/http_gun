@@ -10,6 +10,7 @@
 - Keep credential acquisition, filesystem access and application identity selection outside HTTP Gun.
 - Use OTP public_key parsing and ssl certs_keys options through the existing narrow native bridge.
 - Keep proxy routing pending independently of client certificate authentication.
+- Report a TLS Certificate Required alert with the existing `CertificateRejected` transport cause and the conservative submission evidence of the moment it arrives. TLS 1.3 can deliver the alert after the local handshake completes, so the evidence can be MaybeSent.
 
 ## Rationale and alternatives
 

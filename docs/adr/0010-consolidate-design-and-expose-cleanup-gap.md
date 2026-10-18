@@ -5,7 +5,7 @@
 ## Migration decision
 
 - The 2026-10-06 user instruction authorizes fresh documentation organization, Typst design/glossary, ADR rationale and project-skills setup. This is a documentation migration; it accepts no new runtime behavior.
-- Current responsibilities, state, capacity and failure contracts move to `docs/design/design.typ`. Canonical vocabulary moves to its CONTEXT. Material decisions move to ADRs 0001–0009. README, CHANGELOG, testing procedures, examples, fixtures, notices and raw executable/oracle evidence remain useful operational artifacts.
+- Current responsibilities, state, capacity and failure contracts move to `docs/design/design.typ`. Canonical vocabulary moves to its CONTEXT. Material decisions move to ADRs 0001–0009. The README, AGENTS.md, examples, fixtures, notices, `docs/ORACLE.md`, `docs/BENCHMARKS.md` and raw executable and oracle evidence remain operational artifacts. Usage is compiled examples that the gate runs, and the oracle and benchmark documents retain the references and measurements. Testing and dependency-upgrade procedures are design content; the design states them and ADRs 0007, 0013, 0014 and 0015 hold their rationale.
 - Retire docs/DESIGN, BOUNDS, GUN_AUDIT, all three never-published migration-wave guides, top-level docs/history reports, five evidence README execution reports and the implementation wave tracker. Preserve their useful contracts/rationale in this layer and operational documents. Preserve raw receipts, hashes, logs, patches and executable evidence; Git retains original prose.
 
 ## Unresolved cleanup contract

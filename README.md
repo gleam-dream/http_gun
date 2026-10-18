@@ -15,9 +15,8 @@ an adjacent application, add:
 http_gun = { path = "../http_gun" }
 ```
 
-The current package requires Gleam 1.18 or newer and targets Erlang. Gun and
-Cowlib use qualified patch ranges; see the
-[dependency procedure](docs/DEPENDENCY-UPGRADES.md) before widening them.
+The package requires Gleam 1.18 or newer and targets Erlang. Gun and Cowlib use
+qualified patch ranges that the design's foreign-boundary section governs.
 
 ## Send a request
 
@@ -40,59 +39,149 @@ contains the status, ordered headers and `BitArray` body; trailers and negotiate
 protocol are separate fields. Non-2xx statuses remain response data. The caller
 chooses retry, redirect and decoding behavior.
 
-The example stops the client after either request result. `start` links the
-client to its caller; applications that share a client can instead use
-[OTP supervision](docs/USAGE.md#lifecycle-and-supervision).
+`start` links the client to its caller. Applications that share a client run it
+under supervision:
 
-## Defaults and ownership
-
-Clients admit public destinations and use HTTP/1.1 with verified system TLS
-trust. Local tests and services must explicitly enable loopback access with
-`config.allow_loopback`.
-
-The default request and idle read timeouts are 30 seconds. Connect and pool
-wait timeouts are 5 seconds. `send` collects at most 8 MiB per response. Client
-views can replace per-call timeouts, add cancellation and narrow destination
-policy over the same pool; [all defaults and setters](docs/USAGE.md#defaults)
-are listed in the usage guide.
-
-For a streamed response, the process that opens the body owns its reads. Copies
-share one cursor. Use `with_response` to close the body on callback return or
-exception, or close an explicit `open` body even after reaching EOF.
-[Streaming and typed failures](docs/USAGE.md#stream-a-body) show these calls.
-
-## Further use
-
-The [usage guide](docs/USAGE.md) retains configuration, client views, streaming,
-batching, destination rules, failure handling, record/playback, redaction and
-observations. The [ordinary consumer](examples/ordinary/src/http_gun_consumer.gleam)
-demonstrates these through public imports in a separate package. The
-[asynchronous feed recipe](examples/async/README.md) adds application-owned jobs,
-sinks and cancellation. The [mTLS consumer](examples/mtls/README.md) demonstrates
-client identities, independent server trust, recovery and explicit rotation.
-
-[Historical local benchmarks](examples/comparison/README.md#retained-measurements)
-include elapsed times, workloads, environment receipts and reproduction commands.
-
-Streamed uploads, redirect following, decompression, proxies, cookie/cache
-adapters and generic SSE parsing remain pending capabilities in the
-[design](docs/design/design.typ); this checkout does not expose those APIs.
-
-## Development
-
-```sh
-./dev/env sh dev/gate fast
-./dev/env sh dev/gate full
-sh dev/matrix
+```gleam
+let name = process.new_name("http_client")
+let assert Ok(_) =
+  static_supervisor.new(static_supervisor.OneForOne)
+  |> static_supervisor.add(http_gun.supervised(config.default(), name))
+  |> static_supervisor.start
+let client = http_gun.named(name)
 ```
 
-Fast checks formatting, compilation, tests and native boundaries. Full adds
-separate consumers, real HTTP/2, batch, recording and load checks. The matrix
-runs isolated gates on each selected runtime. These use local servers and
-temporary fixtures; [TESTING.md](docs/TESTING.md) gives the exact procedures.
+## Configure a client
 
-The [design source](docs/design/design.typ),
-[rendered design](docs/design/design-layer.pdf),
-[vocabulary](docs/design/CONTEXT.typ), [coverage](docs/COVERAGE.md) and
-[decision records](docs/adr/0001-gleam-owns-exchange-state.md) describe the package
-contracts. [CHANGELOG.md](CHANGELOG.md) records changes.
+A `Config` is opaque: start from `config.default()` and set only what you need.
+Every timeout takes a `gleam/time/duration.Duration`; `config.Infinity` lifts the
+request or idle timeout explicitly.
+
+```gleam
+let settings =
+  config.default()
+  |> config.with_protocol(config.PreferHttp2)
+  |> config.with_request_timeout(config.After(duration.seconds(10)))
+  |> config.with_max_response_body_bytes(1_048_576)
+```
+
+Clients admit public destinations over HTTP/1.1 with verified system TLS trust.
+Local tests and services enable loopback access with `config.allow_loopback` or
+`config.with_destination(destination.loopback_only())`. Capacities, timeouts
+and every other default are listed in the design.
+
+Per-call settings are client views over the same pool. `with_timeout`,
+`with_deadline`, `with_idle_timeout`, `with_cancellation`, `with_body_limit`,
+`with_destination` and `with_correlation` each return a new handle.
+
+```gleam
+let stream =
+  client
+  |> http_gun.with_timeout(config.Infinity)
+  |> http_gun.with_idle_timeout(config.After(duration.seconds(60)))
+```
+
+A TLS client identity comes from `client_identity.from_pem(chain, key)` and is
+selected with `config.with_client_identity`. Each client owns one immutable
+identity; rotation starts a new client.
+
+## Stream a body
+
+```gleam
+use response <- http_gun.with_response(client, req, fn(failure) { failure })
+count(response.body, 0)
+
+fn count(stream: body.Body, total: Int) -> Result(Int, error.Failure) {
+  case body.next(stream) {
+    Ok(body.Chunk(bytes)) -> count(stream, total + bit_array.byte_size(bytes))
+    Ok(body.End(..)) -> Ok(total)
+    Error(failure) -> Error(failure)
+  }
+}
+```
+
+The process that opens the body owns its reads, and copies share one cursor.
+`with_response` closes the body when the callback returns or raises; an explicit
+`open` body is closed by the caller even after EOF. `batch(client, requests,
+concurrency)` runs at most `concurrency` requests at once and returns results in
+input order.
+
+## Handle failures
+
+A `Failure` is opaque. Branch on its closed `Kind` and ask whether a retry is
+safe:
+
+```gleam
+case http_gun.send(client, req) {
+  Ok(buffered) -> Ok(buffered.response)
+  Error(failure) ->
+    case error.kind(failure) {
+      error.Refused -> Error(BadDestination)
+      _ ->
+        case error.is_retryable(failure, idempotent: False) {
+          True -> Error(TryLater)
+          False -> Error(Failed(error.describe(failure)))
+        }
+    }
+}
+```
+
+Every failure carries submission evidence, `NotSent` or `MaybeSent`. A
+`MaybeSent` failure is retryable only for an idempotent request.
+`error.status` and `error.headers` keep the response head after a collection
+failure, with credential headers redacted.
+
+## Test without a network
+
+`http_gun/testing` starts an offline client from a script, and `http_gun/cassette`
+records live exchanges to a JSON file that loads back as a script:
+
+```gleam
+let assert Ok(cassette.Recorded(client:, recording:)) =
+  cassette.record(settings, "test/orders.json", cassette.options())
+// ... make requests ...
+let assert Ok(_) = cassette.finish(recording, duration.seconds(5))
+
+let assert Ok(script) = cassette.load("test/orders.json", 1_048_576)
+let assert Ok(client) = testing.playback(script, settings)
+```
+
+Playback never opens a connection. A mismatch fails with `PlaybackMismatch` and
+keeps the exchange. Cassettes omit credential headers; `config.with_redaction`
+adds headers, query parameters and body rewriting.
+
+## Observe requests
+
+Each request emits `[http_gun, lifecycle]` events through `sinal.emit`.
+`config.with_label` puts a label in each event so a node-wide handler can filter,
+and `config.with_observations` sends one client's events to a forwarder.
+
+## Examples
+
+Each topic above has a compiled example in a separate package that imports only
+public modules. The gate builds and runs them, so they stay current with the
+library. The snippets in this README are compiled by `test/http_gun_readme_test.gleam`.
+
+| Topic                                               | Example                                                                  |
+| --------------------------------------------------- | ------------------------------------------------------------------------ |
+| Defaults, configuration and validation              | [`usage_configure`](examples/ordinary/src/usage_configure.gleam)         |
+| Client views, streamed bodies, limits and batches   | [`usage_views`](examples/ordinary/src/usage_views.gleam)                 |
+| Destination policies, plaintext rules and tenants   | [`usage_destinations`](examples/ordinary/src/usage_destinations.gleam)   |
+| Scripted playback, failures with a head, redaction  | [`usage_offline`](examples/ordinary/src/usage_offline.gleam)             |
+| Supervision, failure handling, observations, replay | [`http_gun_consumer`](examples/ordinary/src/http_gun_consumer.gleam)     |
+| Cancellation by application and operation           | [`cancellation_checks`](examples/ordinary/src/cancellation_checks.gleam) |
+| TLS client identities and rotation                  | [mutual TLS consumer](examples/mtls/README.md)                           |
+| Application-owned jobs, sinks and shutdown          | [asynchronous feed recipe](examples/async/README.md)                     |
+
+## More
+
+- [Ordinary consumer](examples/ordinary/README.md) runs all the usage examples above through public imports.
+- [Oracle references](docs/ORACLE.md) pin what HTTP Gun is compared with, and [benchmarks](docs/BENCHMARKS.md) hold the method and retained measurements.
+- [Asynchronous feed recipe](examples/async/README.md) adds application-owned jobs, sinks and cancellation.
+- [Mutual TLS consumer](examples/mtls/README.md) demonstrates client identities, independent server trust and rotation.
+- [Comparison harness](examples/comparison/README.md) compares HTTP Gun with Dream on local servers.
+- [Design](docs/design/design.typ), [vocabulary](docs/design/CONTEXT.typ), [coverage](docs/COVERAGE.md) and [decision records](docs/adr) describe the package contracts. [AGENTS.md](AGENTS.md) lists the gate commands.
+
+Streamed uploads, redirect following, decompression, proxies, cookie and cache
+adapters and generic SSE parsing are pending capabilities in the design; this
+checkout does not expose those APIs.

@@ -18,4 +18,13 @@
   (slug: "term-request-id", title: [Request id], body: [An opaque random UUID v4 for one observed invocation, probabilistically unique across nodes and restarts. It is distinct from the caller's correlation and from a durable remote request identifier.]),
   (slug: "term-http-termination", title: [HTTP termination], body: [The response owner's terminal HTTP observation: completion, local cancellation, deadline expiry or failure. It does not certify application consumption or capture publication.]),
   (slug: "term-redaction", title: [Redaction], body: [The selected removal or rewriting of data retained in fixtures and failure headers. It preserves the live request and does not detect all secrets.]),
+  (slug: "term-client-identity", title: [Client identity], body: [An immutable snapshot of a PEM certificate chain and one unencrypted private key, bound to one client's TLS connections. Views cannot replace it.]),
+  (slug: "term-destination-policy", title: [Destination policy], body: [The rule set that admits a request's host, port, address classes and plaintext use. A client holds one policy and each view appends a narrowing policy.]),
+  (slug: "term-origin-lane", title: [Origin lane], body: [A first-in-first-out queue of pending requests that share one #term("term-origin"). A blocked lane head blocks only its own lane.]),
+  (slug: "term-shutdown-grace", title: [Shutdown grace], body: [The interval in which `stop` lets active leases finish before it closes the remaining bodies and connections locally. It bounds the planned drain only.]),
+  (slug: "term-cancellation-token", title: [Cancellation token], body: [A process whose death marks every copy of the token cancelled. A client view retains one or more tokens, and any retained token cancels requests through that view.]),
+  (slug: "term-batch", title: [Batch], body: [A set of requests that run with bounded concurrency under one shared retained-byte budget. Results keep input order and each failure occupies only its own position.]),
+  (slug: "term-script", title: [Script], body: [An immutable ordered list of expected requests and their replies. Each playback client consumes its own copy from the first exchange.]),
+  (slug: "term-staging-directory", title: [Staging directory], body: [The directory beside a cassette destination, named with the `.http-gun-` suffix, that holds unredacted capture data until publication or cleanup.]),
+  (slug: "term-validation-profile", title: [Validation profile], body: [A named gate configuration (fast, full, matrix or soak) that selects which checks run and which evidence the run retains.]),
 )

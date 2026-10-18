@@ -6,7 +6,7 @@ root=$(pwd)
 mkdir -p build/evidence/linux
 input=$(mktemp "$root/build/linux-input.XXXXXX")
 trap 'rm -f "$input"' EXIT HUP INT TERM
-git ls-files -z -- src test dev examples .github docs/design docs/TESTING.md docs/DEPENDENCY-UPGRADES.md docs/COVERAGE.md \
+git ls-files -z -- src test dev examples .github docs/design docs/adr docs/COVERAGE.md \
   gleam.toml manifest.toml flake.nix flake.lock ruff.toml .envrc AGENTS.md README.md LICENSE NOTICE lefthook.yml \
   ':!**/.env.local' | COPYFILE_DISABLE=1 tar --no-xattrs --null -T - -cf "$input"
 # The repository snapshot is read-only; the container compiles a private copy.
