@@ -62,6 +62,9 @@
       pending-entry(title: "Resolve recording cleanup promise strength", kind: "ruling", since: "2026-10-06", adr: 10)[
         Abort and failure attempt staging removal. The implementation ignores removal failures and can return while a blocked writer's cleaner waits. The public contract is either best-effort cleanup or typed cleanup completion; the owner has not ruled.
       ],
+      pending-entry(title: "Check carried-over defaults and native claims against code", kind: "verify", since: "2026-10-17")[
+        The default-settings table, the native assumption inventory and the destination and offline-playback rules were carried over from the retired usage, testing and dependency-upgrade guides. The compiled usage examples exercise the public paths. The stated default values, budgets and native assumptions have not been compared with the source.
+      ],
   )
 
   #pagebreak(weak: true)
@@ -663,7 +666,7 @@
       ))
       #points(
         [`dev/env` enters the pinned Nix shell. A #term("term-validation-profile") selects the checks and evidence of one gate run. `dev/gate` builds an isolated validation copy unless it already runs inside that gate; normal gates consume no sibling working copy. The outer invocation checks the original Git tree with `nix flake check --print-build-logs` and runs gate controls before creating the copy. Ignored local credential files never enter Nix source snapshots. #adr(14)],
-        [The Nix checks enforce canonical Gleam, Nix, Elixir, Markdown, YAML and Python formatting and authored-tooling lint (actionlint, ShellCheck, Ruff restricted to E9/F rules on authored `dev/**/*.py`). Formatting excludes generated build, render and PDF output, retained `docs/history` evidence, frozen `dev/dependencies` bytes and disposable `dev/results`. Compiler-negative fixtures live only in temporary consumer copies.],
+        [The Nix checks enforce canonical Gleam, Nix, Elixir, Markdown, YAML and Python formatting and authored-tooling lint (actionlint, ShellCheck, Ruff restricted to E9/F rules on authored `dev/**/*.py`). Formatting excludes generated build, render and PDF output, retained `docs/evidence` data, frozen `dev/dependencies` bytes and disposable `dev/results`. Compiler-negative fixtures live only in temporary consumer copies.],
         [`dev/check_native.py` compiles authored Erlang, including both consumers' FFI and copied local servers, with `erlc -Werror`, dependency include paths and generated dependency BEAM paths. A valid native module and an intended unused-variable rejection test qualify this check separately from Gleam's warning flag.],
         [`dev/check_results.py` rejects missing, empty, failed, skipped or ambiguous test summaries and requires all eleven distinct load workloads with their H1/H2 connection and large-byte assertions. Controls reject malformed JSON, duplicate or missing workloads and stale consumer dependency resolution. A timeout control proves isolated gate descendants stop before workspace cleanup.],
         [Each gate run replaces `build/evidence`, so a failed run cannot export an earlier success receipt. `build/evidence/logs` keeps commands and raw per-check logs, `build/evidence/manifests` keeps the resolved root and consumer manifests, and `summary.json` records the profile, selected dependencies, elapsed time, outcome and exit code, failed runs included.],
@@ -678,7 +681,7 @@
         [`examples/async` owns the bounded application job recipe: worker lifetime, synchronous sinks and cancellation. Its worker opens and reads the body through `with_response` in one process, runs the sink before the next read and holds no forwarding loop or body mailbox. Early Stop returns the observed prefix, a guardian kills the worker when its creator dies, and shutdown cancels, waits a finite grace and kills only that worker.],
         [`dev/check_downstream.py` runs explicitly selected, isolated LLM Wire qualification and records source identity. It writes to a fresh receipt directory, excludes credential names before reading or copying source and stays outside the ordinary gate. Archived consumers prove only their recorded revisions; a current consumer requires selecting current source and checking that the originals remain unchanged. No normal gate modifies a sibling checkout.],
         [Local Erlang HTTP, H2 and TLS servers use the test certificates; `dev/ip-fixture` generates the IP-SAN case. `dev/nghttpd.py` drives the development nghttpd package for real peer-capacity and trailer checks and owns no provider semantics. A native connection-refusal regression waits for Gun to exit before installing a second monitor, so the monitor reports `noproc` while the preceding terminal event retains ConnectionRefused.],
-        [`build/evidence` holds current runtime output. `docs/history/evidence` preserves raw source, hash, receipt and log inputs from earlier qualification as evidence storage; those paths carry no design contract. `NOTICE`, dependency licenses and fixture attribution remain authoritative for source reuse.],
+        [`build/evidence` holds current runtime output. `docs/evidence` preserves the raw source, hash and measurement data that `docs/ORACLE.md` and `docs/BENCHMARKS.md` cite; those paths carry no design contract. `NOTICE`, dependency licenses and fixture attribution remain authoritative for source reuse.],
         [`dev/convert_cassette.py` is an explicit offline schema-1-to-2 conversion tool. Runtime playback has one decoder and never migrates or rerecords.],
       )
     ])
