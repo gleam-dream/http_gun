@@ -28,7 +28,7 @@ HTTP Gun is an Erlang/OTP HTTP client written in Gleam. Read `docs/design/design
 ## Workflow
 
 - Change only this repository unless the task names a sibling; sibling repositories are otherwise read-only, and another task's checkout is never altered.
-- Push to master after the full gate passes and the change is validated against the packages and apps that use it.
+- Push to main after the full gate passes and the change is validated against the packages and apps that use it.
 - Hex publication, upstream contact and provider credentials need explicit owner approval.
 
 <!-- agent-skills:begin -->
