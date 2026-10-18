@@ -21,5 +21,5 @@
 ## Evidence
 
 - The retained run accompanies the 2026-09-30 scheduling correction in ADR 0003. Environment, results, the failed Dream trial and the Dream pin are in `docs/BENCHMARKS.md`.
-- Pins, comparison cases and classification rules are in `docs/ORACLE.md`. The Cowlib 2.21 source audit that qualified the native range is summarized there and in ADR 0007, with its sources and receipt in `docs/evidence/cowlib-2.21`.
+- Pins, comparison cases and classification rules are in `docs/ORACLE.md`. The Cowlib 2.21 source audit that qualified the native range is summarized there and in ADR 0007, with its source inventory and receipt in `docs/evidence/cowlib-2.21`; the qualification archive is retained in Git history at `6f9f8cc`.
 - Receipts: `docs/evidence/comparison` (inputs, raw measurements, summary, failed-trial observation) and `docs/evidence/dream-comparison/source.json`.
