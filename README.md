@@ -6,7 +6,7 @@ playback and live recording through one client type.
 
 ## Use the current checkout
 
-HTTP Gun is unreleased. Gleam fetches Sinal from its pinned Git revision; no
+HTTP Gun is unreleased. Gleam fetches Sinal from its Git repository on `main`, and `manifest.toml` locks the commit; no
 sibling Sinal checkout is needed. To use a local HTTP Gun checkout from
 an adjacent application, add:
 

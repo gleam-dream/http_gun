@@ -11,11 +11,9 @@ measurements are in [BENCHMARKS.md](../../docs/BENCHMARKS.md).
 
 ## Run
 
-From the HTTP Gun root, materialize the bundled Sinal snapshot, then run the
-wrapper:
+From the HTTP Gun root, run the wrapper:
 
 ```sh
-./dev/env python3 dev/sinal_source.py build/dream-comparison/sinal
 ./dev/env python3 dev/comparison/run.py all --trials 3 --output build/comparison-recheck
 ```
 

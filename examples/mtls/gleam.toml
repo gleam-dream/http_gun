@@ -6,7 +6,7 @@ gleam_time = ">= 1.11.0 and < 2.0.0"
 http_gun = { path = "../http_gun" }
 gleam_stdlib = ">= 0.71.0 and < 2.0.0"
 gleam_http = ">= 4.4.0 and < 5.0.0"
-sinal = { git = "https://github.com/gleam-dream/sinal.git", ref = "9727f9baab6ed4f796780a0c3a1027c3292c5fc7" }
+sinal = { git = "https://github.com/gleam-dream/sinal.git", ref = "main" }
 gleam_erlang = ">= 1.3.0 and < 2.0.0"
 gleam_otp = ">= 1.3.0 and < 2.0.0"
 

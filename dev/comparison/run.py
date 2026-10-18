@@ -5,7 +5,6 @@ import argparse, collections, hashlib, json, os, platform, shutil, socket, stati
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from sinal_source import extract
 
 ROOT = Path(__file__).resolve().parents[2]
 WORK = ROOT / "build/dream-comparison"
@@ -98,8 +97,6 @@ def prepare():
             assert (
                 hashlib.sha256((DREAM / name).read_bytes()).hexdigest() == expected
             ), name
-    if not (WORK / "sinal").exists():
-        extract(WORK / "sinal")
     ours = WORK / "http_gun"
     ours.mkdir(exist_ok=True)
     shutil.copytree(ROOT / "src", ours / "src", dirs_exist_ok=True)

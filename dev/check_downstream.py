@@ -18,7 +18,6 @@ import signal
 import subprocess
 import tempfile
 import tomllib
-from sinal_source import verify
 
 
 def git(root, *args):
@@ -177,7 +176,6 @@ def main():
     )
     args = parser.parse_args()
     roots = closure(args.http_gun.resolve(), args.llm_wire.resolve())
-    verify(roots["sinal"])
     output = args.output.resolve()
     if any(output.is_relative_to(root) for root in roots.values()):
         parser.error("--output must be outside all input checkouts")

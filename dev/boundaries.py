@@ -24,7 +24,7 @@ assert set(config["dependencies"]) == allowed
 sinal = config["dependencies"]["sinal"]
 assert set(sinal) == {"git", "ref"}
 assert sinal["git"] == "https://github.com/gleam-dream/sinal.git"
-assert re.fullmatch(r"[0-9a-f]{40}", sinal["ref"])
+assert sinal["ref"] == "main"
 assert all(
     isinstance(value, str)
     for name, value in config["dependencies"].items()
@@ -32,6 +32,10 @@ assert all(
 )
 lock = tomllib.loads((root / "manifest.toml").read_text())
 versions = {p["name"]: p["version"] for p in lock["packages"]}
+locked_sinal = next(p for p in lock["packages"] if p["name"] == "sinal")
+assert locked_sinal["source"] == "git" and re.fullmatch(
+    r"[0-9a-f]{40}", locked_sinal["commit"]
+)
 
 
 def version(text):

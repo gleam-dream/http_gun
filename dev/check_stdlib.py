@@ -9,7 +9,6 @@ import subprocess
 import tempfile
 
 from consumer_dependencies import prepare, retain, versions
-from sinal_source import extract
 
 root = Path(__file__).resolve().parent.parent
 config = (root / "gleam.toml").read_text()
@@ -34,7 +33,6 @@ for stdlib in dict.fromkeys([lower[1], selected]):
                 )
             else:
                 shutil.copy2(source, package / name)
-        extract(work / "sinal")
         consumer = work / "consumer"
         (consumer / "src").mkdir(parents=True)
         (consumer / "gleam.toml").write_text(f"""name = "stdlib_consumer"

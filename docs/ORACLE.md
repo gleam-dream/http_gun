@@ -32,12 +32,11 @@ references are in [BENCHMARKS.md](BENCHMARKS.md).
 From the repository root, inside `./dev/env`:
 
 ```sh
-./dev/env python3 dev/sinal_source.py build/dream-comparison/sinal
 ./dev/env python3 dev/comparison/run.py contracts --output build/comparison-recheck
 ./dev/env python3 dev/nghttpd.py
 ```
 
-- Extracting the Sinal snapshot needs a new destination. Use a new output directory to keep earlier receipts.
+- Use a new output directory to keep earlier receipts.
 - The wrapper downloads the pinned Dream archive when it is absent and checks its recorded hashes. Dream source stays in its isolated checkout and is never modified.
 - Cowlib and Gun selection is exercised by `./dev/env sh dev/gate full` and `HTTP_GUN_DEPENDENCIES=latest ./dev/env sh dev/gate full`.
 

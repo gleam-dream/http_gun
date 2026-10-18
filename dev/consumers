@@ -5,7 +5,6 @@ work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT HUP INT TERM
 mkdir "$work/http_gun"
 cp -R src gleam.toml manifest.toml "$work/http_gun/"
-python3 dev/sinal_source.py "$work/sinal"
 cp -R examples/ordinary "$work/ordinary"
 cp test/http_gun_test_server.erl "$work/ordinary/src/"
 python3 dev/consumer_dependencies.py prepare "$work/ordinary" ordinary

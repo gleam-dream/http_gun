@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the package gate with pinned Sinal and retain selected consumer manifests."""
+"""Run the package gate in an isolated workspace and retain selected consumer manifests."""
 
 import json
 import os
@@ -12,14 +12,11 @@ import time
 
 from consumer_dependencies import retain, versions
 from isolated_process import run
-from sinal_source import extract, verify
 
 root = Path(__file__).resolve().parent.parent
 selection = os.environ.get("HTTP_GUN_DEPENDENCIES", "minimum")
 if selection not in ["minimum", "latest"]:
     raise ValueError(f"Unknown dependency selection: {selection}")
-if (root.parent / "sinal").exists():
-    verify(root.parent / "sinal")
 with tempfile.TemporaryDirectory(prefix="http-gun-gate-") as directory:
     workspace = Path(directory)
     package = workspace / "http_gun"
@@ -36,7 +33,6 @@ with tempfile.TemporaryDirectory(prefix="http-gun-gate-") as directory:
             )
         else:
             shutil.copy2(source, package / name)
-    extract(workspace / "sinal")
     evidence = package / "build/evidence"
     evidence.mkdir(parents=True)
     env = dict(os.environ, HTTP_GUN_ISOLATED_GATE="1")

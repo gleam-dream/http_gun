@@ -22,7 +22,6 @@ comparison and how outcomes are classified are in [ORACLE.md](ORACLE.md).
 ## Run
 
 ```sh
-./dev/env python3 dev/sinal_source.py build/dream-comparison/sinal
 ./dev/env python3 dev/comparison/run.py all --trials 3 --output build/comparison-recheck
 ```
 
