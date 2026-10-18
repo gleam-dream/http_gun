@@ -24,6 +24,10 @@ import http_gun/testing
 import sinal
 import sinal/correlation
 import sinal/forwarder
+import usage_configure
+import usage_destinations
+import usage_offline
+import usage_views
 
 @external(erlang, "http_gun_test_server", "persistent")
 fn server() -> Int
@@ -52,6 +56,10 @@ pub fn main() {
   let assert <<"abc":utf8>> = reply.response.body
   http_gun.stop(client)
 
+  usage_configure.main()
+  usage_views.main()
+  usage_destinations.main()
+  usage_offline.main()
   supervised(req)
   failures(req)
   observed(req)
@@ -189,7 +197,10 @@ fn observed(req: request.Request(BitArray)) -> Nil {
         _ -> Nil
       }
     })
-  let assert Ok(shared) = http_gun.start(local_config())
+  // A label names the client in every event, so a node-wide handler can tell
+  // an application's client from one that a library owns.
+  let assert Ok(shared) =
+    http_gun.start(local_config() |> config.with_label("billing"))
   // The application's own id for this unit of work; every gleam-dream
   // package writes it under the same `correlation` metadata key.
   let assert Ok(correlation) = correlation.from_string("order-42")
@@ -198,6 +209,7 @@ fn observed(req: request.Request(BitArray)) -> Nil {
   let assert Ok(#(_, metadata)) = process.receive(completed, 1000)
   let assert True = metadata.correlation == Some(correlation)
   let assert telemetry.Live = metadata.mode
+  let assert Some("billing") = metadata.client
   let assert Ok(Nil) = sinal.detach(attachment)
   forwarder.unroute(["http_gun"])
   http_gun.stop(shared)
