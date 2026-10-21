@@ -4,6 +4,8 @@ HTTP Gun is an Erlang/OTP HTTP client written in Gleam. Read `docs/design/design
 
 ## Commands
 
+- When updating dependency pins, reconcile affected `manifest.toml` files in examples, consumers and nested packages through Gleam, then run the full repository gate; updating the root lock alone is insufficient.
+
 - Fast gate: `./dev/env sh dev/gate fast`.
 - Full gate: `./dev/env sh dev/gate full`.
 - Runtime matrix: `sh dev/matrix`.
