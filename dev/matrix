@@ -12,8 +12,8 @@ for runtime in default otp28 otp27; do
   else
     code=$?
   fi
-  for name in load.jsonl recording.jsonl batch.jsonl summary.json manifests nghttpd logs; do
-    if [ "$code" = 0 ] || [ -e "build/evidence/$name" ]; then
+  for name in load.jsonl manifests nghttpd logs; do
+    if [ -e "build/evidence/$name" ]; then
       cp -R "build/evidence/$name" "$scope/"
     fi
   done

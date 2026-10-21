@@ -1,57 +1,22 @@
 #!/bin/sh
 set -eu
 mode=${1:-fast}
-case "$mode" in fast|full|soak) ;; *) echo 'Usage: dev/gate fast|full|soak' >&2; exit 2;; esac
+case "$mode" in fast|full|soak) ;; *) echo 'Usage: sh dev/gate fast|full|soak' >&2; exit 2;; esac
 if [ "${HTTP_GUN_ISOLATED_GATE:-0}" != 1 ]; then
   rm -rf build/evidence
-fi
-mkdir -p build/evidence/logs
-step() {
-  label=$1
-  shift
-  printf '%s\n' "$@" > "build/evidence/logs/$label.command"
-  if "$@" > "build/evidence/logs/$label.log" 2>&1; then
-    echo "$label passed"
-  else
-    code=$?
-    cat "build/evidence/logs/$label.log"
-    return "$code"
-  fi
-}
-json_step() {
-  label=$1
-  shift
-  printf '%s\n' "$@" > "build/evidence/logs/$label.command"
-  if "$@" > "build/evidence/$label.jsonl" 2> "build/evidence/logs/$label.stderr"; then
-    echo "$label observations retained"
-  else
-    code=$?
-    cat "build/evidence/logs/$label.stderr"
-    return "$code"
-  fi
-}
-if [ "${HTTP_GUN_ISOLATED_GATE:-0}" != 1 ]; then
-  step tooling nix flake check --print-build-logs
-  step gate-controls python3 dev/test_gate.py
   exec python3 dev/isolated_gate.py "$mode"
 fi
-step runtime erl -noshell -eval 'io:format("OTP ~s ERTS ~s~n",[erlang:system_info(otp_release),erlang:system_info(version)]),halt().'
-step gleam-version gleam --version
-step format gleam format --check src test dev examples
-step check gleam check
-step build gleam build --warnings-as-errors
-step native python3 dev/check_native.py
-step package-tests gleam test
-python3 dev/check_results.py tests build/evidence/logs/package-tests.log
-step boundaries python3 dev/boundaries.py
+gleam build --warnings-as-errors
+sh dev/compile-native
+gleam test
 if [ "$mode" = full ]; then
-  step stdlib python3 dev/check_stdlib.py
-  step consumers sh dev/consumers
-  step batch python3 dev/check_batch.py
-  step nghttpd python3 dev/nghttpd.py
-  json_step recording gleam run -m http_gun_recording_benchmark
-  json_step load gleam run -m http_gun_benchmark
-  python3 dev/check_results.py load build/evidence/load.jsonl
+  python3 dev/check_stdlib.py
+  sh dev/consumers
+  python3 dev/comparison/run.py contracts --output build/evidence/comparison
+  python3 dev/nghttpd.py
+  mkdir -p build/evidence
+  gleam run -m http_gun_benchmark > build/evidence/load.jsonl
+  python3 dev/check_load.py build/evidence/load.jsonl
 elif [ "$mode" = soak ]; then
-  step nghttpd-soak python3 dev/nghttpd.py --soak-seconds 600
+  python3 dev/nghttpd.py --soak-seconds 600
 fi

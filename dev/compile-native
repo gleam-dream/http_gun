@@ -1,0 +1,8 @@
+#!/bin/sh
+# Gleam does not promote authored Erlang warnings to errors.
+set -eu
+cd "${1:-.}"
+mkdir -p build/native
+export ERL_LIBS="$PWD/build/dev/erlang"
+find src -type f -name '*.erl' -exec erlc -Werror -o build/native {} +
+if [ -d test ]; then find test -type f -name '*.erl' -exec erlc -Werror -o build/native {} +; fi

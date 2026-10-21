@@ -9,7 +9,7 @@ cp -R examples/ordinary "$work/ordinary"
 cp test/http_gun_test_server.erl "$work/ordinary/src/"
 python3 dev/consumer_dependencies.py prepare "$work/ordinary" ordinary
 (cd "$work/ordinary" && gleam build --warnings-as-errors && gleam run)
-python3 dev/check_native.py --source "$work/ordinary"
+sh dev/compile-native "$work/ordinary"
 python3 dev/consumer_dependencies.py retain "$work/ordinary" ordinary
 if [ "${UPDATE_CONSUMER_LOCKS:-0}" = 1 ]; then cp "$work/ordinary/manifest.toml" examples/ordinary/manifest.toml; fi
 # Resolve dependencies in the successful consumer, then type-check standalone

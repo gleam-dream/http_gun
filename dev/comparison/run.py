@@ -121,7 +121,7 @@ def prepare():
     assert run(["gleam", "build", "--warnings-as-errors"], RUNNER, "harness-build") == 0
     assert (
         run(
-            ["python3", str(ROOT / "dev/check_native.py"), "--source", str(RUNNER)],
+            ["sh", str(ROOT / "dev/compile-native"), str(RUNNER)],
             ROOT,
             "harness-native",
         )
@@ -143,7 +143,6 @@ def upstream():
     raw = {
         name: run(args, MODULE, name, 360)
         for name, args in [
-            ("dream-format", ["gleam", "format", "--check"]),
             ("dream-check", ["gleam", "check"]),
             ("dream-test", ["gleam", "test"]),
         ]

@@ -9,5 +9,5 @@ python3 dev/consumer_dependencies.py prepare "$work/mtls" mtls
 sh dev/mtls-fixtures "$work/fixtures" > "$work/fixtures.log" 2>&1
 export HTTP_GUN_MTLS_FIXTURES="$work/fixtures"
 (cd "$work/mtls" && gleam build --warnings-as-errors && gleam run)
-python3 dev/check_native.py --source "$work/mtls"
+sh dev/compile-native "$work/mtls"
 python3 dev/consumer_dependencies.py retain "$work/mtls" mtls

@@ -9,6 +9,8 @@ The pinned references and how outcomes are classified are in
 [ORACLE.md](../../docs/ORACLE.md). The method, run commands and retained
 measurements are in [BENCHMARKS.md](../../docs/BENCHMARKS.md).
 
+The full gate compiles this package and runs its behavioral contracts against the current HTTP Gun source. Timing benchmarks remain in scheduled qualification.
+
 ## Run
 
 From the HTTP Gun root, run the wrapper:

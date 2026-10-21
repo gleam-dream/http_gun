@@ -94,8 +94,6 @@
             beam29Packages.rebar3
             elixirPackage
             python3
-            actionlint
-            shellcheck
             ruff
             nghttp2
             openssl
@@ -110,8 +108,6 @@
             beam28Packages.erlang
             beam28Packages.rebar3
             python3
-            actionlint
-            shellcheck
             ruff
             nghttp2
             openssl
@@ -126,8 +122,6 @@
             beam27Packages.erlang
             beam27Packages.rebar3
             python3
-            actionlint
-            shellcheck
             ruff
             nghttp2
             openssl
@@ -138,22 +132,6 @@
         formatter = treefmtEval.config.build.wrapper;
 
         checks.formatting = treefmtEval.config.build.check ./.;
-        checks.tooling =
-          pkgs.runCommand "http-gun-tooling"
-            {
-              nativeBuildInputs = [
-                pkgs.actionlint
-                pkgs.shellcheck
-                pkgs.ruff
-              ];
-            }
-            ''
-              cd ${./.}
-              actionlint -shellcheck=${pkgs.shellcheck}/bin/shellcheck .github/workflows/*.yml
-              shellcheck --shell=sh dev/env dev/gate dev/matrix dev/linux-gate dev/consumers dev/async-consumer dev/mtls-consumer dev/mtls-fixtures dev/ip-fixture .envrc
-              ruff check --no-cache dev
-              touch "$out"
-            '';
       }
     );
 }

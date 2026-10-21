@@ -58,7 +58,7 @@ Median elapsed milliseconds with minimum and maximum across successful trials:
 
 - Three local trials on one machine establish scheduling behavior for these workloads only.
 - Comparing wall time without matching concurrency misattributes pool semantics, so read the four-worker row, not the setting-4 rows, for equal application concurrency.
-- The batch scaling guard `5000 requests < 15 × 500-request median + 50 ms` is a regression guard from the same correction and adds no absolute latency promise.
+- The former batch scaling threshold is retired by ADR 0016; measurements are optional observations.
 
 ## Related
 

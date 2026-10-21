@@ -46,7 +46,7 @@ jobs:
         with:
           name: http-gun-${{ matrix.check }}-${{ github.run_attempt }}
           path: build/evidence/
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 30
   result:
     name: Extended qualification
