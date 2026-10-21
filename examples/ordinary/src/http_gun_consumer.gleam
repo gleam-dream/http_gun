@@ -48,6 +48,7 @@ fn temp_path() -> String
 fn remove_fixture(path: String) -> Nil
 
 pub fn main() {
+  // snips-start: send-request
   let req = local_request(server())
   // The common path: start a client, send, read the collected response, stop.
   let assert Ok(client) = http_gun.start(local_config())
@@ -55,6 +56,7 @@ pub fn main() {
   let assert 200 = reply.response.status
   let assert <<"abc":utf8>> = reply.response.body
   http_gun.stop(client)
+  // snips-end: send-request
 
   usage_configure.main()
   usage_views.main()
@@ -113,6 +115,7 @@ fn first_chunk(
 
 // Under a supervisor, the client registers under a name and `named` returns
 // a handle that keeps working across restarts.
+// snips-start: supervision
 fn supervised(req: request.Request(BitArray)) -> Nil {
   let name = process.new_name("http_client")
   let assert Ok(_supervisor) =
@@ -122,6 +125,8 @@ fn supervised(req: request.Request(BitArray)) -> Nil {
   let client = http_gun.named(name)
   consume(client, req)
 }
+
+// snips-end: supervision
 
 // Branch on the closed `Kind`, and ask `is_retryable` whether sending the
 // request again is safe. HTTP Gun never retries on its own.
@@ -142,11 +147,13 @@ fn failures(req: request.Request(BitArray)) -> Nil {
 
   // Nothing listens on this port: the request never left, so a retry is safe
   // even for a request that is not idempotent.
+  // snips-start: retry-evidence
   let assert Error(unreachable) =
     http_gun.send(client, local_request(unused_port()))
   let assert error.Network = error.kind(unreachable)
   let assert error.NotSent = error.evidence(unreachable)
   let assert True = error.is_retryable(unreachable, idempotent: False)
+  // snips-end: retry-evidence
 
   // The server received the request but sends no response within 200 ms. It
   // may have acted on it, so only an idempotent request is retried.

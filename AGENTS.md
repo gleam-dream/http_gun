@@ -67,3 +67,12 @@ estimates context. Review documentation and conventions manually.
 conformance review before the layer is treated as current.
 
 <!-- agent-skills:end -->
+
+## README snippets
+
+Keep README Gleam examples in compiled example or consumer source. Use named
+`snips-start` / `snips-end` regions (or include a whole example module), and retain
+Prettier ignore ranges around generated README blocks. Format the source first,
+then run `nix run .#snips -- --commands deny README.md`. CI runs
+`nix run .#snips -- --check --commands deny README.md` using the shared pinned
+package. Snips checks synchronization; existing example tests check behavior.

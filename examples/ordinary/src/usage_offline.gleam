@@ -99,6 +99,7 @@ fn redacted_cassette() -> Nil {
     |> request.set_query([#("token", "secret-value"), #("page", "2")])
     |> request.set_header("x-signature", "secret-signature")
 
+  // snips-start: record-and-load
   let assert Ok(cassette.Recorded(client:, recording:)) =
     cassette.record(settings, path, cassette.options())
   let assert Ok(_) = http_gun.send(client, req)
@@ -114,4 +115,5 @@ fn redacted_cassette() -> Nil {
   let assert Ok(buffered) = http_gun.send(replay, req)
   let assert <<"abc":utf8>> = buffered.response.body
   http_gun.stop(replay)
+  // snips-end: record-and-load
 }

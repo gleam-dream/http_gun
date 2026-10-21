@@ -26,6 +26,8 @@ jobs:
           extra_nix_config: experimental-features = nix-command flakes
       - run: nix flake check
       - run: nix run .#design-gate-check -- docs/design .
+      - name: README snippets
+        run: nix run --no-update-lock-file .#snips -- --check --commands deny README.md
       - run: nix develop ".#${{ matrix.runtime }}" --command sh dev/gate full
         env:
           HTTP_GUN_DEPENDENCIES: ${{ matrix.dependencies }}

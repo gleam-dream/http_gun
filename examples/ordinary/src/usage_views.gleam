@@ -23,21 +23,25 @@ pub fn main() -> Nil {
     http_gun.start(config.default() |> config.allow_loopback)
 
   // Each view returns a new handle over the same pool.
+  // snips-start: client-view
   let order = correlation.unique()
   let stream =
     client
     |> http_gun.with_timeout(config.Infinity)
     |> http_gun.with_idle_timeout(config.After(duration.seconds(60)))
     |> http_gun.with_correlation(order)
+  // snips-end: client-view
   let assert Some(read_back) = http_gun.correlation(stream)
   let assert True = read_back == order
   let assert None = http_gun.correlation(client)
 
   // `with_response` closes the body when the callback returns or raises.
+  // snips-start: stream-body
   let assert Ok(3) = {
     use response <- http_gun.with_response(stream, req, fn(failure) { failure })
     count(response.body, 0)
   }
+  // snips-end: stream-body
 
   // A body read with a wait returns `None` when nothing arrived in time and
   // leaves the stream intact; here the bytes are already there.
@@ -75,6 +79,7 @@ pub fn main() -> Nil {
   http_gun.stop(client)
 }
 
+// snips-start: count-body
 fn count(stream: body.Body, total: Int) -> Result(Int, error.Failure) {
   case body.next(stream) {
     Ok(body.Chunk(bytes)) -> count(stream, total + bit_array.byte_size(bytes))
@@ -82,6 +87,8 @@ fn count(stream: body.Body, total: Int) -> Result(Int, error.Failure) {
     Error(failure) -> Error(failure)
   }
 }
+
+// snips-end: count-body
 
 fn local_request(port: Int) -> request.Request(BitArray) {
   let assert Ok(req) = request.to("http://localhost:" <> int.to_string(port))

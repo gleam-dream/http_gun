@@ -13,12 +13,14 @@ fn server() -> Int
 
 pub fn main() -> Nil {
   // A Config is opaque: start from `config.default()` and set only what you need.
+  // snips-start: configure
   let settings =
     config.default()
     |> config.with_protocol(config.PreferHttp2)
     |> config.with_connect_timeout(duration.seconds(3))
     |> config.with_request_timeout(config.After(duration.seconds(10)))
     |> config.with_max_response_body_bytes(1_048_576)
+  // snips-end: configure
   let assert Ok(_) = config.validate(settings)
 
   // Lifting the request or idle timeout is explicit.
