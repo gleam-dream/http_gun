@@ -1,27 +1,55 @@
 # HTTP Gun
 
-HTTP Gun sends HTTP requests and reads byte responses in Gleam on Erlang/OTP.
-It provides connection pooling, streamed bodies, bounded collection, offline
-playback and live recording through one client type.
+HTTP Gun is a Gleam HTTP client for Erlang/OTP applications. One client gives
+you a reusable connection pool, collected or streamed byte responses, explicit
+resource limits, and offline playback. Your application decides what a status
+or response body means.
 
-## Use the current checkout
+## Capabilities
 
-HTTP Gun is unreleased. Gleam fetches Sinal from its Git repository on `main`, and `manifest.toml` locks the commit; no
-sibling Sinal checkout is needed. To use a local HTTP Gun checkout from
-an adjacent application, add:
+- A client that can be linked to its caller or started under an OTP supervisor;
+  per-call views share the same pool.
+- Reused HTTP/1.1 connections, optional HTTP/2, verified server TLS, and
+  optional client certificate identities.
+- Destination policies that check resolved addresses and can narrow a client's
+  access by host and address class.
+- Collected responses with per-response and batch limits, plus streamed bodies
+  with explicit ownership, trailers, and close behavior.
+- Ordered batches with a caller-selected concurrency bound.
+- Per-call deadlines, request and idle timeouts, and cancellation tokens.
+- Typed failures with submission evidence (`NotSent` or `MaybeSent`) and any
+  response status and headers already received.
+- Ordered offline scripts and local cassette recording, loading, playback, and
+  configurable redaction.
+- Sinal lifecycle events with request IDs, optional correlation, and client
+  labels.
+
+## When to use it
+
+Use HTTP Gun for ordinary API calls in a supervised Erlang application, for
+reading large responses a chunk at a time, or for tests that need deterministic
+offline responses and recorded exchanges. It is a transport client: provider
+adapters still own authentication, status and content interpretation, retries,
+protocol framing such as SSE, and reconciliation of external effects.
+
+## Install
+
+HTTP Gun is unreleased and requires Gleam 1.18 or newer on the Erlang target.
+Add it to your application's `gleam.toml`:
 
 ```toml
 [dependencies]
-http_gun = { path = "../http_gun" }
+http_gun = { git = "https://github.com/gleam-dream/http_gun.git", ref = "main" }
 ```
 
-The package requires Gleam 1.18 or newer and targets Erlang. Gun and Cowlib use
-qualified patch ranges that the design's foreign-boundary section governs.
+Gleam fetches its dependencies without sibling checkouts. Commit the application's
+`manifest.toml` to lock the resolved revisions.
 
 ## Send a request
 
-This runnable consumer starts a local fixture with `server()` and permits its
-loopback address through `local_config()`. The full source supplies these helpers.
+This excerpt uses `server`, `local_request`, and `local_config` from the
+[complete ordinary consumer](examples/ordinary/src/http_gun_consumer.gleam).
+That consumer starts a local fixture and explicitly permits loopback access.
 
 <!-- prettier-ignore-start -->
 
@@ -38,80 +66,9 @@ http_gun.stop(client)
 
 <!-- prettier-ignore-end -->
 
-`send` returns `Result(Buffered, error.Failure)`. On success, `buffered.response`
-contains the status, ordered headers and `BitArray` body; trailers and negotiated
-protocol are separate fields. Non-2xx statuses remain response data. The caller
-chooses retry, redirect and decoding behavior.
-
-`start` links the client to its caller. Applications that share a client run it
-under supervision:
-
-<!-- prettier-ignore-start -->
-
-<!-- snips: examples/ordinary/src/http_gun_consumer.gleam#supervision -->
-```gleam
-fn supervised(req: request.Request(BitArray)) -> Nil {
-  let name = process.new_name("http_client")
-  let assert Ok(_supervisor) =
-    static_supervisor.new(static_supervisor.OneForOne)
-    |> static_supervisor.add(http_gun.supervised(local_config(), name))
-    |> static_supervisor.start
-  let client = http_gun.named(name)
-  consume(client, req)
-}
-
-```
-
-<!-- prettier-ignore-end -->
-
-## Configure a client
-
-A `Config` is opaque: start from `config.default()` and set only what you need.
-Every timeout takes a `gleam/time/duration.Duration`; `config.Infinity` lifts the
-request or idle timeout explicitly.
-
-<!-- prettier-ignore-start -->
-
-<!-- snips: examples/ordinary/src/usage_configure.gleam#configure -->
-```gleam
-let settings =
-  config.default()
-  |> config.with_protocol(config.PreferHttp2)
-  |> config.with_connect_timeout(duration.seconds(3))
-  |> config.with_request_timeout(config.After(duration.seconds(10)))
-  |> config.with_max_response_body_bytes(1_048_576)
-```
-
-<!-- prettier-ignore-end -->
-
-Clients admit public destinations over HTTP/1.1 with verified system TLS trust.
-Local tests and services enable loopback access with `config.allow_loopback` or
-`config.with_destination(destination.loopback_only())`. Capacities, timeouts
-and every other default are listed in the design.
-
-Per-call settings are client views over the same pool. `with_timeout`,
-`with_deadline`, `with_idle_timeout`, `with_cancellation`, `with_body_limit`,
-`with_destination` and `with_correlation` each return a new handle.
-
-<!-- prettier-ignore-start -->
-
-<!-- snips: examples/ordinary/src/usage_views.gleam#client-view -->
-```gleam
-let order = correlation.unique()
-let stream =
-  client
-  |> http_gun.with_timeout(config.Infinity)
-  |> http_gun.with_idle_timeout(config.After(duration.seconds(60)))
-  |> http_gun.with_correlation(order)
-```
-
-<!-- prettier-ignore-end -->
-
-A TLS client identity comes from `client_identity.from_pem(chain, key)` and is
-selected with `config.with_client_identity`. Each client owns one immutable
-identity; rotation starts a new client.
-
-## Stream a body
+`send` collects the response body up to its configured limit. Statuses such as
+404 and 500 are still response data. For a streaming response, scope body cleanup
+with `with_response` and read chunks using `body.next`:
 
 <!-- prettier-ignore-start -->
 
@@ -125,119 +82,56 @@ let assert Ok(3) = {
 
 <!-- prettier-ignore-end -->
 
-The helper reads until the stream ends:
+The [consumer source](examples/ordinary/src/usage_views.gleam) includes the
+`count` helper and runs this example against a local server.
 
-<!-- prettier-ignore-start -->
+## Runtime ownership
 
-<!-- snips: examples/ordinary/src/usage_views.gleam#count-body -->
-```gleam
-fn count(stream: body.Body, total: Int) -> Result(Int, error.Failure) {
-  case body.next(stream) {
-    Ok(body.Chunk(bytes)) -> count(stream, total + bit_array.byte_size(bytes))
-    Ok(body.End(..)) -> Ok(total)
-    Error(failure) -> Error(failure)
-  }
-}
+Each client has a pool process that admits requests and assigns connection
+capacity. Each response has a body owner that coordinates the HTTP exchange;
+only the process that opened a body may read it. Gun handles HTTP wire
+protocols. An optional recorder captures exchanges, and lifecycle events go to
+Sinal handlers.
 
+```mermaid
+flowchart LR
+  caller[Calling process] -->|send / open / batch| pool[Client pool process]
+  pool -->|admit and lease| body[Body owner]
+  body -->|requests and cancellation| gun[Gun connections]
+  gun -->|response events| body
+  caller -->|next / close| body
+  pool -. lifecycle events .-> sinal[Sinal handlers]
+  body -. lifecycle events .-> sinal
+  body -. optional capture .-> recorder[Recorder]
 ```
 
-<!-- prettier-ignore-end -->
+## Operational limits
 
-The process that opens the body owns its reads, and copies share one cursor.
-`with_response` closes the body when the callback returns or raises; an explicit
-`open` body is closed by the caller even after EOF. `batch(client, requests,
-concurrency)` runs at most `concurrency` requests at once and returns results in
-input order.
+- The default destination policy admits public addresses and permits plaintext
+  HTTP. Local tests must opt into loopback; set the policy to
+  `destination.RequireTls` with `destination.with_plaintext` when plaintext
+  must be refused.
+- The collection limit applies to `send` and `batch`; streaming has separate
+  buffering and open-body limits. These limits do not bound all memory used by
+  Gun, Cowlib, or the Erlang VM.
+- HTTP Gun does not retry automatically. Use failure evidence and request
+  idempotency when deciding whether an application retry is safe.
+- Cassettes remove common credential headers by default, but unlisted headers,
+  query values, and bodies may still be stored. Add redaction for application
+  secrets and inspect fixtures before sharing them. Publication is atomic, but
+  crash durability is not promised.
+- Sinal events are best effort. Without a forwarder route, handlers run inside
+  client processes and a slow handler can delay requests.
+- Streamed uploads, redirect following, decompression, proxies, cookie/cache
+  adapters, and generic SSE framing are not implemented.
 
-## Handle failures
+## Examples and reference
 
-A `Failure` is opaque. Branch on its closed `Kind` and ask whether a retry is
-safe. This consumer uses `unused_port()` to provoke a failure before sending:
-
-<!-- prettier-ignore-start -->
-
-<!-- snips: examples/ordinary/src/http_gun_consumer.gleam#retry-evidence -->
-```gleam
-let assert Error(unreachable) =
-  http_gun.send(client, local_request(unused_port()))
-let assert error.Network = error.kind(unreachable)
-let assert error.NotSent = error.evidence(unreachable)
-let assert True = error.is_retryable(unreachable, idempotent: False)
-```
-
-<!-- prettier-ignore-end -->
-
-Every failure carries submission evidence, `NotSent` or `MaybeSent`. A
-`MaybeSent` failure is retryable only for an idempotent request.
-`error.status` and `error.headers` keep the response head after a collection
-failure, with credential headers redacted.
-
-## Test without a network
-
-`http_gun/testing` starts an offline client from a script, and `http_gun/cassette`
-records live exchanges to a JSON file that loads back as a script. This excerpt
-uses the request, temporary path and redaction settings prepared by the runnable
-example:
-
-<!-- prettier-ignore-start -->
-
-<!-- snips: examples/ordinary/src/usage_offline.gleam#record-and-load -->
-```gleam
-let assert Ok(cassette.Recorded(client:, recording:)) =
-  cassette.record(settings, path, cassette.options())
-let assert Ok(_) = http_gun.send(client, req)
-let assert Ok(_) = cassette.finish(recording, duration.seconds(5))
-http_gun.stop(client)
-
-let assert Ok(script) = cassette.load(path, 1_048_576)
-let encoded = cassette.encode(script)
-remove_fixture(path)
-let assert False = string.contains(encoded, "secret")
-let assert True = string.contains(encoded, "token=REDACTED&page=2")
-let assert Ok(replay) = testing.playback(script, settings)
-let assert Ok(buffered) = http_gun.send(replay, req)
-let assert <<"abc":utf8>> = buffered.response.body
-http_gun.stop(replay)
-```
-
-<!-- prettier-ignore-end -->
-
-Playback never opens a connection. A mismatch fails with `PlaybackMismatch` and
-keeps the exchange. Cassettes omit credential headers; `config.with_redaction`
-adds headers, query parameters and body rewriting.
-
-## Observe requests
-
-Each request emits `[http_gun, lifecycle]` events through `sinal.emit`.
-`config.with_label` puts a label in each event so a node-wide handler can filter,
-and `config.with_observations` sends one client's events to a forwarder.
-
-## Examples
-
-Each topic above has a compiled example in a separate package that imports only
-public modules. The gate builds and runs them, so they stay current with the
-library. The snippets in this README come from those executable consumers.
-
-| Topic                                               | Example                                                                  |
-| --------------------------------------------------- | ------------------------------------------------------------------------ |
-| Defaults, configuration and validation              | [`usage_configure`](examples/ordinary/src/usage_configure.gleam)         |
-| Client views, streamed bodies, limits and batches   | [`usage_views`](examples/ordinary/src/usage_views.gleam)                 |
-| Destination policies, plaintext rules and tenants   | [`usage_destinations`](examples/ordinary/src/usage_destinations.gleam)   |
-| Scripted playback, failures with a head, redaction  | [`usage_offline`](examples/ordinary/src/usage_offline.gleam)             |
-| Supervision, failure handling, observations, replay | [`http_gun_consumer`](examples/ordinary/src/http_gun_consumer.gleam)     |
-| Cancellation by application and operation           | [`cancellation_checks`](examples/ordinary/src/cancellation_checks.gleam) |
-| TLS client identities and rotation                  | [mutual TLS consumer](examples/mtls/README.md)                           |
-| Application-owned jobs, sinks and shutdown          | [asynchronous feed recipe](examples/async/README.md)                     |
-
-## More
-
-- [Ordinary consumer](examples/ordinary/README.md) runs all the usage examples above through public imports.
-- [Oracle references](docs/ORACLE.md) pin what HTTP Gun is compared with, and [benchmarks](docs/BENCHMARKS.md) hold the method and retained measurements.
-- [Asynchronous feed recipe](examples/async/README.md) adds application-owned jobs, sinks and cancellation.
-- [Mutual TLS consumer](examples/mtls/README.md) demonstrates client identities, independent server trust and rotation.
-- [Comparison harness](examples/comparison/README.md) compares HTTP Gun with Dream on local servers.
-- [Design](docs/design/design.typ), [vocabulary](docs/design/CONTEXT.typ), [coverage](docs/COVERAGE.md) and [decision records](docs/adr) describe the package contracts. [AGENTS.md](AGENTS.md) lists the gate commands.
-
-Streamed uploads, redirect following, decompression, proxies, cookie and cache
-adapters and generic SSE parsing are pending capabilities in the design; this
-checkout does not expose those APIs.
+The [ordinary consumer](examples/ordinary/README.md) runs the public API
+examples. See the [async feed recipe](examples/async/README.md) for application
+owned jobs and sinks, and the [mTLS consumer](examples/mtls/README.md) for
+client identity setup and rotation. The [public API](src/http_gun.gleam),
+[design](docs/design/design-layer.pdf), and [coverage map](docs/COVERAGE.md) describe
+the package contracts. [Benchmark notes](docs/BENCHMARKS.md) report retained local
+workload measurements; they predate this checkout and make no performance
+promise.
