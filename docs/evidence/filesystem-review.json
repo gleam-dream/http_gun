@@ -1,0 +1,101 @@
+{
+  "reviewed": "2026-09-29",
+  "source_reused": false,
+  "packages": [
+    {
+      "package": "file_streams",
+      "version": "1.7.0",
+      "decision": "adopt",
+      "url": "https://repo.hex.pm/tarballs/file_streams-1.7.0.tar",
+      "archive_sha256": "62757932b5fac14fc9d0ee69bc4694dc6ea9f0fe6e198f695711c4fcac1f7a26",
+      "source_files": {
+        "gleam.toml": "b3a99c1058cea898cebf6d878ed2599c3c086cc580af99ce182e934b73689e62",
+        "src/file_streams/file_open_mode.gleam": "a1dbfd7a7b49409212d8918447106d1046115d341a574ec13f936b397d8f5796",
+        "src/file_streams/file_stream.gleam": "b37b744658c6d8e9c49b6ea6b64dbb6409e354eaea203e29a3f23b9a8b69406f",
+        "src/file_streams/file_stream_error.gleam": "27eaefb37604626761cf8c5ae19756a1d5aac8f894ff5eb6130dbedbc5b05dc6",
+        "src/file_streams/internal/raw_location.gleam": "0be68d54c069e925f6a82a9e45350080e0391d7d9bf7b935a4f9195fb8a5d176",
+        "src/file_streams/internal/raw_read_result.gleam": "9047733e4374808dc72e940f7e800d88bc9b8488dd2ab0b48041aff529130f0e",
+        "src/file_streams/internal/raw_result.gleam": "9a612b674cae8a35c811ecdd3fd406fabe4924b4ad5843da294a5787d0931fd0",
+        "src/file_streams/text_encoding.gleam": "36a462108b9d5d2080ea68c9b3506ac3dbb3d62bc2654502d4de106333d87c33",
+        "src/file_streams@file_open_mode.erl": "a2142cf79f8d27335775910a88372e9a272829a71e61c5a58f9c535d37098e86",
+        "src/file_streams@file_stream.erl": "90322698f4fedc4f7dcc364dd11e4aea126b6734a93197c8fe803805c1c83e27",
+        "src/file_streams@file_stream_error.erl": "4ce00fdfdf70ec2c6190442c6a43f2c62e83ebaf40cf4a5a34a36f6b1bba3cc8",
+        "src/file_streams@internal@raw_location.erl": "f373f48df33977154e62f0429f89b027e72f535da5cfcc13c5ff043f538b4355",
+        "src/file_streams@internal@raw_read_result.erl": "80a3270b9122cd16a17e0b51cee82d34aab4f7c66da7d5660ec437bf71996763",
+        "src/file_streams@internal@raw_result.erl": "2fb5763f2f2553f0028b075c1aea792f8616aa1ce3caff98488030c0a38c7d99",
+        "src/file_streams@text_encoding.erl": "5498992f6f99b0a9264ad70f1937f3b55de6313486d46cb095c344eddd774c69",
+        "src/file_streams_ffi.erl": "3dacfdbf6780f1b7600dede65d9ad97dd579938f8dff6e55fc10061868c9a7fb"
+      }
+    },
+    {
+      "package": "simplifile",
+      "version": "2.7.0",
+      "decision": "adopt",
+      "url": "https://repo.hex.pm/tarballs/simplifile-2.7.0.tar",
+      "archive_sha256": "a2727627b063e87351934c7f7f008f2d1fdb16f6de0b8c79f9e46459cfc9c164",
+      "source_files": {
+        "LICENSE": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+        "gleam.toml": "5f486a6474f56d1e8d076f41a9b3ab47a8dfb7becbbbd40796ae8be8fecf2164",
+        "src/simplifile.erl": "0d915c18eaf66edbcdaaf87684559e991fd7540e7d468fe9650a37e5a38c0d21",
+        "src/simplifile.gleam": "35d2b0a043b12cc524dba75899711bca74a42daf20aa7bec30e06dd45e3983b1",
+        "src/simplifile_erl.erl": "42b9d89473f0499391ec72e441041b5b0c3ad31f0aceed957002c3a3338d6602"
+      }
+    },
+    {
+      "package": "file_streams",
+      "version": "2.0.0",
+      "decision": "defer stdlib1 migration",
+      "url": "https://repo.hex.pm/tarballs/file_streams-2.0.0.tar",
+      "archive_sha256": "a12e1e618c7845d1c4fe88dd6096df99fe9696fc56c9135765ce474fabf53f1a",
+      "source_files": {
+        "gleam.toml": "bafbeca0946ae4be01c2bc83ac804ee1b9b1afe236b3897b59d06bb2ed25a0b3",
+        "src/file_streams/file_open_mode.gleam": "a1dbfd7a7b49409212d8918447106d1046115d341a574ec13f936b397d8f5796",
+        "src/file_streams/file_stream.gleam": "b37b744658c6d8e9c49b6ea6b64dbb6409e354eaea203e29a3f23b9a8b69406f",
+        "src/file_streams/file_stream_error.gleam": "27eaefb37604626761cf8c5ae19756a1d5aac8f894ff5eb6130dbedbc5b05dc6",
+        "src/file_streams/internal/raw_location.gleam": "0be68d54c069e925f6a82a9e45350080e0391d7d9bf7b935a4f9195fb8a5d176",
+        "src/file_streams/internal/raw_read_result.gleam": "9047733e4374808dc72e940f7e800d88bc9b8488dd2ab0b48041aff529130f0e",
+        "src/file_streams/internal/raw_result.gleam": "9a612b674cae8a35c811ecdd3fd406fabe4924b4ad5843da294a5787d0931fd0",
+        "src/file_streams/text_encoding.gleam": "36a462108b9d5d2080ea68c9b3506ac3dbb3d62bc2654502d4de106333d87c33",
+        "src/file_streams@file_open_mode.erl": "a2142cf79f8d27335775910a88372e9a272829a71e61c5a58f9c535d37098e86",
+        "src/file_streams@file_stream.erl": "07a142caa60a814e1b355d5b8efc37e5fd21efd135787cfd3887d1432ff3a2c2",
+        "src/file_streams@file_stream_error.erl": "4ce00fdfdf70ec2c6190442c6a43f2c62e83ebaf40cf4a5a34a36f6b1bba3cc8",
+        "src/file_streams@internal@raw_location.erl": "f373f48df33977154e62f0429f89b027e72f535da5cfcc13c5ff043f538b4355",
+        "src/file_streams@internal@raw_read_result.erl": "d4d2a3f6b642fb845df166906e263945188339dc1be4a36152fbed708866a4dc",
+        "src/file_streams@internal@raw_result.erl": "2fb5763f2f2553f0028b075c1aea792f8616aa1ce3caff98488030c0a38c7d99",
+        "src/file_streams@text_encoding.erl": "5498992f6f99b0a9264ad70f1937f3b55de6313486d46cb095c344eddd774c69",
+        "src/file_streams_ffi.erl": "3dacfdbf6780f1b7600dede65d9ad97dd579938f8dff6e55fc10061868c9a7fb"
+      }
+    },
+    {
+      "package": "fio",
+      "version": "1.2.1",
+      "decision": "do not adopt",
+      "url": "https://repo.hex.pm/tarballs/fio-1.2.1.tar",
+      "archive_sha256": "5d4a4b3855692bd9280824996ad8bc61dbaeeadbd7d68bf6fd08c8bd031510ab",
+      "source_files": {
+        "LICENSE": "2a0a6a6b45d0ab14d9ee7f807a5a1fa5180ea239775a6bd8fd44639f079ed79e",
+        "gleam.toml": "09384ebc7f6da76a4c409038e79721b97aa45d729f774c0182d390a2c3b8aefa",
+        "src/fio/error.gleam": "ad4afe72ad0071cf4e11cca597db83a2f04a21c319fbb82f4eeee975c19d1fc8",
+        "src/fio/handle.gleam": "f23c869ae3d2250f3cb02c5d5fbc2265ee611f3a607ac532b2898a9d22f5f12b",
+        "src/fio/internal/io.gleam": "f6cbe1989c2ff2dd92d07faddca507c21893407cc8c7320dc4a01eee333eac90",
+        "src/fio/json.gleam": "afed827786ad3581f2db1b6e544bc44161e06dc3e52a9cc2dee6723e2a926d93",
+        "src/fio/observer.gleam": "b0dd6a04a9cb2d7107917849127e5e6cd606c4fe02cd52deafed5d7be849d97c",
+        "src/fio/path.gleam": "f3e668c82fc48a421c7434ae33d580d53b331f3935529581df8d5cb4e6bd22a2",
+        "src/fio/recursive.gleam": "7982ff625619a79f3fbee7b53b40875c4ad511410e14ba818a5a9aa20215df97",
+        "src/fio/types.gleam": "835dc05889ac287e6139f87a793a2cce06f35e372d8731d9ef98bffdf386dd41",
+        "src/fio.erl": "a8b52c4e6d83273159ab0f3ff1ac9a73295e3c830351900f6429bca2c004b2d6",
+        "src/fio.gleam": "ba221d6983e35f0d545d5d78697962f9f56455f000bd8f41e8a49cc2d03ce473",
+        "src/fio@error.erl": "ec394d1dd0d7607a3fe769888fce0aeed55e58b29b8a1679ae18724fbe381bab",
+        "src/fio@handle.erl": "5e38d92eab43f26b9286ce5402d17e5f2631b0fbd20099f444021292cddd445c",
+        "src/fio@internal@io.erl": "7bdcf306a3dbc2d4b94e6a1350ff63afd109300ee0bd6d743c3468e0c3efd39f",
+        "src/fio@json.erl": "9bd0fe1eb1deaaa5517c640603d9c09e09c4efb7310fb0df6b145123f71a3651",
+        "src/fio@observer.erl": "a17495085e6ea9ea85478eb95b9db1443b61a009a3ccf37aa43c32ecd4d2003d",
+        "src/fio@path.erl": "f68d68f298b4cd57c4adca39b3b7fdb60bd362c93f2b890e103ad9488d9a23f4",
+        "src/fio@recursive.erl": "bea61ce367b00508bdfa59af873182dd97c8f7a9fcabd6d289b4ffcbf27a95ac",
+        "src/fio@types.erl": "ca49fc434512c223e9cf10aff7a1d9530b34453b87b42f04f052ce5667f24859",
+        "src/fio_ffi.erl": "8232781d34a6f06f08a51f50afac11467cc2106adbaa4b23c6668c70595fa2a6",
+        "src/fio_ffi_bridge.erl": "fe0b9f5674cfaf4c0697be60d305265cc0cd23d47a75f848f40143e878f566cd"
+      }
+    }
+  ]
+}

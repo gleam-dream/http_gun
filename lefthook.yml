@@ -1,0 +1,8 @@
+pre-commit:
+  commands:
+    fast:
+      # Git exports repository-local variables to hooks. Dependency fetches
+      # must operate on their own checkout, not this staged worktree.
+      run: env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE -u GIT_PREFIX ./dev/env sh dev/gate fast
+    design:
+      run: nix run .#design-gate-check -- docs/design

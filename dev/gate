@@ -1,0 +1,22 @@
+#!/bin/sh
+set -eu
+mode=${1:-fast}
+case "$mode" in fast|full|soak) ;; *) echo 'Usage: sh dev/gate fast|full|soak' >&2; exit 2;; esac
+if [ "${HTTP_GUN_ISOLATED_GATE:-0}" != 1 ]; then
+  rm -rf build/evidence
+  exec python3 dev/isolated_gate.py "$mode"
+fi
+gleam build --warnings-as-errors
+sh dev/compile-native
+gleam test
+if [ "$mode" = full ]; then
+  python3 dev/check_stdlib.py
+  sh dev/consumers
+  python3 dev/comparison/run.py contracts --output build/evidence/comparison
+  python3 dev/nghttpd.py
+  mkdir -p build/evidence
+  gleam run -m http_gun_benchmark > build/evidence/load.jsonl
+  python3 dev/check_load.py build/evidence/load.jsonl
+elif [ "$mode" = soak ]; then
+  python3 dev/nghttpd.py --soak-seconds 600
+fi

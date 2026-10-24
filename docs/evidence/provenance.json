@@ -1,0 +1,47 @@
+[
+  {
+    "path": "manifest.toml",
+    "revision": "a1ad984a9249389988bbc936a9af71002419fe79",
+    "sha256": "256cc42f36e6ebb141a3a33c87c2572d9f39a0ba0aa90c27a6645b93f662d265"
+  },
+  {
+    "path": "gleam.toml",
+    "revision": "a1ad984a9249389988bbc936a9af71002419fe79",
+    "sha256": "cdbddf0651adfa0505246a6920c092866e5734ca88d45e962c03acf1f2ba922c"
+  },
+  {
+    "path": "LICENSE",
+    "revision": "a1ad984a9249389988bbc936a9af71002419fe79",
+    "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+  },
+  {
+    "path": "test/http_gun_test_server.erl",
+    "revision": "a1ad984a9249389988bbc936a9af71002419fe79",
+    "sha256": "10ce77e7424c186466905ed8916f796d55512ff401f70f8cb62ae7222c90767a"
+  },
+  {
+    "path": "test/http_gun_h2_server.erl",
+    "revision": "a1ad984a9249389988bbc936a9af71002419fe79",
+    "sha256": "85a99bcee3a777ef96dc18418a1eeb9aa01987858def788409ad89e6ae14522b"
+  },
+  {
+    "path": "test/fixtures/ca.crt",
+    "revision": "a1ad984a9249389988bbc936a9af71002419fe79",
+    "sha256": "59127cc465e09c17821d2aad1bc6420e347ce9b70dd7394337fe80fd39f197b9"
+  },
+  {
+    "path": "test/fixtures/localhost.crt",
+    "revision": "a1ad984a9249389988bbc936a9af71002419fe79",
+    "sha256": "b1c3ae8652a0d6398120742a1d148fa4667ee70f8c5b6f48caef589dc3f6dc47"
+  },
+  {
+    "path": "test/fixtures/localhost.key",
+    "revision": "a1ad984a9249389988bbc936a9af71002419fe79",
+    "sha256": "d5af74bdcaa2f4ed453698559d7053e52cd3e0eace019775df72085ade4b9a55"
+  },
+  {
+    "path": "test/fixtures/README.md",
+    "revision": "a1ad984a9249389988bbc936a9af71002419fe79",
+    "sha256": "5f77a0a2131241117d6252851775e0e472ec1802dfab4ec9e3042898c4466f78"
+  }
+]

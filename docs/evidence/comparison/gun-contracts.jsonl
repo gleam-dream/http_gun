@@ -1,0 +1,15 @@
+{"client":"gun","case":"created201","observation":"#(\"ok\", 201, [#(\"content-length\", \"3\")], \"abc\", [])"}
+{"client":"gun","case":"status429","observation":"#(\"ok\", 429, [#(\"content-length\", \"3\")], \"abc\", [])"}
+{"client":"gun","case":"empty204","observation":"#(\"ok\", 204, [], \"\", [])"}
+{"client":"gun","case":"binary200","observation":"#(\"ok\", 200, [#(\"content-length\", \"3\")], <<0, 255, 128>>, [])"}
+{"client":"gun","case":"duplicates-and-trailers","observation":"#(\"ok\", 200, [#(\"x-dup\", \"a\"), #(\"x-dup\", \"b\"), #(\"transfer-encoding\", \"chunked\"), #(\"trailer\", \"x-end\")], \"abc\", [#(\"x-end\", \"yes\")])"}
+{"client":"gun","case":"pull-created201","observation":"Ok(3)"}
+{"client":"gun","case":"pull-status429","observation":"Ok(3)"}
+{"client":"gun","case":"pull-empty204","observation":"Ok(0)"}
+{"client":"gun","case":"pull-binary200","observation":"Ok(3)"}
+{"client":"gun","case":"pull-duplicates-and-trailers","observation":"Ok(3)"}
+{"client":"gun","case":"custom-ca-tls","observation":"#(\"ok\", 200, [#(\"content-length\", \"3\")], \"abc\", [])"}
+{"client":"gun","case":"early-pull-closes-within-2s","observation":"True"}
+{"client":"gun","case":"pull-owner-exit-closes-within-2s","observation":"True"}
+{"client":"gun","case":"record-offline-roundtrip","observation":"#(\"\\\"abc\\\"\", \"not requested\", \"\\\"abc\\\"\", \"not requested\", \"Failure(FixtureExhausted, NotSubmitted)\")"}
+{"client":"gun","case":"record-identical-sequence","observation":"#(\"\\\"abc\\\"\", \"\\\"xyz\\\"\", \"\\\"abc\\\"\", \"\\\"xyz\\\"\", \"Failure(FixtureExhausted, NotSubmitted)\")"}
