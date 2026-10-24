@@ -1,0 +1,24 @@
+{
+  "client": "dream",
+  "scenario": "buffered",
+  "requests": 1000,
+  "connection_cap": 4,
+  "trial": "2",
+  "elapsed_us": 5013866,
+  "p50_us": 24493,
+  "p95_us": 3960818,
+  "p99_us": 5012432,
+  "connections": 393,
+  "failures": 48,
+  "failure_examples": [
+    "RequestError(\"{failed_connect,[{to_address,{\\\"localhost\\\",62847}},{inet,[inet],timeout}]}\")",
+    "RequestError(\"{failed_connect,[{to_address,{\\\"localhost\\\",62847}},{inet,[inet],timeout}]}\")",
+    "RequestError(\"{failed_connect,[{to_address,{\\\"localhost\\\",62847}},{inet,[inet],timeout}]}\")"
+  ],
+  "bytes": 2856,
+  "peak_vm_bytes": 67615401,
+  "peak_total_mailbox": 972,
+  "peak_one_mailbox": 969,
+  "peak_processes": 911,
+  "peak_ports": 236
+}

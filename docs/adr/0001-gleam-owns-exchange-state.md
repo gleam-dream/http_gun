@@ -1,0 +1,24 @@
+# Gleam owns exchange state and Gun owns wire protocols
+
+<a id="adr-0001"></a>
+
+## Decision
+
+- Retain the owner's 2026-09-29 restart decision. Gleam owns client policy, admission, body state, batching, matching and recording coordination. Erlang binds Gun/OTP, exception scopes and missing filesystem primitives.
+- Keep Gun/Cowlib as the wire implementation. Do not revive the previous Erlang orchestration, custom parser hardening or dependency patches.
+
+## Rationale and alternatives
+
+- Handwritten Erlang state servers would duplicate Gleam domain state and weaken the intended public ownership model. Reusing only a buffered HTTP wrapper would omit streamed-body ownership, H2 capacity and bounded live capture.
+- A new wire parser would make this package responsible for protocol compatibility and allocation guarantees that the supported Gun event boundary does not provide. Narrow native bindings preserve one transport oracle while keeping policy testable in Gleam.
+- The restart is evidenced in local AGENTS.md and docs/DESIGN.md. The original approval transcript is not retained as a tracked artifact; its recorded date is 2026-09-29. Commit `04ef776` on 2026-09-30 records the resulting client.
+- Initial Gun connection failure can stop with `{shutdown, Reason}` before the pool installs its monitor. A monitor installed after exit reports `noproc` and loses the original transport cause. The stateless Gun event handler sends the existing `gun_error` message with the terminal reason to the original pool owner before exit; default callbacks, Gun supervision and Gleam state ownership remain intact. The existing down-event handling absorbs subsequent monitor or disconnect notifications. No retry or general `noproc` classification is introduced.
+
+## Evidence and provenance
+
+- [Gun 2.6.0 source](https://github.com/ninenines/gun/blob/2.6.0/src/gun.erl) stops an initial refused connection through `not_connected/3` and calls the event handler from `terminate/3`. `connection_refusal_survives_monitor_after_gun_exit_test` waits for actual Gun death before monitoring it again; it requires both `noproc` and the retained typed refusal. Ordinary public refusal and established-close/TLS/protocol tests exercise the same production binding.
+
+- Current authorities: `src/http_gun/internal/{pool,owner,recorder,pending,batch,script,codec}.gleam`; foreign bindings: `src/http_gun_ffi.erl`, `src/http_gun_event_h.erl`, `src/http_gun_file_ffi.erl`.
+- Original restart recovery evidence lives in `.archive`; preserve it. Recorded snapshots were the pre-restart checkout and previous implementation at `a1ad984a9249389988bbc936a9af71002419fe79`. Their provenance hashes remain recoverable from Git history; this migration does not requalify their contents.
+- `NOTICE`, test certificate attribution, `docs/evidence/adoption-review/reference-sources.json` and Dream comparison source receipts retain license and reference evidence. Dream, ReqCassette, Gleam HTTPc, Mint and Finch supply scoped scenarios rather than full parity.
+- This record consolidates architecture/rationale from the retired DESIGN and PROVENANCE documents. Historical test counts and completion diaries are retired and remain in Git history; the raw evidence that current documents cite remains under `docs/evidence`.

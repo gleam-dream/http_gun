@@ -1,0 +1,158 @@
+%% Narrow transport/runtime boundary. No client state or server loops.
+-module(http_gun_ffi).
+-export([start/0, open/10, request/5, credit/3, cancel/2, close/1, now/0, scoped/2, decode/1]).
+-export([on_exception/2, cause/1]).
+-export([parse_address/1, lookup/3, client_identity/2]).
+-export([reusable/1]).
+-export([counter_new/0, counter_add/2]).
+counter_new() -> atomics:new(1, [{signed, true}]).
+counter_add(Ref, Amount) -> atomics:add_get(Ref, 1, Amount).
+reusable(Pid) ->
+    try gun:info(Pid) of
+        #{state_name := connected, protocol := http} -> true;
+        _ -> false
+    catch _:_ -> false end.
+parse_address(Host) ->
+    case inet:parse_strict_address(binary_to_list(Host)) of
+        {ok, Address} -> {ok, address(Address)};
+        {error, _} -> {error, nil}
+    end.
+address({A,B,C,D}) -> {ipv4,A,B,C,D};
+address({A,B,C,D,E,F,G,H}) -> {ipv6,A,B,C,D,E,F,G,H}.
+start() ->
+    case application:ensure_all_started(gun) of
+        {ok, _} -> {ok, nil};
+        {error, _} -> {error, nil}
+    end.
+lookup(Host, Family, Timeout) ->
+    case inet:getaddrs(binary_to_list(Host), Family, Timeout) of
+        {ok, Addresses} -> {ok, lists:map(fun address/1, Addresses)};
+        {error, nxdomain} -> {ok, []};
+        {error, _} -> {error, nil}
+    end.
+ip({ipv4,A,B,C,D}) -> {A,B,C,D};
+ip({ipv6,A,B,C,D,E,F,G,H}) -> {A,B,C,D,E,F,G,H}.
+open(Address, ServerName, Port, Tls, Protocol, Trust, Identity, Timeout, SendTimeout, HeaderCount) ->
+    try
+        Send = case SendTimeout of {send_within, Ms} -> Ms; send_unbounded -> infinity end,
+        Protocols = case {Tls, Protocol} of
+            {true, require_http2} -> [http2, http];
+            {false, require_http2} -> [http2];
+            {true, prefer_http2} -> [http2, http];
+            _ -> [http]
+        end,
+        Base = #{event_handler => {http_gun_event_h, self()},
+            retry => 0, protocols => Protocols, connect_timeout => Timeout,
+            domain_lookup_timeout => Timeout, tls_handshake_timeout => Timeout,
+            tcp_opts => [{send_timeout, Send}, {send_timeout_close, true}],
+            http_opts => #{flow => 1, max_headers => HeaderCount},
+            http2_opts => #{flow => 1, notify_settings_changed => true,
+                %% HPACK includes :status; application header counts do not.
+                max_headers => HeaderCount + 1,
+                initial_stream_window_size => 16384,
+                initial_connection_window_size => 65535}},
+        Options = case Tls of
+            false -> Base#{transport => tcp};
+            true ->
+                Ca = case Trust of
+                    system_trust -> {cacerts, public_key:cacerts_get()};
+                    {custom_ca, Path} -> {cacertfile, binary_to_list(Path)};
+                    {anchors, Certificates} -> {cacerts, Certificates}
+                end,
+                Credentials = case Identity of
+                    none -> [];
+                    {some, Snapshot} -> [{certs_keys, [Snapshot]}]
+                end,
+                Name = case ServerName of
+                    none -> [];
+                    {some, Host} -> [{server_name_indication, binary_to_list(Host)}]
+                end,
+                Base#{transport => tls, tls_opts => [Ca, {verify, verify_peer},
+                    {send_timeout, Send}, {send_timeout_close, true},
+                    {customize_hostname_check, [{match_fun, public_key:pkix_verify_hostname_match_fun(https)}]} | Name ++ Credentials]}
+        end,
+        case gun:open(ip(Address), Port, Options) of
+            {ok, Pid} -> {ok, Pid};
+            {error, Reason} -> {error, cause(Reason)}
+        end
+    catch _:Caught -> {error, cause(Caught)} end.
+request(Pid, Method, Path, Headers, Body) ->
+    try {ok, gun:request(Pid, Method, Path, Headers, Body, #{reply_to => self(), flow => 1})}
+    catch _:Reason -> {error, cause(Reason)} end.
+credit(Pid, Ref, Amount) -> gun:update_flow(Pid, Ref, Amount), nil.
+cancel(Pid, Ref) -> gun:cancel(Pid, Ref), nil.
+close(Pid) -> try gun:close(Pid) catch _:_ -> ok end, nil.
+now() -> erlang:monotonic_time(millisecond).
+scoped(Run, Cleanup) -> try Run() after Cleanup() end.
+on_exception(Run, Cleanup) ->
+    try Run() catch Class:Reason:Stack -> Cleanup(), erlang:raise(Class, Reason, Stack) end.
+decode({gun_up, P, http}) -> {up, P, h1};
+decode({gun_up, P, http2}) -> {up, P, h2};
+decode({gun_down, P, _, Reason, _}) -> {down, P, cause(Reason)};
+decode({gun_error, P, Reason}) -> {down, P, cause(Reason)};
+decode({gun_notify, P, settings_changed, Settings}) ->
+    {capacity, P, maps:get(max_concurrent_streams, Settings, 2147483647)};
+decode({gun_response, _, R, Fin, Status, Headers}) -> {head, R, Fin =:= fin, Status, Headers};
+decode({gun_data, _, R, Fin, Bytes}) -> {data, R, Fin =:= fin, Bytes};
+decode({gun_trailers, _, R, Headers}) -> {trailers, R, Headers};
+decode({gun_error, _, R, Reason}) -> {failed, R, cause(Reason)};
+decode({gun_inform, _, R, _, H}) -> {inform, R, H};
+decode({gun_upgrade, _, R, _, _}) -> {failed, R, unexpected_protocol};
+decode(_) -> ignore.
+
+%% Classify supported runtime reasons; never format arbitrary peer/runtime terms.
+cause({shutdown, Reason}) -> cause(Reason);
+cause({error, Reason}) -> cause(Reason);
+%% Gun H1/H2 wrap stream failures after TLS completion in {closed, Reason}.
+cause({closed, Reason}) -> cause(Reason);
+cause(nxdomain) -> name_resolution_failed;
+cause(econnrefused) -> connection_refused;
+cause(econnreset) -> connection_reset;
+cause(closed) -> peer_closed;
+cause(normal) -> peer_closed;
+cause(closing) -> peer_draining;
+cause(timeout) -> transport_timeout;
+cause(etimedout) -> transport_timeout;
+cause({tls_alert, {Alert, _}}) when Alert =:= unknown_ca; Alert =:= bad_certificate;
+    Alert =:= certificate_expired; Alert =:= certificate_revoked;
+    Alert =:= certificate_unknown; Alert =:= certificate_required -> certificate_rejected;
+cause({tls_alert, _}) -> tls_failed;
+cause({bad_cert, _}) -> certificate_rejected;
+cause({stream_error, _, _}) -> protocol_error;
+cause({connection_error, limit_reached, _}) -> header_limit_reached;
+cause({connection_error, _, _}) -> protocol_error;
+cause(_) -> unknown_transport.
+
+%% Native PEM/DER admission only; callers own credential IO and rotation.
+client_identity(CertificatePem, KeyPem) ->
+    case certificates(CertificatePem) of
+        {ok, Chain} ->
+            case private_key(KeyPem) of
+                {ok, Key} -> {ok, #{cert => Chain, key => Key}};
+                Error -> Error
+            end;
+        Error -> Error
+    end.
+certificates(Pem) ->
+    try
+        Entries = public_key:pem_decode(Pem),
+        true = Entries =/= [],
+        Chain = lists:map(fun({'Certificate', Der, not_encrypted}) ->
+            _ = public_key:pkix_decode_cert(Der, otp),
+            Der
+        end, Entries),
+        {ok, Chain}
+    catch _:_ -> {error, invalid_certificate_chain} end.
+private_key(Pem) ->
+    try
+        case public_key:pem_decode(Pem) of
+            [{'EncryptedPrivateKeyInfo', _, _}] -> {error, encrypted_private_key};
+            [{_, _, Encryption}] when Encryption =/= not_encrypted -> {error, encrypted_private_key};
+            [{Type, Der, not_encrypted} = Entry] when
+                Type =:= 'RSAPrivateKey'; Type =:= 'DSAPrivateKey';
+                Type =:= 'ECPrivateKey'; Type =:= 'PrivateKeyInfo' ->
+                _ = public_key:pem_entry_decode(Entry),
+                {ok, {Type, Der}};
+            _ -> {error, invalid_private_key}
+        end
+    catch _:_ -> {error, invalid_private_key} end.

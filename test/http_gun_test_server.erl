@@ -1,0 +1,191 @@
+-module(http_gun_test_server).
+
+-export([unused_port/0, late_monitor_refusal/1]).
+-export([remove_fixture/1]).
+
+-export([start/0,
+         serve/1,
+         persistent/0,
+         observed/0,
+         next_observed/0,
+         temp_path/0,
+         controlled/0,
+         gated/0,
+         await_request/1,
+         send_control/2,
+         await_closed/1,
+         disconnect/1]).
+
+start() -> serve(<<"HTTP/1.1 201 Created\r\nContent-Length: 3\r\n\r\n", 0, 255, 128>>).
+
+serve(Response) ->
+    {ok, L} = gen_tcp:listen(0,
+                             [binary, {active, false}, {reuseaddr, true}, {ip, {127, 0, 0, 1}}]),
+    {ok, {_, Port}} = inet:sockname(L),
+    spawn(fun () ->
+                  {ok, S} = gen_tcp:accept(L, 5000),
+                  {ok, _} = gen_tcp:recv(S, 0, 5000),
+                  ok = gen_tcp:send(S, Response),
+                  gen_tcp:close(S),
+                  gen_tcp:close(L)
+          end),
+    Port.
+
+persistent() -> persistent(undefined).
+observed() -> persistent(self()).
+next_observed() ->
+    receive {observed_request, Path} -> Path after 2000 -> error(no_observed_request) end.
+persistent(Observer) ->
+    {ok, L} = gen_tcp:listen(0,
+                             [binary, {active, false}, {reuseaddr, true}, {ip, {127, 0, 0, 1}}]),
+    {ok, {_, Port}} = inet:sockname(L),
+    spawn(fun () -> accept_loop(L, Observer) end),
+    Port.
+
+accept_loop(L, Observer) ->
+    case gen_tcp:accept(L, 5000) of
+        {ok, S} ->
+            spawn(fun () -> request_loop(S, <<>>, Observer) end),
+            accept_loop(L, Observer);
+        _ -> gen_tcp:close(L)
+    end.
+
+request_loop(S, Buf, Observer) ->
+    case binary:match(Buf, <<"\r\n\r\n">>) of
+        {At, 4} ->
+            <<Head:At/binary, _:4/binary, Rest/binary>> = Buf,
+            Len = content_length(binary:split(Head, <<"\r\n">>, [global])),
+            {Body, Remaining} = read_body(S, Rest, Len),
+            [First | _] = binary:split(Head, <<"\r\n">>),
+            [Method, Path, _] = binary:split(First, <<" ">>, [global]),
+            case Observer of undefined -> ok; _ -> Observer ! {observed_request, Path} end,
+            Data = case Method of
+                       <<"POST">> -> Body;
+                       <<"HEAD">> -> <<>>;
+                       _ -> <<"abc">>
+                   end,
+            case Path of
+                <<"/flow-trailers">> ->
+                    ok = gen_tcp:send(S,
+                        [<<"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nX-Connection: ">>,
+                         list_to_binary(pid_to_list(self())), <<"\r\n\r\n">>,
+                         lists:duplicate(25, [<<"1000\r\n">>, binary:copy(<<42>>,4096), <<"\r\n">>]),
+                         <<"0\r\nx-final: yes\r\nx-final: again\r\n\r\n">>]);
+                _ -> ok = gen_tcp:send(S,
+                              [<<"HTTP/1.1 200 OK\r\nContent-Length: ">>,
+                               integer_to_binary(byte_size(Data)),
+                               <<"\r\nX-Connection: ">>, list_to_binary(pid_to_list(self())),
+                               <<"\r\n\r\n">>, Data])
+            end,
+            request_loop(S, Remaining, Observer);
+        nomatch ->
+            case gen_tcp:recv(S, 0, 5000) of
+                {ok, D} -> request_loop(S, <<Buf/binary, D/binary>>, Observer);
+                _ -> gen_tcp:close(S)
+            end
+    end.
+
+content_length([]) -> 0;
+content_length([Line | Rest]) ->
+    case binary:split(string:lowercase(Line), <<": ">>) of
+        [<<"content-length">>, N] -> binary_to_integer(N);
+        _ -> content_length(Rest)
+    end.
+
+read_body(_S, B, Len) when byte_size(B) >= Len ->
+    <<Body:Len/binary, Rest/binary>> = B,
+    {Body, Rest};
+read_body(S, B, Len) ->
+    {ok, D} = gen_tcp:recv(S, 0, 5000),
+    read_body(S, <<B/binary, D/binary>>, Len).
+
+temp_path() ->
+    list_to_binary(filename:join("/tmp",
+                                 "http-gun-" ++
+                                     integer_to_list(erlang:unique_integer([positive, monotonic]))
+                                         ++ "-" ++ os:getpid() ++ ".json")).
+
+gated() -> controlled(false).
+
+controlled() -> controlled(true).
+
+controlled(Head) ->
+    Parent = self(),
+    {ok, L} = gen_tcp:listen(0,
+                             [binary, {active, false}, {reuseaddr, true}, {ip, {127, 0, 0, 1}}]),
+    {ok, {_, Port}} = inet:sockname(L),
+    P = spawn(fun () ->
+                      {ok, S} = gen_tcp:accept(L, 5000),
+                      gen_tcp:close(L),
+                      {ok, _} = gen_tcp:recv(S, 0, 5000),
+                      Parent ! {request_received, self()},
+                      case Head of
+                          true ->
+                              gen_tcp:send(S,
+                                           <<"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n">>);
+                          false -> ok
+                      end,
+                      control_loop(S)
+              end),
+    {Port, P}.
+
+await_request(P) ->
+    receive {request_received, P} -> ok after 2000 -> error(request_not_received) end.
+
+control_loop(S) ->
+    receive
+        {send, From, Ref, B} ->
+            R = gen_tcp:send(S, B),
+            From ! {Ref, R},
+            control_loop(S);
+        {await_closed, From, Ref} ->
+            R = gen_tcp:recv(S, 0, 2000),
+            From ! {Ref, R},
+            gen_tcp:close(S);
+        disconnect -> gen_tcp:close(S)
+        after 10000 -> gen_tcp:close(S)
+    end.
+
+send_control(P, B) ->
+    Ref = make_ref(),
+    P ! {send, self(), Ref, B},
+    receive {Ref, ok} -> nil after 2000 -> error(server_timeout) end.
+
+await_closed(P) ->
+    Ref = make_ref(),
+    P ! {await_closed, self(), Ref},
+    receive
+        {Ref, {error, closed}} -> true;
+        {Ref, _} -> false
+        after 3000 -> false
+    end.
+
+disconnect(P) ->
+    P ! disconnect,
+    nil.
+
+remove_fixture(Path) ->
+    file:delete(Path),
+    nil.
+
+unused_port() ->
+    {ok, Socket} = gen_tcp:listen(0, [{ip, {127,0,0,1}}]),
+    {ok, {_, Port}} = inet:sockname(Socket),
+    ok = gen_tcp:close(Socket),
+    Port.
+
+%% Deliberately monitor only after Gun has exited. The first monitor merely
+%% waits for that precondition; the second proves the lost-reason noproc case.
+late_monitor_refusal(Port) ->
+    {ok, nil} = http_gun_ffi:start(),
+    {ok, Pid} = http_gun_ffi:open({ipv4,127,0,0,1}, none, Port, false,
+                                http1, system_trust, none, 1000, {send_within, 1000}, 100),
+    Ref = erlang:monitor(process, Pid),
+    receive {'DOWN', Ref, process, Pid, _} -> ok
+    after 2000 -> gun:close(Pid), erlang:error(startup_connection_did_not_exit) end,
+    LateRef = erlang:monitor(process, Pid),
+    LateReason = receive {'DOWN', LateRef, process, Pid, Reason} -> Reason
+    after 2000 -> erlang:error(late_monitor_did_not_complete) end,
+    Cause = receive {gun_error, Pid, TerminalReason} -> http_gun_ffi:cause(TerminalReason)
+    after 0 -> unknown_transport end,
+    {Cause, LateReason =:= noproc}.

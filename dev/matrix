@@ -1,0 +1,26 @@
+#!/bin/sh
+# The isolated gate gives every runtime a separate source/build/consumer tree.
+set -eu
+root=$(pwd)
+work=$(mktemp -d)
+trap 'mkdir -p build/evidence/matrix; cp -R "$work/." build/evidence/matrix/; rm -rf "$work"' EXIT
+for runtime in default otp28 otp27; do
+  scope="$work/$runtime"
+  mkdir -p "$scope"
+  if nix develop "$root#$runtime" --command sh dev/gate full > "$scope/gate.log" 2>&1; then
+    code=0
+  else
+    code=$?
+  fi
+  for name in load.jsonl manifests nghttpd logs; do
+    if [ -e "build/evidence/$name" ]; then
+      cp -R "build/evidence/$name" "$scope/"
+    fi
+  done
+  if [ "$code" = 0 ]; then
+    echo "$runtime full gate passed"
+  else
+    cat "$scope/gate.log"
+    exit "$code"
+  fi
+done

@@ -1,0 +1,8 @@
+/build/
+/examples/*/build/
+/.direnv/
+/.env
+/.archive/
+__pycache__/
+.render/
+**/.render/

@@ -1,0 +1,14 @@
+#!/bin/sh
+# Regenerate local-only IP-SAN fixtures; never install their CA in system trust.
+set -eu
+work=$(mktemp -d)
+trap 'rm -rf "$work"' EXIT HUP INT TERM
+openssl req -x509 -newkey rsa:2048 -nodes -keyout "$work/ca.key" -out test/fixtures/ip_ca.crt -days 3650 -subj /CN=http-gun-IP-test-CA -addext basicConstraints=critical,CA:TRUE -addext keyUsage=critical,keyCertSign,cRLSign
+openssl req -new -newkey rsa:2048 -nodes -keyout test/fixtures/ip.key -out "$work/ip.csr" -subj /CN=http-gun-IP-test-server
+cat > "$work/extensions" <<'EXT'
+basicConstraints=critical,CA:FALSE
+keyUsage=critical,digitalSignature,keyEncipherment
+extendedKeyUsage=serverAuth
+subjectAltName=IP:127.0.0.1
+EXT
+openssl x509 -req -in "$work/ip.csr" -CA test/fixtures/ip_ca.crt -CAkey "$work/ca.key" -set_serial 2 -days 3650 -extfile "$work/extensions" -out test/fixtures/ip.crt
