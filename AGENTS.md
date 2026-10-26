@@ -12,7 +12,7 @@ HTTP Gun is an Erlang/OTP HTTP client written in Gleam. Read `docs/design/design
 - Separate public consumers: `./dev/env sh dev/consumers`, `./dev/env sh dev/async-consumer`, `./dev/env sh dev/mtls-consumer`.
 - Downstream qualification is an explicit, isolated command, `dev/check_downstream.py`. Run it when a public contract changes, and inspect its arguments first.
 - Dependency range changes follow the design's native assumption inventory.
-- Sinal, the one unpublished sibling dependency, is a Git dependency on `main` in `gleam.toml`; `manifest.toml` holds the resolved commit. Update it by hand with `gleam update sinal` when needed. Oracle and benchmark inputs (the Dream archive) are downloaded into `build/` and checked against recorded hashes; none is committed.
+- Sinal, the one unpublished sibling dependency, is a Git dependency pinned to a verified commit in `gleam.toml`; `manifest.toml` holds the resolved commit. Update it by hand with `gleam update sinal` when needed. Oracle and benchmark inputs (the Dream archive) are downloaded into `build/` and checked against recorded hashes; none is committed.
 
 ## Constraints
 
