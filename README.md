@@ -34,16 +34,13 @@ protocol framing such as SSE, and reconciliation of external effects.
 
 ## Install
 
-HTTP Gun is unreleased and requires Gleam 1.18 or newer on the Erlang target.
-Add it to your application's `gleam.toml`:
+HTTP Gun requires Gleam 1.18 or newer on the Erlang target. Add it from Hex:
 
-```toml
-[dependencies]
-http_gun = { git = "https://github.com/gleam-dream/http_gun.git", ref = "main" }
+```sh
+gleam add http_gun
 ```
 
-Gleam fetches its dependencies without sibling checkouts. Commit the application's
-`manifest.toml` to lock the resolved revisions.
+Commit the application's `gleam.toml` and `manifest.toml` to retain the resolved versions.
 
 ## Send a request
 
