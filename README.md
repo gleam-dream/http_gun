@@ -132,3 +132,6 @@ client identity setup and rotation. The [public API](src/http_gun.gleam),
 the package contracts. [Benchmark notes](docs/BENCHMARKS.md) report retained local
 workload measurements; they predate this checkout and make no performance
 promise.
+
+The [changelog](https://github.com/gleam-dream/http_gun/blob/main/CHANGELOG.md)
+records releases and additions to public error variants.

@@ -8,7 +8,7 @@ repository = { type = "github", user = "gleam-dream", repo = "http_gun" }
 internal_modules = ["http_gun/internal", "http_gun/internal/*"]
 
 [dependencies]
-sinal = { git = "https://github.com/gleam-dream/sinal.git", ref = "95f2dbce4459942e16e819e3527eb00d9c503c9d" }
+sinal = ">= 0.1.0 and < 0.2.0"
 gleam_stdlib = ">= 0.71.0 and < 2.0.0"
 gleam_http = ">= 4.4.0 and < 5.0.0"
 gleam_erlang = ">= 1.3.0 and < 2.0.0"
@@ -33,3 +33,8 @@ youid = ">= 1.6.0 and < 2.0.0"
 
 [dev-dependencies]
 gleeunit = ">= 1.0.0 and < 2.0.0"
+
+[[documentation.pages]]
+title = "Changelog"
+path = "changelog.html"
+source = "./CHANGELOG.md"
