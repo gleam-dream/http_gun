@@ -138,6 +138,38 @@ def prepare():
         == 0
     )
     retain(RUNNER, ROOT, "comparison")
+    fixture_tests = WORK / "fixture-tests"
+    fixture_tests.mkdir(exist_ok=True)
+    assert (
+        run(
+            [
+                "erlc",
+                "-Werror",
+                "-DTEST",
+                "-o",
+                str(fixture_tests),
+                str(ROOT / "examples/comparison/src/comparison_ffi.erl"),
+            ],
+            ROOT,
+            "fixture-test-build",
+        )
+        == 0
+    )
+    assert (
+        run(
+            [
+                "erl",
+                "-noshell",
+                "-pa",
+                str(fixture_tests),
+                "-eval",
+                "case eunit:test(comparison_ffi, [verbose]) of ok -> halt(0); _ -> halt(1) end.",
+            ],
+            ROOT,
+            "fixture-test",
+        )
+        == 0
+    )
 
 
 def upstream():
