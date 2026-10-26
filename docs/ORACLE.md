@@ -38,6 +38,7 @@ From the repository root, inside `./dev/env`:
 
 - Use a new output directory to keep earlier receipts.
 - The wrapper downloads the pinned Dream archive when it is absent and checks its recorded hashes. Dream source stays in its isolated checkout and is never modified.
+- The reconciled Dream checks use `ERL_COMPILER_OPTIONS='[nowarn_deprecated_catch]'` for the pinned upstream Meck dependency on OTP 29. This permits its deprecated `catch` syntax; the retained compiler receipt identifies the option. The raw upstream observation, HTTP Gun gate and comparison harness keep their ordinary compiler settings, and behavioral failures still fail qualification.
 - Cowlib and Gun selection is exercised by `./dev/env sh dev/gate full` and `HTTP_GUN_DEPENDENCIES=latest ./dev/env sh dev/gate full`.
 
 ## Limits of the claim

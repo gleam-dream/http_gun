@@ -4,6 +4,7 @@ target = "erlang"
 gleam = ">= 1.18.0"
 licences = ["Apache-2.0"]
 description = "Owned HTTP byte streams, bounded collection and explicit cassettes on Gun."
+repository = { type = "github", user = "gleam-dream", repo = "http_gun" }
 internal_modules = ["http_gun/internal", "http_gun/internal/*"]
 
 [dependencies]

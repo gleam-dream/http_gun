@@ -63,11 +63,16 @@ def record_inputs():
     (OUT / "inputs.json").write_text(json.dumps(receipt, indent=2) + "\n")
 
 
-def run(args, cwd, stem, timeout=180):
+def run(args, cwd, stem, timeout=180, env=None):
     with (OUT / f"{stem}.log").open("w") as log:
         try:
             completed = subprocess.run(
-                args, cwd=cwd, stdout=log, stderr=subprocess.STDOUT, timeout=timeout
+                args,
+                cwd=cwd,
+                stdout=log,
+                stderr=subprocess.STDOUT,
+                timeout=timeout,
+                env=env,
             )
             code = completed.returncode
         except subprocess.TimeoutExpired:
@@ -162,8 +167,22 @@ def upstream():
     )
     (MODULE / "manifest.toml").write_text(reconciled)
     (OUT / "dream-reconciled-manifest.toml").write_text(reconciled)
+    # The pinned upstream meck treats OTP 29's new catch deprecation as an
+    # error. Apply its compiler compatibility option only to this third-party
+    # oracle; HTTP Gun and the comparison harness keep their ordinary checks.
+    compatibility = dict(os.environ, ERL_COMPILER_OPTIONS="[nowarn_deprecated_catch]")
+    (OUT / "dream-compiler-compatibility.json").write_text(
+        json.dumps(
+            {
+                "ERL_COMPILER_OPTIONS": compatibility["ERL_COMPILER_OPTIONS"],
+                "scope": "reconciled pinned Dream oracle only",
+            },
+            indent=2,
+        )
+        + "\n"
+    )
     results = {
-        name: run(args, MODULE, name, 360)
+        name: run(args, MODULE, name, 360, env=compatibility)
         for name, args in [
             ("dream-reconciled-check", ["gleam", "check"]),
             ("dream-reconciled-test", ["gleam", "test"]),
