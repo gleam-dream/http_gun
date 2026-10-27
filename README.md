@@ -1,5 +1,9 @@
 # HTTP Gun
 
+[![CI](https://github.com/gleam-dream/http_gun/actions/workflows/check.yml/badge.svg?branch=main)](https://github.com/gleam-dream/http_gun/actions/workflows/check.yml)
+[![http_gun on Hex](https://img.shields.io/hexpm/v/http_gun?label=Hex%3A%20http_gun)](https://hex.pm/packages/http_gun)
+[![Gleam](https://img.shields.io/badge/Gleam-FFAFF3?logo=gleam&logoColor=000000)](https://gleam.run/)
+
 HTTP Gun is a Gleam HTTP client for Erlang/OTP applications. One client gives
 you a reusable connection pool, collected or streamed byte responses, explicit
 resource limits, and offline playback. Your application decides what a status

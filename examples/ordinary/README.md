@@ -1,5 +1,9 @@
 # Ordinary consumer
 
+[![CI](https://github.com/gleam-dream/http_gun/actions/workflows/check.yml/badge.svg?branch=main)](https://github.com/gleam-dream/http_gun/actions/workflows/check.yml)
+[![http_gun on Hex](https://img.shields.io/hexpm/v/http_gun?label=Hex%3A%20http_gun)](https://hex.pm/packages/http_gun)
+[![Gleam](https://img.shields.io/badge/Gleam-FFAFF3?logo=gleam&logoColor=000000)](https://gleam.run/)
+
 A separate package that imports only public HTTP Gun modules. Each module is a
 runnable usage example against local servers, and `http_gun_consumer.main` runs
 them all.

@@ -1,5 +1,9 @@
 # Local HTTP comparison
 
+[![CI](https://github.com/gleam-dream/http_gun/actions/workflows/check.yml/badge.svg?branch=main)](https://github.com/gleam-dream/http_gun/actions/workflows/check.yml)
+[![http_gun on Hex](https://img.shields.io/hexpm/v/http_gun?label=Hex%3A%20http_gun)](https://hex.pm/packages/http_gun)
+[![Gleam](https://img.shields.io/badge/Gleam-FFAFF3?logo=gleam&logoColor=000000)](https://gleam.run/)
+
 A separate package that compares the public HTTP Gun and Dream APIs over local
 HTTP/1.1 servers. `comparison_adapter` keeps status, error and body differences
 and gives the workload driver one call shape. `comparison_contract` exercises
