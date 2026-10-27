@@ -30,9 +30,9 @@ or response body means.
 
 ## When to use it
 
-Use HTTP Gun for ordinary API calls in a supervised Erlang application, for
-reading large responses a chunk at a time, or for tests that need deterministic
-offline responses and recorded exchanges. It is a transport client: provider
+Use HTTP Gun for API calls in supervised Erlang applications, streamed reads of
+large responses, or tests with deterministic offline responses and recorded
+exchanges. It is a transport client: provider
 adapters still own authentication, status and content interpretation, retries,
 protocol framing such as SSE, and reconciliation of external effects.
 

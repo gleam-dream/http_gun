@@ -23,6 +23,6 @@ them all.
 ./dev/env sh dev/consumers
 ```
 
-The full gate runs it, so an example that no longer matches the library fails the
-gate. No provider endpoint or sibling checkout is needed. Start from
+The full gate runs these examples. No provider endpoint or sibling checkout is
+needed. Start from
 `src/http_gun_consumer.gleam`.

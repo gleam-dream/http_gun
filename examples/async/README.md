@@ -4,8 +4,8 @@
 [![http_gun on Hex](https://img.shields.io/hexpm/v/http_gun?label=Hex%3A%20http_gun)](https://hex.pm/packages/http_gun)
 [![Gleam](https://img.shields.io/badge/Gleam-FFAFF3?logo=gleam&logoColor=000000)](https://gleam.run/)
 
-A separate package with public imports. It holds an application recipe for
-bounded feed jobs: a worker opens and reads a response body through
+A separate package using public imports for bounded feed jobs: a worker opens
+and reads a response body through
 `http_gun.with_response`, runs a synchronous sink for each chunk and supports
 cancellation and bounded shutdown. The recipe is application code, not an
 exported HTTP Gun task API.
