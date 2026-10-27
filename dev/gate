@@ -10,6 +10,7 @@ gleam build --warnings-as-errors
 sh dev/compile-native
 gleam test
 if [ "$mode" = full ]; then
+  python3 -B -m unittest discover -s dev -p test_downstream.py -v
   python3 dev/check_stdlib.py
   sh dev/consumers
   python3 dev/comparison/run.py contracts --output build/evidence/comparison

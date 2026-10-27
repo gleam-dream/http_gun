@@ -20,7 +20,7 @@ HTTP Gun is an Erlang/OTP HTTP client written in Gleam. Read `docs/design/design
 - Gun and Cowlib own wire protocols. Do not patch dependencies, implement parsers or pursue whole-stack memory certification. No retries, redirects or decompression. Reuse `file_streams` and `simplifile` where their semantics preserve bounded reads, exclusive creation, atomic publication and cleanup.
 - Local network tests and examples set `destination.allow_loopback` explicitly. Never use `SNI=disable` for IP literals or bypass destination policy on connection replacement.
 - Use observable public tests, one failing scenario at a time, then minimal implementation and refactoring while green. Missing functionality is unfinished. Retain exact qualification evidence and claim no unexecuted workflow.
-- The package is unreleased. Breaking API and schema cleanup is authorized; update owned tests and examples together, add no compatibility layers and keep one strict, version-marked fixture schema.
+- Published `0.1.0` is the compatibility baseline. Proposed breaking API or schema changes require an explicit release and version decision. Update owned tests and examples together and keep one strict, version-marked fixture schema.
 
 ## References
 

@@ -73,7 +73,7 @@ def closure(http_gun, llm_wire):
         manifest = tomllib.loads((root / "gleam.toml").read_text())
         for section in ("dependencies", "dev-dependencies"):
             for name, value in manifest.get(section, {}).items():
-                if not isinstance(value, dict) or "path" not in value:
+                if not isinstance(value, dict) or "path" not in value or "git" in value:
                     continue
                 target = (
                     http_gun if name == "http_gun" else (root / value["path"]).resolve()
@@ -95,27 +95,77 @@ def isolate(roots, before, work):
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, target)
         for relative in before[name]:
-            if Path(relative).name not in ("gleam.toml", "manifest.toml"):
+            if Path(relative).name != "gleam.toml":
                 continue
             source, target = root / relative, destination / relative
+            config = tomllib.loads(source.read_text())
+            text = target.read_text()
+            for section in ("dependencies", "dev-dependencies"):
+                replacements = {}
+                for dependency, value in config.get(section, {}).items():
+                    if dependency == "http_gun":
+                        replacements[dependency] = destinations["http_gun"]
+                    elif (
+                        isinstance(value, dict)
+                        and "path" in value
+                        and "git" not in value
+                    ):
+                        original = (source.parent / value["path"]).resolve()
+                        for package, package_root in roots.items():
+                            if original.is_relative_to(package_root):
+                                replacements[dependency] = destinations[
+                                    package
+                                ] / original.relative_to(package_root)
+                                break
+                        else:
+                            raise ValueError(
+                                f"Unresolved local dependency in {source}: {original}"
+                            )
+                if not replacements:
+                    continue
 
-            def relocate(match):
-                original = (source.parent / match[1]).resolve()
-                # HTTP Gun paths in the downstream may name a different checkout.
-                if original.name == "http_gun":
-                    return "path = " + json.dumps(str(destinations["http_gun"]))
-                for package, package_root in roots.items():
-                    if original.is_relative_to(package_root):
-                        moved = destinations[package] / original.relative_to(
-                            package_root
+                def rewrite_table(match):
+                    table = match[2]
+                    for dependency, path in replacements.items():
+                        table, count = re.subn(
+                            rf"""(?m)^{re.escape(dependency)}\s*=\s*(?:\{{[^}}]*\}}|"[^"\n]*"|'[^'\n]*')""",
+                            lambda _: (
+                                f"{dependency} = {{ path = {json.dumps(str(path))} }}"
+                            ),
+                            table,
                         )
-                        return "path = " + json.dumps(str(moved))
-                raise ValueError(f"Unresolved local dependency in {source}: {original}")
+                        if count != 1:
+                            raise ValueError(
+                                f"Cannot replace {dependency} in {source} [{section}]"
+                            )
+                    return match[1] + table
 
-            target.write_text(
-                re.sub(r'path = "([^"\n]+)"', relocate, target.read_text())
-            )
+                text, count = re.subn(
+                    rf"(?ms)(^\[{section}\][ \t]*(?:\#[^\n]*)?\n)(.*?)(?=^\[|\Z)",
+                    rewrite_table,
+                    text,
+                )
+                if count != 1:
+                    raise ValueError(f"Cannot replace [{section}] in {source}")
+            target.write_text(text)
     return destinations
+
+
+def prepare_dependencies(projects):
+    # Let Gleam retain the selected third-party versions while reconciling the
+    # copied locks. One resolution settles one changed direct path fingerprint.
+    for project in sorted(projects):
+        config = tomllib.loads((project / "gleam.toml").read_text())
+        dependencies = config.get("dependencies", {}) | config.get(
+            "dev-dependencies", {}
+        )
+        paths = sum(
+            isinstance(value, dict) and "path" in value and "git" not in value
+            for value in dependencies.values()
+        )
+        if paths:
+            for _ in range(paths + 1):
+                subprocess.run(["gleam", "deps", "download"], cwd=project, check=True)
 
 
 def main():
@@ -138,6 +188,9 @@ def main():
     with tempfile.TemporaryDirectory(prefix="http-gun-downstream-") as directory:
         copies = isolate(roots, before, Path(directory))
         downstream = copies["llm_wire"]
+        # These are the executable packages below; the external boundary script
+        # also reads the example consumer's lock to seed its compiler probes.
+        prepare_dependencies((downstream, downstream / "examples/consumer"))
         commands = [
             ["gleam", "build", "--warnings-as-errors"],
             ["gleam", "test"],
