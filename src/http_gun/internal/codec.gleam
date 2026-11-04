@@ -23,7 +23,8 @@ pub type ParseError {
 }
 
 /// Encode exchanges with `redaction` applied to every request and to
-/// response headers and trailers.
+/// response headers, bodies and trailers. A rewritten response body is
+/// stored as one chunk, as a recording stores it.
 pub fn encode(exchanges: List(script.Exchange), policy: Redaction) -> String {
   json.object([
     #("http_gun", json.int(version)),
@@ -50,7 +51,14 @@ fn redact_reply(policy: Redaction, reply: script.Reply) -> script.Reply {
       script.Respond(
         status,
         redaction.headers(policy, headers),
-        chunks,
+        case redaction.rewrites_body_for(policy, headers) {
+          False -> chunks
+          True ->
+            case redaction.body_for(policy, headers, bit_array.concat(chunks)) {
+              <<>> -> []
+              body -> [body]
+            }
+        },
         case ending {
           script.Finished(trailers) ->
             script.Finished(redaction.headers(policy, trailers))

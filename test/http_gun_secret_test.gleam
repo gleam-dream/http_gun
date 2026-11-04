@@ -9,6 +9,7 @@ import gleam/http/request
 import gleam/http/response
 import gleam/int
 import gleam/list
+import gleam/option.{Some}
 import gleam/string
 import gleam/time/duration
 import gleeunit/should
@@ -321,4 +322,41 @@ fn receive_events(
         Error(Nil) -> []
       }
   }
+}
+
+pub fn default_redaction_scrubs_json_request_body_fields_test() {
+  let assert Ok(req) = request.to("https://example.com/login?sig=abc&q=1")
+  let req =
+    req
+    |> request.set_header("content-type", "application/vnd.api+json")
+    |> request.set_header("x-amz-security-token", "amz-secret")
+    |> request.set_body(<<
+      "{\"user\":\"ana\", \"password\" : \"pw\\\"secret\", \"list\":[{\"secret\":{\"deep\":[1,2]}}],\"token\":null,\"n\":1.5e3}":utf8,
+    >>)
+  let redacted = redaction.request(redaction.default(), req)
+  redacted.query |> should.equal(Some("sig=REDACTED&q=1"))
+  list.key_find(redacted.headers, "x-amz-security-token")
+  |> should.equal(Error(Nil))
+  redacted.body
+  |> should.equal(<<
+    "{\"user\":\"ana\", \"password\" : \"REDACTED\", \"list\":[{\"secret\":\"REDACTED\"}],\"token\":\"REDACTED\",\"n\":1.5e3}":utf8,
+  >>)
+  // Applying it twice changes nothing more, so playback keys stay stable.
+  redaction.request(redaction.default(), redacted) |> should.equal(redacted)
+}
+
+pub fn default_redaction_keeps_unparsable_and_other_bodies_test() {
+  let assert Ok(req) = request.to("https://example.com/")
+  let form = <<"client_secret=kept":utf8>>
+  // No form content type: the body is not interpreted.
+  redaction.request(redaction.default(), request.set_body(req, form)).body
+  |> should.equal(form)
+  let broken = <<"{\"access_token\":\"unterminated":utf8>>
+  redaction.request(
+    redaction.default(),
+    req
+      |> request.set_header("content-type", "application/json")
+      |> request.set_body(broken),
+  ).body
+  |> should.equal(broken)
 }

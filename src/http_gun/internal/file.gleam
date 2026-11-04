@@ -54,8 +54,15 @@ pub fn read(path: String, limit: Int) -> Result(BitArray, FileError) {
   }
 }
 
+/// Create `path` readable and writable only by its owner, then write
+/// `bytes`. Staged files keep this mode when published, so a cassette never
+/// inherits a permissive umask.
 pub fn write_new(path: String, bytes: BitArray) -> Result(Nil, FileError) {
   use stream <- with_file(path, [Write, Exclusive, Raw])
+  use Nil <- result.try(
+    simplifile.set_permissions_octal(path, 0o600)
+    |> result.map_error(path_error(SetPermissions, _)),
+  )
   file_stream.write_bytes(stream, bytes)
   |> result.map_error(stream_error(WriteFile, _))
 }
