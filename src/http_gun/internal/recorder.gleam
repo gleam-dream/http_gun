@@ -58,7 +58,8 @@ type StreamState {
   AwaitHead
   Receiving(has_chunks: Bool)
   /// The body is held until it ends, so the body redaction sees it whole.
-  Buffering(chunks: List(BitArray))
+  /// `headers` carry the content type that selects the field redaction.
+  Buffering(headers: List(#(String, String)), chunks: List(BitArray))
   Ended
 }
 
@@ -476,8 +477,8 @@ fn fragment(
             codec.headers_json(redaction.headers(policy, headers)),
           )
             <> ",\"chunks\":[",
-          case redaction.rewrites_bodies(policy) {
-            True -> Buffering([])
+          case redaction.rewrites_body_for(policy, headers) {
+            True -> Buffering(headers, [])
             False -> Receiving(False)
           },
         ),
@@ -491,10 +492,15 @@ fn fragment(
           <> json.to_string(codec.bytes_json(bytes)),
         Receiving(True),
       ))
-    Buffering(chunks), obs.Bytes(bytes) ->
-      Ok(#("", Buffering([bytes, ..chunks])))
-    Buffering(chunks), _ -> {
-      let body = redaction.body(policy, bit_array.concat(list.reverse(chunks)))
+    Buffering(headers, chunks), obs.Bytes(bytes) ->
+      Ok(#("", Buffering(headers, [bytes, ..chunks])))
+    Buffering(headers, chunks), _ -> {
+      let body =
+        redaction.body_for(
+          policy,
+          headers,
+          bit_array.concat(list.reverse(chunks)),
+        )
       let chunk = case bit_array.byte_size(body) {
         0 -> ""
         _ -> json.to_string(codec.bytes_json(body))

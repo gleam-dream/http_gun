@@ -9,6 +9,7 @@ import gleam/http/request
 import gleam/http/response
 import gleam/int
 import gleam/list
+import gleam/option.{Some}
 import gleam/string
 import gleam/time/duration
 import gleeunit/should
@@ -321,4 +322,130 @@ fn receive_events(
         Error(Nil) -> []
       }
   }
+}
+
+pub fn default_redaction_scrubs_json_request_body_fields_test() {
+  let assert Ok(req) = request.to("https://example.com/login?sig=abc&q=1")
+  let req =
+    req
+    |> request.set_header("content-type", "application/vnd.api+json")
+    |> request.set_header("x-amz-security-token", "amz-secret")
+    |> request.set_body(<<
+      "{\"user\":\"ana\", \"password\" : \"pw\\\"secret\", \"list\":[{\"secret\":{\"deep\":[1,2]}}],\"token\":null,\"n\":1.5e3}":utf8,
+    >>)
+  let redacted = redaction.request(redaction.default(), req)
+  redacted.query |> should.equal(Some("sig=REDACTED&q=1"))
+  list.key_find(redacted.headers, "x-amz-security-token")
+  |> should.equal(Error(Nil))
+  redacted.body
+  |> should.equal(<<
+    "{\"user\":\"ana\", \"password\" : \"REDACTED\", \"list\":[{\"secret\":\"REDACTED\"}],\"token\":\"REDACTED\",\"n\":1.5e3}":utf8,
+  >>)
+  // Applying it twice changes nothing more, so playback keys stay stable.
+  redaction.request(redaction.default(), redacted) |> should.equal(redacted)
+}
+
+pub fn default_redaction_keeps_other_content_types_test() {
+  let assert Ok(req) = request.to("https://example.com/")
+  let form = <<"client_secret=kept":utf8>>
+  // No form content type: the body is not interpreted.
+  redaction.request(redaction.default(), request.set_body(req, form)).body
+  |> should.equal(form)
+}
+
+fn with_type(
+  content_type: String,
+  body: BitArray,
+) -> request.Request(BitArray) {
+  let assert Ok(req) = request.to("https://example.com/")
+  req
+  |> request.set_header("content-type", content_type)
+  |> request.set_body(body)
+}
+
+pub fn default_redaction_replaces_bodies_that_do_not_scan_test() {
+  let marker = <<"REDACTED-UNPARSABLE":utf8>>
+  list.each(
+    [
+      with_type("application/json", <<
+        "{\"access_token\":\"S3CR3T\",\"refresh_token\":\"S3CR":utf8,
+      >>),
+      with_type("application/json", <<"{\"access_token\":":utf8>>),
+      with_type("application/x-www-form-urlencoded", <<
+        "client_secret=S3CR3T&x=":utf8, 255,
+      >>),
+    ],
+    fn(req) {
+      let redacted = redaction.request(redaction.default(), req).body
+      redacted |> should.equal(marker)
+      // Stable under repeated redaction, so playback keys still match.
+      redaction.request(redaction.default(), request.set_body(req, redacted)).body
+      |> should.equal(marker)
+    },
+  )
+}
+
+pub fn encoded_aborted_json_response_keeps_no_secret_test() {
+  let assert Ok(req) = request.to("https://example.com/token")
+  let script =
+    testing.script([
+      testing.exchange(
+        request.set_body(req, <<>>),
+        testing.Respond(
+          response.new(200)
+            |> response.set_header("content-type", "application/json")
+            |> response.set_body([
+              <<"{\"access_token\":\"S3CR3T\",\"refresh_token\":\"S3CR":utf8>>,
+            ]),
+          testing.Aborted(error.new(error.Closed, error.NotSent)),
+        ),
+      ),
+    ])
+  let text = cassette.encode(script)
+  string.contains(text, "S3CR") |> should.be_false
+  string.contains(text, "REDACTED-UNPARSABLE") |> should.be_true
+}
+
+pub fn default_redaction_normalises_names_test() {
+  let assert Ok(req) =
+    request.to(
+      "https://example.com/?CLIENT_SECRET=q1&Token=q2&apiKey=q3&API-KEY=q4&password=q5&tokens=keep",
+    )
+  redaction.request(redaction.default(), request.set_body(req, <<>>)).query
+  |> should.equal(Some(
+    "CLIENT_SECRET=REDACTED&Token=REDACTED&apiKey=REDACTED&API-KEY=REDACTED&password=REDACTED&tokens=keep",
+  ))
+  redaction.request(
+    redaction.default(),
+    with_type("application/x-www-form-urlencoded", <<
+      "Access_Token=f1;Password=f2&grant_type=authorization_code;code=f3":utf8,
+    >>),
+  ).body
+  |> should.equal(<<
+    "Access_Token=REDACTED;Password=REDACTED&grant_type=authorization_code;code=REDACTED":utf8,
+  >>)
+  redaction.request(
+    redaction.default(),
+    with_type("application/json", <<
+      "{\"accessToken\":\"j1\",\"code\":\"j2\",\"key\":\"j3\",\"Api-Key\":\"j4\",\"tokenType\":\"Bearer\"}":utf8,
+    >>),
+  ).body
+  |> should.equal(<<
+    "{\"accessToken\":\"REDACTED\",\"code\":\"REDACTED\",\"key\":\"REDACTED\",\"Api-Key\":\"REDACTED\",\"tokenType\":\"Bearer\"}":utf8,
+  >>)
+}
+
+pub fn default_redaction_redacts_values_of_escaped_json_keys_test() {
+  // Escaped keys are not decoded: any key with a backslash escape is treated
+  // as a credential, so `\u0070assword` and an escaped non-credential key
+  // both lose their value rather than risk a leak.
+  redaction.request(
+    redaction.default(),
+    with_type("application/json", <<
+      "{\"\\u0070assword\":\"S3CR3T\",\"access\\u005ftoken\":\"S3CR3T2\",\"na\\u006de\":\"ana\",\"plain\":\"kept\"}":utf8,
+    >>),
+  ).body
+  |> should.equal(<<
+    "{\"\\u0070assword\":\"REDACTED\",\"access\\u005ftoken\":\"REDACTED\",\"na\\u006de\":\"REDACTED\",\"plain\":\"kept\"}":utf8,
+  >>)
 }

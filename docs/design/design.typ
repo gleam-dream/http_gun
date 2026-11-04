@@ -214,7 +214,7 @@
         ([Destination per view], [Not required], [`config.require_view_destination`]),
         ([TLS client identity], [None], [`config.with_client_identity`]),
         ([Protocol and server trust], [HTTP/1.1; system CAs; peer and host name verified], [`config.with_protocol`, `config.with_trust`]),
-        ([Cassette redaction], [Credential headers `authorization`, `proxy-authorization`, `cookie`, `set-cookie`, `x-api-key`, `api-key`, `x-goog-api-key`], [`config.with_redaction`]),
+        ([Cassette redaction], [Credential headers `authorization`, `proxy-authorization`, `cookie`, `set-cookie`, `x-api-key`, `api-key`, `x-goog-api-key`, `x-auth-token`, `x-access-token`, `x-amz-security-token`, `x-csrf-token`; credential query parameters; credential fields in form and JSON bodies], [`config.with_redaction`]),
         ([Observations], [`sinal.emit`, following the application's routes], [`config.with_observations`, `config.without_observations`]),
         ([Client label in events], [None], [`config.with_label`]),
       ))
@@ -531,11 +531,13 @@
     ])
     #subsection(title: "Secret ownership and whole-body rewriting", [
       #points(
-        [#term("term-redaction") always removes authorization, proxy-authorization, cookie, set-cookie, x-api-key, api-key and x-goog-api-key. Added header names are case-insensitive and affect stored request/response headers, trailers and collected failure headers.],
-        [Query redaction matches exact percent-decoded parameter names, treating plus as space. Listed names keep their original encoded spelling with value REDACTED. Parameter order and all unselected query bytes remain exact.],
-        [A body hook rewrites each request body and each response body as a whole. Recording holds response chunks within its capture budget then stores one rewritten chunk, so split secrets are visible to that hook. A later hook replaces the earlier one. The live request/response delivery remains unchanged.],
+        [#term("term-redaction") always removes authorization, proxy-authorization, cookie, set-cookie, x-api-key, api-key, x-goog-api-key, x-auth-token, x-access-token, x-amz-security-token and x-csrf-token. Added header names are case-insensitive and affect stored request/response headers, trailers and collected failure headers.],
+        [One normalized credential-name list serves query parameters, form pairs and JSON keys. Names compare after percent-decoding (plus as space), lowercasing and removing `-` and `_`. Listed names keep their original encoded spelling with value REDACTED. Parameter order and all unselected query bytes remain exact. The default list holds key, api_key, apikey, access_token, token, client_secret, code, refresh_token, id_token, signature, sig, x-amz-security-token, x-goog-api-key, x-amz-signature, x-amz-credential, password, secret and authorization; `with_query_parameters` and `with_body_fields` both add to it.],
+        [Default field redaction selects by the body's content-type header. A form body applies the query rule to pairs split at `&` and `;`. A JSON or +json body is byte-scanned, not decoded: the value after a listed object key, at any depth, becomes the string REDACTED and every other byte remains, so repeated redaction is stable. Key escapes are not decoded; the value of any key containing a backslash escape, or not UTF-8, is replaced whatever the key spells. Form and JSON redaction fails closed: a non-UTF-8 form body, JSON that does not scan (an unterminated string or missing value, as in a truncated or aborted body) and a body above 16 MiB become the whole body REDACTED-UNPARSABLE. Other content types remain unchanged. Field redaction runs before any body hook.],
+        [A body hook rewrites each request body and each response body as a whole. Recording holds response chunks within its capture budget then stores one rewritten chunk, so split secrets are visible to that hook. Form and JSON response bodies are held the same way for field redaction. A later hook replaces the earlier one. The live request/response delivery remains unchanged.],
         [Matching applies the same hook to expected and incoming request values. A recorder can redact a request before storage and matching can redact it again; callback authors therefore supply stable repeatable rewriting. Callbacks own their execution time, allocations and retained captures. There is no general secret detector or callback sandbox.],
-        [Unlisted headers, query parameters and body data remain in fixtures. Safe logging of failures and observations does not imply that user-supplied fixtures, callback state, native VM crash data or arbitrary application logs contain no secrets.],
+        [Matching therefore treats a redacted query value or body field as equal to any live value.],
+        [Unlisted headers, query parameters, body fields and other body data remain in fixtures. Safe logging of failures and observations does not imply that user-supplied fixtures, callback state, native VM crash data or arbitrary application logs contain no secrets.],
       )
     ])
   ])
@@ -543,7 +545,7 @@
   #section(title: "Recording and filesystem publication", lead: "Capture completion is separate from HTTP completion.", body: [
     #subsection(title: "Reservation order and acknowledged writer", [
       #points(
-        [`cassette.record` validates configuration and capture options, creates one exclusive sibling staging directory and applies mode 0700 before request data is stored. It then starts the recorder and live pool. Failed pool startup discards the recorder's staging area.],
+        [`cassette.record` validates configuration and capture options, creates one exclusive sibling staging directory and applies mode 0700 before request data is stored. Every staged file, including the assembled cassette, receives mode 0600 at creation before data is written, and publication keeps that mode. It then starts the recorder and live pool. Failed pool startup discards the recorder's staging area.],
         [Each #term("term-capture-reservation") receives a zero-based position before live execution. Concurrent completion writes separate exchange spool files; final assembly follows reservation order. Capacity/policy/connect/open failures can be recorded as reject outcomes. Refusals preceding capture reservation are not stored exchanges.],
         [The recorder has one active writer and an admitted job queue. Request fragment reservation and each head/chunk/terminal fragment are budgeted before enqueue. Body owners wait for capture acknowledgment before delivering successful data or demanding more; capture limits also bound held whole-body redaction input.],
         [Acknowledgment follows completed normal write and file close. There is no delayed-write buffer or fsync guarantee. Capture failure detaches recording from HTTP; live outcomes continue independently. A recorder closed by accepted finish refuses new requests with RecordingClosed; a broken capture may let live requests continue uncaptured.],

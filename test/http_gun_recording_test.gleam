@@ -690,3 +690,94 @@ pub fn body_redaction_sees_a_secret_split_across_chunks_test() {
 fn local_config() -> config.Config {
   config.default() |> config.allow_loopback
 }
+
+// Default redaction: an OAuth token exchange recorded with no configured
+// redaction keeps none of its credentials.
+
+fn token_exchange(port: Int) -> request.Request(BitArray) {
+  let assert Ok(req) =
+    request.to(
+      "http://localhost:"
+      <> int.to_string(port)
+      <> "/token?key=api-key-secret&page=2",
+    )
+  req
+  |> request.set_method(http.Post)
+  |> request.set_header(
+    "content-type",
+    "application/x-www-form-urlencoded; charset=utf-8",
+  )
+  |> request.set_header("x-auth-token", "header-token-secret")
+  |> request.set_body(<<
+    "grant_type=refresh_token&client_secret=client-secret-value&refresh_token=old-refresh-secret&scope=openid":utf8,
+  >>)
+}
+
+const token_response =
+  "{\"access_token\":\"access-secret-value\",\"token_type\":\"Bearer\",\"expires_in\":3600,\"refresh_token\":\"new-refresh-secret\",\"nested\":{\"id_token\":\"id-secret-value\"}}"
+
+pub fn default_redaction_scrubs_token_exchange_from_recording_test() {
+  let port =
+    serve(bit_array.from_string(
+      "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: "
+      <> int.to_string(string.byte_size(token_response))
+      <> "\r\n\r\n"
+      <> token_response,
+    ))
+  let destination = path()
+  let assert Ok(recorded) =
+    cassette.record(local_config(), destination, cassette.options())
+  let assert Ok(live) = http_gun.send(recorded.client, token_exchange(port))
+  // The live response is untouched.
+  live.response.body |> should.equal(bit_array.from_string(token_response))
+  cassette.finish(recorded.recording, duration.milliseconds(1000))
+  |> should.equal(Ok(destination))
+  http_gun.stop(recorded.client)
+
+  let assert Ok(text) = simplifile.read(destination)
+  list.each(
+    [
+      "api-key-secret", "header-token-secret", "client-secret-value",
+      "old-refresh-secret", "access-secret-value", "new-refresh-secret",
+      "id-secret-value",
+    ],
+    fn(secret) { string.contains(text, secret) |> should.be_false },
+  )
+  let assert Ok(tape) = cassette.load(destination, 100_000)
+  let assert [stored] = testing.exchanges(tape)
+  let stored_request = testing.request(stored)
+  stored_request.query |> should.equal(Some("key=REDACTED&page=2"))
+  stored_request.body
+  |> should.equal(<<
+    "grant_type=refresh_token&client_secret=REDACTED&refresh_token=REDACTED&scope=openid":utf8,
+  >>)
+  let assert testing.Respond(stored_response, testing.Finished([])) =
+    testing.reply(stored)
+  stored_response.body
+  |> should.equal([
+    <<
+      "{\"access_token\":\"REDACTED\",\"token_type\":\"Bearer\",\"expires_in\":3600,\"refresh_token\":\"REDACTED\",\"nested\":{\"id_token\":\"REDACTED\"}}":utf8,
+    >>,
+  ])
+
+  // The redacted cassette still replays against the original live request.
+  let assert Ok(client) = testing.playback(tape, local_config())
+  let assert Ok(replayed) = http_gun.send(client, token_exchange(port))
+  replayed.response.status |> should.equal(200)
+  http_gun.stop(client)
+  remove(destination)
+}
+
+pub fn published_cassette_is_private_to_its_owner_test() {
+  let port = server()
+  let destination = path()
+  let assert Ok(recorded) =
+    cassette.record(local_config(), destination, cassette.options())
+  let assert Ok(_) = http_gun.send(recorded.client, req(port))
+  cassette.finish(recorded.recording, duration.milliseconds(1000))
+  |> should.equal(Ok(destination))
+  http_gun.stop(recorded.client)
+  let assert Ok(info) = simplifile.file_info(destination)
+  simplifile.file_info_permissions_octal(info) |> should.equal(0o600)
+  remove(destination)
+}

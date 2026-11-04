@@ -117,9 +117,14 @@ flowchart LR
   Gun, Cowlib, or the Erlang VM.
 - HTTP Gun does not retry automatically. Use failure evidence and request
   idempotency when deciding whether an application retry is safe.
-- Cassettes remove common credential headers by default, but unlisted headers,
-  query values, and bodies may still be stored. Add redaction for application
-  secrets and inspect fixtures before sharing them. Publication is atomic, but
+- Cassettes remove common credential headers by default, and replace common
+  credential names (such as `client_secret`, `access_token`, `refresh_token`,
+  `password`, compared without case, `-` or `_`) in query parameters and in
+  form and JSON bodies with `REDACTED`. A form or JSON body that cannot be
+  scanned is stored as `REDACTED-UNPARSABLE`. Unlisted headers, parameters
+  and fields, and bodies of other content types, are still stored. Add
+  redaction for application secrets and inspect fixtures before sharing them.
+  Cassette files are created with mode `0600`. Publication is atomic, but
   crash durability is not promised.
 - Sinal events are best effort. Without a forwarder route, handlers run inside
   client processes and a slow handler can delay requests.

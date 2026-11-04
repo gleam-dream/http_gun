@@ -21,9 +21,12 @@
 //// with `UnsupportedVersion`.
 ////
 //// What a cassette stores follows the configuration's redaction
-//// (`config.with_redaction`): the credential headers by default, plus any
-//// headers, query parameters and body rewriting you add. Bodies and queries
-//// are otherwise stored exactly and can contain secrets.
+//// (`config.with_redaction`). By default credential headers are removed, and
+//// credential query parameters and credential fields of form and JSON
+//// bodies are replaced by `REDACTED`; a form or JSON body that cannot be
+//// scanned is stored as `REDACTED-UNPARSABLE`. Unlisted headers, parameters
+//// and fields, and bodies of other content types, are stored exactly and can
+//// contain secrets; add redaction for them.
 ////
 //// A recording writes each exchange as it completes, within a byte budget,
 //// and publishes the file atomically when `finish` succeeds. Capture
