@@ -434,3 +434,18 @@ pub fn default_redaction_normalises_names_test() {
     "{\"accessToken\":\"REDACTED\",\"code\":\"REDACTED\",\"key\":\"REDACTED\",\"Api-Key\":\"REDACTED\",\"tokenType\":\"Bearer\"}":utf8,
   >>)
 }
+
+pub fn default_redaction_redacts_values_of_escaped_json_keys_test() {
+  // Escaped keys are not decoded: any key with a backslash escape is treated
+  // as a credential, so `\u0070assword` and an escaped non-credential key
+  // both lose their value rather than risk a leak.
+  redaction.request(
+    redaction.default(),
+    with_type("application/json", <<
+      "{\"\\u0070assword\":\"S3CR3T\",\"access\\u005ftoken\":\"S3CR3T2\",\"na\\u006de\":\"ana\",\"plain\":\"kept\"}":utf8,
+    >>),
+  ).body
+  |> should.equal(<<
+    "{\"\\u0070assword\":\"REDACTED\",\"access\\u005ftoken\":\"REDACTED\",\"na\\u006de\":\"REDACTED\",\"plain\":\"kept\"}":utf8,
+  >>)
+}

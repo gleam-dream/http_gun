@@ -18,8 +18,10 @@
 ////   byte of the body is kept.
 ////
 //// Names are compared without case and ignoring `-` and `_`, so `api_key`
-//// also selects `API-KEY`, `apiKey` and `ApiKey`. A JSON key is compared as
-//// written, without decoding escapes. A form or JSON body that cannot be
+//// also selects `API-KEY`, `apiKey` and `ApiKey`. Escapes in a JSON key are
+//// not decoded: the value of any key that contains a backslash escape is
+//// replaced, whatever it spells, so an escaped credential name never
+//// survives. A form or JSON body that cannot be
 //// scanned (a form body that is not UTF-8, JSON with an unterminated string
 //// or a missing value, as a truncated or aborted body has) or that is above
 //// 16 MiB is replaced as a whole by `REDACTED-UNPARSABLE`. Bodies with
@@ -374,10 +376,13 @@ fn json_from(
   }
 }
 
+// Escapes are not decoded: a key with a backslash escape, or one that is not
+// UTF-8, could spell a listed name, so its value is redacted.
 fn named(raw: BitArray, names: List(String)) -> Bool {
   case bit_array.to_string(raw) {
-    Ok(name) -> list.contains(names, normalise(name))
-    Error(Nil) -> False
+    Ok(name) ->
+      string.contains(name, "\\") || list.contains(names, normalise(name))
+    Error(Nil) -> True
   }
 }
 

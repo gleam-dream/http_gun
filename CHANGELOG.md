@@ -13,7 +13,9 @@
   `application/x-www-form-urlencoded` bodies (split at `&` and `;`) and keys
   of JSON request and response bodies whose value becomes `REDACTED`. Names
   compare without case and ignoring `-` and `_`, so `CLIENT_SECRET`,
-  `accessToken` and `API-KEY` are covered. Previously a recorded OAuth token
+  `accessToken` and `API-KEY` are covered. JSON key escapes are not decoded;
+  the value of any key containing a backslash escape (such as
+  `"\u0070assword"`) is replaced, whatever the key spells. Previously a recorded OAuth token
   exchange stored the client secret, authorization code and tokens
   verbatim.
 - A form or JSON body that cannot be scanned (non-UTF-8 form data, or JSON
