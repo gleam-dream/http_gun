@@ -345,18 +345,92 @@ pub fn default_redaction_scrubs_json_request_body_fields_test() {
   redaction.request(redaction.default(), redacted) |> should.equal(redacted)
 }
 
-pub fn default_redaction_keeps_unparsable_and_other_bodies_test() {
+pub fn default_redaction_keeps_other_content_types_test() {
   let assert Ok(req) = request.to("https://example.com/")
   let form = <<"client_secret=kept":utf8>>
   // No form content type: the body is not interpreted.
   redaction.request(redaction.default(), request.set_body(req, form)).body
   |> should.equal(form)
-  let broken = <<"{\"access_token\":\"unterminated":utf8>>
+}
+
+fn with_type(
+  content_type: String,
+  body: BitArray,
+) -> request.Request(BitArray) {
+  let assert Ok(req) = request.to("https://example.com/")
+  req
+  |> request.set_header("content-type", content_type)
+  |> request.set_body(body)
+}
+
+pub fn default_redaction_replaces_bodies_that_do_not_scan_test() {
+  let marker = <<"REDACTED-UNPARSABLE":utf8>>
+  list.each(
+    [
+      with_type("application/json", <<
+        "{\"access_token\":\"S3CR3T\",\"refresh_token\":\"S3CR":utf8,
+      >>),
+      with_type("application/json", <<"{\"access_token\":":utf8>>),
+      with_type("application/x-www-form-urlencoded", <<
+        "client_secret=S3CR3T&x=":utf8, 255,
+      >>),
+    ],
+    fn(req) {
+      let redacted = redaction.request(redaction.default(), req).body
+      redacted |> should.equal(marker)
+      // Stable under repeated redaction, so playback keys still match.
+      redaction.request(redaction.default(), request.set_body(req, redacted)).body
+      |> should.equal(marker)
+    },
+  )
+}
+
+pub fn encoded_aborted_json_response_keeps_no_secret_test() {
+  let assert Ok(req) = request.to("https://example.com/token")
+  let script =
+    testing.script([
+      testing.exchange(
+        request.set_body(req, <<>>),
+        testing.Respond(
+          response.new(200)
+            |> response.set_header("content-type", "application/json")
+            |> response.set_body([
+              <<"{\"access_token\":\"S3CR3T\",\"refresh_token\":\"S3CR":utf8>>,
+            ]),
+          testing.Aborted(error.new(error.Closed, error.NotSent)),
+        ),
+      ),
+    ])
+  let text = cassette.encode(script)
+  string.contains(text, "S3CR") |> should.be_false
+  string.contains(text, "REDACTED-UNPARSABLE") |> should.be_true
+}
+
+pub fn default_redaction_normalises_names_test() {
+  let assert Ok(req) =
+    request.to(
+      "https://example.com/?CLIENT_SECRET=q1&Token=q2&apiKey=q3&API-KEY=q4&password=q5&tokens=keep",
+    )
+  redaction.request(redaction.default(), request.set_body(req, <<>>)).query
+  |> should.equal(Some(
+    "CLIENT_SECRET=REDACTED&Token=REDACTED&apiKey=REDACTED&API-KEY=REDACTED&password=REDACTED&tokens=keep",
+  ))
   redaction.request(
     redaction.default(),
-    req
-      |> request.set_header("content-type", "application/json")
-      |> request.set_body(broken),
+    with_type("application/x-www-form-urlencoded", <<
+      "Access_Token=f1;Password=f2&grant_type=authorization_code;code=f3":utf8,
+    >>),
   ).body
-  |> should.equal(broken)
+  |> should.equal(<<
+    "Access_Token=REDACTED;Password=REDACTED&grant_type=authorization_code;code=REDACTED":utf8,
+  >>)
+  redaction.request(
+    redaction.default(),
+    with_type("application/json", <<
+      "{\"accessToken\":\"j1\",\"code\":\"j2\",\"key\":\"j3\",\"Api-Key\":\"j4\",\"tokenType\":\"Bearer\"}":utf8,
+    >>),
+  ).body
+  |> should.equal(<<
+    "{\"accessToken\":\"REDACTED\",\"code\":\"REDACTED\",\"key\":\"REDACTED\",\"Api-Key\":\"REDACTED\",\"tokenType\":\"Bearer\"}":utf8,
+  >>)
 }

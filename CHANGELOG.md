@@ -5,16 +5,21 @@
 ### Security
 
 - `redaction.default()` now also keeps credentials outside headers out of
-  cassettes. It replaces the value of credential query parameters (`key`,
-  `api_key`, `apikey`, `access_token`, `token`, `client_secret`, `code`,
-  `refresh_token`, `id_token`, `signature`, `sig`, `x-amz-security-token`,
-  `x-goog-api-key` and the AWS spellings `Signature`, `X-Amz-Signature`,
-  `X-Amz-Credential`, `X-Amz-Security-Token`) with `REDACTED`, and replaces
-  credential fields in `application/x-www-form-urlencoded` and JSON request
-  and response bodies (`client_secret`, `access_token`, `refresh_token`,
-  `id_token`, `api_key`, `password`, `secret`, `token`, `authorization`, plus
-  the query names in form bodies). Previously a recorded OAuth token exchange
-  stored the client secret, authorization code and tokens verbatim.
+  cassettes. One list of credential names (`key`, `api_key`, `apikey`,
+  `access_token`, `token`, `client_secret`, `code`, `refresh_token`,
+  `id_token`, `signature`, `sig`, `x-amz-security-token`, `x-goog-api-key`,
+  `x-amz-signature`, `x-amz-credential`, `password`, `secret`,
+  `authorization`) selects query parameters, pairs of
+  `application/x-www-form-urlencoded` bodies (split at `&` and `;`) and keys
+  of JSON request and response bodies whose value becomes `REDACTED`. Names
+  compare without case and ignoring `-` and `_`, so `CLIENT_SECRET`,
+  `accessToken` and `API-KEY` are covered. Previously a recorded OAuth token
+  exchange stored the client secret, authorization code and tokens
+  verbatim.
+- A form or JSON body that cannot be scanned (non-UTF-8 form data, or JSON
+  cut off inside a string or before a value, as an aborted response is) or
+  that is above 16 MiB is stored as `REDACTED-UNPARSABLE` instead of
+  verbatim.
 - The default removed headers add `x-auth-token`, `x-access-token`,
   `x-amz-security-token` and `x-csrf-token`.
 - Recorded cassettes and their staged files are created with mode `0600`
@@ -24,17 +29,21 @@
 
 - Playback applies the same default redaction to both sides, so a recorded
   request still matches its live request; a redacted value now matches any
-  live value of that parameter or field. A recording buffers form and JSON
-  response bodies whole (within its byte budget) and stores them as one
-  chunk, and `cassette.encode` stores those response bodies the same way.
-- Bodies with other content types, non-UTF-8 form bodies, JSON bodies that do
-  not scan and bodies above 16 MiB are stored as before; use
+  live value of that parameter or field.
+- A recording now buffers every form and JSON response body whole and stores
+  it as one chunk; `cassette.encode` stores those response bodies the same
+  way. The held bytes count against `max_bytes`, so a recording of large
+  form or JSON responses can fail with `CaptureLimit` sooner than before.
+- `with_query_parameters` names are compared without case and ignoring `-`
+  and `_`, and share one list with body fields, so they also apply to form
+  and JSON bodies.
+- Bodies with other content types are stored as before; use
   `redaction.with_body` for them.
 
 ### Added
 
-- `redaction.with_body_fields` adds field names to replace in form and JSON
-  bodies.
+- `redaction.with_body_fields` adds names to replace in form and JSON bodies
+  (and, sharing the list, in the query).
 - `redaction.body_for` and `redaction.rewrites_body_for` apply and report the
   content-type-aware body redaction. `redaction.body` and
   `redaction.rewrites_bodies` keep their meaning (the body function only).

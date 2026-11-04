@@ -3,28 +3,28 @@
 //// `default()` removes the credential headers `authorization`,
 //// `proxy-authorization`, `cookie`, `set-cookie`, `x-api-key`, `api-key`,
 //// `x-goog-api-key`, `x-auth-token`, `x-access-token`,
-//// `x-amz-security-token` and `x-csrf-token`. It replaces the value of the
-//// credential query parameters `key`, `api_key`, `apikey`, `access_token`,
-//// `token`, `client_secret`, `code`, `refresh_token`, `id_token`,
-//// `signature`, `sig`, `x-amz-security-token`, `x-goog-api-key`, and the
-//// AWS spellings `Signature`, `X-Amz-Signature`, `X-Amz-Credential` and
-//// `X-Amz-Security-Token`, with `REDACTED`. It also rewrites credential
-//// fields in request and response bodies:
+//// `x-amz-security-token` and `x-csrf-token`. One list of credential names,
+//// `key`, `api_key`, `apikey`, `access_token`, `token`, `client_secret`,
+//// `code`, `refresh_token`, `id_token`, `signature`, `sig`,
+//// `x-amz-security-token`, `x-goog-api-key`, `x-amz-signature`,
+//// `x-amz-credential`, `password`, `secret` and `authorization`, selects
+//// what else is replaced by `REDACTED`:
 ////
-//// - an `application/x-www-form-urlencoded` body keeps every pair, with the
-////   value of each query parameter name above, and of each body field name
-////   below, replaced by `REDACTED`;
-//// - an `application/json` or `+json` body keeps every byte except the
-////   value of an object key, at any depth, named `client_secret`,
-////   `access_token`, `refresh_token`, `id_token`, `api_key`, `password`,
-////   `secret`, `token` or `authorization`, which becomes `"REDACTED"`.
+//// - the value of a query parameter with a listed name;
+//// - in an `application/x-www-form-urlencoded` request or response body, the
+////   value of a pair with a listed name, with pairs split at `&` and `;`;
+//// - in an `application/json` or `+json` body, the value of an object key
+////   with a listed name at any depth, which becomes `"REDACTED"`. Every other
+////   byte of the body is kept.
 ////
-//// Names are compared exactly; a JSON key is compared as written, without
-//// decoding escapes. A body with another content type, a form body that is
-//// not UTF-8, a JSON body that does not scan (an unterminated string or
-//// unbalanced brackets) and a body above 16 MiB are kept as they are; use
-//// `with_body` for those. Add your own secrets, then pass the redaction to
-//// `config.with_redaction`:
+//// Names are compared without case and ignoring `-` and `_`, so `api_key`
+//// also selects `API-KEY`, `apiKey` and `ApiKey`. A JSON key is compared as
+//// written, without decoding escapes. A form or JSON body that cannot be
+//// scanned (a form body that is not UTF-8, JSON with an unterminated string
+//// or a missing value, as a truncated or aborted body has) or that is above
+//// 16 MiB is replaced as a whole by `REDACTED-UNPARSABLE`. Bodies with
+//// another content type are kept; use `with_body` for those. Add your own
+//// secrets, then pass the redaction to `config.with_redaction`:
 ////
 //// ```gleam
 //// let redaction =
@@ -64,8 +64,7 @@ import gleam/uri
 pub opaque type Redaction {
   Redaction(
     headers: List(String),
-    query: List(String),
-    fields: List(String),
+    names: List(String),
     body: Option(fn(BitArray) -> BitArray),
   )
 }
@@ -98,10 +97,8 @@ const credential_parameters = [
   "sig",
   "x-amz-security-token",
   "x-goog-api-key",
-  "Signature",
-  "X-Amz-Signature",
-  "X-Amz-Credential",
-  "X-Amz-Security-Token",
+  "x-amz-signature",
+  "x-amz-credential",
 ]
 
 const credential_fields = [
@@ -122,16 +119,31 @@ const max_scanned_bytes = 16_777_216
 
 const marker = "REDACTED"
 
+/// Replaces a whole form or JSON body that cannot be scanned.
+const unparsable = "REDACTED-UNPARSABLE"
+
 /// Remove the credential headers, and replace credential query parameters
 /// and credential fields in form and JSON bodies, as the module
 /// documentation lists.
 pub fn default() -> Redaction {
   Redaction(
     headers: credential_headers,
-    query: credential_parameters,
-    fields: credential_fields,
+    names: add_names([], list.append(credential_parameters, credential_fields)),
     body: None,
   )
+}
+
+/// Names compare without case and without `-` or `_`, so `api-key`,
+/// `api_key`, `apiKey` and `APIKEY` are one name.
+fn normalise(name: String) -> String {
+  name
+  |> string.lowercase
+  |> string.replace("-", "")
+  |> string.replace("_", "")
+}
+
+fn add_names(names: List(String), added: List(String)) -> List(String) {
+  list.unique(list.append(names, list.map(added, normalise)))
 }
 
 /// Also remove these headers, compared without case, from stored requests
@@ -146,28 +158,25 @@ pub fn with_headers(redaction: Redaction, names: List(String)) -> Redaction {
 }
 
 /// Replace the value of these query parameters with `REDACTED`, compared by
-/// exact, percent-decoded name. The parameter order and every other byte of
-/// the query stay as sent. The same names are replaced in form bodies.
+/// percent-decoded name without case and ignoring `-` and `_`. The parameter
+/// order and every other byte of the query stay as sent. Query parameters
+/// and body fields share one list, so the names also apply to form and JSON
+/// bodies.
 pub fn with_query_parameters(
   redaction: Redaction,
   names: List(String),
 ) -> Redaction {
-  Redaction(
-    ..redaction,
-    query: list.unique(list.append(redaction.query, names)),
-  )
+  Redaction(..redaction, names: add_names(redaction.names, names))
 }
 
-/// Also replace the value of these fields, compared exactly, in form and
-/// JSON bodies.
+/// Also replace the value of these fields in form and JSON bodies, compared
+/// as `with_query_parameters` compares names. Query parameters and body
+/// fields share one list, so the names also apply to the query.
 pub fn with_body_fields(
   redaction: Redaction,
   names: List(String),
 ) -> Redaction {
-  Redaction(
-    ..redaction,
-    fields: list.unique(list.append(redaction.fields, names)),
-  )
+  Redaction(..redaction, names: add_names(redaction.names, names))
 }
 
 /// Rewrite stored bodies with `redact`, after the credential fields are
@@ -244,31 +253,35 @@ pub fn rewrites_bodies(redaction: Redaction) -> Bool {
 }
 
 fn query(redaction: Redaction, query: String) -> String {
-  pairs(query, redaction.query)
+  pairs(query, redaction.names, ["&"])
 }
 
-/// Replace the value of each `&`-separated pair whose percent-decoded name
-/// is in `names`, keeping every other byte.
-fn pairs(text: String, names: List(String)) -> String {
-  case names {
-    [] -> text
-    names ->
-      string.split(text, "&")
-      |> list.map(fn(pair) {
-        let name = case string.split_once(pair, "=") {
-          Ok(#(name, _)) -> name
-          Error(Nil) -> pair
-        }
-        let decoded = case uri.percent_decode(string.replace(name, "+", " ")) {
-          Ok(decoded) -> decoded
-          Error(Nil) -> name
-        }
-        case list.contains(names, decoded) {
-          True -> name <> "=" <> marker
-          False -> pair
-        }
-      })
-      |> string.join("&")
+/// Replace the value of each pair, split at `separators`, whose
+/// percent-decoded, normalised name is in `names`, keeping every other byte.
+fn pairs(
+  text: String,
+  names: List(String),
+  separators: List(String),
+) -> String {
+  case separators {
+    [separator, ..rest] ->
+      string.split(text, separator)
+      |> list.map(pairs(_, names, rest))
+      |> string.join(separator)
+    [] -> {
+      let name = case string.split_once(text, "=") {
+        Ok(#(name, _)) -> name
+        Error(Nil) -> text
+      }
+      let decoded = case uri.percent_decode(string.replace(name, "+", " ")) {
+        Ok(decoded) -> decoded
+        Error(Nil) -> name
+      }
+      case list.contains(names, normalise(decoded)) {
+        True -> name <> "=" <> marker
+        False -> text
+      }
+    }
   }
 }
 
@@ -303,30 +316,26 @@ fn content_kind(headers: List(#(String, String))) -> ContentKind {
   }
 }
 
+// A form or JSON body that cannot be scanned fails closed: it may be a
+// truncated body whose secret value is cut short, so it is replaced whole.
 fn fields(
   redaction: Redaction,
   kind: ContentKind,
   bytes: BitArray,
 ) -> BitArray {
   case kind, bit_array.byte_size(bytes) > max_scanned_bytes {
-    Opaque, _ | _, True -> bytes
+    Opaque, _ -> bytes
+    _, True -> bit_array.from_string(unparsable)
     Form, False ->
       case bit_array.to_string(bytes) {
         Ok(text) ->
-          bit_array.from_string(pairs(
-            text,
-            list.unique(list.append(redaction.query, redaction.fields)),
-          ))
-        Error(Nil) -> bytes
+          bit_array.from_string(pairs(text, redaction.names, ["&", ";"]))
+        Error(Nil) -> bit_array.from_string(unparsable)
       }
     Json, False ->
-      case redaction.fields {
-        [] -> bytes
-        names ->
-          case json_from(bytes, names, []) {
-            Ok(parts) -> bit_array.concat(list.reverse(parts))
-            Error(Nil) -> bytes
-          }
+      case json_from(bytes, redaction.names, []) {
+        Ok(parts) -> bit_array.concat(list.reverse(parts))
+        Error(Nil) -> bit_array.from_string(unparsable)
       }
   }
 }
@@ -367,7 +376,7 @@ fn json_from(
 
 fn named(raw: BitArray, names: List(String)) -> Bool {
   case bit_array.to_string(raw) {
-    Ok(name) -> list.contains(names, name)
+    Ok(name) -> list.contains(names, normalise(name))
     Error(Nil) -> False
   }
 }

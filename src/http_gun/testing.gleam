@@ -23,13 +23,17 @@
 //// request after the last fails with `PlaybackExhausted`. Concurrent
 //// requests are matched in admission order.
 ////
-//// Matching is exact by default: method, URL, headers and body bytes, after
-//// the configuration's redaction (`config.with_redaction`) is applied to
-//// both sides. `ignoring_headers` skips headers such as a timestamp or a
-//// signature, and `matching` replaces the comparison.
+//// Matching compares method, URL, headers and body bytes after the
+//// configuration's redaction (`config.with_redaction`) is applied to both
+//// sides, so a redacted query parameter or body field matches any value.
+//// Everything else is compared exactly. `ignoring_headers` skips headers
+//// such as a timestamp or a signature, and `matching` replaces the
+//// comparison.
 ////
-//// `exchange` drops the credential headers of `redaction.default()` from
-//// the request it stores, so a script never holds a caller's credentials.
+//// `exchange` applies `redaction.default()` to the request it stores: it
+//// drops the credential headers and replaces credential query parameters
+//// and form or JSON body fields, so a script never holds a caller's
+//// credentials.
 
 import gleam/http/request.{type Request}
 import gleam/http/response.{type Response}
