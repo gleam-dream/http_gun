@@ -5,4 +5,6 @@ pre-commit:
       # must operate on their own checkout, not this staged worktree.
       run: env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE -u GIT_PREFIX ./dev/env sh dev/gate fast
     design:
-      run: nix run .#design-gate-check -- docs/design
+      # The same Git variables point a linked worktree's flake evaluation at
+      # the main checkout, so the check would read another tree.
+      run: env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE -u GIT_PREFIX nix run .#design-gate-check -- docs/design .
