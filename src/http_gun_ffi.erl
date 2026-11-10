@@ -1,6 +1,6 @@
 %% Narrow transport/runtime boundary. No client state or server loops.
 -module(http_gun_ffi).
--export([start/0, open/10, request/5, credit/3, cancel/2, close/1, now/0, scoped/2, decode/1]).
+-export([start/0, open/11, request/5, credit/3, cancel/2, close/1, now/0, scoped/2, decode/1]).
 -export([on_exception/2, cause/1]).
 -export([parse_address/1, lookup/3, client_identity/2]).
 -export([reusable/1]).
@@ -32,7 +32,7 @@ lookup(Host, Family, Timeout) ->
     end.
 ip({ipv4,A,B,C,D}) -> {A,B,C,D};
 ip({ipv6,A,B,C,D,E,F,G,H}) -> {A,B,C,D,E,F,G,H}.
-open(Address, ServerName, Port, Tls, Protocol, Trust, Identity, Timeout, SendTimeout, HeaderCount) ->
+open(Address, ServerName, Port, Tls, Protocol, Trust, CipherSuites, Identity, Timeout, SendTimeout, HeaderCount) ->
     try
         Send = case SendTimeout of {send_within, Ms} -> Ms; send_unbounded -> infinity end,
         Protocols = case {Tls, Protocol} of
@@ -67,7 +67,8 @@ open(Address, ServerName, Port, Tls, Protocol, Trust, Identity, Timeout, SendTim
                     none -> [];
                     {some, Host} -> [{server_name_indication, binary_to_list(Host)}]
                 end,
-                Base#{transport => tls, tls_opts => [Ca, {verify, verify_peer},
+                Ciphers = ciphers(CipherSuites),
+                Base#{transport => tls, tls_opts => Ciphers ++ [Ca, {verify, verify_peer},
                     {send_timeout, Send}, {send_timeout_close, true},
                     {customize_hostname_check, [{match_fun, public_key:pkix_verify_hostname_match_fun(https)}]} | Name ++ Credentials]}
         end,
@@ -76,6 +77,16 @@ open(Address, ServerName, Port, Tls, Protocol, Trust, Identity, Timeout, SendTim
             {error, Reason} -> {error, cause(Reason)}
         end
     catch _:Caught -> {error, cause(Caught)} end.
+%% OTP's defaults are used unless the client adds the TLS 1.2 ECDHE AES-CBC
+%% suites, which go after the defaults so a modern suite is preferred.
+ciphers(otp_defaults) -> [];
+ciphers(otp_defaults_and_tls12_cbc) ->
+    Defaults = lists:append([ssl:cipher_suites(default, V) || V <- ['tlsv1.3', 'tlsv1.2']]),
+    Cbc = [S || S = #{key_exchange := K, cipher := C, mac := M} <- ssl:cipher_suites(all, 'tlsv1.2'),
+                lists:member(K, [ecdhe_rsa, ecdhe_ecdsa]),
+                lists:member(C, [aes_128_cbc, aes_256_cbc]),
+                lists:member(M, [sha256, sha384])],
+    [{ciphers, Defaults ++ [S || S <- Cbc, not lists:member(S, Defaults)]}].
 request(Pid, Method, Path, Headers, Body) ->
     try {ok, gun:request(Pid, Method, Path, Headers, Body, #{reply_to => self(), flow => 1})}
     catch _:Reason -> {error, cause(Reason)} end.

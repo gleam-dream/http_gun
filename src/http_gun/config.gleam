@@ -31,6 +31,7 @@
 //// | protocol | HTTP/1.1 | `with_protocol` |
 //// | TLS client identity | none | `with_client_identity` |
 //// | TLS trust | system CA store, peer and host name verified | `with_trust` |
+//// | TLS cipher suites | OTP defaults | `with_cipher_suites` |
 //// | connect, including DNS and TLS | `duration.seconds(5)` | `with_connect_timeout` |
 //// | waiting for a pooled connection | `duration.seconds(5)` | `with_pool_timeout` |
 //// | request, admission to last byte | `After(duration.seconds(30))` | `with_request_timeout` |
@@ -85,6 +86,20 @@ pub type Trust {
   CustomCa(path: String)
   /// DER-encoded CA certificates, replacing system trust without file IO.
   Anchors(certificates: List(BitArray))
+}
+
+/// Which TLS cipher suites a client offers. Every choice keeps OTP's
+/// supported protocol versions, peer verification and host name checks.
+pub type CipherSuites {
+  /// OTP's default suites for each supported TLS version.
+  OtpDefaults
+  /// OTP's defaults, then the TLS 1.2 suites with ECDHE key exchange,
+  /// AES-CBC encryption and an HMAC-SHA-256 or HMAC-SHA-384 MAC (such as
+  /// `ECDHE-RSA-AES256-SHA384`). OTP left CBC suites out of its defaults;
+  /// some servers, including Brazilian government web services, still accept
+  /// only them. The defaults stay first, so a server that supports them
+  /// negotiates one of them.
+  OtpDefaultsAndTls12Cbc
 }
 
 /// A time bound that may be lifted. `Infinity` lifts it and must be chosen
@@ -152,6 +167,7 @@ pub fn default() -> Config {
   Settings(
     protocol: settings.Http1,
     trust: settings.SystemTrust,
+    cipher_suites: settings.OtpDefaults,
     client_identity: None,
     connect_timeout: 5000,
     pool_timeout: 5000,
@@ -243,6 +259,15 @@ pub fn with_trust(config: Config, trust: Trust) -> Config {
     SystemTrust -> settings.SystemTrust
     CustomCa(path) -> settings.CustomCa(path)
     Anchors(certificates) -> settings.Anchors(certificates)
+  })
+}
+
+/// Choose the TLS cipher suites the client offers. Default `OtpDefaults`.
+/// Views cannot change it.
+pub fn with_cipher_suites(config: Config, suites: CipherSuites) -> Config {
+  Settings(..config, cipher_suites: case suites {
+    OtpDefaults -> settings.OtpDefaults
+    OtpDefaultsAndTls12Cbc -> settings.OtpDefaultsAndTls12Cbc
   })
 }
 

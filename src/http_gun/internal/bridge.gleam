@@ -54,6 +54,7 @@ pub fn open(
   tls: Bool,
   protocol: Protocol,
   trust: Trust,
+  cipher_suites: settings.CipherSuites,
   identity: option.Option(client_identity.Identity),
   connect_timeout: Int,
   send_timeout: SendTimeout,
