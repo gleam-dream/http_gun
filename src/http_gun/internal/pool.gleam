@@ -1358,6 +1358,7 @@ fn resolved(
                   p.origin.tls,
                   state.config.protocol,
                   state.config.trust,
+                  state.config.cipher_suites,
                   state.config.client_identity,
                   int.max(
                     1,

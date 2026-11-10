@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- `config.with_cipher_suites` with `config.CipherSuites`: `OtpDefaults`
+  (the default) or `OtpDefaultsAndTls12Cbc`, which also offers the TLS 1.2
+  ECDHE AES-CBC suites with HMAC-SHA-256/384 after OTP's defaults. OTP left
+  CBC suites out of its defaults, and some servers (for example the São Paulo
+  NFS-e web service) accept only them. Verification, trust and destination
+  policy are unchanged. See ADR 0017.
+
 ## 0.1.1 - 2026-11-04
 
 ### Security

@@ -8,7 +8,7 @@ import http_gun/destination
 import http_gun/redaction
 import sinal/forwarder
 
-// Constructor names match the atoms http_gun_ffi:open/10 expects.
+// Constructor names match the atoms http_gun_ffi:open/11 expects.
 pub type Protocol {
   Http1
   PreferHttp2
@@ -19,6 +19,11 @@ pub type Trust {
   SystemTrust
   CustomCa(String)
   Anchors(List(BitArray))
+}
+
+pub type CipherSuites {
+  OtpDefaults
+  OtpDefaultsAndTls12Cbc
 }
 
 pub type Negotiated {
@@ -66,6 +71,7 @@ pub type Settings {
   Settings(
     protocol: Protocol,
     trust: Trust,
+    cipher_suites: CipherSuites,
     client_identity: Option(client_identity.Identity),
     connect_timeout: Int,
     pool_timeout: Int,
