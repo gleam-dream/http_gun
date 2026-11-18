@@ -17,6 +17,9 @@
 ////   with a listed name at any depth, which becomes `"REDACTED"`. Every other
 ////   byte of the body is kept.
 ////
+//// `request_fields_only` limits the last two to request bodies, so response
+//// bodies are stored as received apart from the body function.
+////
 //// Names are compared without case and ignoring `-` and `_`, so `api_key`
 //// also selects `API-KEY`, `apiKey` and `ApiKey`. Escapes in a JSON key are
 //// not decoded: the value of any key that contains a backslash escape is
@@ -311,7 +314,9 @@ pub fn request(
   )
 }
 
-/// Rewrite a request or response body with the `content-type` in `headers`:
+/// Rewrite a request or response body with the `content-type` in `headers`,
+/// by the default rule for both directions (a recording applies
+/// `request_fields_only` to responses on top of this):
 /// replace the credential fields of a form or JSON body, then apply the body
 /// function, if any. The request-body rewrite is not applied; `request`
 /// applies it.
@@ -342,7 +347,8 @@ pub fn body(redaction: Redaction, bytes: BitArray) -> BitArray {
 }
 
 /// Whether this redaction has a body function. Credential fields are replaced
-/// whatever this returns; see `rewrites_body_for`.
+/// whatever this returns (in responses too, unless `request_fields_only`);
+/// see `rewrites_body_for`.
 pub fn rewrites_bodies(redaction: Redaction) -> Bool {
   option.is_some(redaction.body)
 }

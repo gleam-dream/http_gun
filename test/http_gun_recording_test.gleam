@@ -986,7 +986,7 @@ pub fn verify_refuses_a_recording_client_test() {
 
 // A recorded schema 3 file is already in the codec's layout, and a streamed
 // answer reads back byte for byte.
-pub fn recorded_file_is_its_own_upgrade_test() {
+pub fn recorded_file_is_its_own_conversion_test() {
   let port =
     serve(<<
       "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nTransfer-Encoding: chunked\r\n\r\n12\r\ndata: {\"a\":\"é\"}\n\n\r\nE\r\ndata: [DONE]\n\n\r\n0\r\nX-End: yes\r\n\r\n":utf8,
@@ -1159,6 +1159,24 @@ pub fn request_fields_only_keeps_answers_exact_test() {
   // answer as sent.
   bit_array.concat(stored_response.body)
   |> should.equal(<<"{\"error\":{\"code\":429}}\n":utf8>>)
+
+  // The recording stores what `cassette.redact` makes of the live exchange.
+  let seen =
+    testing.exchange(
+      req,
+      testing.Respond(
+        response.Response(live.response.status, live.response.headers, [
+          live.response.body,
+        ]),
+        testing.Finished(live.trailers),
+      ),
+    )
+  let assert [redacted] =
+    testing.exchanges(cassette.redact(testing.script([seen]), policy))
+  let assert testing.Respond(redacted_response, _) = testing.reply(redacted)
+  bit_array.concat(redacted_response.body)
+  |> should.equal(bit_array.concat(stored_response.body))
+  testing.request(redacted) |> should.equal(testing.request(stored))
 
   let assert Ok(client) = testing.playback(tape, settings)
   let assert Ok(replayed) = http_gun.send(client, req)

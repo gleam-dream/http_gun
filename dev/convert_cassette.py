@@ -4,7 +4,7 @@
 Schema 2 stores each body and chunk as {"text": ..} when it is valid UTF-8 and
 {"base64": ..} otherwise, names endings finished/aborted/abandoned, and stores
 failures in the `error.to_json` shape. Exchanges, order, headers and bytes are
-unchanged. HTTP Gun reads schema 2; `cassette.upgrade` turns the result into
+unchanged. HTTP Gun reads schema 2; `cassette.parse` then `cassette.encode` turns the result into
 schema 3, the version it writes. Usage:
 
     python3 dev/convert_cassette.py OLD.json [NEW.json]

@@ -99,8 +99,10 @@ Status: Accepted
   different request it always replayed as and converts as that request. A
   file that loads but holds a target a client could not send, such as port
   0, encodes to text `parse` refuses.
-- A hand-built script encoded with credential headers or fields keeps them;
-  a caller who wants them out applies `cassette.redact` first.
+- A hand-built script keeps, when encoded, the credentials its responses
+  hold: credential response or trailer headers, failure headers and
+  credential fields in response bodies (`testing.exchange` already redacts
+  the request). A caller who wants them out applies `cassette.redact` first.
 - After the schema 2 reader is retired, an unconverted schema 2 file fails
   with `UnsupportedVersion(2)`.
 - `cassette.encode` output changes for anyone comparing it to a stored string.

@@ -73,8 +73,10 @@
   or an empty host, converts to text `parse` refuses: check before writing.
 - Who breaks: `cassette.encode` applies no redaction any more. Since 0.1.0 it
   promised never to write credential headers, and since 0.1.1 it replaced
-  credential fields; a hand-built script built from live requests now keeps
-  its `authorization` header and credential fields when encoded. Apply
+  credential fields; a hand-built script now keeps, when encoded, the
+  credentials its responses hold (a `set-cookie` or other credential response
+  or trailer header, failure headers, credential fields in response bodies).
+  `testing.exchange` still redacts the request. Apply
   `cassette.redact(script, redaction.default())` first, as recording already
   does. `cassette.encode` of a hand-built script whose target a client
   could not send (an empty host, port 0, a path without a leading `/`) writes

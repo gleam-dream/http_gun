@@ -110,14 +110,14 @@ pub fn schema_2_cassettes_keep_loading_test() {
       "{\"text\":\"crlf\\r\\nends\\r\\n\"},{\"text\":\"trailing\\n\"},{\"text\":\"\\n\"}",
     )
   let assert Ok(original) = cassette.parse(with_newlines, 10_000)
-  let assert Ok(upgraded) = convert(with_newlines, 10_000)
-  string.contains(upgraded, "{\"lines\": [") |> should.be_true
-  let assert Ok(reloaded) = cassette.parse(upgraded, 10_000)
+  let assert Ok(converted) = convert(with_newlines, 10_000)
+  string.contains(converted, "{\"lines\": [") |> should.be_true
+  let assert Ok(reloaded) = cassette.parse(converted, 10_000)
   testing.exchanges(reloaded) |> should.equal(testing.exchanges(original))
-  let assert [upgraded_exchange] = testing.exchanges(reloaded)
-  let assert testing.Respond(upgraded_reply, _) =
-    testing.reply(upgraded_exchange)
-  upgraded_reply.body
+  let assert [converted_exchange] = testing.exchanges(reloaded)
+  let assert testing.Respond(converted_reply, _) =
+    testing.reply(converted_exchange)
+  converted_reply.body
   |> should.equal([
     <<"crlf\r\nends\r\n":utf8>>,
     <<"trailing\n":utf8>>,
@@ -276,13 +276,13 @@ pub fn conversion_keeps_bodies_recorded_before_field_redaction_test() {
   let schema_2 =
     "{\"http_gun\":2,\"exchanges\":[{\"request\":{\"method\":\"GET\",\"url\":\"http://offline.invalid/ask\",\"headers\":[],\"body\":{\"text\":\"\"}},\"reply\":{\"kind\":\"response\",\"status\":200,\"headers\":[[\"content-type\",\"application/json\"]],\"chunks\":[{\"text\":\"{\\\"token\\\":\"},{\"text\":\"\\\"t-1\\\"}\"}],\"ending\":{\"kind\":\"finished\",\"trailers\":[]}}},{\"request\":{\"method\":\"GET\",\"url\":\"http://offline.invalid/ask\",\"headers\":[],\"body\":{\"text\":\"\"}},\"reply\":{\"kind\":\"response\",\"status\":200,\"headers\":[[\"content-type\",\"application/json\"]],\"chunks\":[{\"text\":\"{\\\"partial\\\":\"}],\"ending\":{\"kind\":\"abandoned\"}}}]}"
   let assert Ok(original) = cassette.parse(schema_2, 100_000)
-  let assert Ok(upgraded) = convert(schema_2, 100_000)
-  string.contains(upgraded, "\"http_gun\": 3") |> should.be_true
-  let assert Ok(reloaded) = cassette.parse(upgraded, 100_000)
+  let assert Ok(converted) = convert(schema_2, 100_000)
+  string.contains(converted, "\"http_gun\": 3") |> should.be_true
+  let assert Ok(reloaded) = cassette.parse(converted, 100_000)
   testing.exchanges(reloaded) |> should.equal(testing.exchanges(original))
 
   // Converting is idempotent, and fails as parsing fails.
-  convert(upgraded, 100_000) |> should.equal(Ok(upgraded))
+  convert(converted, 100_000) |> should.equal(Ok(converted))
   convert(schema_2, 10)
   |> should.equal(Error(cassette.TooLarge(10, string.byte_size(schema_2))))
   convert("not JSON", 100) |> should.equal(Error(cassette.Corrupt))
@@ -316,13 +316,13 @@ pub fn target_fields_read_back_exactly_test() {
   testing.exchanges(loaded) |> should.equal(exchanges)
   convert(text, 100_000) |> should.equal(Ok(text))
 
-  // Schema 2 URLs with a port, a query and https upgrade to the request
+  // Schema 2 URLs with a port, a query and https convert to the request
   // they loaded as.
   let schema_2 =
     "{\"http_gun\":2,\"exchanges\":[{\"request\":{\"method\":\"POST\",\"url\":\"https://API.example.test:8443/v1/x?key=REDACTED&q=%20a\",\"headers\":[],\"body\":{\"text\":\"\"}},\"reply\":{\"kind\":\"reject\",\"failure\":{\"name\":\"client_closed\",\"evidence\":\"not_sent\"}}}]}"
   let assert Ok(original) = cassette.parse(schema_2, 10_000)
-  let assert Ok(upgraded) = convert(schema_2, 10_000)
-  let assert Ok(reloaded) = cassette.parse(upgraded, 10_000)
+  let assert Ok(converted) = convert(schema_2, 10_000)
+  let assert Ok(reloaded) = cassette.parse(converted, 10_000)
   testing.exchanges(reloaded) |> should.equal(testing.exchanges(original))
 }
 
@@ -430,8 +430,8 @@ pub fn request_fields_only_keeps_response_chunks_test() {
       testing.script([exchange]),
       redaction.default() |> redaction.request_fields_only,
     ))
-  testing.request(kept).body
-  |> should.equal(<<"{\"token\":\"REDACTED\"}":utf8>>)
+  // `testing.exchange` already redacted the request; the recording test
+  // shows the opt-in replacing a live request's field.
   testing.reply(kept) |> should.equal(testing.reply(exchange))
   // The default still replaces the field in the answer.
   let assert [default] =
@@ -440,4 +440,34 @@ pub fn request_fields_only_keeps_response_chunks_test() {
       redaction.default(),
     ))
   { testing.reply(default) == testing.reply(exchange) } |> should.be_false
+}
+
+// Under requests-only field redaction a body hook still rewrites a response
+// body, which is then held whole; only the credential fields stay.
+pub fn request_fields_only_still_applies_the_body_hook_test() {
+  let assert Ok(base) = request.to("http://offline.invalid/ask")
+  let exchange =
+    testing.exchange(
+      request.set_body(base, <<>>),
+      testing.Respond(
+        response.Response(200, [#("content-type", "application/json")], [
+          <<"{\"code\":429,":utf8>>,
+          <<"\"note\":\"card 4111\"}":utf8>>,
+        ]),
+        testing.Finished([]),
+      ),
+    )
+  let hook = fn(bytes) {
+    let assert Ok(text) = bit_array.to_string(bytes)
+    bit_array.from_string(string.replace(text, "4111", "[card]"))
+  }
+  let policy =
+    redaction.default()
+    |> redaction.request_fields_only
+    |> redaction.with_body(hook)
+  let assert [stored] =
+    testing.exchanges(cassette.redact(testing.script([exchange]), policy))
+  let assert testing.Respond(reply, _) = testing.reply(stored)
+  reply.body
+  |> should.equal([<<"{\"code\":429,\"note\":\"card [card]\"}":utf8>>])
 }

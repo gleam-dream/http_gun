@@ -5,9 +5,9 @@
 //// newline (version 3 only), `{"text": ..}` when it is other valid UTF-8 and
 //// `{"base64": ..}` otherwise. Failures use `error.to_json`, on one line.
 ////
-//// The layout is owned here as fragments: `encode` concatenates them, and
+//// The layout is owned here as fragments: `render` concatenates them, and
 //// the recorder writes the same fragments as it captures, so a recorded file
-//// and its upgraded form are the same text. Separators lead the element they
+//// and its parsed and re-rendered form are the same text. Separators lead the element they
 //// precede and a closing bracket depends only on whether its array held an
 //// element, so a streamed writer needs no lookahead.
 
@@ -210,7 +210,7 @@ fn bytes_text(bytes: BitArray, depth: Int) -> String {
 /// The form a recording under `policy` stores an exchange in: the request
 /// redacted, response headers, trailers and the headers a stored failure
 /// holds filtered, and a rewritten
-/// response body held as one chunk. Encoding uses it; the recorder's streamed
+/// response body held as one chunk. `cassette.redact` uses it; the recorder's streamed
 /// fragments are tested against it.
 pub fn store(policy: Redaction, exchange: script.Exchange) -> script.Exchange {
   script.Exchange(
