@@ -1160,7 +1160,7 @@ pub fn request_fields_only_keeps_answers_exact_test() {
   bit_array.concat(stored_response.body)
   |> should.equal(<<"{\"error\":{\"code\":429}}\n":utf8>>)
 
-  // The recording stores what `cassette.redact` makes of the live exchange.
+  // The stored response is what `cassette.redact` makes of the live one.
   let seen =
     testing.exchange(
       req,

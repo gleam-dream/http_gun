@@ -328,7 +328,9 @@ pub fn body_for(
 }
 
 /// Whether `body_for` can change a body with these headers: a body function
-/// is set, or the content type is form or JSON.
+/// is set, or the content type is form or JSON. Like `body_for`, this
+/// ignores `request_fields_only`; `cassette.redact` shows what a recording
+/// stores.
 pub fn rewrites_body_for(
   redaction: Redaction,
   headers: List(#(String, String)),

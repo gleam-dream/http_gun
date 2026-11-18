@@ -42,6 +42,14 @@
   NFS-e web service) accept only them. Verification, trust and destination
   policy are unchanged. See ADR 0017.
 
+### Security
+
+- `cassette.encode` no longer removes credentials: it lays a script out as
+  given. Since 0.1.0 it promised never to write credential headers, and since
+  0.1.1 it replaced credential fields. Code that encodes hand-built or parsed
+  scripts must apply `cassette.redact(script, redaction.default())` first;
+  recordings are redacted as they are captured, as before.
+
 ### Changed
 
 - Cassettes are written in schema 3 (`"http_gun": 3`), and schema 2 files
