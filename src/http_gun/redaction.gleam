@@ -314,13 +314,11 @@ pub fn request(
   )
 }
 
-/// Rewrite a request or response body with the `content-type` in `headers`,
-/// by the default rule for both directions; a recording also applies
-/// `request_fields_only` to responses, and `cassette.redact` reproduces what
-/// a recording stores:
+/// Rewrite a request or response body with the `content-type` in `headers`:
 /// replace the credential fields of a form or JSON body, then apply the body
-/// function, if any. The request-body rewrite is not applied; `request`
-/// applies it.
+/// function, if any. This ignores `request_fields_only`, so it does not
+/// predict a recorded response under that option; `cassette.redact` does.
+/// The request-body rewrite is not applied; `request` applies it.
 pub fn body_for(
   redaction: Redaction,
   headers: List(#(String, String)),

@@ -32,6 +32,7 @@ pub fn main() -> Nil {
   retry_after()
   redacted_cassette()
   masked_requests()
+  exact_answers()
 }
 
 // A script answers requests in order; playback never opens a connection.
@@ -204,9 +205,6 @@ fn masked_requests() -> Nil {
   let policy =
     redaction.default()
     |> redaction.keeping_request_headers(["accept"])
-    // Keep answers exactly as received; credential fields are replaced in
-    // requests only.
-    |> redaction.request_fields_only
     |> redaction.with_request_body(fn(body) {
       case body {
         <<"asked at ":utf8, _:bytes>> -> <<"asked at <time>":utf8>>
@@ -224,5 +222,36 @@ fn masked_requests() -> Nil {
   let cleaned = cassette.encode(cassette.redact(old, policy))
   // snips-end: masked-requests
   let assert False = string.contains(cleaned, "run-7")
+  Nil
+}
+
+// By default a JSON answer's credential-named fields are replaced, so an
+// error body `{"error":{"code":429}}` would be stored with `"code"` as
+// `"REDACTED"`. `request_fields_only` keeps answers as received and replaces
+// credential fields in requests only; whoever opts in keeps secrets, such as
+// an OAuth token answer, out of their cassettes.
+fn exact_answers() -> Nil {
+  let assert Ok(req) = request.to("https://api.example.test/ask")
+  let answer = <<"{\"error\":{\"code\":429}}":utf8>>
+  let script =
+    testing.script([
+      testing.exchange(
+        request.set_body(req, <<>>),
+        testing.Respond(
+          response.new(429)
+            |> response.set_header("content-type", "application/json")
+            |> response.set_body([answer]),
+          testing.Finished([]),
+        ),
+      ),
+    ])
+  let exact = redaction.default() |> redaction.request_fields_only
+  let assert [kept] = testing.exchanges(cassette.redact(script, exact))
+  let assert testing.Respond(reply, _) = testing.reply(kept)
+  let assert [<<"{\"error\":{\"code\":429}}":utf8>>] = reply.body
+  let assert [scrubbed] =
+    testing.exchanges(cassette.redact(script, redaction.default()))
+  let assert testing.Respond(reply, _) = testing.reply(scrubbed)
+  let assert [<<"{\"error\":{\"code\":\"REDACTED\"}}":utf8>>] = reply.body
   Nil
 }

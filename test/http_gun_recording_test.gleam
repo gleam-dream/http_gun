@@ -1229,4 +1229,15 @@ pub fn request_fields_only_keeps_recorded_chunks_test() {
   |> should.equal([<<"{\"error\":{":utf8>>, <<"\"code\":429}}\n":utf8>>])
   recorded_chunks(redaction.default())
   |> should.equal([<<"{\"error\":{\"code\":\"REDACTED\"}}\n":utf8>>])
+  // With a body hook the body is held and rewritten by the hook alone.
+  let hook = fn(bytes) {
+    let assert Ok(text) = bit_array.to_string(bytes)
+    bit_array.from_string(string.replace(text, "error", "fault"))
+  }
+  recorded_chunks(
+    redaction.default()
+    |> redaction.request_fields_only
+    |> redaction.with_body(hook),
+  )
+  |> should.equal([<<"{\"fault\":{\"code\":429}}\n":utf8>>])
 }
