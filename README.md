@@ -189,8 +189,8 @@ flowchart LR
 - Cassettes use schema 3: laid out over many lines, with a text body containing a
   newline stored as its lines, so a re-recorded answer diffs line by line and
   reads back byte for byte. Schema 2 files still load; convert them with
-  `cassette.upgrade`, not with `parse` then `encode`, which would apply the
-  default redaction to recorded answers. Files are larger than in schema 2
+  `cassette.parse` then `cassette.encode`, which applies no redaction, so no
+  recorded answer changes. Files are larger than in schema 2
   (about a quarter for a streamed answer), so raise `max_bytes` on `load`
   where it was tight.
 - Sinal events are best effort. Without a forwarder route, handlers run inside

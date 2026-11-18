@@ -473,7 +473,7 @@ fn fragment(
       Ok(
         #(
           codec.response_head(status, redaction.headers(policy, headers)),
-          case redaction.rewrites_body_for(policy, headers) {
+          case redaction.rewrites_response_body_for(policy, headers) {
             True -> Buffering(headers, [])
             False -> Receiving(False)
           },
@@ -485,7 +485,7 @@ fn fragment(
       Ok(#("", Buffering(headers, [bytes, ..chunks])))
     Buffering(headers, chunks), _ -> {
       let body =
-        redaction.body_for(
+        redaction.response_body_for(
           policy,
           headers,
           bit_array.concat(list.reverse(chunks)),

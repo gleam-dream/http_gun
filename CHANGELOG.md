@@ -24,8 +24,12 @@
   after the last, so a non-empty script is never exhausted. With a matcher
   that accepts any request, one exchange answers every request, for example
   with a built provider failure.
-- `cassette.upgrade(text, max_bytes)` lays out a stored cassette of schema 2
-  or 3 in schema 3 without redacting it again; it is how old files convert.
+- `redaction.request_fields_only(redaction)` replaces credential fields in
+  request bodies and the query only, and stores response bodies as received
+  (apart from `with_body`), so a JSON answer or error body with a listed key,
+  such as `{"error":{"code":429}}`, replays exactly. The default is
+  unchanged; a consumer that opts in owns keeping secrets such as OAuth token
+  answers out of its cassettes.
 - `cassette.redact(script, redaction)` applies a redaction to stored
   exchanges as a recording would store them, to find what a grown policy
   would still change in old cassettes and to clean them with `encode`
@@ -53,22 +57,26 @@
 
 ### Upgrading cassettes
 
-- Convert each schema 2 file with `cassette.upgrade(text, max_bytes)`: read
-  the file, upgrade the text, write it back. No credentials, no network.
-  `upgrade` does not redact again, so no recorded answer changes. Do not
-  convert with `parse` then `encode`: `encode` applies the default redaction
-  and can rewrite an answer recorded before field redaction existed. To clean
-  such a file on purpose, use `cassette.redact`.
+- Convert each schema 2 file with `cassette.parse(text, max_bytes)` then
+  `cassette.encode`: read the file, convert the text, parse the result to
+  check it, then write it back. No credentials, no network. `encode` applies
+  no redaction, so no recorded answer changes. To clean a file recorded
+  before field redaction existed, apply `cassette.redact` on purpose.
 - Schema 3 stores a request's scheme, host, port, path and query as
   separate fields, so every request a client accepts reads back exactly:
   a query with brackets, braces, a pipe or quotes, a non-ASCII path, an IPv6
   host, or a `?` or `#` in a path. A schema 2 file stored one URL, which
-  could not carry those targets. Such a file either never loaded (`load`
-  and `upgrade` return `Corrupt`, and HTTP Gun cannot recover it: record it
-  again) or loaded as a different request, which `upgrade` keeps. A schema 2
+  could not carry those targets. Such a file either never loaded (`parse`
+  returns `Corrupt`, and HTTP Gun cannot recover it: record it again) or
+  loaded as a different request, which converts as that request. A schema 2
   file that loads but holds a target a client could not send, such as port 0
-  or an empty host, is refused by `upgrade` as `Corrupt`.
-- Who breaks: `cassette.encode` of a hand-built script whose target a client
+  or an empty host, converts to text `parse` refuses: check before writing.
+- Who breaks: `cassette.encode` applies no redaction any more. Since 0.1.0 it
+  promised never to write credential headers, and since 0.1.1 it replaced
+  credential fields; a hand-built script built from live requests now keeps
+  its `authorization` header and credential fields when encoded. Apply
+  `cassette.redact(script, redaction.default())` first, as recording already
+  does. `cassette.encode` of a hand-built script whose target a client
   could not send (an empty host, port 0, a path without a leading `/`) writes
   a file `parse` refuses as `Corrupt`; schema 2 loaded such files. An older
   HTTP Gun reading a schema 3 file fails with
@@ -95,10 +103,9 @@
   line. It is now refused as `InvalidRequest(InvalidTarget)` (or
   `InvalidOrigin` for the host), like any other space.
 
-- `cassette.encode` removed credential headers from requests, responses and
-  trailers but wrote the headers held inside a scripted failure (a `Reject`
-  or an `Aborted` ending) as given, although its documentation says credential
-  headers are never written. It now filters them too. Recordings were not
+- `cassette.redact` filtered credential headers from requests, responses and
+  trailers but not the headers held inside a scripted failure (a `Reject` or
+  an `Aborted` ending). It now filters them too. Recordings were not
   affected: a recorded failure holds no headers.
 
 ## 0.1.1 - 2026-11-04

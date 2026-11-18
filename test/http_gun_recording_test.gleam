@@ -20,6 +20,14 @@ import http_gun/redaction
 import http_gun/testing
 import simplifile
 
+// Converts a stored cassette to schema 3: parse, then encode.
+fn convert(
+  text: String,
+  max_bytes: Int,
+) -> Result(String, cassette.CassetteError) {
+  cassette.parse(text, max_bytes) |> result.map(cassette.encode)
+}
+
 @external(erlang, "http_gun_test_server", "start")
 fn server() -> Int
 
@@ -1026,7 +1034,7 @@ pub fn recorded_file_is_its_own_upgrade_test() {
   http_gun.stop(recorded.client)
 
   let assert Ok(text) = simplifile.read(destination)
-  cassette.upgrade(text, 1_000_000) |> should.equal(Ok(text))
+  convert(text, 1_000_000) |> should.equal(Ok(text))
   string.contains(text, "\"data: [DONE]\"") |> should.be_true
   string.contains(text, "\"kind\": \"reject\"") |> should.be_true
   string.contains(text, "\"kind\": \"abandoned\"") |> should.be_true
@@ -1116,4 +1124,46 @@ pub fn recording_budget_counts_stored_bytes_test() {
   http_gun.stop(recorded.client)
   cassette.load(empty, 42) |> should.be_ok
   remove(empty)
+}
+
+// With requests-only field redaction, a request's credential field is
+// replaced and a JSON answer is stored exactly as received, chunk for chunk.
+pub fn request_fields_only_keeps_answers_exact_test() {
+  let port =
+    serve(<<
+      "HTTP/1.1 429 Too Many Requests\r\nContent-Type: application/json\r\nTransfer-Encoding: chunked\r\n\r\na\r\n{\"error\":{\r\nd\r\n\"code\":429}}\n\r\n0\r\n\r\n":utf8,
+    >>)
+  let policy = redaction.default() |> redaction.request_fields_only
+  let settings = local_config() |> config.with_redaction(policy)
+  let assert Ok(req) =
+    request.to("http://localhost:" <> int.to_string(port) <> "/ask")
+  let req =
+    req
+    |> request.set_method(http.Post)
+    |> request.set_header("content-type", "application/json")
+    |> request.set_body(<<"{\"token\":\"t-1\",\"q\":1}":utf8>>)
+  let destination = path()
+  let assert Ok(recorded) =
+    cassette.record(settings, destination, cassette.options())
+  let assert Ok(live) = http_gun.send(recorded.client, req)
+  let assert Ok(_) =
+    cassette.finish(recorded.recording, duration.milliseconds(1000))
+  http_gun.stop(recorded.client)
+
+  let assert Ok(tape) = cassette.load(destination, 100_000)
+  let assert [stored] = testing.exchanges(tape)
+  testing.request(stored).body
+  |> should.equal(<<"{\"token\":\"REDACTED\",\"q\":1}":utf8>>)
+  let assert testing.Respond(stored_response, _) = testing.reply(stored)
+  // The chunks are as the transport delivered them; their bytes are the
+  // answer as sent.
+  bit_array.concat(stored_response.body)
+  |> should.equal(<<"{\"error\":{\"code\":429}}\n":utf8>>)
+
+  let assert Ok(client) = testing.playback(tape, settings)
+  let assert Ok(replayed) = http_gun.send(client, req)
+  replayed.response.status |> should.equal(429)
+  replayed.response.body |> should.equal(live.response.body)
+  http_gun.stop(client)
+  remove(destination)
 }

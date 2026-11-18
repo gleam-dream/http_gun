@@ -7,9 +7,10 @@ Status: Accepted
 
 ## Decision
 
-- Cassettes carry marker `http_gun: 3`. HTTP Gun writes 3 and reads 2 and 3.
-  This supersedes ADR 0005's "one current schema": two markers are read, one
-  is written, and there is still no fallback to a live request.
+- Cassettes carry marker `http_gun: 3`, the only marker HTTP Gun writes.
+  While consumers convert, it also reads marker 2; that reader is retired as
+  below. This supersedes ADR 0005's "one current schema" for that period;
+  there is still no fallback to a live request.
 - A UTF-8 body or chunk that contains a newline is stored as `lines`, the
   strings between its newlines, and rebuilt by joining them with a newline.
   Other UTF-8 bytes stay `text`; bytes that are not UTF-8 stay `base64`.
@@ -25,9 +26,12 @@ Status: Accepted
   charged on every byte the file holds.
 - Schema 3 stores a request's scheme, host, port, path and query as separate
   fields, read back without URL parsing; schema 2 keeps its single URL.
-- Converting is `cassette.upgrade`: it lays a stored cassette of either
-  marker out in schema 3 without redacting it again, so no recorded answer
-  changes. Upgrading needs no credentials and makes no live request.
+- `cassette.encode` lays a script out and applies no redaction, so
+  converting is parsing then encoding: no recorded answer changes, and it
+  needs no credentials and no live request. Keeping credentials out of a
+  file is the job of recording and of `cassette.redact`.
+- The schema 2 reader is retired in the same release, once the cassettes of
+  LLM Wire and Fabric, the known schema 2 readers, are converted.
 - This settles the cassette text layout left as an open ruling by ADR 0018.
 
 ## Rationale and alternatives
@@ -58,10 +62,17 @@ Status: Accepted
   re-record shows a prompt change or a changed answer as one changed body
   line; a cheaper path for requests is then for the model library to send
   indented request JSON, which lines already stores exactly.
-- Converting through `cassette.load` then `cassette.encode` was rejected:
-  encoding applies the default redaction, which would rewrite fields in a
-  file recorded before field redaction existed, or turn a truncated JSON
-  body into `REDACTED-UNPARSABLE`, altering a recorded answer.
+- `cassette.encode` used to apply the default redaction, which rewrote
+  fields in a file recorded before field redaction existed and turned a
+  truncated JSON body into `REDACTED-UNPARSABLE`, altering a recorded answer.
+  A separate conversion function that skipped the redaction was tried and
+  dropped: it left four overlapping paths (recording, `redact`, `encode`'s
+  implicit default and the conversion's bypass) where two suffice. Keeping
+  only the credential headers in `encode` was also weighed; the owner chose
+  layout only, moving the 0.1.0 promise that `encode` never writes a
+  credential header to recording and `redact`.
+- Keeping the schema 2 reader indefinitely was rejected: the known readers
+  are the owner's own packages, and converting them is cheap.
 - A stored failure stays one line: its fields come from `error.to_json`, and
   laying them out field by field would need a second serializer kept in step
   with it. OTP's `json:format` was not used: its output is not specified to
@@ -76,8 +87,6 @@ Status: Accepted
   different request. Refusing those targets on live requests would change
   what clients accept; refusing them only when recording would fail
   recordings late. Separate fields need no parsing and read back exactly.
-- Reading schema 2 costs one branch in the body decoder; dropping it would
-  break every committed cassette to save one branch.
 - Writing fragments from the codec, instead of reformatting the assembled
   file at publication, keeps the recorder's streaming writes and its bounded
   memory (ADR 0005), and leaves one copy of the layout.
@@ -86,10 +95,14 @@ Status: Accepted
 
 - An older HTTP Gun reading a schema 3 file fails with `UnsupportedVersion`.
 - A schema 2 file holding a target its URL cannot carry stays as it was: it
-  either failed to load already and cannot be upgraded, or it loads as the
-  different request it always replayed as and upgrades as that request. A
+  either failed to load already and cannot be converted, or it loads as the
+  different request it always replayed as and converts as that request. A
   file that loads but holds a target a client could not send, such as port
-  0, is refused by `upgrade` as `Corrupt`.
+  0, encodes to text `parse` refuses.
+- A hand-built script encoded with credential headers or fields keeps them;
+  a caller who wants them out applies `cassette.redact` first.
+- After the schema 2 reader is retired, an unconverted schema 2 file fails
+  with `UnsupportedVersion(2)`.
 - `cassette.encode` output changes for anyone comparing it to a stored string.
 - Files grow by their indentation and line structure, against the recording
   budget, whose 16 MiB ceiling is unchanged, and a caller's `load` limit. A
@@ -101,15 +114,14 @@ Status: Accepted
 - Chunk boundaries are part of a recorded answer, so two recordings of the
   same streamed answer with different chunking differ at every boundary, and
   an event split across chunks shows as broken lines.
-- `cassette.encode` of a loaded file equals the file only when the default
-  redaction leaves it unchanged.
 
 ## Evidence
 
 - The owner chose lines after the comparison of JSON storage, verbatim
-  storage and lines for byte fidelity, and accepted `cassette.upgrade` as the
-  documented conversion, with recorded-file identity stated on `upgrade`, in
-  the planning of pull request gleam-dream/http_gun#8 and its follow-up.
+  storage and lines for byte fidelity, then chose `cassette.encode` as layout
+  only and the retirement of the schema 2 reader after converting LLM Wire
+  and Fabric, in the planning of pull requests gleam-dream/http_gun#8 and
+  gleam-dream/http_gun#9.
 - llm_wire encodes request bodies with `json.to_string`, compact on one line.
 - Whether dash-crm's recorded answers are streamed or buffered, and indented
   or compact, is not yet measured; its first real recordings settle it.

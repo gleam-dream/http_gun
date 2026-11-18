@@ -4,6 +4,7 @@
 import gleam/http
 import gleam/http/request
 import gleam/option.{Some}
+import gleam/result
 import gleam/time/duration
 import gleeunit/should
 import http_gun
@@ -11,6 +12,14 @@ import http_gun/cassette
 import http_gun/config
 import http_gun/testing
 import simplifile
+
+// Converts a stored cassette to schema 3: parse, then encode.
+fn convert(
+  text: String,
+  max_bytes: Int,
+) -> Result(String, cassette.CassetteError) {
+  cassette.parse(text, max_bytes) |> result.map(cassette.encode)
+}
 
 @external(erlang, "http_gun_test_server", "serve")
 fn serve(response: BitArray) -> Int
@@ -53,7 +62,7 @@ fn round_trip(sent: request.Request(BitArray)) -> Nil {
   http_gun.stop(recorded.client)
 
   let assert Ok(text) = simplifile.read(destination)
-  cassette.upgrade(text, 1_000_000) |> should.equal(Ok(text))
+  convert(text, 1_000_000) |> should.equal(Ok(text))
   let assert Ok(tape) = cassette.load(destination, 1_000_000)
   let assert [stored] = testing.exchanges(tape)
   testing.request(stored) |> should.equal(sent)

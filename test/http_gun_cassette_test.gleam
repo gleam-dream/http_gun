@@ -278,7 +278,10 @@ pub fn real_disk_offline_and_header_matching_test() {
       expected,
       respond(200, [#("set-cookie", "secret-two")], [<<0, 255>>], []),
     )
-  let text = cassette.encode(testing.script([item]))
+  // Keeping credentials out of a hand-built script is `redact`'s job;
+  // encoding only lays it out.
+  let text =
+    cassette.encode(cassette.redact(testing.script([item]), redaction.default()))
   string.contains(text, "secret-one") |> should.be_false
   string.contains(text, "secret-two") |> should.be_false
   string.contains(text, "secret-three") |> should.be_false
@@ -751,8 +754,10 @@ pub fn stored_failures_keep_no_redacted_header_test() {
       ),
     ])
 
-  // Encoding never writes a credential header, wherever it is held.
-  let text = cassette.encode(script)
+  // Redacting then encoding writes no credential header, wherever it is held.
+  // Keeping credentials out of a hand-built script is `redact`'s job;
+  // encoding only lays it out.
+  let text = cassette.encode(cassette.redact(script, redaction.default()))
   string.contains(text, "failure-secret") |> should.be_false
   string.contains(text, "retry-after") |> should.be_true
 

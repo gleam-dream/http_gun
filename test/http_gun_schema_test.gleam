@@ -8,13 +8,23 @@ import gleam/http/response
 import gleam/int
 import gleam/list
 import gleam/option
+import gleam/result
 import gleam/string
 import gleeunit/should
 import http_gun
 import http_gun/cassette
 import http_gun/config
 import http_gun/error
+import http_gun/redaction
 import http_gun/testing
+
+// Converts a stored cassette to schema 3: parse, then encode.
+fn convert(
+  text: String,
+  max_bytes: Int,
+) -> Result(String, cassette.CassetteError) {
+  cassette.parse(text, max_bytes) |> result.map(cassette.encode)
+}
 
 fn exchange_with(body: BitArray, chunks: List(BitArray)) -> testing.Exchange {
   let assert Ok(req) = request.to("http://offline.invalid/ask")
@@ -100,7 +110,7 @@ pub fn schema_2_cassettes_keep_loading_test() {
       "{\"text\":\"crlf\\r\\nends\\r\\n\"},{\"text\":\"trailing\\n\"},{\"text\":\"\\n\"}",
     )
   let assert Ok(original) = cassette.parse(with_newlines, 10_000)
-  let assert Ok(upgraded) = cassette.upgrade(with_newlines, 10_000)
+  let assert Ok(upgraded) = convert(with_newlines, 10_000)
   string.contains(upgraded, "{\"lines\": [") |> should.be_true
   let assert Ok(reloaded) = cassette.parse(upgraded, 10_000)
   testing.exchanges(reloaded) |> should.equal(testing.exchanges(original))
@@ -259,30 +269,26 @@ pub fn encoding_writes_the_schema_3_layout_test() {
   |> should.equal("{\n  \"http_gun\": 3,\n  \"exchanges\": []\n}\n")
 }
 
-pub fn upgrade_keeps_bodies_the_default_redaction_would_change_test() {
+pub fn conversion_keeps_bodies_recorded_before_field_redaction_test() {
   // A schema 2 file recorded before field redaction: a JSON answer with a
   // credential-named field, split over two chunks, and a truncated JSON
-  // answer. Encoding would rewrite both; upgrading keeps every byte.
+  // answer. Parsing then encoding keeps every byte.
   let schema_2 =
     "{\"http_gun\":2,\"exchanges\":[{\"request\":{\"method\":\"GET\",\"url\":\"http://offline.invalid/ask\",\"headers\":[],\"body\":{\"text\":\"\"}},\"reply\":{\"kind\":\"response\",\"status\":200,\"headers\":[[\"content-type\",\"application/json\"]],\"chunks\":[{\"text\":\"{\\\"token\\\":\"},{\"text\":\"\\\"t-1\\\"}\"}],\"ending\":{\"kind\":\"finished\",\"trailers\":[]}}},{\"request\":{\"method\":\"GET\",\"url\":\"http://offline.invalid/ask\",\"headers\":[],\"body\":{\"text\":\"\"}},\"reply\":{\"kind\":\"response\",\"status\":200,\"headers\":[[\"content-type\",\"application/json\"]],\"chunks\":[{\"text\":\"{\\\"partial\\\":\"}],\"ending\":{\"kind\":\"abandoned\"}}}]}"
   let assert Ok(original) = cassette.parse(schema_2, 100_000)
-  let assert Ok(upgraded) = cassette.upgrade(schema_2, 100_000)
+  let assert Ok(upgraded) = convert(schema_2, 100_000)
   string.contains(upgraded, "\"http_gun\": 3") |> should.be_true
   let assert Ok(reloaded) = cassette.parse(upgraded, 100_000)
   testing.exchanges(reloaded) |> should.equal(testing.exchanges(original))
-  // Encoding, by contrast, applies the default redaction.
-  let assert Ok(encoded) = cassette.parse(cassette.encode(original), 100_000)
-  { testing.exchanges(encoded) == testing.exchanges(original) }
-  |> should.be_false
 
-  // Upgrading is idempotent, and fails as parsing fails.
-  cassette.upgrade(upgraded, 100_000) |> should.equal(Ok(upgraded))
-  cassette.upgrade(schema_2, 10)
+  // Converting is idempotent, and fails as parsing fails.
+  convert(upgraded, 100_000) |> should.equal(Ok(upgraded))
+  convert(schema_2, 10)
   |> should.equal(Error(cassette.TooLarge(10, string.byte_size(schema_2))))
-  cassette.upgrade("not JSON", 100) |> should.equal(Error(cassette.Corrupt))
+  convert("not JSON", 100) |> should.equal(Error(cassette.Corrupt))
 }
 
-// Target edges read back exactly through encode, parse and upgrade.
+// Target edges read back exactly through encode, parse and conversion.
 pub fn target_fields_read_back_exactly_test() {
   let assert Ok(base) = request.to("http://offline.invalid/ask")
   let targets = [
@@ -308,14 +314,14 @@ pub fn target_fields_read_back_exactly_test() {
   let text = cassette.encode(testing.script(exchanges))
   let assert Ok(loaded) = cassette.parse(text, 100_000)
   testing.exchanges(loaded) |> should.equal(exchanges)
-  cassette.upgrade(text, 100_000) |> should.equal(Ok(text))
+  convert(text, 100_000) |> should.equal(Ok(text))
 
   // Schema 2 URLs with a port, a query and https upgrade to the request
   // they loaded as.
   let schema_2 =
     "{\"http_gun\":2,\"exchanges\":[{\"request\":{\"method\":\"POST\",\"url\":\"https://API.example.test:8443/v1/x?key=REDACTED&q=%20a\",\"headers\":[],\"body\":{\"text\":\"\"}},\"reply\":{\"kind\":\"reject\",\"failure\":{\"name\":\"client_closed\",\"evidence\":\"not_sent\"}}}]}"
   let assert Ok(original) = cassette.parse(schema_2, 10_000)
-  let assert Ok(upgraded) = cassette.upgrade(schema_2, 10_000)
+  let assert Ok(upgraded) = convert(schema_2, 10_000)
   let assert Ok(reloaded) = cassette.parse(upgraded, 10_000)
   testing.exchanges(reloaded) |> should.equal(testing.exchanges(original))
 }
@@ -351,12 +357,13 @@ pub fn hand_built_scripts_keep_their_shapes_test() {
     http_gun.send(client, request.set_header(sent, "accept", "text/plain"))
   http_gun.stop(client)
 
-  // A schema 2 target schema 3 cannot hold is refused by upgrade, not
-  // turned into text that does not parse.
+  // A schema 2 target schema 3 cannot hold converts to text that parse
+  // refuses.
   let port_zero =
     "{\"http_gun\":2,\"exchanges\":[{\"request\":{\"method\":\"GET\",\"url\":\"http://offline.invalid:0/\",\"headers\":[],\"body\":{\"text\":\"\"}},\"reply\":{\"kind\":\"reject\",\"failure\":{\"name\":\"client_closed\",\"evidence\":\"not_sent\"}}}]}"
   cassette.parse(port_zero, 10_000) |> should.be_ok
-  cassette.upgrade(port_zero, 10_000) |> should.equal(Error(cassette.Corrupt))
+  let assert Ok(converted) = convert(port_zero, 10_000)
+  cassette.parse(converted, 10_000) |> should.equal(Error(cassette.Corrupt))
 }
 
 // A hand-built target a client could not send is encoded, and the file is
@@ -374,4 +381,63 @@ pub fn encoded_unsendable_target_is_refused_on_parse_test() {
   )
   |> cassette.parse(10_000)
   |> should.equal(Error(cassette.Corrupt))
+}
+
+// Encoding lays a script out and nothing else: a credential header and a
+// credential-named answer field are written as given, and a stored answer
+// survives parse then encode byte for byte.
+pub fn encode_applies_no_redaction_test() {
+  let assert Ok(base) = request.to("http://offline.invalid/ask?key=live-key")
+  let exchange =
+    testing.exchange(
+      request.set_body(base, <<>>),
+      testing.Respond(
+        response.Response(
+          429,
+          [#("content-type", "application/json"), #("set-cookie", "s=1")],
+          [<<"{\"error\":{\"code\":429,\"token\":\"t-1\"}}":utf8>>],
+        ),
+        testing.Finished([]),
+      ),
+    )
+  let text = cassette.encode(testing.script([exchange]))
+  string.contains(text, "set-cookie") |> should.be_true
+  string.contains(text, "\\\"code\\\":429") |> should.be_true
+  let assert Ok(parsed) = cassette.parse(text, 100_000)
+  testing.exchanges(parsed) |> should.equal([exchange])
+  cassette.encode(parsed) |> should.equal(text)
+}
+
+// Requests-only field redaction keeps a response's chunks and bytes as
+// stored, while the request's field is replaced.
+pub fn request_fields_only_keeps_response_chunks_test() {
+  let assert Ok(base) = request.to("http://offline.invalid/ask")
+  let exchange =
+    testing.exchange(
+      base
+        |> request.set_header("content-type", "application/json")
+        |> request.set_body(<<"{\"token\":\"t-1\"}":utf8>>),
+      testing.Respond(
+        response.Response(429, [#("content-type", "application/json")], [
+          <<"{\"error\":{":utf8>>,
+          <<"\"code\":429}}":utf8>>,
+        ]),
+        testing.Finished([]),
+      ),
+    )
+  let assert [kept] =
+    testing.exchanges(cassette.redact(
+      testing.script([exchange]),
+      redaction.default() |> redaction.request_fields_only,
+    ))
+  testing.request(kept).body
+  |> should.equal(<<"{\"token\":\"REDACTED\"}":utf8>>)
+  testing.reply(kept) |> should.equal(testing.reply(exchange))
+  // The default still replaces the field in the answer.
+  let assert [default] =
+    testing.exchanges(cassette.redact(
+      testing.script([exchange]),
+      redaction.default(),
+    ))
+  { testing.reply(default) == testing.reply(exchange) } |> should.be_false
 }

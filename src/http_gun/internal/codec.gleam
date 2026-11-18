@@ -33,13 +33,6 @@ pub type ParseError {
   UnsupportedVersion(Int)
 }
 
-/// Encode exchanges with `redaction` applied to every request and to
-/// response headers, bodies and trailers. A rewritten response body is
-/// stored as one chunk, as a recording stores it.
-pub fn encode(exchanges: List(script.Exchange), policy: Redaction) -> String {
-  render(list.map(exchanges, store(policy, _)))
-}
-
 /// Lay out exchanges already in their stored form, without redacting them.
 pub fn render(exchanges: List(script.Exchange)) -> String {
   let #(text, any) =
@@ -237,10 +230,16 @@ fn redact_reply(policy: Redaction, reply: script.Reply) -> script.Reply {
       script.Respond(
         status,
         redaction.headers(policy, headers),
-        case redaction.rewrites_body_for(policy, headers) {
+        case redaction.rewrites_response_body_for(policy, headers) {
           False -> chunks
           True ->
-            case redaction.body_for(policy, headers, bit_array.concat(chunks)) {
+            case
+              redaction.response_body_for(
+                policy,
+                headers,
+                bit_array.concat(chunks),
+              )
+            {
               <<>> -> []
               body -> [body]
             }

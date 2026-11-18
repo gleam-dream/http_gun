@@ -66,7 +66,8 @@ import gleam/string
 import gleam/uri
 
 /// What to remove from stored exchanges. The `default()` credentials are
-/// always removed; the functions below only add to the lists.
+/// always removed; the functions below only add to the lists, except
+/// `request_fields_only`, which stops replacing fields in response bodies.
 pub opaque type Redaction {
   Redaction(
     headers: List(String),
@@ -76,6 +77,8 @@ pub opaque type Redaction {
     /// Lowercased request header names to keep, once
     /// `keeping_request_headers` is called, even with no names.
     kept_request_headers: Option(List(String)),
+    /// Whether credential fields are replaced in response bodies too.
+    response_fields: Bool,
   )
 }
 
@@ -142,6 +145,7 @@ pub fn default() -> Redaction {
     body: None,
     request_body: None,
     kept_request_headers: None,
+    response_fields: True,
   )
 }
 
@@ -237,6 +241,44 @@ pub fn keeping_request_headers(
     None -> list.unique(["content-type", ..names])
   }
   Redaction(..redaction, kept_request_headers: Some(kept))
+}
+
+/// Replace credential fields in request bodies and the query only, and
+/// store response bodies as received apart from `with_body`: with no body
+/// function, a response body keeps its received chunks. Use it when a
+/// recorded answer must replay exactly, for example a JSON error body with a
+/// `code` field; you then own keeping secrets, such as an OAuth token answer,
+/// out of your cassettes. It is the one call that stores more, it cannot be
+/// undone, and calling it again changes nothing.
+pub fn request_fields_only(redaction: Redaction) -> Redaction {
+  Redaction(..redaction, response_fields: False)
+}
+
+/// Rewrite a response body as a recording stores it: credential fields, if
+/// this redaction replaces them in responses, then the body function.
+@internal
+pub fn response_body_for(
+  redaction: Redaction,
+  headers: List(#(String, String)),
+  bytes: BitArray,
+) -> BitArray {
+  case redaction.response_fields {
+    True -> body_for(redaction, headers, bytes)
+    False -> body(redaction, bytes)
+  }
+}
+
+/// Whether `response_body_for` can change a response body with these
+/// headers, so a recording holds it whole.
+@internal
+pub fn rewrites_response_body_for(
+  redaction: Redaction,
+  headers: List(#(String, String)),
+) -> Bool {
+  case redaction.response_fields {
+    True -> rewrites_body_for(redaction, headers)
+    False -> rewrites_bodies(redaction)
+  }
 }
 
 /// Remove the redacted headers from a header list. The request header
