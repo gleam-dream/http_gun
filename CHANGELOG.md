@@ -37,6 +37,12 @@
 
 ### Fixed
 
+- A request whose host, path or query held a space followed by a combining
+  mark passed admission, because the check matched whole characters as
+  displayed rather than code points; the space then reached the request
+  line. It is now refused as `InvalidRequest(InvalidTarget)` (or
+  `InvalidOrigin` for the host), like any other space.
+
 - `cassette.encode` removed credential headers from requests, responses and
   trailers but wrote the headers held inside a scripted failure (a `Reject`
   or an `Aborted` ending) as given, although its documentation says credential

@@ -110,6 +110,15 @@ pub fn descriptions_never_contain_request_values_test() {
       http_gun.send(live, base |> request.set_path("/secret path")),
       error.InvalidRequest(error.InvalidTarget),
     ),
+    // A combining mark after the space does not hide it.
+    #(
+      http_gun.send(live, base |> request.set_path("/secret \u{301}path")),
+      error.InvalidRequest(error.InvalidTarget),
+    ),
+    #(
+      http_gun.send(live, request.Request(..base, query: Some("a= \u{301}b"))),
+      error.InvalidRequest(error.InvalidTarget),
+    ),
     #(http_gun.send(live, base), error.ResolutionFailed),
     #(
       http_gun.send(public_only, base |> request.set_host("127.0.0.1")),
