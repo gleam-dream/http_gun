@@ -10,7 +10,9 @@ import gleam/list
 import gleam/option
 import gleam/string
 import gleeunit/should
+import http_gun
 import http_gun/cassette
+import http_gun/config
 import http_gun/error
 import http_gun/testing
 
@@ -316,4 +318,43 @@ pub fn target_fields_read_back_exactly_test() {
   let assert Ok(upgraded) = cassette.upgrade(schema_2, 10_000)
   let assert Ok(reloaded) = cassette.parse(upgraded, 10_000)
   testing.exchanges(reloaded) |> should.equal(testing.exchanges(original))
+}
+
+// Hand-built scripts keep the shapes matching accepts: an uppercase header
+// name encodes and parses back, and a method spelled Other("GET") matches
+// itself.
+pub fn hand_built_scripts_keep_their_shapes_test() {
+  let assert Ok(base) = request.to("http://offline.invalid/ask")
+  let sent =
+    base
+    |> request.set_method(http.Other("GET"))
+    |> request.set_body(<<>>)
+  let scripted = request.Request(..sent, headers: [#("Accept", "text/plain")])
+  let script =
+    testing.script([
+      testing.exchange(
+        scripted,
+        testing.Respond(
+          response.Response(200, [], [<<"ok":utf8>>]),
+          testing.Finished([]),
+        ),
+      ),
+    ])
+  let assert Ok(parsed) = cassette.parse(cassette.encode(script), 100_000)
+  let assert Ok(client) = testing.playback(script, config.default())
+  let assert Ok(reply) =
+    http_gun.send(client, request.set_header(sent, "accept", "text/plain"))
+  reply.response.body |> should.equal(<<"ok":utf8>>)
+  http_gun.stop(client)
+  let assert Ok(client) = testing.playback(parsed, config.default())
+  let assert Ok(_) =
+    http_gun.send(client, request.set_header(sent, "accept", "text/plain"))
+  http_gun.stop(client)
+
+  // A schema 2 target schema 3 cannot hold is refused by upgrade, not
+  // turned into text that does not parse.
+  let port_zero =
+    "{\"http_gun\":2,\"exchanges\":[{\"request\":{\"method\":\"GET\",\"url\":\"http://offline.invalid:0/\",\"headers\":[],\"body\":{\"text\":\"\"}},\"reply\":{\"kind\":\"reject\",\"failure\":{\"name\":\"client_closed\",\"evidence\":\"not_sent\"}}}]}"
+  cassette.parse(port_zero, 10_000) |> should.be_ok
+  cassette.upgrade(port_zero, 10_000) |> should.equal(Error(cassette.Corrupt))
 }

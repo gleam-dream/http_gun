@@ -1,9 +1,9 @@
 //// The rule a request must meet before it is sent: whole-byte body, a known
 //// method, a host and port, a path and query without whitespace, control
 //// bytes or a missing leading slash, and lowercase token header names with
-//// clean values. Admission applies it to live requests and the codec to a
-//// stored schema 3 request, so a cassette holds only requests a client could
-//// have sent.
+//// clean values. Admission applies `check` to live requests; the codec
+//// applies `check_target`, the host, port, path and query part, to a stored
+//// schema 3 request, so a cassette's targets are ones a client could send.
 
 import gleam/bit_array
 import gleam/http
@@ -34,21 +34,11 @@ pub fn origin(req: Request(a)) -> #(String, Int, Bool) {
 
 /// The first problem that stops `req` from being sent, if any.
 pub fn check(req: Request(BitArray)) -> Result(Nil, RequestProblem) {
-  let #(host, port, _) = origin(req)
   let method_ok =
     http.parse_method(http.method_to_string(req.method)) |> result.is_ok
   use <- guard(bit_array.bit_size(req.body) % 8 == 0, error.BodyNotBytes)
   use <- guard(method_ok, error.InvalidMethod)
-  use <- guard(
-    host != "" && port > 0 && port <= 65_535 && safe(host),
-    error.InvalidOrigin,
-  )
-  use <- guard(
-    safe(option.unwrap(req.query, ""))
-      && safe(req.path)
-      && string.starts_with(req.path, "/"),
-    error.InvalidTarget,
-  )
+  use Nil <- result.try(check_target(req))
   use <- guard(
     list.all(req.headers, fn(h) {
       h.0 == string.lowercase(h.0)
@@ -58,6 +48,22 @@ pub fn check(req: Request(BitArray)) -> Result(Nil, RequestProblem) {
       && !string.contains(h.1, "\u{0}")
     }),
     error.InvalidHeader,
+  )
+  Ok(Nil)
+}
+
+/// The host, port, path and query part of `check`.
+pub fn check_target(req: Request(a)) -> Result(Nil, RequestProblem) {
+  let #(host, port, _) = origin(req)
+  use <- guard(
+    host != "" && port > 0 && port <= 65_535 && safe(host),
+    error.InvalidOrigin,
+  )
+  use <- guard(
+    safe(option.unwrap(req.query, ""))
+      && safe(req.path)
+      && string.starts_with(req.path, "/"),
+    error.InvalidTarget,
   )
   Ok(Nil)
 }

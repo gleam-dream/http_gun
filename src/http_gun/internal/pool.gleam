@@ -7,7 +7,6 @@ import gleam/bit_array
 import gleam/dict.{type Dict}
 import gleam/erlang/process
 import gleam/erlang/reference
-import gleam/http
 import gleam/http/request
 import gleam/http/response
 import gleam/int
@@ -239,12 +238,6 @@ pub fn open(
   let req = case req.path {
     "" -> request.Request(..req, path: "/")
     _ -> req
-  }
-  // One spelling per method, so `Other("GET")` is recorded and matched as
-  // `Get`; the wire is the same either way.
-  let req = case http.parse_method(http.method_to_string(req.method)) {
-    Ok(method) -> request.Request(..req, method:)
-    Error(Nil) -> req
   }
   use origin <- result.try(validate_target(req))
   // Nothing was sent when the client is not registered or already dead; a

@@ -324,7 +324,7 @@ fn request_decoder(version: Int) -> decode.Decoder(request.Request(BitArray)) {
         "" -> request.Request(..req, path: "/")
         _ -> req
       }
-      case version, target_rule.check(sendable) {
+      case version, target_rule.check_target(sendable) {
         3, Error(_) -> decode.failure(failed, "HTTP request target")
         _, _ -> decode.success(req)
       }

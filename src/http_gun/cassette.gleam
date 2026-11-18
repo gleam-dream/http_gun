@@ -139,7 +139,7 @@ pub fn options() -> RecordOptions {
 /// The capture's byte budget, from the 42 bytes of envelope charged at
 /// start to 16 MiB. It is
 /// charged on every byte the file will hold, and also on a response body
-/// while it is held for redaction, so a recording within the budget loads
+/// held for redaction, whose bytes stay charged, so a recording within the budget loads
 /// with the same `max_bytes`. A session that needs more is split into several
 /// recordings.
 pub fn with_max_bytes(options: RecordOptions, bytes: Int) -> RecordOptions {
@@ -185,7 +185,8 @@ pub fn redact(
 /// over it yourself (without the recorder's atomic publication or file mode).
 /// A recorded schema 3 file is returned unchanged, and upgrading is
 /// idempotent. `max_bytes` bounds the input, as `parse` checks it, and the
-/// errors are those of `parse`; the output of a schema 2 input is larger, so
+/// errors are those of `parse`, and `Corrupt` for a schema 2 request whose
+/// target a client could not send; the output of a schema 2 input is larger, so
 /// load it with a higher limit. Fields the decoder ignores are not kept. A
 /// schema 2 file stored each request as one URL, which cannot carry every
 /// target: one that never loaded cannot be upgraded either, and one that
@@ -195,8 +196,14 @@ pub fn redact(
 /// redaction, which can rewrite an answer recorded before that redaction
 /// existed. To clean such a file on purpose, use `redact`.
 pub fn upgrade(text: String, max_bytes: Int) -> Result(String, CassetteError) {
-  parse(text, max_bytes)
-  |> result.map(fn(script) { codec.render(testing.exchanges(script)) })
+  use script <- result.try(parse(text, max_bytes))
+  let upgraded = codec.render(testing.exchanges(script))
+  // A schema 2 target schema 3 cannot hold, such as port 0, is refused here
+  // rather than written as text that does not parse.
+  case codec.parse(upgraded) {
+    Ok(_) -> Ok(upgraded)
+    Error(_) -> Error(Corrupt)
+  }
 }
 
 /// Parse a cassette of at most `max_bytes`.

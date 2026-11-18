@@ -2,6 +2,7 @@
 //// definition of how a playback request matches an expected one.
 
 import gleam/bit_array
+import gleam/http
 import gleam/http/request.{type Request}
 import gleam/list
 import gleam/option.{type Option, None, Some}
@@ -51,6 +52,11 @@ pub fn key(
   let req = redaction.request(policy, req)
   request.Request(
     ..req,
+    // One spelling per method: `Other("GET")` is `Get`.
+    method: case http.parse_method(http.method_to_string(req.method)) {
+      Ok(method) -> method
+      Error(Nil) -> req.method
+    },
     host: string.lowercase(req.host),
     path: case req.path {
       "" -> "/"
