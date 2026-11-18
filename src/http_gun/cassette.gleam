@@ -19,9 +19,9 @@
 //// lines: a body or chunk that is valid UTF-8 containing a newline is stored
 //// as `{"lines": [..]}`, one string per line, other UTF-8 as
 //// `{"text": ..}`, and anything else as `{"base64": ..}`. Every body reads
-//// back byte for byte. Schema 2 files still load; `parse` then `encode`
-//// converts them. A file of another version fails with
-//// `UnsupportedVersion`.
+//// back byte for byte. A file of another version fails with
+//// `UnsupportedVersion`; `describe_error` says how to convert a schema 2
+//// file written by HTTP Gun 0.1.x.
 ////
 //// What a cassette stores follows the configuration's redaction
 //// (`config.with_redaction`). By default credential headers are removed, and
@@ -89,6 +89,8 @@ pub type CassetteError {
   Io(operation: FileOperation, cause: FileCause)
   /// Not UTF-8 JSON in the cassette schema.
   Corrupt
+  /// A schema this version does not read. Schema 2, written by HTTP Gun
+  /// 0.1.x, is converted on an earlier commit; `describe_error` says how.
   UnsupportedVersion(version: Int)
   TooLarge(limit: Int, observed: Int)
 }
@@ -305,6 +307,12 @@ pub fn describe_error(problem: CassetteError) -> String {
     Missing -> "cassette missing"
     Io(operation, cause) -> describe_io(operation, cause)
     Corrupt -> "cassette corrupt"
+    // Schema 2 is what HTTP Gun 0.1.x wrote. The CHANGELOG names the commit
+    // that converts it, so this text stays true after later releases.
+    UnsupportedVersion(2) ->
+      "cassette schema 2, written by HTTP Gun 0.1.x, is no longer read: "
+      <> "convert it to schema 3 with cassette.parse then cassette.encode on the "
+      <> "HTTP Gun commit named under \"Upgrading cassettes\" in the CHANGELOG"
     UnsupportedVersion(version) ->
       "cassette version " <> int.to_string(version) <> " unsupported"
     TooLarge(limit, observed) ->

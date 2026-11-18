@@ -188,12 +188,11 @@ flowchart LR
   crash durability is not promised.
 - Cassettes use schema 3: laid out over many lines, with a text body containing a
   newline stored as its lines, so a re-recorded answer diffs line by line and
-  reads back byte for byte. Schema 2 files still load; convert them with
-  `cassette.parse` then `cassette.encode`, which applies no redaction, so no
-  recorded answer changes; parse the result before writing it over the old
-  file. Files are larger than in schema 2
-  (about a quarter for a streamed answer), so raise `max_bytes` on `load`
-  where it was tight.
+  reads back byte for byte. Cassettes written by HTTP Gun 0.1.x (schema 2)
+  are no longer read; convert them on the commit the
+  [changelog](CHANGELOG.md#upgrading-cassettes) names before upgrading.
+  Files are larger than in schema 2 (about a quarter for a streamed answer),
+  so raise `max_bytes` on `load` where it was tight.
 - Sinal events are best effort. Without a forwarder route, handlers run inside
   client processes and a slow handler can delay requests.
 - Streamed uploads, redirect following, decompression, proxies, cookie/cache

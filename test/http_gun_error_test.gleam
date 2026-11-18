@@ -548,7 +548,7 @@ pub fn obsolete_fixture_errors_are_rejected_test() {
     "{\"http_gun\":1,\"exchanges\":[{\"request\":{\"url\":\"http://localhost/\",\"method\":\"GET\",\"headers\":[],\"body\":{\"bytes\":0,\"base64\":\"\"}},\"reply\":{\"kind\":\"reject\",\"failure\":{\"reason\":\"limit\",\"detail\":\"collection\",\"count\":2,\"evidence\":\"may_have_been_sent\"}}}]}"
   cassette.parse(text, 10_000)
   |> should.equal(Error(cassette.UnsupportedVersion(1)))
-  // A schema 2 file carrying the obsolete failure shape is corrupt.
+  // A file carrying an obsolete failure shape is corrupt.
   let req = request.new() |> request.set_body(<<>>)
   let failure = error.new(error.ClientClosed, error.NotSent)
   let encoded =

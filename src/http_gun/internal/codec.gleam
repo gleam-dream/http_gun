@@ -1,8 +1,8 @@
-//// The cassette schema: version 3 is written, versions 2 and 3 are read.
+//// The cassette schema: version 3 is written and read.
 //// Dynamic decoding is confined to this boundary.
 ////
 //// A chunk or body is `{"lines": [..]}` when it is valid UTF-8 containing a
-//// newline (version 3 only), `{"text": ..}` when it is other valid UTF-8 and
+//// newline, `{"text": ..}` when it is other valid UTF-8 and
 //// `{"base64": ..}` otherwise. Failures use `error.to_json`, on one line.
 ////
 //// The layout is owned here as fragments: `render` concatenates them, and
@@ -264,12 +264,9 @@ pub fn parse(text: String) -> Result(List(script.Exchange), ParseError) {
     json.parse(text, version_decoder) |> result.replace_error(Corrupt),
   )
   case found {
-    2 | 3 -> {
+    3 -> {
       let decoder = {
-        use values <- decode.field(
-          "exchanges",
-          decode.list(exchange_decoder(found)),
-        )
+        use values <- decode.field("exchanges", decode.list(exchange_decoder()))
         decode.success(values)
       }
       json.parse(text, decoder) |> result.replace_error(Corrupt)
@@ -278,54 +275,49 @@ pub fn parse(text: String) -> Result(List(script.Exchange), ParseError) {
   }
 }
 
-fn exchange_decoder(version: Int) -> decode.Decoder(script.Exchange) {
-  use req <- decode.field("request", request_decoder(version))
-  use reply <- decode.field("reply", reply_decoder(version))
+fn exchange_decoder() -> decode.Decoder(script.Exchange) {
+  use req <- decode.field("request", request_decoder())
+  use reply <- decode.field("reply", reply_decoder())
   decode.success(script.Exchange(req, reply))
 }
 
-fn request_decoder(version: Int) -> decode.Decoder(request.Request(BitArray)) {
+fn request_decoder() -> decode.Decoder(request.Request(BitArray)) {
   let failed = request.set_body(request.new(), <<>>)
   use method <- decode.field("method", decode.string)
   use headers <- decode.field("headers", headers_decoder())
-  use body <- decode.field("body", bytes_decoder(version))
-  use target <- decode.then(case version {
-    // Version 3 stores the target in fields, read back as stored.
-    3 -> {
-      use scheme <- decode.field("scheme", decode.string)
-      use host <- decode.field("host", decode.string)
-      use port <- decode.field("port", decode.optional(decode.int))
-      use path <- decode.field("path", decode.string)
-      use query <- decode.field("query", decode.optional(decode.string))
-      case http.scheme_from_string(scheme) {
-        Ok(scheme) ->
-          decode.success(
-            request.Request(..failed, scheme:, host:, port:, path:, query:),
-          )
-        Error(Nil) -> decode.failure(failed, "HTTP scheme")
-      }
-    }
-    // Version 2 stores one URL.
-    _ -> {
-      use url <- decode.field("url", decode.string)
-      case request.to(url) {
-        Ok(req) -> decode.success(request.set_body(req, <<>>))
-        Error(Nil) -> decode.failure(failed, "HTTP URL")
-      }
-    }
+  use body <- decode.field("body", bytes_decoder())
+  // The target is stored in fields, read back as stored.
+  use scheme <- decode.field("scheme", decode.string)
+  use host <- decode.field("host", decode.string)
+  use port <- decode.field("port", decode.optional(decode.int))
+  use path <- decode.field("path", decode.string)
+  use query <- decode.field("query", decode.optional(decode.string))
+  use scheme <- decode.then(case http.scheme_from_string(scheme) {
+    Ok(scheme) -> decode.success(scheme)
+    Error(Nil) -> decode.failure(http.Http, "HTTP scheme")
   })
   case http.parse_method(method) {
     Ok(method) -> {
-      let req = request.Request(..target, method:, headers:, body:)
-      // A stored schema 3 target must be one a client could have sent;
-      // admission sends an empty path as `/`.
+      let req =
+        request.Request(
+          method:,
+          headers:,
+          body:,
+          scheme:,
+          host:,
+          port:,
+          path:,
+          query:,
+        )
+      // A stored target must be one a client could have sent; admission
+      // sends an empty path as `/`.
       let sendable = case req.path {
         "" -> request.Request(..req, path: "/")
         _ -> req
       }
-      case version, target_rule.check_target(sendable) {
-        3, Error(_) -> decode.failure(failed, "HTTP request target")
-        _, _ -> decode.success(req)
+      case target_rule.check_target(sendable) {
+        Ok(Nil) -> decode.success(req)
+        Error(_) -> decode.failure(failed, "HTTP request target")
       }
     }
     Error(Nil) -> decode.failure(failed, "HTTP method")
@@ -343,8 +335,8 @@ fn headers_decoder() -> decode.Decoder(List(#(String, String))) {
   decode.list(pair)
 }
 
-// The first of text, base64 and (version 3) lines that decodes.
-fn bytes_decoder(version: Int) -> decode.Decoder(BitArray) {
+// The first of text, base64 and lines that decodes.
+fn bytes_decoder() -> decode.Decoder(BitArray) {
   let base64 = {
     use encoded <- decode.field("base64", decode.string)
     case bit_array.base64_decode(encoded) {
@@ -365,14 +357,11 @@ fn bytes_decoder(version: Int) -> decode.Decoder(BitArray) {
       use text <- decode.field("text", decode.string)
       decode.success(bit_array.from_string(text))
     },
-    case version {
-      3 -> [base64, lines]
-      _ -> [base64]
-    },
+    [base64, lines],
   )
 }
 
-fn reply_decoder(version: Int) -> decode.Decoder(script.Reply) {
+fn reply_decoder() -> decode.Decoder(script.Reply) {
   let corrupt = script.Reject(error.new(error.ClientClosed, error.NotSent))
   use kind <- decode.field("kind", decode.string)
   case kind {
@@ -383,7 +372,7 @@ fn reply_decoder(version: Int) -> decode.Decoder(script.Reply) {
     "response" -> {
       use status <- decode.field("status", decode.int)
       use headers <- decode.field("headers", headers_decoder())
-      use chunks <- decode.field("chunks", decode.list(bytes_decoder(version)))
+      use chunks <- decode.field("chunks", decode.list(bytes_decoder()))
       use ending <- decode.field("ending", ending_decoder())
       case status >= 200 && status <= 599 {
         True -> decode.success(script.Respond(status, headers, chunks, ending))

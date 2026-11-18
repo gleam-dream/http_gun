@@ -193,9 +193,9 @@ pub fn corrupt_and_too_large_cassettes_are_rejected_test() {
     "",
     "[]",
     "{}",
-    "{\"http_gun\":\"2\",\"exchanges\":[]}",
-    "{\"http_gun\":2}",
-    "{\"http_gun\":2,\"exchanges\":{}}",
+    "{\"http_gun\":\"3\",\"exchanges\":[]}",
+    "{\"http_gun\":3}",
+    "{\"http_gun\":3,\"exchanges\":{}}",
     // A chunk that is neither text nor base64.
     string.replace(valid, "{\"text\": \"ok\"}", "{\"hex\": \"6f6b\"}"),
     // Invalid base64.

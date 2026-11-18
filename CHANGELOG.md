@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+> [!WARNING]
+> This release does not read the cassettes HTTP Gun 0.1.0 and 0.1.1 wrote
+> (schema 2): loading one fails with `UnsupportedVersion(2)`. Convert every
+> cassette on commit `0974868` before moving to this release, as
+> [Upgrading cassettes](#upgrading-cassettes) describes. `cassette.encode`
+> also no longer removes credentials; see [Security](#security).
+
 ### Added
 
 - `testing.verify(client) -> Result(testing.Verdict, testing.VerifyError)`
@@ -52,8 +59,9 @@
 
 ### Changed
 
-- Cassettes are written in schema 3 (`"http_gun": 3`), and schema 2 files
-  still load. Schema 3 lays a cassette out over many lines, each header
+- Cassettes are written and read in schema 3 (`"http_gun": 3`); schema 2
+  files are no longer read, and `cassette.describe_error` of
+  `UnsupportedVersion(2)` says how to convert one. Schema 3 lays a cassette out over many lines, each header
   pair, chunk and body line on a line of its own, and stores a UTF-8 body or
   chunk that contains a newline as `{"lines": [...]}`, the strings between
   its newlines, rebuilt exactly by joining them. Every body reads back byte
@@ -66,11 +74,18 @@
 
 ### Upgrading cassettes
 
-- Convert each schema 2 file with `cassette.parse(text, max_bytes)` then
-  `cassette.encode`: read the file, convert the text, parse the result to
-  check it, then write it back. No credentials, no network. `encode` applies
-  no redaction, so no recorded answer changes. To clean a file recorded
-  before field redaction existed, apply `cassette.redact` on purpose.
+- This release reads schema 3 only. Commit
+  `0974868199378dd774e5979bff8f503cf645fd4c` is the last that reads schema
+  2, and it writes the same schema 3 as this release. Convert on it, then
+  move on:
+  1. Depend on that commit:
+     `http_gun = { git = "https://github.com/gleam-dream/http_gun", ref = "0974868199378dd774e5979bff8f503cf645fd4c" }`.
+  2. For each cassette, read the file, apply `cassette.parse(text, max_bytes)`
+     then `cassette.encode`, parse the result to check it, and write it back.
+     No credentials, no network. `encode` applies no redaction, so no
+     recorded answer changes. To clean a file recorded before field
+     redaction existed, apply `cassette.redact` on purpose.
+  3. Commit the converted files, then depend on this release.
 - Schema 3 stores a request's scheme, host, port, path and query as
   separate fields, so every request a client accepts reads back exactly:
   a query with brackets, braces, a pipe or quotes, a non-ASCII path, an IPv6
@@ -92,15 +107,15 @@
   could not send (an empty host, port 0, a path without a leading `/`) writes
   a file `parse` refuses as `Corrupt`; schema 2 loaded such files. An older
   HTTP Gun reading a schema 3 file fails with
-  `UnsupportedVersion(3)`; code comparing `cassette.encode` output with a
+  `UnsupportedVersion(3)`, and this release reading a schema 2 file fails
+  with `UnsupportedVersion(2)`; code comparing `cassette.encode` output with a
   stored string sees the new layout; a `load` limit set close to a file's
   schema 2 size can fail with `TooLarge` (a streamed answer grows by about a
   quarter); `cassette.record` with a budget below 42 bytes now fails at once
   with `CaptureLimit` instead of at the first request; and a recording that
   fit its budget under schema 2 can now exceed it, since the same exchanges
-  store more bytes and every stored byte is charged. Convert in one commit,
-  after moving to this version, so no re-record mixes a format change with a
-  content change.
+  store more bytes and every stored byte is charged. Convert in one commit
+  of your own, so no re-record mixes a format change with a content change.
 
 ### Fixed
 

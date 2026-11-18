@@ -62,9 +62,6 @@
       pending-entry(title: "Resolve recording cleanup promise strength", kind: "ruling", since: "2026-10-06", adr: 10)[
         Abort and failure attempt staging removal. The implementation ignores removal failures and can return while a blocked writer's cleaner waits. The public contract is either best-effort cleanup or typed cleanup completion; the owner has not ruled.
       ],
-      pending-entry(title: "Retire the schema 2 reader", kind: "build", since: "2026-11-18", adr: 19)[
-        Accepted: once LLM Wire's and Fabric's cassettes are converted to schema 3, the decoder stops reading marker 2, in the same release as schema 3. The release waits on both repositories' converted files. With the reader go the statements that runtime playback reads schema 2, the schema 2 behavior, the use of `dev/convert_cassette.py`'s output as schema 2 input, and the schema 2 conversion notes in the README, the changelog and the `cassette` module documentation. How users of 0.1.x outside these packages convert is the owner's open question.
-      ],
       pending-entry(title: "Decide the release version for the record and replay additions", kind: "ruling", since: "2026-11-18", adr: 18)[
         The verify call, the masking additions, the verdict's dropped count and schema 3 are unreleased; schema 3 breaks older readers of new files, anyone comparing `cassette.encode` output to a stored string, recordings with a budget below the envelope, and recordings near their budget. `cassette.encode` stops removing credentials from hand-built scripts, and retiring the schema 2 reader makes every 0.1.x cassette unreadable until converted. The owner decides the version at release.
       ],
@@ -554,7 +551,7 @@
         [A body object decodes as the first of text, then base64, then (under marker 3 only) lines that decodes; other fields are ignored, and an object for which none decodes is Corrupt, so a lines-only body under marker 2 is Corrupt. Lines decode only as an array of at least two strings. Invalid required fields, methods/URLs, header-pair shapes or final status are Corrupt too.],
         [Parse does not perform the playback script-data budget check until playback startup.],
         [The codec owns one text layout and every piece of it: laid out over many lines, indented by nesting, a header pair, a chunk or a body line on a line of its own, and a final newline; a body or chunk object, an ending and a reject open on their field's line, and a stored failure stays on one line. Separators lead the element they precede and a closing bracket depends only on whether the array held an element, so a streamed writer needs no lookahead. The recorder writes only fragments the codec makes, so its file has the codec's layout; how the recorder charges them is in Reservation order and acknowledged writer. A caller loading files in this layout sets `max_bytes` for their stored size, which the layout makes larger than schema 2. #adr(19)],
-        [`cassette.encode` lays a script out and nothing else: it applies no redaction, so `encode(parse(text))` of a recorded schema 3 file is byte-identical to it, and a schema 2 file converts to schema 3 by parsing and encoding it, with every body kept. Keeping credentials out of a file belongs to recording and to `cassette.redact`. A schema 2 file whose URL does not parse cannot be converted; one whose URL loads as a different request converts as that request; one holding a target a client could not send, such as port 0, encodes to text `parse` refuses, so a caller converting in place parses the result before writing it over the source. This relies on the method and a stored failure each writing back the text they were read from. The caller reads the file and writes the result, without the recorder's atomic publication or file mode. #adr(19)],
+        [`cassette.encode` lays a script out and nothing else: it applies no redaction, so `encode(parse(text))` of a recorded schema 3 file is byte-identical to it, and a hand-built script whose target a client could not send encodes to text `parse` refuses. Keeping credentials out of a file belongs to recording and to `cassette.redact`. This relies on the method and a stored failure each writing back the text they were read from. Schema 2, which HTTP Gun 0.1.x wrote, is not read: its files are converted by parsing and encoding them on the last commit that read both schemas, which the changelog names, and the refusal's description points there rather than carrying the commit itself. #adr(19)],
         [One codec step owns the stored form of an exchange under a redaction: the request through the request redaction, response headers, trailers and the headers a stored failure holds filtered, a rewritten response body held as one chunk. `cassette.redact` exposes it; encoding does not apply it.],
         [`cassette.redact` maps a script to a script, keeping its matching settings. Comparing the result with the stored exchanges shows what a policy that contains the old one would still change; `cassette.encode` of the result gives the cleaned text of an old cassette without a live run. The consumer writes that text itself, without the recorder's atomic publication or file mode, and cleaning a file does not withdraw a secret already published in it or its history.],
         [`parse(text, max_bytes)` checks encoded string size before JSON decoding. `load(path, max_bytes)` uses raw reads of at most max_bytes plus one without read-ahead. A negative file limit clamps to zero. Empty/non-UTF-8/malformed data is corrupt; missing and I/O failures remain typed.],
@@ -569,10 +566,10 @@
         #when[it is parsed and encoded again]
         #then[the text is byte-identical to the published file]
       ]
-      #behavior(title: "A schema 2 cassette keeps loading and converts exactly", level: "boundary", area: "Cassette schema")[
-        #given[a cassette with marker 2]
-        #when[it is loaded, or parsed, encoded and loaded again]
-        #then[it plays back the same exchanges, byte for byte, either way]
+      #behavior(title: "A schema 2 cassette is refused with conversion guidance", level: "interface", area: "Cassette schema")[
+        #given[a cassette with marker 2, as the 0.1 releases wrote it]
+        #when[it is loaded or parsed]
+        #then[it is refused as an unsupported version, and the error's description names the schema, the releases that wrote it, the conversion step and where the conversion commit is recorded]
       ]
     ])
     #subsection(title: "Secret ownership and whole-body rewriting", [
@@ -762,7 +759,7 @@
         [`dev/check_downstream.py` explicitly selects current LLM Wire source and builds isolated copies of its local dependency closure. Credential names are excluded before reading or copying source, and no command runs in a sibling checkout. Output contains HTTP observations rather than a custom provenance receipt. This opt-in integration check stays outside ordinary validation.],
         [Local Erlang HTTP, H2 and TLS servers use the test certificates; `dev/ip-fixture` generates the IP-SAN case. `dev/nghttpd.py` drives the development nghttpd package for real peer-capacity and trailer checks and owns no provider semantics. A native connection-refusal regression waits for Gun to exit before installing a second monitor, so the monitor reports `noproc` while the preceding terminal event retains ConnectionRefused.],
         [`build/evidence` holds current runtime output. `docs/evidence` preserves the raw source, hash and measurement data that `docs/ORACLE.md` and `docs/BENCHMARKS.md` cite; those paths carry no design contract. `NOTICE`, dependency licenses and fixture attribution remain authoritative for source reuse.],
-        [`dev/convert_cassette.py` is an explicit offline schema-1-to-2 conversion tool; parsing and encoding its output gives schema 3. Runtime playback reads schemas 2 and 3 and never migrates or rerecords.],
+        [`dev/convert_cassette.py` is an explicit offline schema-1-to-2 conversion tool; its output reaches schema 3 by parsing and encoding it on the conversion commit the changelog names. Runtime playback reads schema 3 only and never migrates or rerecords.],
       )
     ])
     #subsection(title: "Comparison and benchmark method", [

@@ -1,5 +1,5 @@
-//// Cassette schema 3: byte-exact bodies, the shared layout, reading
-//// schema 2, and upgrading.
+//// Cassette schema 3: byte-exact bodies, the shared layout, and refusing
+//// schema 2 with conversion guidance.
 
 import gleam/bit_array
 import gleam/http
@@ -93,36 +93,22 @@ pub fn generated_bodies_read_back_byte_for_byte_test() {
   |> should.equal(generated)
 }
 
-pub fn schema_2_cassettes_keep_loading_test() {
+// A schema 2 file, written by HTTP Gun 0.1.x, is refused, and its
+// description says what the file is and how to convert it.
+pub fn schema_2_cassettes_are_refused_with_conversion_guidance_test() {
   let schema_2 =
-    "{\"http_gun\":2,\"exchanges\":[{\"request\":{\"method\":\"GET\",\"url\":\"http://offline.invalid/ask\",\"headers\":[],\"body\":{\"text\":\"a\\nb\"}},\"reply\":{\"kind\":\"response\",\"status\":200,\"headers\":[],\"chunks\":[{\"base64\":\"AP8=\"}],\"ending\":{\"kind\":\"finished\",\"trailers\":[]}}}]}"
-  let assert Ok(loaded) = cassette.parse(schema_2, 10_000)
-  let assert [exchange] = testing.exchanges(loaded)
-  testing.request(exchange).body |> should.equal(<<"a\nb":utf8>>)
-  let assert testing.Respond(reply, _) = testing.reply(exchange)
-  reply.body |> should.equal([<<0, 255>>])
-
-  // Upgrading turns text with newlines into lines, every byte kept.
-  let with_newlines =
-    string.replace(
-      schema_2,
-      "{\"base64\":\"AP8=\"}",
-      "{\"text\":\"crlf\\r\\nends\\r\\n\"},{\"text\":\"trailing\\n\"},{\"text\":\"\\n\"}",
-    )
-  let assert Ok(original) = cassette.parse(with_newlines, 10_000)
-  let assert Ok(converted) = convert(with_newlines, 10_000)
-  string.contains(converted, "{\"lines\": [") |> should.be_true
-  let assert Ok(reloaded) = cassette.parse(converted, 10_000)
-  testing.exchanges(reloaded) |> should.equal(testing.exchanges(original))
-  let assert [converted_exchange] = testing.exchanges(reloaded)
-  let assert testing.Respond(converted_reply, _) =
-    testing.reply(converted_exchange)
-  converted_reply.body
-  |> should.equal([
-    <<"crlf\r\nends\r\n":utf8>>,
-    <<"trailing\n":utf8>>,
-    <<"\n":utf8>>,
-  ])
+    "{\"http_gun\":2,\"exchanges\":[{\"request\":{\"method\":\"GET\",\"url\":\"http://offline.invalid/ask\",\"headers\":[],\"body\":{\"text\":\"a\"}},\"reply\":{\"kind\":\"reject\",\"failure\":{\"name\":\"client_closed\",\"evidence\":\"not_sent\"}}}]}"
+  let refused = cassette.parse(schema_2, 10_000)
+  refused |> should.equal(Error(cassette.UnsupportedVersion(2)))
+  let assert Error(problem) = refused
+  cassette.describe_error(problem)
+  |> should.equal(
+    "cassette schema 2, written by HTTP Gun 0.1.x, is no longer read: "
+    <> "convert it to schema 3 with cassette.parse then cassette.encode on the "
+    <> "HTTP Gun commit named under \"Upgrading cassettes\" in the CHANGELOG",
+  )
+  cassette.describe_error(cassette.UnsupportedVersion(4))
+  |> should.equal("cassette version 4 unsupported")
 }
 
 pub fn lines_bodies_are_checked_test() {
@@ -130,18 +116,12 @@ pub fn lines_bodies_are_checked_test() {
     "{\"http_gun\":"
     <> marker
     <> ",\"exchanges\":[{\"request\":{\"method\":\"GET\","
-    <> case marker {
-      "2" -> "\"url\":\"http://offline.invalid/\","
-      _ ->
-        "\"scheme\":\"http\",\"host\":\"offline.invalid\",\"port\":null,\"path\":\"/\",\"query\":null,"
-    }
+    <> "\"scheme\":\"http\",\"host\":\"offline.invalid\",\"port\":null,\"path\":\"/\",\"query\":null,"
     <> "\"headers\":[],\"body\":"
     <> value
     <> "},\"reply\":{\"kind\":\"reject\",\"failure\":{\"name\":\"client_closed\",\"evidence\":\"not_sent\"}}}]}"
   }
-  // Lines are a schema 3 kind, and need at least two strings.
-  cassette.parse(body("2", "{\"lines\":[\"a\",\"b\"]}"), 10_000)
-  |> should.equal(Error(cassette.Corrupt))
+  // Lines need at least two strings.
   cassette.parse(body("3", "{\"lines\":[\"a\"]}"), 10_000)
   |> should.equal(Error(cassette.Corrupt))
   cassette.parse(body("3", "{\"lines\":[]}"), 10_000)
@@ -155,7 +135,7 @@ pub fn lines_bodies_are_checked_test() {
     cassette.parse(body("3", "{\"text\":5,\"lines\":[\"x\",\"y\"]}"), 10_000)
   let assert [exchange] = testing.exchanges(loaded)
   testing.request(exchange).body |> should.equal(<<"x\ny":utf8>>)
-  // A marker 3 target is read from its fields, which must hold a target
+  // A target is read from its fields, which must hold a target
   // admission would accept.
   let valid = body("3", "{\"text\":\"\"}")
   cassette.parse(valid, 10_000) |> should.be_ok
@@ -269,22 +249,21 @@ pub fn encoding_writes_the_schema_3_layout_test() {
   |> should.equal("{\n  \"http_gun\": 3,\n  \"exchanges\": []\n}\n")
 }
 
-pub fn conversion_keeps_bodies_recorded_before_field_redaction_test() {
-  // A schema 2 file recorded before field redaction: a JSON answer with a
-  // credential-named field, split over two chunks, and a truncated JSON
-  // answer. Parsing then encoding keeps every byte.
-  let schema_2 =
-    "{\"http_gun\":2,\"exchanges\":[{\"request\":{\"method\":\"GET\",\"url\":\"http://offline.invalid/ask\",\"headers\":[],\"body\":{\"text\":\"\"}},\"reply\":{\"kind\":\"response\",\"status\":200,\"headers\":[[\"content-type\",\"application/json\"]],\"chunks\":[{\"text\":\"{\\\"token\\\":\"},{\"text\":\"\\\"t-1\\\"}\"}],\"ending\":{\"kind\":\"finished\",\"trailers\":[]}}},{\"request\":{\"method\":\"GET\",\"url\":\"http://offline.invalid/ask\",\"headers\":[],\"body\":{\"text\":\"\"}},\"reply\":{\"kind\":\"response\",\"status\":200,\"headers\":[[\"content-type\",\"application/json\"]],\"chunks\":[{\"text\":\"{\\\"partial\\\":\"}],\"ending\":{\"kind\":\"abandoned\"}}}]}"
-  let assert Ok(original) = cassette.parse(schema_2, 100_000)
-  let assert Ok(converted) = convert(schema_2, 100_000)
-  string.contains(converted, "\"http_gun\": 3") |> should.be_true
-  let assert Ok(reloaded) = cassette.parse(converted, 100_000)
-  testing.exchanges(reloaded) |> should.equal(testing.exchanges(original))
-
-  // Converting is idempotent, and fails as parsing fails.
-  convert(converted, 100_000) |> should.equal(Ok(converted))
-  convert(schema_2, 10)
-  |> should.equal(Error(cassette.TooLarge(10, string.byte_size(schema_2))))
+// Converting a schema 3 file, as a consumer did from schema 2, is
+// idempotent, and fails as parsing fails.
+pub fn conversion_is_idempotent_test() {
+  let text =
+    cassette.encode(
+      testing.script([
+        exchange_with(<<"{\"token\":\"t-1\"}":utf8>>, [
+          <<"{\"token\":":utf8>>,
+          <<"\"t-1\"}\n":utf8>>,
+        ]),
+      ]),
+    )
+  convert(text, 100_000) |> should.equal(Ok(text))
+  convert(text, 10)
+  |> should.equal(Error(cassette.TooLarge(10, string.byte_size(text))))
   convert("not JSON", 100) |> should.equal(Error(cassette.Corrupt))
 }
 
@@ -315,15 +294,6 @@ pub fn target_fields_read_back_exactly_test() {
   let assert Ok(loaded) = cassette.parse(text, 100_000)
   testing.exchanges(loaded) |> should.equal(exchanges)
   convert(text, 100_000) |> should.equal(Ok(text))
-
-  // Schema 2 URLs with a port, a query and https convert to the request
-  // they loaded as.
-  let schema_2 =
-    "{\"http_gun\":2,\"exchanges\":[{\"request\":{\"method\":\"POST\",\"url\":\"https://API.example.test:8443/v1/x?key=REDACTED&q=%20a\",\"headers\":[],\"body\":{\"text\":\"\"}},\"reply\":{\"kind\":\"reject\",\"failure\":{\"name\":\"client_closed\",\"evidence\":\"not_sent\"}}}]}"
-  let assert Ok(original) = cassette.parse(schema_2, 10_000)
-  let assert Ok(converted) = convert(schema_2, 10_000)
-  let assert Ok(reloaded) = cassette.parse(converted, 10_000)
-  testing.exchanges(reloaded) |> should.equal(testing.exchanges(original))
 }
 
 // Hand-built scripts keep the shapes matching accepts: an uppercase header
@@ -356,14 +326,6 @@ pub fn hand_built_scripts_keep_their_shapes_test() {
   let assert Ok(_) =
     http_gun.send(client, request.set_header(sent, "accept", "text/plain"))
   http_gun.stop(client)
-
-  // A schema 2 target schema 3 cannot hold converts to text that parse
-  // refuses.
-  let port_zero =
-    "{\"http_gun\":2,\"exchanges\":[{\"request\":{\"method\":\"GET\",\"url\":\"http://offline.invalid:0/\",\"headers\":[],\"body\":{\"text\":\"\"}},\"reply\":{\"kind\":\"reject\",\"failure\":{\"name\":\"client_closed\",\"evidence\":\"not_sent\"}}}]}"
-  cassette.parse(port_zero, 10_000) |> should.be_ok
-  let assert Ok(converted) = convert(port_zero, 10_000)
-  cassette.parse(converted, 10_000) |> should.equal(Error(cassette.Corrupt))
 }
 
 // A hand-built target a client could not send is encoded, and the file is
