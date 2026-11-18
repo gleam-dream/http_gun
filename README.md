@@ -186,7 +186,7 @@ flowchart LR
   redaction for application secrets and inspect fixtures before sharing them.
   Cassette files are created with mode `0600`. Publication is atomic, but
   crash durability is not promised.
-- Cassettes use schema 3: one field per line, and a text body containing a
+- Cassettes use schema 3: laid out over many lines, with a text body containing a
   newline stored as its lines, so a re-recorded answer diffs line by line and
   reads back byte for byte. Schema 2 files still load; convert them with
   `cassette.upgrade`, not with `parse` then `encode`, which would apply the

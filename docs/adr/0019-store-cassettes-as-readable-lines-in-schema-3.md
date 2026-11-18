@@ -17,8 +17,9 @@ Status: Accepted
 - The codec owns one text layout and every fragment of it, separators and
   closing brackets included:
   one field per line, indented by nesting, each header pair, chunk and body
-  line on a line of its own, a stored failure on one line, and a final
-  newline. Separators lead elements and a closing bracket depends only on
+  line on a line of its own, and a final newline; body, chunk, ending
+  and reject objects open on their field's line, and a stored failure stays
+  on one line. Separators lead elements and a closing bracket depends only on
   whether the array held an element, so the recorder streams fragments with
   no lookahead. The recorder writes only codec fragments, and the budget is
   charged on every byte the file holds.

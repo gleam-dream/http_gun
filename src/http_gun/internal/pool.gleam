@@ -395,8 +395,9 @@ fn validate_size(
   }
 }
 
+// A target never carries whitespace, control bytes or a fragment.
 fn safe_target(value: String) -> Bool {
-  !list.any([" ", "\r", "\n", "\t", "\u{0}"], fn(char) {
+  !list.any([" ", "\r", "\n", "\t", "\u{0}", "#"], fn(char) {
     string.contains(value, char)
   })
 }

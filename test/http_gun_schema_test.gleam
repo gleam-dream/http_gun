@@ -78,17 +78,6 @@ pub fn generated_bodies_read_back_byte_for_byte_test() {
   |> should.equal(generated)
 }
 
-pub fn text_with_newlines_is_stored_as_lines_under_marker_3_test() {
-  let text =
-    cassette.encode(
-      testing.script([exchange_with(<<"first\nsecond\n":utf8>>, [])]),
-    )
-  string.contains(text, "\"http_gun\": 3") |> should.be_true
-  string.contains(text, "\"lines\"") |> should.be_true
-  string.contains(text, "\"first\",") |> should.be_true
-  string.contains(text, "first\\nsecond") |> should.be_false
-}
-
 pub fn schema_2_cassettes_keep_loading_test() {
   let schema_2 =
     "{\"http_gun\":2,\"exchanges\":[{\"request\":{\"method\":\"GET\",\"url\":\"http://offline.invalid/ask\",\"headers\":[],\"body\":{\"text\":\"a\\nb\"}},\"reply\":{\"kind\":\"response\",\"status\":200,\"headers\":[],\"chunks\":[{\"base64\":\"AP8=\"}],\"ending\":{\"kind\":\"finished\",\"trailers\":[]}}}]}"
@@ -97,6 +86,28 @@ pub fn schema_2_cassettes_keep_loading_test() {
   testing.request(exchange).body |> should.equal(<<"a\nb":utf8>>)
   let assert testing.Respond(reply, _) = testing.reply(exchange)
   reply.body |> should.equal([<<0, 255>>])
+
+  // Upgrading turns text with newlines into lines, every byte kept.
+  let with_newlines =
+    string.replace(
+      schema_2,
+      "{\"base64\":\"AP8=\"}",
+      "{\"text\":\"crlf\\r\\nends\\r\\n\"},{\"text\":\"trailing\\n\"},{\"text\":\"\\n\"}",
+    )
+  let assert Ok(original) = cassette.parse(with_newlines, 10_000)
+  let assert Ok(upgraded) = cassette.upgrade(with_newlines, 10_000)
+  string.contains(upgraded, "{\"lines\": [") |> should.be_true
+  let assert Ok(reloaded) = cassette.parse(upgraded, 10_000)
+  testing.exchanges(reloaded) |> should.equal(testing.exchanges(original))
+  let assert [upgraded_exchange] = testing.exchanges(reloaded)
+  let assert testing.Respond(upgraded_reply, _) =
+    testing.reply(upgraded_exchange)
+  upgraded_reply.body
+  |> should.equal([
+    <<"crlf\r\nends\r\n":utf8>>,
+    <<"trailing\n":utf8>>,
+    <<"\n":utf8>>,
+  ])
 }
 
 pub fn lines_bodies_are_checked_test() {

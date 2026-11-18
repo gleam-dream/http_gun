@@ -63,10 +63,19 @@
   `UnsupportedVersion(3)`; code comparing `cassette.encode` output with a
   stored string sees the new layout; a `load` limit set close to a file's
   schema 2 size can fail with `TooLarge` (a streamed answer grows by about a
-  quarter). Convert in one commit, after moving to this version, so no
+  quarter); `cassette.record` with a budget below 42 bytes now fails at once
+  with `CaptureLimit` instead of at the first request; and a recording that
+  fit its budget under schema 2 can now exceed it, since the same exchanges
+  store more bytes and every stored byte is charged. Convert in one commit, after moving to this version, so no
   re-record mixes a format change with a content change.
 
 ### Fixed
+
+- A request whose path or query contains `#` is refused as
+  `InvalidRequest(InvalidTarget)`, before it is sent. A fragment is never
+  part of a request target; such a request was sent as written, and a
+  recording of it could not be matched on replay, because the stored URL
+  lost everything after the `#`.
 
 - `cassette.encode` removed credential headers from requests, responses and
   trailers but wrote the headers held inside a scripted failure (a `Reject`

@@ -15,7 +15,7 @@
 //// let assert Ok(client) = testing.playback(script, settings)
 //// ```
 ////
-//// A cassette is readable JSON (`"http_gun": 3`), one field per line: a body
+//// A cassette is readable JSON (`"http_gun": 3`), laid out over many lines: a body
 //// or chunk that is valid UTF-8 containing a newline is stored as
 //// `{"lines": [..]}`, one string per line, other UTF-8 as `{"text": ..}`,
 //// and anything else as `{"base64": ..}`. Every body reads back byte for
@@ -185,7 +185,8 @@ pub fn redact(
 /// over it yourself (without the recorder's atomic publication or file mode).
 /// A recorded schema 3 file is returned unchanged, and upgrading is
 /// idempotent. `max_bytes` bounds the input, as `parse` checks it, and the
-/// errors are those of `parse`. Fields the decoder ignores are not kept.
+/// errors are those of `parse`; the output of a schema 2 input is larger, so
+/// load it with a higher limit. Fields the decoder ignores are not kept.
 ///
 /// Do not convert with `parse` then `encode`: `encode` applies the default
 /// redaction, which can rewrite an answer recorded before that redaction
