@@ -519,6 +519,7 @@
         [`testing.playback` validates complete configuration, whole-byte request/chunk bodies, final statuses 200–599 and estimated script size before starting. It creates a #term("term-playback-session") with one global admission-ordered cursor. Concurrency does not define a reusable first-match lookup.],
         [Exact match keys apply configured redaction to both expected and actual requests. Host and header names become lowercase, empty path becomes slash, ignored headers disappear and remaining headers sort by name while duplicate-name order remains. Method, URI fields and bytes otherwise remain exact.],
         [An explicit custom matcher receives these normalized forms. It owns only equality; common validation, lifetime and response admission still run. A mismatch reports the zero-based position and consumes nothing. Exhaustion fails without network fallback. Custom callbacks are trusted code and can block the pool.],
+        [A script can repeat (`testing.repeating`): after its last exchange the cursor returns to the first, so a non-empty repeating script is never exhausted. Positions stay within the script. Once a pass has completed, every exchange counts as used. Repetition is a playback setting like ignored headers and is not stored in a cassette. #adr(18)],
         [A loaded `testing.Script` (#term("term-script")) is immutable input. Each `testing.playback` call starts a separate client at its first exchange, so one script serves independent runs. Client views share their client's cursor; `with_correlation` changes observation metadata and selects no sequence. Concurrent requests on one client consume exchanges in admission order.],
         [Offline requests skip destination resolution/address authorization and open no network socket. Required-view selection still applies. Bodies pass the same post-delivery header/byte admission and collection logic with negotiated protocol Offline.],
         [A playback session keeps the first 64 requests it refused by mismatch, with the position and the request of the exchange it was compared against, the first 64 it refused by exhaustion, and a count of every refusal of either kind beyond those. Kept requests, actual and expected, are in match-key form without the headers the script ignores (`testing.ignoring_headers`), so they carry only what the configured redaction leaves. Requests refused before matching, such as invalid, cancelled or expired ones, are not kept.],
@@ -530,12 +531,18 @@
         #then[the request fails with the current position]
         #then[the next matching request consumes that same exchange]
       ]
+      #behavior(title: "A repeating script answers past its end", level: "boundary", area: "Playback matching")[
+        #given[a playback client whose non-empty script repeats]
+        #when[a request arrives after the last exchange was used]
+        #then[it is compared with the first exchange again, at position zero]
+        #then[no request is refused as exhausted]
+      ]
       #behavior(title: "Verify reports what playback refused and left", level: "boundary", area: "Playback matching")[
         #given[a running playback client]
         #when[a test calls `testing.verify` on it or on any of its views]
         #then[the verdict lists the first 64 mismatched requests with their positions and expected requests, and the first 64 exhausted requests, oldest first, all in match-key form]
         #then[refusals beyond the first 64 of each kind are counted in the verdict and not listed]
-        #then[the verdict lists the exchanges not yet used, in order]
+        #then[the verdict lists the exchanges not yet used, in order, and none once a repeating script has completed a pass]
         #then[an empty verdict with no refusals dropped means every request that reached matching before the call matched, and every exchange was used]
       ]
     ])

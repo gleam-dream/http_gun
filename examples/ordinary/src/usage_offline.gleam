@@ -1,6 +1,6 @@
 //// Offline use: scripted playback, mismatch and exhaustion, verification, a
-//// failure that keeps its response head, cassette redaction, and masking
-//// for requests a consumer normalises.
+//// repeating failure, a failure that keeps its response head, cassette
+//// redaction, and masking for requests a consumer normalises.
 
 import gleam/http/request
 import gleam/http/response
@@ -28,6 +28,7 @@ fn remove_fixture(path: String) -> Nil
 pub fn main() -> Nil {
   scripted()
   verified()
+  always_failing()
   retry_after()
   redacted_cassette()
   masked_requests()
@@ -152,6 +153,30 @@ fn redacted_cassette() -> Nil {
   let assert <<"abc":utf8>> = buffered.response.body
   http_gun.stop(replay)
   // snips-end: record-and-load
+}
+
+// One built failure answers every request, however many the code under
+// test sends, for example through its retries.
+fn always_failing() -> Nil {
+  let failure =
+    error.new(error.RequestFailed(error.ConnectionReset), error.MaybeSent)
+  let script =
+    testing.script([
+      testing.exchange(
+        request.new() |> request.set_body(<<>>),
+        testing.Reject(failure),
+      ),
+    ])
+    |> testing.matching(fn(_expected, _actual) { True })
+    |> testing.repeating
+  let assert Ok(client) = testing.playback(script, config.default())
+  let assert Ok(req) = request.to("https://api.example.test/any")
+  list.each([1, 2, 3], fn(_) {
+    let assert Error(again) = http_gun.send(client, request.set_body(req, <<>>))
+    let assert error.RequestFailed(error.ConnectionReset) = error.reason(again)
+  })
+  let assert Ok(testing.Verdict([], [], [], 0)) = testing.verify(client)
+  http_gun.stop(client)
 }
 
 // Masking for a consumer that normalises its requests: keep only named

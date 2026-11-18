@@ -762,3 +762,44 @@ pub fn stored_failures_keep_no_redacted_header_test() {
     ),
   ])
 }
+
+pub fn repeating_script_answers_past_its_end_test() {
+  let failure =
+    error.new(error.RequestFailed(error.PeerClosed), error.MaybeSent)
+  let first = testing.exchange(req(), respond(200, [], [<<1>>], []))
+  let second = testing.exchange(req(), testing.Reject(failure))
+  let script = testing.script([first, second]) |> testing.repeating
+  let assert Ok(client) = testing.playback(script, config.default())
+
+  // Before a pass completes, unused exchanges are reported as usual.
+  let assert Ok(one) = http_gun.send(client, req())
+  one.response.body |> should.equal(<<1>>)
+  testing.verify(client)
+  |> should.equal(Ok(testing.Verdict([], [], [second], 0)))
+
+  // Past the end the cursor returns to the first exchange.
+  let assert Error(rejected) = http_gun.send(client, req())
+  error.reason(rejected)
+  |> should.equal(error.RequestFailed(error.PeerClosed))
+  let assert Ok(again) = http_gun.send(client, req())
+  again.response.body |> should.equal(<<1>>)
+  let assert Error(mismatch) =
+    http_gun.send(client, request.set_path(req(), "/other"))
+  error.reason(mismatch) |> should.equal(error.PlaybackMismatch(1))
+  let assert Error(_) = http_gun.send(client, req())
+  let assert Ok(_) = http_gun.send(client, req())
+
+  // Nothing is exhausted, and after a full pass nothing is unused.
+  let assert Ok(verdict) = testing.verify(client)
+  verdict.exhausted |> should.equal([])
+  verdict.unused |> should.equal([])
+  list.map(verdict.mismatched, fn(miss) { miss.position }) |> should.equal([1])
+  http_gun.stop(client)
+
+  // An empty repeating script is still exhausted.
+  let assert Ok(empty) =
+    testing.playback(testing.script([]) |> testing.repeating, config.default())
+  let assert Error(exhausted) = http_gun.send(empty, req())
+  error.reason(exhausted) |> should.equal(error.PlaybackExhausted)
+  http_gun.stop(empty)
+}

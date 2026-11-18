@@ -25,6 +25,9 @@ Status: Accepted
   fragments are tested against it. `cassette.redact` serves both the check
   of old cassettes against a grown policy and their cleaning without a live
   run.
+- A script can repeat: after its last exchange playback starts again at the
+  first. A test that answers any request with a built failure then needs no
+  script sized to outlast every retry.
 - Additions to the public verdict types arrive as separate functions, never
   as new fields or variants, because consumers pin those types.
 - Mapping volatile values back into replies, choosing a cassette per

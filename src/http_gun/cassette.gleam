@@ -182,7 +182,9 @@ pub fn parse(
     True -> Error(TooLarge(int.max(0, max_bytes), size))
     False ->
       codec.parse(text)
-      |> result.map(fn(exchanges) { script.Script(exchanges, script.exact) })
+      |> result.map(fn(exchanges) {
+        script.Script(exchanges, script.exact, False)
+      })
       |> result.map_error(fn(problem) {
         case problem {
           codec.Corrupt -> Corrupt

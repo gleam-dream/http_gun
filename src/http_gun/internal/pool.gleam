@@ -93,6 +93,7 @@ pub type Mode {
 pub type Replay {
   Replay(
     remaining: List(script.Exchange),
+    cycle: Cycle,
     position: Int,
     matching: script.Matching,
     /// Failed requests in match-key form, newest first, for `verify`: at
@@ -101,6 +102,13 @@ pub type Replay {
     exhausted: List(request.Request(BitArray)),
     dropped: Int,
   )
+}
+
+/// Whether a script starts again after its last exchange.
+pub type Cycle {
+  Once
+  /// `every` exchange of a non-empty script; `lapped` once a pass completed.
+  Repeating(every: List(script.Exchange), lapped: Bool)
 }
 
 const kept_refusals = 64
@@ -118,8 +126,13 @@ fn keep(replay: Replay, kept: List(a), add: fn() -> Replay) -> Replay {
 pub fn playback(
   exchanges: List(script.Exchange),
   matching: script.Matching,
+  repeating: Bool,
 ) -> Mode {
-  Playback(Replay(exchanges, 0, matching, [], [], 0))
+  let cycle = case repeating, exchanges {
+    True, [_, ..] -> Repeating(exchanges, False)
+    _, _ -> Once
+  }
+  Playback(Replay(exchanges, cycle, 0, matching, [], [], 0))
 }
 
 type Phase {
@@ -417,7 +430,10 @@ fn handle(state: State, message: Message) -> actor.Next(State, Message) {
             Some(script.Report(
               list.reverse(replay.mismatched),
               list.reverse(replay.exhausted),
-              replay.remaining,
+              case replay.cycle {
+                Repeating(lapped: True, ..) -> []
+                _ -> replay.remaining
+              },
               replay.dropped,
             ))
           Live | Record(_) -> None
@@ -982,12 +998,23 @@ fn admit_playback(state: State, p: Pending, replay: Replay) -> State {
     )
   }
   let Replay(remaining:, position:, matching:, ..) = replay
-  case remaining {
-    [] -> {
+  case remaining, replay.cycle {
+    [], Repeating(every:, ..) ->
+      admit_playback(
+        state,
+        p,
+        Replay(
+          ..replay,
+          remaining: every,
+          position: 0,
+          cycle: Repeating(every, True),
+        ),
+      )
+    [], Once -> {
       reject(p, error.PlaybackExhausted)
       refuse(None)
     }
-    [exchange, ..rest] ->
+    [exchange, ..rest], _ ->
       case
         script.matches(
           matching,

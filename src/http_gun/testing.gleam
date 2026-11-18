@@ -116,7 +116,7 @@ pub fn reply(exchange: Exchange) -> Reply {
 
 /// A script of exchanges, matched in order and exactly.
 pub fn script(exchanges: List(Exchange)) -> Script {
-  internal.Script(exchanges, internal.exact)
+  internal.Script(exchanges, internal.exact, False)
 }
 
 /// The exchanges of a script, in order.
@@ -136,6 +136,16 @@ pub fn ignoring_headers(script: Script, names: List(String)) -> Script {
       ignored: list.append(matching.ignored, list.map(names, string.lowercase)),
     ),
   )
+}
+
+/// Start again at the first exchange after the last, so a non-empty script
+/// is never exhausted: a test that answers every request with the same built
+/// failure needs one exchange, with `matching` accepting any request.
+/// Positions stay within the script, and once a pass has completed `verify`
+/// reports no unused exchange. Like `ignoring_headers`, this is a playback
+/// setting that `cassette.encode` does not store.
+pub fn repeating(script: Script) -> Script {
+  internal.Script(..script, repeating: True)
 }
 
 /// Replace the exact comparison. `compare` receives the expected and the
@@ -178,7 +188,10 @@ pub fn playback(
     True -> Ok(Nil)
     False -> Error(http_gun.ScriptTooLarge(internal.max_bytes, size))
   })
-  pool.start(settings, pool.playback(script.exchanges, script.matching))
+  pool.start(
+    settings,
+    pool.playback(script.exchanges, script.matching, script.repeating),
+  )
   |> result.map(fn(started) { started.data })
   |> result.replace_error(http_gun.StartFailed)
 }
@@ -216,7 +229,8 @@ pub type Verdict {
     /// Requests that arrived after the last exchange, oldest first, in the
     /// same form: the first 64.
     exhausted: List(Request(BitArray)),
-    /// Exchanges not used yet, in order.
+    /// Exchanges not used yet, in order; none once a repeating script has
+    /// completed a pass.
     unused: List(Exchange),
     /// Refusals of either kind beyond the first 64 of each, which the
     /// client counted but did not keep.

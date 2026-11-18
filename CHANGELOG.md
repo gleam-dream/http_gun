@@ -20,6 +20,10 @@
 - `redaction.with_request_body(redaction, rewrite)` rewrites request bodies
   only, in recordings and on both sides of playback matching, so normalising
   volatile request values never edits a recorded answer.
+- `testing.repeating(script)` starts playback again at the first exchange
+  after the last, so a non-empty script is never exhausted. With a matcher
+  that accepts any request, one exchange answers every request, for example
+  with a built provider failure.
 - `cassette.redact(script, redaction)` applies a redaction to stored
   exchanges as a recording would store them, to find what a grown policy
   would still change in old cassettes and to clean them with `encode`
