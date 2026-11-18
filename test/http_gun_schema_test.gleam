@@ -2,13 +2,16 @@
 //// schema 2, and upgrading.
 
 import gleam/bit_array
+import gleam/http
 import gleam/http/request
 import gleam/http/response
 import gleam/int
 import gleam/list
+import gleam/option
 import gleam/string
 import gleeunit/should
 import http_gun/cassette
+import http_gun/error
 import http_gun/testing
 
 fn exchange_with(body: BitArray, chunks: List(BitArray)) -> testing.Exchange {
@@ -140,16 +143,26 @@ pub fn lines_bodies_are_checked_test() {
     cassette.parse(body("3", "{\"text\":5,\"lines\":[\"x\",\"y\"]}"), 10_000)
   let assert [exchange] = testing.exchanges(loaded)
   testing.request(exchange).body |> should.equal(<<"x\ny":utf8>>)
-  // A marker 3 target is read from its fields, which must be valid.
-  cassette.parse(
-    string.replace(
-      body("3", "{\"text\":\"\"}"),
-      "\"scheme\":\"http\"",
-      "\"scheme\":\"ftp\"",
-    ),
-    10_000,
-  )
-  |> should.equal(Error(cassette.Corrupt))
+  // A marker 3 target is read from its fields, which must hold a target
+  // admission would accept.
+  let valid = body("3", "{\"text\":\"\"}")
+  cassette.parse(valid, 10_000) |> should.be_ok
+  [
+    #("\"scheme\":\"http\"", "\"scheme\":\"ftp\""),
+    #("\"host\":\"offline.invalid\"", "\"host\":\"\""),
+    #("\"port\":null", "\"port\":0"),
+    #("\"port\":null", "\"port\":70000"),
+    #("\"path\":\"/\"", "\"path\":\"no-slash\""),
+    #("\"path\":\"/\"", "\"path\":\"/a b\""),
+    #("\"query\":null", "\"query\":\"a\\r\\nb\""),
+    #("\"port\":null,", ""),
+    #(",\"query\":null", ""),
+  ]
+  |> list.each(fn(change) {
+    let changed = string.replace(valid, change.0, change.1)
+    { changed != valid } |> should.be_true
+    cassette.parse(changed, 10_000) |> should.equal(Error(cassette.Corrupt))
+  })
   cassette.parse(body("4", "{\"text\":\"\"}"), 10_000)
   |> should.equal(Error(cassette.UnsupportedVersion(4)))
 }
@@ -265,4 +278,42 @@ pub fn upgrade_keeps_bodies_the_default_redaction_would_change_test() {
   cassette.upgrade(schema_2, 10)
   |> should.equal(Error(cassette.TooLarge(10, string.byte_size(schema_2))))
   cassette.upgrade("not JSON", 100) |> should.equal(Error(cassette.Corrupt))
+}
+
+// Target edges read back exactly through encode, parse and upgrade.
+pub fn target_fields_read_back_exactly_test() {
+  let assert Ok(base) = request.to("http://offline.invalid/ask")
+  let targets = [
+    base,
+    request.Request(..base, query: option.Some("")),
+    request.Request(..base, query: option.None),
+    request.Request(..base, port: option.None),
+    request.Request(..base, port: option.Some(8443), scheme: http.Https),
+    request.Request(..base, host: "API.Example.TEST"),
+    request.Request(
+      ..base,
+      path: "/a%2Fb/%E2%9C%93",
+      query: option.Some("x=%20&y"),
+    ),
+  ]
+  let exchanges =
+    list.map(targets, fn(target) {
+      testing.exchange(
+        request.set_body(target, <<>>),
+        testing.Reject(error.new(error.ClientClosed, error.NotSent)),
+      )
+    })
+  let text = cassette.encode(testing.script(exchanges))
+  let assert Ok(loaded) = cassette.parse(text, 100_000)
+  testing.exchanges(loaded) |> should.equal(exchanges)
+  cassette.upgrade(text, 100_000) |> should.equal(Ok(text))
+
+  // Schema 2 URLs with a port, a query and https upgrade to the request
+  // they loaded as.
+  let schema_2 =
+    "{\"http_gun\":2,\"exchanges\":[{\"request\":{\"method\":\"POST\",\"url\":\"https://API.example.test:8443/v1/x?key=REDACTED&q=%20a\",\"headers\":[],\"body\":{\"text\":\"\"}},\"reply\":{\"kind\":\"reject\",\"failure\":{\"name\":\"client_closed\",\"evidence\":\"not_sent\"}}}]}"
+  let assert Ok(original) = cassette.parse(schema_2, 10_000)
+  let assert Ok(upgraded) = cassette.upgrade(schema_2, 10_000)
+  let assert Ok(reloaded) = cassette.parse(upgraded, 10_000)
+  testing.exchanges(reloaded) |> should.equal(testing.exchanges(original))
 }

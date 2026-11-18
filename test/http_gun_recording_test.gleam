@@ -997,7 +997,7 @@ pub fn recorded_file_is_its_own_upgrade_test() {
   }
   let assert Ok(live) = http_gun.send(recorded.client, asked())
   // A name that does not resolve is recorded as a reject.
-  let assert Error(_) =
+  let assert Error(live_failure) =
     http_gun.send(
       recorded.client,
       request.set_host(asked(), "127.0.0.1.invalid"),
@@ -1036,6 +1036,10 @@ pub fn recorded_file_is_its_own_upgrade_test() {
   let assert Ok(replayed) = http_gun.send(client, asked())
   replayed.response.body |> should.equal(live.response.body)
   replayed.trailers |> should.equal(live.trailers)
+  // The reject replays as the failure the live client saw.
+  let assert Error(replayed_failure) =
+    http_gun.send(client, request.set_host(asked(), "127.0.0.1.invalid"))
+  error.reason(replayed_failure) |> should.equal(error.reason(live_failure))
   http_gun.stop(client)
   remove(destination)
 }

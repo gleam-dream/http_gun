@@ -105,3 +105,24 @@ pub fn bare_ipv6_host_round_trips_test() {
 pub fn bracketed_ipv6_host_round_trips_test() {
   round_trip(target("[::1]", echo_authority(True)))
 }
+
+// A method spelled as Other("GET") is the same method as Get: it is
+// recorded as Get and its live form still replays.
+pub fn other_spelling_of_a_known_method_replays_test() {
+  let sent = target("127.0.0.1", ok()) |> request.set_method(http.Other("GET"))
+  let destination = path()
+  let assert Ok(recorded) =
+    cassette.record(settings(), destination, cassette.options())
+  let assert Ok(_) = http_gun.send(recorded.client, sent)
+  let assert Ok(_) =
+    cassette.finish(recorded.recording, duration.milliseconds(1000))
+  http_gun.stop(recorded.client)
+  let assert Ok(tape) = cassette.load(destination, 1_000_000)
+  let assert [stored] = testing.exchanges(tape)
+  testing.request(stored).method |> should.equal(http.Get)
+  let assert Ok(client) = testing.playback(tape, settings())
+  let assert Ok(_) = http_gun.send(client, sent)
+  testing.verify(client) |> should.equal(Ok(testing.Verdict([], [], [], 0)))
+  http_gun.stop(client)
+  remove(destination)
+}

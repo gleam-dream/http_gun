@@ -79,6 +79,11 @@
 
 ### Fixed
 
+- A request whose method was spelled as another known method, such as
+  `http.Other("GET")`, was recorded as `Get` and then never matched its own
+  live form on replay. Admission now gives every method one spelling; the
+  wire is unchanged.
+
 - A request whose host, path or query held a space followed by a combining
   mark passed admission, because the check matched whole characters as
   displayed rather than code points; the space then reached the request

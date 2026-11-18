@@ -15,7 +15,6 @@ import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/otp/actor
 import gleam/result
-import gleam/string
 import http_gun/destination
 import http_gun/error.{type Failure, MaybeSent, NotSent}
 import http_gun/internal/bridge
@@ -29,6 +28,7 @@ import http_gun/internal/recorder
 import http_gun/internal/resolution
 import http_gun/internal/script
 import http_gun/internal/settings.{type Settings}
+import http_gun/internal/target
 import http_gun/internal/token
 import http_gun/redaction
 import http_gun/telemetry
@@ -240,6 +240,12 @@ pub fn open(
     "" -> request.Request(..req, path: "/")
     _ -> req
   }
+  // One spelling per method, so `Other("GET")` is recorded and matched as
+  // `Get`; the wire is the same either way.
+  let req = case http.parse_method(http.method_to_string(req.method)) {
+    Ok(method) -> request.Request(..req, method:)
+    Error(Nil) -> req
+  }
   use origin <- result.try(validate_target(req))
   // Nothing was sent when the client is not registered or already dead; a
   // client that exits while handling the call may have submitted it.
@@ -317,62 +323,16 @@ fn start_with(
 }
 
 fn origin(req: request.Request(a)) -> Origin {
-  let tls = req.scheme == http.Https
-  Origin(
-    bridge.unbracket(string.lowercase(req.host)),
-    case req.port {
-      Some(port) -> port
-      None ->
-        case tls {
-          True -> 443
-          False -> 80
-        }
-    },
-    tls,
-  )
+  let #(host, port, tls) = target.origin(req)
+  Origin(host, port, tls)
 }
 
 fn validate_target(req: request.Request(BitArray)) -> Result(Origin, Failure) {
-  let invalid = fn(problem) {
-    Error(error.new(error.InvalidRequest(problem), NotSent))
-  }
-  let origin = origin(req)
-  let method_ok =
-    http.parse_method(http.method_to_string(req.method)) |> result.is_ok
-  case bit_array.bit_size(req.body) % 8 == 0, method_ok {
-    False, _ -> invalid(error.BodyNotBytes)
-    True, False -> invalid(error.InvalidMethod)
-    True, True ->
-      case
-        origin.host != ""
-        && origin.port > 0
-        && origin.port <= 65_535
-        && safe_target(origin.host)
-      {
-        False -> invalid(error.InvalidOrigin)
-        True ->
-          case
-            safe_target(option.unwrap(req.query, ""))
-            && safe_target(req.path)
-            && string.starts_with(req.path, "/")
-          {
-            False -> invalid(error.InvalidTarget)
-            True ->
-              case
-                list.all(req.headers, fn(h) {
-                  h.0 == string.lowercase(h.0)
-                  && http.parse_method(h.0) |> result.is_ok
-                  && !string.contains(h.1, "\r")
-                  && !string.contains(h.1, "\n")
-                  && !string.contains(h.1, "\u{0}")
-                })
-              {
-                False -> invalid(error.InvalidHeader)
-                True -> Ok(origin)
-              }
-          }
-      }
-  }
+  target.check(req)
+  |> result.map(fn(_) { origin(req) })
+  |> result.map_error(fn(problem) {
+    error.new(error.InvalidRequest(problem), NotSent)
+  })
 }
 
 fn validate_size(
@@ -393,17 +353,6 @@ fn validate_size(
       owner.check_headers(req.headers, limits, owner.RequestHeaders)
       |> result.map_error(error.new(_, NotSent))
   }
-}
-
-// Compared by code point, not by grapheme, so a combining mark after a
-// space cannot hide it.
-fn safe_target(value: String) -> Bool {
-  !list.any(string.to_utf_codepoints(value), fn(point) {
-    list.contains(
-      [0x20, 0x0D, 0x0A, 0x09, 0x00],
-      string.utf_codepoint_to_int(point),
-    )
-  })
 }
 
 fn handle(state: State, message: Message) -> actor.Next(State, Message) {

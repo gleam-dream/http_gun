@@ -23,6 +23,7 @@ import gleam/result
 import gleam/string
 import http_gun/error
 import http_gun/internal/script
+import http_gun/internal/target as target_rule
 import http_gun/redaction.{type Redaction}
 
 pub const version = 3
@@ -315,8 +316,19 @@ fn request_decoder(version: Int) -> decode.Decoder(request.Request(BitArray)) {
     }
   })
   case http.parse_method(method) {
-    Ok(method) ->
-      decode.success(request.Request(..target, method:, headers:, body:))
+    Ok(method) -> {
+      let req = request.Request(..target, method:, headers:, body:)
+      // A stored schema 3 target must be one a client could have sent;
+      // admission sends an empty path as `/`.
+      let sendable = case req.path {
+        "" -> request.Request(..req, path: "/")
+        _ -> req
+      }
+      case version, target_rule.check(sendable) {
+        3, Error(_) -> decode.failure(failed, "HTTP request target")
+        _, _ -> decode.success(req)
+      }
+    }
     Error(Nil) -> decode.failure(failed, "HTTP method")
   }
 }
