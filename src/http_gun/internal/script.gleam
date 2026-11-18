@@ -135,3 +135,19 @@ pub const max_bytes = 16_777_216
 pub type Script {
   Script(exchanges: List(Exchange), matching: Matching)
 }
+
+/// A request refused at `position`, beside the exchange's request, both in
+/// match-key form.
+pub type Missed {
+  Missed(position: Int, expected: Request(BitArray), actual: Request(BitArray))
+}
+
+/// What a playback client met that did not match its script: failed
+/// requests in match-key form, oldest first, and the exchanges left.
+pub type Report {
+  Report(
+    mismatched: List(Missed),
+    exhausted: List(Request(BitArray)),
+    unused: List(Exchange),
+  )
+}

@@ -515,12 +515,20 @@
         [An explicit custom matcher receives these normalized forms. It owns only equality; common validation, lifetime and response admission still run. A mismatch reports the zero-based position and consumes nothing. Exhaustion fails without network fallback. Custom callbacks are trusted code and can block the pool.],
         [A loaded `testing.Script` (#term("term-script")) is immutable input. Each `testing.playback` call starts a separate client at its first exchange, so one script serves independent runs. Client views share their client's cursor; `with_correlation` changes observation metadata and selects no sequence. Concurrent requests on one client consume exchanges in admission order.],
         [Offline requests skip destination resolution/address authorization and open no network socket. Required-view selection still applies. Bodies pass the same post-delivery header/byte admission and collection logic with negotiated protocol Offline.],
+        [A playback session also keeps every request it refused, in the match-key form with the script's ignored headers removed: a mismatch with the position and the request of the exchange it was compared against, in the same form, and an exhausted request. `testing.verify` returns them oldest first with the exchanges not yet used, as a `Verdict`. The caller still receives the same failure; the report exists because code under test may handle that failure as an ordinary provider error. Views share one report. The session keeps refused requests until it stops, so a test that loops on a refused request grows it. A live or recording client returns `NotPlayback`, a stopped one `ClientStopped`.],
       )
       #behavior(title: "Playback mismatch preserves the next exchange", level: "boundary", area: "Playback matching")[
         #given[an offline session has an unused next exchange]
         #when[the request does not match it]
         #then[the request fails with the current position]
         #then[the next matching request consumes that same exchange]
+      ]
+      #behavior(title: "Verify reports what playback refused and left", level: "boundary", area: "Playback matching")[
+        #given[a running playback client]
+        #when[a test calls `testing.verify` on it or on any of its views]
+        #then[the verdict lists each mismatched request with its position and the expected request, and each exhausted request, oldest first, all in match-key form]
+        #then[the verdict lists the exchanges not yet used, in order]
+        #then[an empty verdict means every request matched and every exchange was used]
       ]
     ])
     #subsection(title: "Cassette schema and bounded file input", [

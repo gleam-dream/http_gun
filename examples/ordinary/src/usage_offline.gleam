@@ -1,4 +1,5 @@
-//// Offline use: scripted playback, mismatch and exhaustion, a failure that
+//// Offline use: scripted playback, mismatch and exhaustion, verification, a
+//// failure that
 //// keeps its response head, and cassette redaction.
 
 import gleam/http/request
@@ -59,6 +60,39 @@ fn scripted() -> Nil {
   let assert Error(exhausted) = http_gun.send(client, expected)
   let assert error.PlaybackExhausted = error.reason(exhausted)
   http_gun.stop(client)
+  verified()
+}
+
+// Code under test may handle a playback failure as one more provider error.
+// `verify` reports every request that missed and every exchange left, so the
+// test fails on a stale or half-used script anyway.
+fn verified() -> Nil {
+  let assert Ok(expected) = request.to("https://api.example.test/orders")
+  let expected = request.set_body(expected, <<>>)
+  let reply =
+    testing.Respond(
+      response.new(204) |> response.set_body([]),
+      testing.Finished([]),
+    )
+  let first = testing.exchange(expected, reply)
+  let second = testing.exchange(expected, reply)
+  let assert Ok(client) =
+    testing.playback(testing.script([first, second]), config.default())
+  let stale = request.set_path(expected, "/v2/orders")
+
+  // snips-start: verify-playback
+  // The code under test swallows the mismatch.
+  let _ = http_gun.send(client, stale)
+  let _ = http_gun.send(client, expected)
+
+  let assert Ok(testing.Verdict(
+    mismatched: [testing.Mismatch(position: 0, expected: _, actual: missed)],
+    exhausted: [],
+    unused: [_second],
+  )) = testing.verify(client)
+  let assert "/v2/orders" = missed.path
+  http_gun.stop(client)
+  // snips-end: verify-playback
 }
 
 // A failure after the head arrived keeps the status and the headers, so a

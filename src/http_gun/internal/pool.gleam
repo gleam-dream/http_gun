@@ -90,7 +90,18 @@ pub type Mode {
     remaining: List(script.Exchange),
     position: Int,
     matching: script.Matching,
+    /// Failed requests in match-key form, newest first, for `verify`.
+    mismatched: List(script.Missed),
+    exhausted: List(request.Request(BitArray)),
   )
+}
+
+/// Start playback at the first exchange with nothing reported.
+pub fn playback(
+  exchanges: List(script.Exchange),
+  matching: script.Matching,
+) -> Mode {
+  Playback(exchanges, 0, matching, [], [])
 }
 
 type Phase {
@@ -134,6 +145,7 @@ pub opaque type Message {
   Resolved(process.Pid, Result(resolution.Resolved, error.Reason))
   CheckedConnection(process.Pid, process.Pid, Result(Bool, error.Reason))
   Inspect(process.Subject(Result(#(Int, Int, Int), Failure)))
+  Verify(process.Subject(Result(Option(script.Report), Failure)))
   Configuration(process.Subject(Result(Settings, Failure)))
   Open(Invocation, process.Subject(Result(Opened, Failure)))
   Stop(process.Subject(Result(Nil, Failure)))
@@ -153,6 +165,12 @@ pub fn named(name: process.Name(Message)) -> Client {
 
 pub fn stats(client: Client) -> Result(#(Int, Int, Int), Failure) {
   call.run(client.subject, Inspect)
+}
+
+/// What a playback client met that did not match its script; `None` for a
+/// client that does not play back.
+pub fn verify(client: Client) -> Result(Option(script.Report), Failure) {
+  call.run(client.subject, Verify)
 }
 
 pub fn settings(client: Client) -> Result(Settings, Failure) {
@@ -371,6 +389,21 @@ fn handle(state: State, message: Message) -> actor.Next(State, Message) {
     }
     Configuration(reply) -> {
       process.send(reply, Ok(state.config))
+      actor.continue(state)
+    }
+    Verify(reply) -> {
+      process.send(
+        reply,
+        Ok(case state.mode {
+          Playback(remaining:, mismatched:, exhausted:, ..) ->
+            Some(script.Report(
+              list.reverse(mismatched),
+              list.reverse(exhausted),
+              remaining,
+            ))
+          Live | Record(_) -> None
+        }),
+      )
       actor.continue(state)
     }
     Stop(reply) -> begin_stop(state, reply)
@@ -905,7 +938,7 @@ fn admit(state: State, p: Pending) -> Admission {
         False ->
           case state.mode {
             Live | Record(_) -> admit_live(state, p)
-            Playback(exchanges, position, matching) ->
+            Playback(exchanges, position, matching, ..) ->
               Taken(admit_playback(state, p, exchanges, position, matching))
           }
       }
@@ -933,7 +966,7 @@ fn admit_playback(
   case exchanges {
     [] -> {
       reject(p, error.PlaybackExhausted)
-      state
+      note_miss(state, p, None)
     }
     [exchange, ..rest] ->
       case
@@ -946,7 +979,7 @@ fn admit_playback(
       {
         False -> {
           reject(p, error.PlaybackMismatch(position))
-          state
+          note_miss(state, p, Some(#(position, exchange.request)))
         }
         True -> {
           lifecycle.emit(p.observation, telemetry.AdmissionGranted)
@@ -980,7 +1013,11 @@ fn admit_playback(
               settle(p)
               State(
                 ..state,
-                mode: Playback(rest, position + 1, matching),
+                mode: case state.mode {
+                  Playback(..) as mode ->
+                    Playback(..mode, remaining: rest, position: position + 1)
+                  other -> other
+                },
                 owners: dict.insert(
                   state.owners,
                   started.pid,
@@ -991,6 +1028,32 @@ fn admit_playback(
           }
         }
       }
+  }
+}
+
+// Keep a failed playback request, in the form matching compared, for
+// `verify`. `against` is the exchange it was compared with; `None` means the
+// script was exhausted.
+fn note_miss(
+  state: State,
+  p: Pending,
+  against: Option(#(Int, request.Request(BitArray))),
+) -> State {
+  case state.mode {
+    Playback(matching:, mismatched:, exhausted:, ..) as mode -> {
+      let key = script.key(state.config.redaction, matching.ignored, _)
+      let actual = key(p.request())
+      let mode = case against {
+        Some(#(at, expected)) ->
+          Playback(..mode, mismatched: [
+            script.Missed(at, key(expected), actual),
+            ..mismatched
+          ])
+        None -> Playback(..mode, exhausted: [actual, ..exhausted])
+      }
+      State(..state, mode:)
+    }
+    Live | Record(_) -> state
   }
 }
 

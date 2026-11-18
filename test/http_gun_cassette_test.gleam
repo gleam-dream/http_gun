@@ -16,6 +16,7 @@ import http_gun/body
 import http_gun/cassette
 import http_gun/config
 import http_gun/error
+import http_gun/redaction
 import http_gun/testing
 
 fn req() -> request.Request(BitArray) {
@@ -489,5 +490,74 @@ pub fn generated_binary_sequences_preserve_every_exchange_test() {
   })
   let assert Error(exhausted) = http_gun.send(client, req())
   error.reason(exhausted) |> should.equal(error.PlaybackExhausted)
+  http_gun.stop(client)
+}
+
+pub fn verify_reports_mismatches_exhaustion_and_unused_exchanges_test() {
+  let first = testing.exchange(req(), respond(200, [], [<<1>>], []))
+  let second = testing.exchange(req(), respond(201, [], [<<2>>], []))
+  let script =
+    testing.script([first, second]) |> testing.ignoring_headers(["x-trace"])
+  let assert Ok(client) = testing.playback(script, config.default())
+
+  // A fresh client has nothing to report.
+  testing.verify(client)
+  |> should.equal(Ok(testing.Verdict([], [], [first, second])))
+
+  // The caller's code swallows these failures; verify still sees them.
+  let wrong =
+    req()
+    |> request.set_path("/wrong")
+    |> request.set_header("X-Trace", "abc")
+    |> request.set_header("Authorization", "Bearer live")
+  let assert Error(_) = http_gun.send(client, wrong)
+  let assert Ok(_) = http_gun.send(client, req())
+  let assert Ok(_) = http_gun.send(client, req())
+  let assert Error(_) = http_gun.send(client, request.set_path(req(), "/late"))
+
+  // Both sides are reported as match_key forms them: credentials removed,
+  // ignored headers dropped. Views share the client's report.
+  let view = http_gun.with_timeout(client, config.After(duration.seconds(5)))
+  testing.verify(view)
+  |> should.equal(
+    Ok(
+      testing.Verdict(
+        mismatched: [
+          testing.Mismatch(
+            position: 0,
+            expected: testing.match_key(redaction.default(), req()),
+            actual: testing.match_key(
+              redaction.default(),
+              request.set_path(req(), "/wrong"),
+            ),
+          ),
+        ],
+        exhausted: [
+          testing.match_key(
+            redaction.default(),
+            request.set_path(req(), "/late"),
+          ),
+        ],
+        unused: [],
+      ),
+    ),
+  )
+  http_gun.stop(client)
+  testing.verify(client) |> should.equal(Error(testing.ClientStopped))
+}
+
+pub fn verify_reports_exchanges_never_used_test() {
+  let first = testing.exchange(req(), respond(200, [], [<<1>>], []))
+  let second = testing.exchange(req(), respond(201, [], [<<2>>], []))
+  let assert Ok(client) =
+    testing.playback(testing.script([first, second]), config.default())
+  let assert Ok(_) = http_gun.send(client, req())
+  testing.verify(client) |> should.equal(Ok(testing.Verdict([], [], [second])))
+  http_gun.stop(client)
+}
+
+pub fn verify_refuses_a_client_that_does_not_play_back_test() {
+  let assert Ok(client) = http_gun.start(config.default())
+  testing.verify(client) |> should.equal(Error(testing.NotPlayback))
   http_gun.stop(client)
 }

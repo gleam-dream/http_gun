@@ -4,6 +4,14 @@
 
 ### Added
 
+- `testing.verify(client) -> Result(testing.Verdict, testing.VerifyError)`
+  reports what a playback client refused and left: each mismatched request
+  beside the exchange it was compared against (`testing.Mismatch` with
+  `position`, `expected` and `actual`), each request after the last exchange,
+  all in `match_key` form and oldest first,
+  and the exchanges not yet used. A test can fail on a stale or half-used
+  script even when the code under test handled the playback failure. A live
+  or recording client gives `NotPlayback`, a stopped one `ClientStopped`.
 - `config.with_cipher_suites` with `config.CipherSuites`: `OtpDefaults`
   (the default) or `OtpDefaultsAndTls12Cbc`, which also offers the TLS 1.2
   ECDHE AES-CBC suites with HMAC-SHA-256/384 after OTP's defaults. OTP left

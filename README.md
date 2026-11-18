@@ -86,6 +86,33 @@ let assert Ok(3) = {
 The [consumer source](examples/ordinary/src/usage_views.gleam) includes the
 `count` helper and runs this example against a local server.
 
+## Test with playback
+
+A playback client answers from a script or a loaded cassette and never opens a
+connection. A request that does not match fails with `PlaybackMismatch`, and
+one after the last exchange with `PlaybackExhausted`. When the code under test
+handles those failures itself, ask the client before stopping it. This excerpt
+comes from the [offline usage example](examples/ordinary/src/usage_offline.gleam).
+
+<!-- prettier-ignore-start -->
+
+<!-- snips: examples/ordinary/src/usage_offline.gleam#verify-playback -->
+```gleam
+// The code under test swallows the mismatch.
+let _ = http_gun.send(client, stale)
+let _ = http_gun.send(client, expected)
+
+let assert Ok(testing.Verdict(
+  mismatched: [testing.Mismatch(position: 0, expected: _, actual: missed)],
+  exhausted: [],
+  unused: [_second],
+)) = testing.verify(client)
+let assert "/v2/orders" = missed.path
+http_gun.stop(client)
+```
+
+<!-- prettier-ignore-end -->
+
 ## Runtime ownership
 
 Each client has a pool process that admits requests and assigns connection
