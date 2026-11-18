@@ -395,10 +395,14 @@ fn validate_size(
   }
 }
 
-// A target never carries whitespace, control bytes or a fragment.
+// Compared by code point, not by grapheme, so a combining mark after a
+// space cannot hide it.
 fn safe_target(value: String) -> Bool {
-  !list.any([" ", "\r", "\n", "\t", "\u{0}", "#"], fn(char) {
-    string.contains(value, char)
+  !list.any(string.to_utf_codepoints(value), fn(point) {
+    list.contains(
+      [0x20, 0x0D, 0x0A, 0x09, 0x00],
+      string.utf_codepoint_to_int(point),
+    )
   })
 }
 

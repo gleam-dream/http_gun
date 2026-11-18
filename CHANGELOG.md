@@ -72,11 +72,11 @@
 
 ### Fixed
 
-- A request whose path or query contains `#` is refused as
-  `InvalidRequest(InvalidTarget)`, before it is sent. A fragment is never
-  part of a request target; such a request was sent as written, and a
-  recording of it could not be matched on replay, because the stored URL
-  lost everything after the `#`.
+- A request whose host, path or query held a space followed by a combining
+  mark passed admission, because the check matched whole characters as
+  displayed rather than code points; the space then reached the request
+  line. It is now refused as `InvalidRequest(InvalidTarget)` (or
+  `InvalidOrigin` for the host), like any other space.
 
 - `cassette.encode` removed credential headers from requests, responses and
   trailers but wrote the headers held inside a scripted failure (a `Reject`

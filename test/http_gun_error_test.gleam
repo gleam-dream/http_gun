@@ -110,15 +110,18 @@ pub fn descriptions_never_contain_request_values_test() {
       http_gun.send(live, base |> request.set_path("/secret path")),
       error.InvalidRequest(error.InvalidTarget),
     ),
-    // A fragment is never part of a request target, so a recording could not
-    // store it and replay would match another request.
+    // A combining mark after the space does not hide it.
     #(
-      http_gun.send(live, base |> request.set_path("/a#b")),
+      http_gun.send(live, base |> request.set_path("/secret \u{301}path")),
       error.InvalidRequest(error.InvalidTarget),
     ),
     #(
-      http_gun.send(live, request.Request(..base, query: Some("q=a#b"))),
+      http_gun.send(live, request.Request(..base, query: Some("a= \u{301}b"))),
       error.InvalidRequest(error.InvalidTarget),
+    ),
+    #(
+      http_gun.send(live, base |> request.set_host("example.com \u{301}")),
+      error.InvalidRequest(error.InvalidOrigin),
     ),
     #(http_gun.send(live, base), error.ResolutionFailed),
     #(

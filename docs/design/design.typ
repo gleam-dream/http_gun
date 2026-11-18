@@ -66,7 +66,7 @@
         AGENTS.md asks to keep one strict, version-marked fixture schema, while schema 3 writes one marker and reads two. Proposed wording: write one strict, version-marked fixture schema and read only the versions the design lists. The owner has not ruled.
       ],
       pending-entry(title: "Decide the release version for the record and replay additions", kind: "ruling", since: "2026-11-18", adr: 18)[
-        The verify call, the masking additions, the verdict's dropped count and schema 3 are unreleased; schema 3 breaks older readers of new files, anyone comparing `cassette.encode` output to a stored string, recordings with a budget below the envelope, and recordings near their budget. Refusing a fragment in a request target changes what a live request accepts. The owner decides the version at release.
+        The verify call, the masking additions, the verdict's dropped count and schema 3 are unreleased; schema 3 breaks older readers of new files, anyone comparing `cassette.encode` output to a stored string, recordings with a budget below the envelope, and recordings near their budget. The owner decides the version at release.
       ],
       pending-entry(title: "Check carried-over defaults and native claims against code", kind: "verify", since: "2026-10-17")[
         The default-settings table, the native assumption inventory and the destination and offline-playback rules were carried over from the retired usage, testing and dependency-upgrade guides. The compiled usage examples exercise the public paths. The stated default values, budgets and native assumptions have not been compared with the source.
@@ -289,7 +289,7 @@
     #subsection(title: "Request admission order", [
       #points(
         [The invocation entry instant is captured before caller-side validation. Already cancelled tokens, expired absolute deadlines and negative body limits fail early. Body bit size must be divisible by eight. The method and lowercase header names must be tokens. Origin/port and target reject invalid forms.],
-        [Paths start with a slash. Host, path and query reject whitespace/control forms checked by admission, and path and query reject `#`, since a fragment is never part of a request target and a stored URL cannot carry it. Header values reject CR/LF/NUL and delivered request headers also pass the shared token/control/size check. Limits count name plus value bytes rather than wire delimiters.],
+        [Paths start with a slash. Host, path and query reject space, CR, LF, TAB and NUL, compared by code point. Header values reject CR/LF/NUL and delivered request headers also pass the shared token/control/size check. Limits count name plus value bytes rather than wire delimiters.],
         [The pool checks required view destination and request body/header limits, then reserves capture when appropriate. Deadline, monitors and timers belong to the pending entry before leasing. A new request never overtakes an existing request in its origin lane.],
         [The #term("term-origin") is cached after validation. Pending entries, owner indexes, cancellation indexes, FIFO links and waiting count mutate together. Removing expired/dead work unlinks it immediately, including work behind a blocked origin head.],
         [Connecting reservations are distinct from waiting queue entries. A request starting a connection may wait for its connect timer beyond ordinary checkout expiry, while its overall deadline still caps the attempt. Resolving and connecting reservations consume connection capacity.],
