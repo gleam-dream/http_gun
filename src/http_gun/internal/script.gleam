@@ -149,5 +149,6 @@ pub type Report {
     mismatched: List(Missed),
     exhausted: List(Request(BitArray)),
     unused: List(Exchange),
+    dropped: Int,
   )
 }

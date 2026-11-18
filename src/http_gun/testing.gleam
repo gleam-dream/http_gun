@@ -207,16 +207,20 @@ pub type Mismatch {
 
 /// What a playback client met that did not match its script. A client whose
 /// requests all matched and whose exchanges were all used reports
-/// `Verdict([], [], [])`.
+/// `Verdict([], [], [], 0)`.
 pub type Verdict {
   Verdict(
-    /// Requests that did not match the next exchange, oldest first.
+    /// Requests that did not match the next exchange, oldest first: the
+    /// first 64.
     mismatched: List(Mismatch),
     /// Requests that arrived after the last exchange, oldest first, in the
-    /// same form.
+    /// same form: the first 64.
     exhausted: List(Request(BitArray)),
     /// Exchanges not used yet, in order.
     unused: List(Exchange),
+    /// Refusals of either kind beyond the first 64 of each, which the
+    /// client counted but did not keep.
+    dropped: Int,
   )
 }
 
@@ -232,7 +236,8 @@ pub type VerifyError {
 /// script. The caller's code sees `PlaybackMismatch` and `PlaybackExhausted`
 /// as before; `verify` lets a test fail on them even when that code handled
 /// the failure, and on exchanges it never used. Views of one client share
-/// one report. The client keeps each failed request until it stops.
+/// one report. The client keeps the first 64 refused requests of each kind
+/// until it stops and counts the rest in `dropped`.
 pub fn verify(client: http_gun.Client) -> Result(Verdict, VerifyError) {
   case pool.verify(client) {
     Error(_) -> Error(ClientStopped)
@@ -244,6 +249,7 @@ pub fn verify(client: http_gun.Client) -> Result(Verdict, VerifyError) {
         }),
         exhausted: report.exhausted,
         unused: report.unused,
+        dropped: report.dropped,
       ))
   }
 }

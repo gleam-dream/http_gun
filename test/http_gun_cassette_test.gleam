@@ -502,7 +502,7 @@ pub fn verify_reports_mismatches_exhaustion_and_unused_exchanges_test() {
 
   // A fresh client has nothing to report.
   testing.verify(client)
-  |> should.equal(Ok(testing.Verdict([], [], [first, second])))
+  |> should.equal(Ok(testing.Verdict([], [], [first, second], 0)))
 
   // The caller's code swallows these failures; verify still sees them.
   let wrong =
@@ -520,27 +520,23 @@ pub fn verify_reports_mismatches_exhaustion_and_unused_exchanges_test() {
   let view = http_gun.with_timeout(client, config.After(duration.seconds(5)))
   testing.verify(view)
   |> should.equal(
-    Ok(
-      testing.Verdict(
-        mismatched: [
-          testing.Mismatch(
-            position: 0,
-            expected: testing.match_key(redaction.default(), req()),
-            actual: testing.match_key(
-              redaction.default(),
-              request.set_path(req(), "/wrong"),
-            ),
-          ),
-        ],
-        exhausted: [
-          testing.match_key(
+    Ok(testing.Verdict(
+      mismatched: [
+        testing.Mismatch(
+          position: 0,
+          expected: testing.match_key(redaction.default(), req()),
+          actual: testing.match_key(
             redaction.default(),
-            request.set_path(req(), "/late"),
+            request.set_path(req(), "/wrong"),
           ),
-        ],
-        unused: [],
-      ),
-    ),
+        ),
+      ],
+      exhausted: [
+        testing.match_key(redaction.default(), request.set_path(req(), "/late")),
+      ],
+      unused: [],
+      dropped: 0,
+    )),
   )
   http_gun.stop(client)
   testing.verify(client) |> should.equal(Error(testing.ClientStopped))
@@ -552,7 +548,8 @@ pub fn verify_reports_exchanges_never_used_test() {
   let assert Ok(client) =
     testing.playback(testing.script([first, second]), config.default())
   let assert Ok(_) = http_gun.send(client, req())
-  testing.verify(client) |> should.equal(Ok(testing.Verdict([], [], [second])))
+  testing.verify(client)
+  |> should.equal(Ok(testing.Verdict([], [], [second], 0)))
   http_gun.stop(client)
 }
 
@@ -645,23 +642,22 @@ pub fn verify_reports_refusals_oldest_first_at_the_cursor_test() {
   let assert Error(_) = http_gun.send(client, request.set_path(req(), "/d"))
   testing.verify(client)
   |> should.equal(
-    Ok(
-      testing.Verdict(
-        mismatched: [
-          testing.Mismatch(0, key(req()), key(request.set_path(req(), "/a"))),
-          testing.Mismatch(
-            1,
-            key(request.set_path(req(), "/second")),
-            key(request.set_path(req(), "/b")),
-          ),
-        ],
-        exhausted: [
-          key(request.set_path(req(), "/c")),
-          key(request.set_path(req(), "/d")),
-        ],
-        unused: [],
-      ),
-    ),
+    Ok(testing.Verdict(
+      mismatched: [
+        testing.Mismatch(0, key(req()), key(request.set_path(req(), "/a"))),
+        testing.Mismatch(
+          1,
+          key(request.set_path(req(), "/second")),
+          key(request.set_path(req(), "/b")),
+        ),
+      ],
+      exhausted: [
+        key(request.set_path(req(), "/c")),
+        key(request.set_path(req(), "/d")),
+      ],
+      unused: [],
+      dropped: 0,
+    )),
   )
   http_gun.stop(client)
 }
@@ -695,5 +691,35 @@ pub fn request_header_allow_list_leaves_failures_and_empty_lists_test() {
   let assert Error(failure) =
     http_gun.send(client |> http_gun.with_body_limit(4, http_gun.Fail), asked)
   list.key_find(error.headers(failure), "retry-after") |> should.equal(Ok("30"))
+  http_gun.stop(client)
+}
+
+pub fn verify_keeps_the_first_refusals_and_counts_the_rest_test() {
+  let only = testing.exchange(req(), respond(200, [], [<<1>>], []))
+  let assert Ok(client) =
+    testing.playback(testing.script([only]), config.default())
+  let at = fn(n) { request.set_path(req(), "/" <> int.to_string(n)) }
+  int.range(0, 70, Nil, fn(_, n) {
+    let assert Error(_) = http_gun.send(client, at(n))
+    Nil
+  })
+  let assert Ok(_) = http_gun.send(client, req())
+  int.range(100, 166, Nil, fn(_, n) {
+    let assert Error(_) = http_gun.send(client, at(n))
+    Nil
+  })
+  let assert Ok(verdict) = testing.verify(client)
+  let key = testing.match_key(redaction.default(), _)
+  list.map(verdict.mismatched, fn(miss) { miss.actual })
+  |> should.equal(
+    int.range(0, 64, [], fn(acc, n) { [key(at(n)), ..acc] })
+    |> list.reverse,
+  )
+  verdict.exhausted
+  |> should.equal(
+    int.range(100, 164, [], fn(acc, n) { [key(at(n)), ..acc] })
+    |> list.reverse,
+  )
+  verdict.dropped |> should.equal(8)
   http_gun.stop(client)
 }

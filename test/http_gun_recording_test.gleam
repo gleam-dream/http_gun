@@ -838,7 +838,7 @@ pub fn request_body_rewrite_never_changes_a_recorded_answer_test() {
   let assert Ok(client) = testing.playback(tape, settings)
   let assert Ok(replayed) = http_gun.send(client, asked("21/11 09:00"))
   replayed.response.body |> should.equal(bit_array.from_string(answer))
-  testing.verify(client) |> should.equal(Ok(testing.Verdict([], [], [])))
+  testing.verify(client) |> should.equal(Ok(testing.Verdict([], [], [], 0)))
   http_gun.stop(client)
   remove(destination)
 }

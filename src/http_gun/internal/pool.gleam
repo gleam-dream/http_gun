@@ -95,10 +95,23 @@ pub type Replay {
     remaining: List(script.Exchange),
     position: Int,
     matching: script.Matching,
-    /// Failed requests in match-key form, newest first, for `verify`.
+    /// Failed requests in match-key form, newest first, for `verify`: at
+    /// most `kept_refusals` of each kind, the rest counted in `dropped`.
     mismatched: List(script.Missed),
     exhausted: List(request.Request(BitArray)),
+    dropped: Int,
   )
+}
+
+const kept_refusals = 64
+
+// A replay that has kept `kept` refusals of one kind keeps the next, or only
+// counts it once the bound is reached.
+fn keep(replay: Replay, kept: List(a), add: fn() -> Replay) -> Replay {
+  case list.length(kept) < kept_refusals {
+    True -> add()
+    False -> Replay(..replay, dropped: replay.dropped + 1)
+  }
 }
 
 /// Start playback at the first exchange with nothing reported.
@@ -106,7 +119,7 @@ pub fn playback(
   exchanges: List(script.Exchange),
   matching: script.Matching,
 ) -> Mode {
-  Playback(Replay(exchanges, 0, matching, [], []))
+  Playback(Replay(exchanges, 0, matching, [], [], 0))
 }
 
 type Phase {
@@ -405,6 +418,7 @@ fn handle(state: State, message: Message) -> actor.Next(State, Message) {
               list.reverse(replay.mismatched),
               list.reverse(replay.exhausted),
               replay.remaining,
+              replay.dropped,
             ))
           Live | Record(_) -> None
         }),
@@ -1044,14 +1058,18 @@ fn note_miss(
   against: Option(#(Int, request.Request(BitArray))),
 ) -> Replay {
   let key = script.key(policy, replay.matching.ignored, _)
-  let actual = key(p.request())
   case against {
     Some(#(at, expected)) ->
-      Replay(..replay, mismatched: [
-        script.Missed(at, key(expected), actual),
-        ..replay.mismatched
-      ])
-    None -> Replay(..replay, exhausted: [actual, ..replay.exhausted])
+      keep(replay, replay.mismatched, fn() {
+        Replay(..replay, mismatched: [
+          script.Missed(at, key(expected), key(p.request())),
+          ..replay.mismatched
+        ])
+      })
+    None ->
+      keep(replay, replay.exhausted, fn() {
+        Replay(..replay, exhausted: [key(p.request()), ..replay.exhausted])
+      })
   }
 }
 

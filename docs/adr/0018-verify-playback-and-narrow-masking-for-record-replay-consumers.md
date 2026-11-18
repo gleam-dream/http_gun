@@ -10,7 +10,9 @@ Status: Accepted
 - A playback session keeps what it refused and the exchanges it has not
   used, and `testing.verify` reports them as a `Verdict`. The caller still
   receives the same failure. A live, recording or stopped client has no
-  verdict.
+  verdict. A session keeps the first 64 refusals of each kind and counts the
+  rest in the verdict's `dropped`, so a test looping on a refused request
+  cannot grow it without bound.
 - A redaction can keep request headers by allow-list. The allow-list governs
   stored and compared request headers only; `content-type` is always kept,
   and the deny-list applies after it, so a named credential header is still
@@ -55,6 +57,12 @@ Status: Accepted
   pure function lets a consumer find the changed part by its own comparison
   and fix the file, and it shares the recorder's rule that a rewritten
   response body is stored as one chunk.
+- One `dropped` count rather than one per kind: any refusal fails a test, and
+  the kept requests already show which kinds occurred. Keeping only the first
+  refusals without a count was rejected because a verdict would then hide how
+  much it left out; keeping each distinct refusal once was rejected because
+  it hides how often a request repeated. The field was added before the
+  verdict's first release, so its one consumer moved with it.
 - A transient failure is consumer policy. `abort` cannot remove a published
   file, so a consumer either watches outcomes while recording and aborts
   before `finish`, or records to a scratch path, checks it and moves it into
@@ -75,8 +83,8 @@ Status: Accepted
 - Cleaning an old cassette does not withdraw a secret already published in
   it or in version-control history; the secret is rotated and any history
   rewrite is the consumer's.
-- The cassette text layout and a bound on the refused requests a session keeps
-  are open rulings in the design's pending ledger.
+- The cassette text layout and the release version are open rulings in the
+  design's pending ledger.
 
 ## Evidence
 

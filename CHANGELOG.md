@@ -8,7 +8,8 @@
   reports what a playback client refused and left: each mismatched request
   beside the exchange it was compared against (`testing.Mismatch` with
   `position`, `expected` and `actual`), each request after the last exchange,
-  all in `match_key` form and oldest first,
+  all in `match_key` form and oldest first (the first 64 of each kind, with
+  the rest counted in `dropped`),
   and the exchanges not yet used. A test can fail on a stale or half-used
   script even when the code under test handled the playback failure. A live
   or recording client gives `NotPlayback`, a stopped one `ClientStopped`.

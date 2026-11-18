@@ -65,8 +65,8 @@
       pending-entry(title: "Choose the cassette text layout", kind: "ruling", since: "2026-11-17", adr: 18)[
         A re-record diff today is one line for the whole file, as the schema subsection states. A multi-line stored layout would isolate exchanges, headers and statuses (bodies stay one line each under the current schema); it needs one layout shared by encoding and the recorder's fragments, grows files against the recording budget and caller read limits, and changes encoded output. Keeping storage compact and rendering a script for review (a pure renderer, usable as a diff driver) leaves storage untouched, but needs per-repository diff configuration and hosted diff views ignore it. A layout of one line per exchange sits between them. The owner has not ruled.
       ],
-      pending-entry(title: "Bound the refused requests a playback session keeps", kind: "ruling", since: "2026-11-17", adr: 18)[
-        A playback session keeps every refused request until it stops. Options that keep the verdict's shape: keep the first refusals of each kind, with any count of the rest as a separate function; or keep each distinct refusal once, which bounds a loop repeating one request but loses how often it repeated. Changing the verdict itself is still possible before the verdict's first release, at the cost of updating a consumer that pins it by commit. The owner has not ruled.
+      pending-entry(title: "Decide the release version for the record and replay additions", kind: "ruling", since: "2026-11-18", adr: 18)[
+        The verify call, the masking additions and the verdict's dropped count are unreleased. The owner decides the version at release.
       ],
       pending-entry(title: "Check carried-over defaults and native claims against code", kind: "verify", since: "2026-10-17")[
         The default-settings table, the native assumption inventory and the destination and offline-playback rules were carried over from the retired usage, testing and dependency-upgrade guides. The compiled usage examples exercise the public paths. The stated default values, budgets and native assumptions have not been compared with the source.
@@ -521,8 +521,8 @@
         [An explicit custom matcher receives these normalized forms. It owns only equality; common validation, lifetime and response admission still run. A mismatch reports the zero-based position and consumes nothing. Exhaustion fails without network fallback. Custom callbacks are trusted code and can block the pool.],
         [A loaded `testing.Script` (#term("term-script")) is immutable input. Each `testing.playback` call starts a separate client at its first exchange, so one script serves independent runs. Client views share their client's cursor; `with_correlation` changes observation metadata and selects no sequence. Concurrent requests on one client consume exchanges in admission order.],
         [Offline requests skip destination resolution/address authorization and open no network socket. Required-view selection still applies. Bodies pass the same post-delivery header/byte admission and collection logic with negotiated protocol Offline.],
-        [A playback session keeps each request it refused by mismatch, with the position and the request of the exchange it was compared against, and each request it refused by exhaustion. Kept requests, actual and expected, are in match-key form without the headers the script ignores (`testing.ignoring_headers`), so they carry only what the configured redaction leaves. Requests refused before matching, such as invalid, cancelled or expired ones, are not kept.],
-        [`testing.verify` returns the kept requests oldest first, with the exchanges not yet used in their stored form, as a `Verdict`. It reports what reached matching before the call; code under test finishes its requests first. The caller of the refused request still receives its failure. A live or recording client returns `NotPlayback`, a stopped one `ClientStopped`. Views share one report. Once released, the verdict types are closed: later additions arrive as separate functions, never as new fields or variants. #adr(18)],
+        [A playback session keeps the first 64 requests it refused by mismatch, with the position and the request of the exchange it was compared against, the first 64 it refused by exhaustion, and a count of every refusal of either kind beyond those. Kept requests, actual and expected, are in match-key form without the headers the script ignores (`testing.ignoring_headers`), so they carry only what the configured redaction leaves. Requests refused before matching, such as invalid, cancelled or expired ones, are not kept.],
+        [`testing.verify` returns the kept requests oldest first, the exchanges not yet used in their stored form, and the count of refusals not kept, as a `Verdict`. It reports what reached matching before the call; code under test finishes its requests first. The caller of the refused request still receives its failure. A live or recording client returns `NotPlayback`, a stopped one `ClientStopped`. Views share one report. Once released, the verdict types are closed: later additions arrive as separate functions, never as new fields or variants. #adr(18)],
       )
       #behavior(title: "Playback mismatch preserves the next exchange", level: "boundary", area: "Playback matching")[
         #given[an offline session has an unused next exchange]
@@ -533,9 +533,10 @@
       #behavior(title: "Verify reports what playback refused and left", level: "boundary", area: "Playback matching")[
         #given[a running playback client]
         #when[a test calls `testing.verify` on it or on any of its views]
-        #then[the verdict lists each mismatched request with its position and the expected request, and each exhausted request, oldest first, all in match-key form]
+        #then[the verdict lists the first 64 mismatched requests with their positions and expected requests, and the first 64 exhausted requests, oldest first, all in match-key form]
+        #then[refusals beyond the first 64 of each kind are counted in the verdict and not listed]
         #then[the verdict lists the exchanges not yet used, in order]
-        #then[an empty verdict means every request that reached matching before the call matched, and every exchange was used]
+        #then[an empty verdict with no refusals dropped means every request that reached matching before the call matched, and every exchange was used]
       ]
     ])
     #subsection(title: "Cassette schema and bounded file input", [

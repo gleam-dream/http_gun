@@ -106,6 +106,7 @@ let assert Ok(testing.Verdict(
   mismatched: [testing.Mismatch(position: 0, expected: _, actual: missed)],
   exhausted: [],
   unused: [_second],
+  dropped: 0,
 )) = testing.verify(client)
 let assert "/v2/orders" = missed.path
 http_gun.stop(client)
