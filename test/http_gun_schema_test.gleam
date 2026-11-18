@@ -114,7 +114,13 @@ pub fn lines_bodies_are_checked_test() {
   let body = fn(marker, value) {
     "{\"http_gun\":"
     <> marker
-    <> ",\"exchanges\":[{\"request\":{\"method\":\"GET\",\"url\":\"http://offline.invalid/\",\"headers\":[],\"body\":"
+    <> ",\"exchanges\":[{\"request\":{\"method\":\"GET\","
+    <> case marker {
+      "2" -> "\"url\":\"http://offline.invalid/\","
+      _ ->
+        "\"scheme\":\"http\",\"host\":\"offline.invalid\",\"port\":null,\"path\":\"/\",\"query\":null,"
+    }
+    <> "\"headers\":[],\"body\":"
     <> value
     <> "},\"reply\":{\"kind\":\"reject\",\"failure\":{\"name\":\"client_closed\",\"evidence\":\"not_sent\"}}}]}"
   }
@@ -134,6 +140,16 @@ pub fn lines_bodies_are_checked_test() {
     cassette.parse(body("3", "{\"text\":5,\"lines\":[\"x\",\"y\"]}"), 10_000)
   let assert [exchange] = testing.exchanges(loaded)
   testing.request(exchange).body |> should.equal(<<"x\ny":utf8>>)
+  // A marker 3 target is read from its fields, which must be valid.
+  cassette.parse(
+    string.replace(
+      body("3", "{\"text\":\"\"}"),
+      "\"scheme\":\"http\"",
+      "\"scheme\":\"ftp\"",
+    ),
+    10_000,
+  )
+  |> should.equal(Error(cassette.Corrupt))
   cassette.parse(body("4", "{\"text\":\"\"}"), 10_000)
   |> should.equal(Error(cassette.UnsupportedVersion(4)))
 }
@@ -168,7 +184,11 @@ pub fn encoding_writes_the_schema_3_layout_test() {
     {
       \"request\": {
         \"method\": \"GET\",
-        \"url\": \"http://offline.invalid/ask?q=1\",
+        \"scheme\": \"http\",
+        \"host\": \"offline.invalid\",
+        \"port\": null,
+        \"path\": \"/ask\",
+        \"query\": \"q=1\",
         \"headers\": [
           [\"accept\", \"text/plain\"]
         ],
@@ -200,7 +220,11 @@ pub fn encoding_writes_the_schema_3_layout_test() {
     {
       \"request\": {
         \"method\": \"GET\",
-        \"url\": \"http://offline.invalid/ask?q=1\",
+        \"scheme\": \"http\",
+        \"host\": \"offline.invalid\",
+        \"port\": null,
+        \"path\": \"/ask\",
+        \"query\": \"q=1\",
         \"headers\": [],
         \"body\": {\"text\": \"\"}
       },

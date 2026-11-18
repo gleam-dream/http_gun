@@ -18,9 +18,9 @@ import gleam/http/request
 import gleam/int
 import gleam/json
 import gleam/list
+import gleam/option.{None, Some}
 import gleam/result
 import gleam/string
-import gleam/uri
 import http_gun/error
 import http_gun/internal/script
 import http_gun/redaction.{type Redaction}
@@ -79,8 +79,22 @@ pub fn exchange_open(first: Bool, req: request.Request(BitArray)) -> String {
   separator(first)
   <> "    {\n      \"request\": {\n        \"method\": "
   <> quoted(http.method_to_string(req.method))
-  <> ",\n        \"url\": "
-  <> quoted(uri.to_string(request.to_uri(req)))
+  <> ",\n        \"scheme\": "
+  <> quoted(http.scheme_to_string(req.scheme))
+  <> ",\n        \"host\": "
+  <> quoted(req.host)
+  <> ",\n        \"port\": "
+  <> case req.port {
+    Some(port) -> int.to_string(port)
+    None -> "null"
+  }
+  <> ",\n        \"path\": "
+  <> quoted(req.path)
+  <> ",\n        \"query\": "
+  <> case req.query {
+    Some(query) -> quoted(query)
+    None -> "null"
+  }
   <> ",\n        \"headers\": "
   <> pairs(req.headers, 10)
   <> ",\n        \"body\": "
@@ -271,15 +285,39 @@ fn exchange_decoder(version: Int) -> decode.Decoder(script.Exchange) {
 }
 
 fn request_decoder(version: Int) -> decode.Decoder(request.Request(BitArray)) {
+  let failed = request.set_body(request.new(), <<>>)
   use method <- decode.field("method", decode.string)
-  use url <- decode.field("url", decode.string)
   use headers <- decode.field("headers", headers_decoder())
   use body <- decode.field("body", bytes_decoder(version))
-  case request.to(url), http.parse_method(method) {
-    Ok(req), Ok(method) ->
-      decode.success(request.Request(..req, method:, headers:, body:))
-    _, _ ->
-      decode.failure(request.set_body(request.new(), <<>>), "HTTP request")
+  use target <- decode.then(case version {
+    // Version 3 stores the target in fields, read back as stored.
+    3 -> {
+      use scheme <- decode.field("scheme", decode.string)
+      use host <- decode.field("host", decode.string)
+      use port <- decode.field("port", decode.optional(decode.int))
+      use path <- decode.field("path", decode.string)
+      use query <- decode.field("query", decode.optional(decode.string))
+      case http.scheme_from_string(scheme) {
+        Ok(scheme) ->
+          decode.success(
+            request.Request(..failed, scheme:, host:, port:, path:, query:),
+          )
+        Error(Nil) -> decode.failure(failed, "HTTP scheme")
+      }
+    }
+    // Version 2 stores one URL.
+    _ -> {
+      use url <- decode.field("url", decode.string)
+      case request.to(url) {
+        Ok(req) -> decode.success(request.set_body(req, <<>>))
+        Error(Nil) -> decode.failure(failed, "HTTP URL")
+      }
+    }
+  })
+  case http.parse_method(method) {
+    Ok(method) ->
+      decode.success(request.Request(..target, method:, headers:, body:))
+    Error(Nil) -> decode.failure(failed, "HTTP method")
   }
 }
 

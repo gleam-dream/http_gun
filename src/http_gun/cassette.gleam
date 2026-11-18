@@ -186,7 +186,10 @@ pub fn redact(
 /// A recorded schema 3 file is returned unchanged, and upgrading is
 /// idempotent. `max_bytes` bounds the input, as `parse` checks it, and the
 /// errors are those of `parse`; the output of a schema 2 input is larger, so
-/// load it with a higher limit. Fields the decoder ignores are not kept.
+/// load it with a higher limit. Fields the decoder ignores are not kept. A
+/// schema 2 file stored each request as one URL, which cannot carry every
+/// target: one that never loaded cannot be upgraded either, and one that
+/// loaded as a different request is upgraded as that request.
 ///
 /// Do not convert with `parse` then `encode`: `encode` applies the default
 /// redaction, which can rewrite an answer recorded before that redaction

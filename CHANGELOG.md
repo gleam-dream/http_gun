@@ -59,6 +59,13 @@
   convert with `parse` then `encode`: `encode` applies the default redaction
   and can rewrite an answer recorded before field redaction existed. To clean
   such a file on purpose, use `cassette.redact`.
+- Schema 3 stores a request's scheme, host, port, path and query as
+  separate fields, so every request a client accepts reads back exactly:
+  a query with brackets, braces, a pipe or quotes, a non-ASCII path, an IPv6
+  host, or a `?` or `#` in a path. A schema 2 file stored one URL, which
+  could not carry those targets. Such a file either never loaded (`load`
+  and `upgrade` return `Corrupt`, and HTTP Gun cannot recover it: record it
+  again) or loaded as a different request, which `upgrade` keeps.
 - Who breaks: an older HTTP Gun reading a schema 3 file fails with
   `UnsupportedVersion(3)`; code comparing `cassette.encode` output with a
   stored string sees the new layout; a `load` limit set close to a file's
