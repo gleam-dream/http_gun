@@ -86,11 +86,53 @@ type Owned {
 pub type Mode {
   Record(recorder.Recording)
   Live
-  Playback(
+  Playback(Replay)
+}
+
+/// A playback session's cursor and what it refused.
+pub type Replay {
+  Replay(
     remaining: List(script.Exchange),
+    cycle: Cycle,
     position: Int,
     matching: script.Matching,
+    /// Failed requests in match-key form, newest first, for `verify`: at
+    /// most `kept_refusals` of each kind, the rest counted in `dropped`.
+    mismatched: List(script.Missed),
+    exhausted: List(request.Request(BitArray)),
+    dropped: Int,
   )
+}
+
+/// Whether a script starts again after its last exchange.
+pub type Cycle {
+  Once
+  /// `every` exchange of a non-empty script; `lapped` once a pass completed.
+  Repeating(every: List(script.Exchange), lapped: Bool)
+}
+
+const kept_refusals = 64
+
+// A replay that has kept `kept` refusals of one kind keeps the next, or only
+// counts it once the bound is reached.
+fn keep(replay: Replay, kept: List(a), add: fn() -> Replay) -> Replay {
+  case list.length(kept) < kept_refusals {
+    True -> add()
+    False -> Replay(..replay, dropped: replay.dropped + 1)
+  }
+}
+
+/// Start playback at the first exchange with nothing reported.
+pub fn playback(
+  exchanges: List(script.Exchange),
+  matching: script.Matching,
+  repeating: Bool,
+) -> Mode {
+  let cycle = case repeating, exchanges {
+    True, [_, ..] -> Repeating(exchanges, False)
+    _, _ -> Once
+  }
+  Playback(Replay(exchanges, cycle, 0, matching, [], [], 0))
 }
 
 type Phase {
@@ -134,6 +176,7 @@ pub opaque type Message {
   Resolved(process.Pid, Result(resolution.Resolved, error.Reason))
   CheckedConnection(process.Pid, process.Pid, Result(Bool, error.Reason))
   Inspect(process.Subject(Result(#(Int, Int, Int), Failure)))
+  Verify(process.Subject(Result(Option(script.Report), Failure)))
   Configuration(process.Subject(Result(Settings, Failure)))
   Open(Invocation, process.Subject(Result(Opened, Failure)))
   Stop(process.Subject(Result(Nil, Failure)))
@@ -153,6 +196,12 @@ pub fn named(name: process.Name(Message)) -> Client {
 
 pub fn stats(client: Client) -> Result(#(Int, Int, Int), Failure) {
   call.run(client.subject, Inspect)
+}
+
+/// What a playback client met that did not match its script; `None` for a
+/// client that does not play back.
+pub fn verify(client: Client) -> Result(Option(script.Report), Failure) {
+  call.run(client.subject, Verify)
 }
 
 pub fn settings(client: Client) -> Result(Settings, Failure) {
@@ -346,9 +395,14 @@ fn validate_size(
   }
 }
 
+// Compared by code point, not by grapheme, so a combining mark after a
+// space cannot hide it.
 fn safe_target(value: String) -> Bool {
-  !list.any([" ", "\r", "\n", "\t", "\u{0}"], fn(char) {
-    string.contains(value, char)
+  !list.any(string.to_utf_codepoints(value), fn(point) {
+    list.contains(
+      [0x20, 0x0D, 0x0A, 0x09, 0x00],
+      string.utf_codepoint_to_int(point),
+    )
   })
 }
 
@@ -371,6 +425,25 @@ fn handle(state: State, message: Message) -> actor.Next(State, Message) {
     }
     Configuration(reply) -> {
       process.send(reply, Ok(state.config))
+      actor.continue(state)
+    }
+    Verify(reply) -> {
+      process.send(
+        reply,
+        Ok(case state.mode {
+          Playback(replay) ->
+            Some(script.Report(
+              list.reverse(replay.mismatched),
+              list.reverse(replay.exhausted),
+              case replay.cycle {
+                Repeating(lapped: True, ..) -> []
+                _ -> replay.remaining
+              },
+              replay.dropped,
+            ))
+          Live | Record(_) -> None
+        }),
+      )
       actor.continue(state)
     }
     Stop(reply) -> begin_stop(state, reply)
@@ -905,8 +978,7 @@ fn admit(state: State, p: Pending) -> Admission {
         False ->
           case state.mode {
             Live | Record(_) -> admit_live(state, p)
-            Playback(exchanges, position, matching) ->
-              Taken(admit_playback(state, p, exchanges, position, matching))
+            Playback(replay) -> Taken(admit_playback(state, p, replay))
           }
       }
   }
@@ -923,19 +995,31 @@ fn checking_count(state: State) -> Int {
   })
 }
 
-fn admit_playback(
-  state: State,
-  p: Pending,
-  exchanges: List(script.Exchange),
-  position: Int,
-  matching: script.Matching,
-) -> State {
-  case exchanges {
-    [] -> {
+fn admit_playback(state: State, p: Pending, replay: Replay) -> State {
+  let refuse = fn(against) {
+    State(
+      ..state,
+      mode: Playback(note_miss(replay, state.config.redaction, p, against)),
+    )
+  }
+  let Replay(remaining:, position:, matching:, ..) = replay
+  case remaining, replay.cycle {
+    [], Repeating(every:, ..) ->
+      admit_playback(
+        state,
+        p,
+        Replay(
+          ..replay,
+          remaining: every,
+          position: 0,
+          cycle: Repeating(every, True),
+        ),
+      )
+    [], Once -> {
       reject(p, error.PlaybackExhausted)
-      state
+      refuse(None)
     }
-    [exchange, ..rest] ->
+    [exchange, ..rest], _ ->
       case
         script.matches(
           matching,
@@ -946,7 +1030,7 @@ fn admit_playback(
       {
         False -> {
           reject(p, error.PlaybackMismatch(position))
-          state
+          refuse(Some(#(position, exchange.request)))
         }
         True -> {
           lifecycle.emit(p.observation, telemetry.AdmissionGranted)
@@ -980,7 +1064,9 @@ fn admit_playback(
               settle(p)
               State(
                 ..state,
-                mode: Playback(rest, position + 1, matching),
+                mode: Playback(
+                  Replay(..replay, remaining: rest, position: position + 1),
+                ),
                 owners: dict.insert(
                   state.owners,
                   started.pid,
@@ -991,6 +1077,31 @@ fn admit_playback(
           }
         }
       }
+  }
+}
+
+// Keep a failed playback request, in the form matching compared, for
+// `verify`. `against` is the exchange it was compared with; `None` means the
+// script was exhausted.
+fn note_miss(
+  replay: Replay,
+  policy: redaction.Redaction,
+  p: Pending,
+  against: Option(#(Int, request.Request(BitArray))),
+) -> Replay {
+  let key = script.key(policy, replay.matching.ignored, _)
+  case against {
+    Some(#(at, expected)) ->
+      keep(replay, replay.mismatched, fn() {
+        Replay(..replay, mismatched: [
+          script.Missed(at, key(expected), key(p.request())),
+          ..replay.mismatched
+        ])
+      })
+    None ->
+      keep(replay, replay.exhausted, fn() {
+        Replay(..replay, exhausted: [key(p.request()), ..replay.exhausted])
+      })
   }
 }
 

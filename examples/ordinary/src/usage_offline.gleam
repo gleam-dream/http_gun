@@ -1,5 +1,6 @@
-//// Offline use: scripted playback, mismatch and exhaustion, a failure that
-//// keeps its response head, and cassette redaction.
+//// Offline use: scripted playback, mismatch and exhaustion, verification, a
+//// repeating failure, a failure that keeps its response head, cassette
+//// redaction, and masking for requests a consumer normalises.
 
 import gleam/http/request
 import gleam/http/response
@@ -26,8 +27,11 @@ fn remove_fixture(path: String) -> Nil
 
 pub fn main() -> Nil {
   scripted()
+  verified()
+  always_failing()
   retry_after()
   redacted_cassette()
+  masked_requests()
 }
 
 // A script answers requests in order; playback never opens a connection.
@@ -59,6 +63,39 @@ fn scripted() -> Nil {
   let assert Error(exhausted) = http_gun.send(client, expected)
   let assert error.PlaybackExhausted = error.reason(exhausted)
   http_gun.stop(client)
+}
+
+// Code under test may handle a playback failure as one more provider error.
+// `verify` reports every request that missed and every exchange left, so the
+// test fails on a stale or half-used script anyway.
+fn verified() -> Nil {
+  let assert Ok(expected) = request.to("https://api.example.test/orders")
+  let expected = request.set_body(expected, <<>>)
+  let reply =
+    testing.Respond(
+      response.new(204) |> response.set_body([]),
+      testing.Finished([]),
+    )
+  let first = testing.exchange(expected, reply)
+  let second = testing.exchange(expected, reply)
+  let assert Ok(client) =
+    testing.playback(testing.script([first, second]), config.default())
+  let stale = request.set_path(expected, "/v2/orders")
+
+  // snips-start: verify-playback
+  // The code under test swallows the mismatch.
+  let _ = http_gun.send(client, stale)
+  let _ = http_gun.send(client, expected)
+
+  let assert Ok(testing.Verdict(
+    mismatched: [testing.Mismatch(position: 0, expected: _, actual: missed)],
+    exhausted: [],
+    unused: [_second],
+    dropped: 0,
+  )) = testing.verify(client)
+  let assert "/v2/orders" = missed.path
+  http_gun.stop(client)
+  // snips-end: verify-playback
 }
 
 // A failure after the head arrived keeps the status and the headers, so a
@@ -116,4 +153,73 @@ fn redacted_cassette() -> Nil {
   let assert <<"abc":utf8>> = buffered.response.body
   http_gun.stop(replay)
   // snips-end: record-and-load
+}
+
+// One built failure answers every request, however many the code under
+// test sends, for example through its retries.
+fn always_failing() -> Nil {
+  let failure =
+    error.new(error.RequestFailed(error.ConnectionReset), error.MaybeSent)
+  let script =
+    testing.script([
+      testing.exchange(
+        request.new() |> request.set_body(<<>>),
+        testing.Reject(failure),
+      ),
+    ])
+    |> testing.matching(fn(_expected, _actual) { True })
+    |> testing.repeating
+  let assert Ok(client) = testing.playback(script, config.default())
+  let assert Ok(req) = request.to("https://api.example.test/any")
+  list.each([1, 2, 3], fn(_) {
+    let assert Error(again) = http_gun.send(client, request.set_body(req, <<>>))
+    let assert error.RequestFailed(error.ConnectionReset) = error.reason(again)
+  })
+  let assert Ok(testing.Verdict([], [], [], 0)) = testing.verify(client)
+  http_gun.stop(client)
+}
+
+// Masking for a consumer that normalises its requests: keep only named
+// request headers, rewrite request bodies only, and apply a grown policy to
+// a cassette already on disk without recording again.
+fn masked_requests() -> Nil {
+  let assert Ok(req) = request.to("https://api.example.test/ask")
+  let req =
+    req
+    |> request.set_header("accept", "application/json")
+    |> request.set_header("x-trace", "run-7")
+    |> request.set_body(<<"asked at 20/11 14:30":utf8>>)
+  let old =
+    testing.script([
+      testing.exchange(
+        req,
+        testing.Respond(
+          response.new(200) |> response.set_body([<<"due 20/11 14:30":utf8>>]),
+          testing.Finished([]),
+        ),
+      ),
+    ])
+
+  // snips-start: masked-requests
+  let policy =
+    redaction.default()
+    |> redaction.keeping_request_headers(["accept"])
+    |> redaction.with_request_body(fn(body) {
+      case body {
+        <<"asked at ":utf8, _:bytes>> -> <<"asked at <time>":utf8>>
+        other -> other
+      }
+    })
+  // The stored form a recording under `policy` writes. Encode it to clean
+  // an old cassette without recording again.
+  let assert [stored] = testing.exchanges(cassette.redact(old, policy))
+  let assert [#("accept", "application/json")] = testing.request(stored).headers
+  let assert <<"asked at <time>":utf8>> = testing.request(stored).body
+  // The answer is never rewritten.
+  let assert testing.Respond(reply, _) = testing.reply(stored)
+  let assert [<<"due 20/11 14:30":utf8>>] = reply.body
+  let cleaned = cassette.encode(cassette.redact(old, policy))
+  // snips-end: masked-requests
+  let assert False = string.contains(cleaned, "run-7")
+  Nil
 }

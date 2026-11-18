@@ -16,6 +16,7 @@ import http_gun/body
 import http_gun/cassette
 import http_gun/config
 import http_gun/error
+import http_gun/redaction
 import http_gun/testing
 
 fn req() -> request.Request(BitArray) {
@@ -490,4 +491,315 @@ pub fn generated_binary_sequences_preserve_every_exchange_test() {
   let assert Error(exhausted) = http_gun.send(client, req())
   error.reason(exhausted) |> should.equal(error.PlaybackExhausted)
   http_gun.stop(client)
+}
+
+pub fn verify_reports_mismatches_exhaustion_and_unused_exchanges_test() {
+  let first = testing.exchange(req(), respond(200, [], [<<1>>], []))
+  let second = testing.exchange(req(), respond(201, [], [<<2>>], []))
+  let script =
+    testing.script([first, second]) |> testing.ignoring_headers(["x-trace"])
+  let assert Ok(client) = testing.playback(script, config.default())
+
+  // A fresh client has nothing to report.
+  testing.verify(client)
+  |> should.equal(Ok(testing.Verdict([], [], [first, second], 0)))
+
+  // The caller's code swallows these failures; verify still sees them.
+  let wrong =
+    req()
+    |> request.set_path("/wrong")
+    |> request.set_header("X-Trace", "abc")
+    |> request.set_header("Authorization", "Bearer live")
+  let assert Error(_) = http_gun.send(client, wrong)
+  let assert Ok(_) = http_gun.send(client, req())
+  let assert Ok(_) = http_gun.send(client, req())
+  let assert Error(_) = http_gun.send(client, request.set_path(req(), "/late"))
+
+  // Both sides are reported as match_key forms them: credentials removed,
+  // ignored headers dropped. Views share the client's report.
+  let view = http_gun.with_timeout(client, config.After(duration.seconds(5)))
+  testing.verify(view)
+  |> should.equal(
+    Ok(testing.Verdict(
+      mismatched: [
+        testing.Mismatch(
+          position: 0,
+          expected: testing.match_key(redaction.default(), req()),
+          actual: testing.match_key(
+            redaction.default(),
+            request.set_path(req(), "/wrong"),
+          ),
+        ),
+      ],
+      exhausted: [
+        testing.match_key(redaction.default(), request.set_path(req(), "/late")),
+      ],
+      unused: [],
+      dropped: 0,
+    )),
+  )
+  http_gun.stop(client)
+  testing.verify(client) |> should.equal(Error(testing.ClientStopped))
+}
+
+pub fn verify_reports_exchanges_never_used_test() {
+  let first = testing.exchange(req(), respond(200, [], [<<1>>], []))
+  let second = testing.exchange(req(), respond(201, [], [<<2>>], []))
+  let assert Ok(client) =
+    testing.playback(testing.script([first, second]), config.default())
+  let assert Ok(_) = http_gun.send(client, req())
+  testing.verify(client)
+  |> should.equal(Ok(testing.Verdict([], [], [second], 0)))
+  http_gun.stop(client)
+}
+
+pub fn verify_refuses_a_client_that_does_not_play_back_test() {
+  let assert Ok(client) = http_gun.start(config.default())
+  testing.verify(client) |> should.equal(Error(testing.NotPlayback))
+  http_gun.stop(client)
+}
+
+pub fn redact_applies_a_grown_policy_to_stored_exchanges_test() {
+  let assert Ok(base) = request.to("http://offline.invalid/ask")
+  let stored_request =
+    base
+    |> request.set_header("x-session", "s-1")
+    |> request.set_header("accept", "text/plain")
+    |> request.set_body(<<>>)
+  let stored =
+    testing.exchange(
+      stored_request,
+      respond(
+        200,
+        [#("content-type", "application/json"), #("x-session", "s-1")],
+        [<<"{\"session\":":utf8>>, <<"\"s-1\",\"ok\":true}":utf8>>],
+        [#("x-session", "s-1"), #("x-end", "yes")],
+      ),
+    )
+  let script = testing.script([stored])
+  let grown =
+    redaction.default()
+    |> redaction.with_headers(["x-session"])
+    |> redaction.with_body_fields(["session"])
+
+  // The stored form a recording under the grown policy would have written.
+  let assert [cleaned] = testing.exchanges(cassette.redact(script, grown))
+  testing.request(cleaned).headers |> should.equal([#("accept", "text/plain")])
+  testing.reply(cleaned)
+  |> should.equal(
+    respond(
+      200,
+      [#("content-type", "application/json")],
+      [<<"{\"session\":\"REDACTED\",\"ok\":true}":utf8>>],
+      [#("x-end", "yes")],
+    ),
+  )
+
+  // Applying it again changes nothing. Under the default policy the only
+  // change is the one a recording makes: the JSON body held as one chunk.
+  testing.exchanges(cassette.redact(cassette.redact(script, grown), grown))
+  |> should.equal([cleaned])
+  testing.exchanges(cassette.redact(script, redaction.default()))
+  |> should.equal([
+    testing.exchange(
+      stored_request,
+      respond(
+        200,
+        [#("content-type", "application/json"), #("x-session", "s-1")],
+        [<<"{\"session\":\"s-1\",\"ok\":true}":utf8>>],
+        [#("x-session", "s-1"), #("x-end", "yes")],
+      ),
+    ),
+  ])
+
+  // Encoding the result gives the cleaned cassette, which still replays.
+  let assert Ok(reloaded) =
+    cassette.parse(cassette.encode(cassette.redact(script, grown)), 100_000)
+  testing.exchanges(reloaded) |> should.equal([cleaned])
+  let assert Ok(client) =
+    testing.playback(reloaded, config.default() |> config.with_redaction(grown))
+  let assert Ok(replayed) = http_gun.send(client, stored_request)
+  replayed.response.body
+  |> should.equal(<<"{\"session\":\"REDACTED\",\"ok\":true}":utf8>>)
+  http_gun.stop(client)
+}
+
+pub fn verify_reports_refusals_oldest_first_at_the_cursor_test() {
+  let first = testing.exchange(req(), respond(200, [], [<<1>>], []))
+  let second =
+    testing.exchange(
+      request.set_path(req(), "/second"),
+      respond(201, [], [<<2>>], []),
+    )
+  let assert Ok(client) =
+    testing.playback(testing.script([first, second]), config.default())
+  let key = testing.match_key(redaction.default(), _)
+  let assert Error(_) = http_gun.send(client, request.set_path(req(), "/a"))
+  let assert Ok(_) = http_gun.send(client, req())
+  let assert Error(_) = http_gun.send(client, request.set_path(req(), "/b"))
+  let assert Ok(_) = http_gun.send(client, request.set_path(req(), "/second"))
+  let assert Error(_) = http_gun.send(client, request.set_path(req(), "/c"))
+  let assert Error(_) = http_gun.send(client, request.set_path(req(), "/d"))
+  testing.verify(client)
+  |> should.equal(
+    Ok(testing.Verdict(
+      mismatched: [
+        testing.Mismatch(0, key(req()), key(request.set_path(req(), "/a"))),
+        testing.Mismatch(
+          1,
+          key(request.set_path(req(), "/second")),
+          key(request.set_path(req(), "/b")),
+        ),
+      ],
+      exhausted: [
+        key(request.set_path(req(), "/c")),
+        key(request.set_path(req(), "/d")),
+      ],
+      unused: [],
+      dropped: 0,
+    )),
+  )
+  http_gun.stop(client)
+}
+
+pub fn request_header_allow_list_leaves_failures_and_empty_lists_test() {
+  // An empty allow-list keeps only the content type.
+  let assert Ok(base) = request.to("http://offline.invalid/ask")
+  let asked =
+    base
+    |> request.set_header("accept", "text/plain")
+    |> request.set_header("content-type", "text/plain")
+    |> request.set_body(<<>>)
+  let only_type = redaction.default() |> redaction.keeping_request_headers([])
+  let script =
+    testing.script([
+      testing.exchange(
+        asked,
+        respond(429, [#("retry-after", "30")], [<<"too large":utf8>>], []),
+      ),
+    ])
+  let assert [stored] = testing.exchanges(cassette.redact(script, only_type))
+  testing.request(stored).headers
+  |> should.equal([#("content-type", "text/plain")])
+
+  // A failure that kept its response head keeps its headers.
+  let assert Ok(client) =
+    testing.playback(
+      script,
+      config.default() |> config.with_redaction(only_type),
+    )
+  let assert Error(failure) =
+    http_gun.send(client |> http_gun.with_body_limit(4, http_gun.Fail), asked)
+  list.key_find(error.headers(failure), "retry-after") |> should.equal(Ok("30"))
+  http_gun.stop(client)
+}
+
+pub fn verify_keeps_the_first_refusals_and_counts_the_rest_test() {
+  let only = testing.exchange(req(), respond(200, [], [<<1>>], []))
+  let assert Ok(client) =
+    testing.playback(testing.script([only]), config.default())
+  let at = fn(n) { request.set_path(req(), "/" <> int.to_string(n)) }
+  int.range(0, 70, Nil, fn(_, n) {
+    let assert Error(_) = http_gun.send(client, at(n))
+    Nil
+  })
+  let assert Ok(_) = http_gun.send(client, req())
+  int.range(100, 166, Nil, fn(_, n) {
+    let assert Error(_) = http_gun.send(client, at(n))
+    Nil
+  })
+  let assert Ok(verdict) = testing.verify(client)
+  let key = testing.match_key(redaction.default(), _)
+  list.map(verdict.mismatched, fn(miss) { miss.actual })
+  |> should.equal(
+    int.range(0, 64, [], fn(acc, n) { [key(at(n)), ..acc] })
+    |> list.reverse,
+  )
+  verdict.exhausted
+  |> should.equal(
+    int.range(100, 164, [], fn(acc, n) { [key(at(n)), ..acc] })
+    |> list.reverse,
+  )
+  verdict.dropped |> should.equal(8)
+  http_gun.stop(client)
+}
+
+pub fn stored_failures_keep_no_redacted_header_test() {
+  let failure =
+    error.new(error.RequestFailed(error.UnknownTransport), error.MaybeSent)
+    |> error.with_headers([
+      #("authorization", "Bearer failure-secret"),
+      #("x-session", "s-1"),
+      #("retry-after", "30"),
+    ])
+  let script =
+    testing.script([
+      testing.exchange(req(), testing.Reject(failure)),
+      testing.exchange(
+        req(),
+        testing.Respond(
+          response.new(200) |> response.set_body([]),
+          testing.Aborted(failure),
+        ),
+      ),
+    ])
+
+  // Encoding never writes a credential header, wherever it is held.
+  let text = cassette.encode(script)
+  string.contains(text, "failure-secret") |> should.be_false
+  string.contains(text, "retry-after") |> should.be_true
+
+  // A grown policy removes its headers from stored failures too.
+  let grown = redaction.default() |> redaction.with_headers(["x-session"])
+  let kept = error.with_headers(failure, [#("retry-after", "30")])
+  testing.exchanges(cassette.redact(script, grown))
+  |> list.map(testing.reply)
+  |> should.equal([
+    testing.Reject(kept),
+    testing.Respond(
+      response.new(200) |> response.set_body([]),
+      testing.Aborted(kept),
+    ),
+  ])
+}
+
+pub fn repeating_script_answers_past_its_end_test() {
+  let failure =
+    error.new(error.RequestFailed(error.PeerClosed), error.MaybeSent)
+  let first = testing.exchange(req(), respond(200, [], [<<1>>], []))
+  let second = testing.exchange(req(), testing.Reject(failure))
+  let script = testing.script([first, second]) |> testing.repeating
+  let assert Ok(client) = testing.playback(script, config.default())
+
+  // Before a pass completes, unused exchanges are reported as usual.
+  let assert Ok(one) = http_gun.send(client, req())
+  one.response.body |> should.equal(<<1>>)
+  testing.verify(client)
+  |> should.equal(Ok(testing.Verdict([], [], [second], 0)))
+
+  // Past the end the cursor returns to the first exchange.
+  let assert Error(rejected) = http_gun.send(client, req())
+  error.reason(rejected)
+  |> should.equal(error.RequestFailed(error.PeerClosed))
+  let assert Ok(again) = http_gun.send(client, req())
+  again.response.body |> should.equal(<<1>>)
+  let assert Error(mismatch) =
+    http_gun.send(client, request.set_path(req(), "/other"))
+  error.reason(mismatch) |> should.equal(error.PlaybackMismatch(1))
+  let assert Error(_) = http_gun.send(client, req())
+  let assert Ok(_) = http_gun.send(client, req())
+
+  // Nothing is exhausted, and after a full pass nothing is unused.
+  let assert Ok(verdict) = testing.verify(client)
+  verdict.exhausted |> should.equal([])
+  verdict.unused |> should.equal([])
+  list.map(verdict.mismatched, fn(miss) { miss.position }) |> should.equal([1])
+  http_gun.stop(client)
+
+  // An empty repeating script is still exhausted.
+  let assert Ok(empty) =
+    testing.playback(testing.script([]) |> testing.repeating, config.default())
+  let assert Error(exhausted) = http_gun.send(empty, req())
+  error.reason(exhausted) |> should.equal(error.PlaybackExhausted)
+  http_gun.stop(empty)
 }

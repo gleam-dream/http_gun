@@ -116,7 +116,7 @@ pub fn reply(exchange: Exchange) -> Reply {
 
 /// A script of exchanges, matched in order and exactly.
 pub fn script(exchanges: List(Exchange)) -> Script {
-  internal.Script(exchanges, internal.exact)
+  internal.Script(exchanges, internal.exact, False)
 }
 
 /// The exchanges of a script, in order.
@@ -136,6 +136,16 @@ pub fn ignoring_headers(script: Script, names: List(String)) -> Script {
       ignored: list.append(matching.ignored, list.map(names, string.lowercase)),
     ),
   )
+}
+
+/// Start again at the first exchange after the last, so a non-empty script
+/// is never exhausted: a test that answers every request with the same built
+/// failure needs one exchange, with `matching` accepting any request.
+/// Positions stay within the script, and once a pass has completed `verify`
+/// reports no unused exchange. Like `ignoring_headers`, this is a playback
+/// setting that `cassette.encode` does not store.
+pub fn repeating(script: Script) -> Script {
+  internal.Script(..script, repeating: True)
 }
 
 /// Replace the exact comparison. `compare` receives the expected and the
@@ -178,7 +188,10 @@ pub fn playback(
     True -> Ok(Nil)
     False -> Error(http_gun.ScriptTooLarge(internal.max_bytes, size))
   })
-  pool.start(settings, pool.Playback(script.exchanges, 0, script.matching))
+  pool.start(
+    settings,
+    pool.playback(script.exchanges, script.matching, script.repeating),
+  )
   |> result.map(fn(started) { started.data })
   |> result.replace_error(http_gun.StartFailed)
 }
@@ -191,4 +204,66 @@ pub fn match_key(
   request: Request(BitArray),
 ) -> Request(BitArray) {
   internal.key(redaction, [], request)
+}
+
+/// A request that did not match the exchange at `position`. Both the
+/// exchange's request and the actual one are as `match_key` forms them, with
+/// the script's ignored headers removed, so they differ exactly where
+/// matching saw a difference (unless `matching` replaced the comparison).
+pub type Mismatch {
+  Mismatch(
+    position: Int,
+    expected: Request(BitArray),
+    actual: Request(BitArray),
+  )
+}
+
+/// What a playback client met that did not match its script. A client whose
+/// requests all matched and whose exchanges were all used reports
+/// `Verdict([], [], [], 0)`.
+pub type Verdict {
+  Verdict(
+    /// Requests that did not match the next exchange, oldest first: the
+    /// first 64.
+    mismatched: List(Mismatch),
+    /// Requests that arrived after the last exchange, oldest first, in the
+    /// same form: the first 64.
+    exhausted: List(Request(BitArray)),
+    /// Exchanges not used yet, in order; none once a repeating script has
+    /// completed a pass.
+    unused: List(Exchange),
+    /// Refusals of either kind beyond the first 64 of each, which the
+    /// client counted but did not keep.
+    dropped: Int,
+  )
+}
+
+/// Why `verify` has no verdict.
+pub type VerifyError {
+  /// The client was started by `http_gun.start` or `cassette.record`.
+  NotPlayback
+  /// The client has stopped; ask before `http_gun.stop`.
+  ClientStopped
+}
+
+/// Report what this playback client met so far that did not match its
+/// script. The caller's code sees `PlaybackMismatch` and `PlaybackExhausted`
+/// as before; `verify` lets a test fail on them even when that code handled
+/// the failure, and on exchanges it never used. Views of one client share
+/// one report. The client keeps the first 64 refused requests of each kind
+/// until it stops and counts the rest in `dropped`.
+pub fn verify(client: http_gun.Client) -> Result(Verdict, VerifyError) {
+  case pool.verify(client) {
+    Error(_) -> Error(ClientStopped)
+    Ok(option.None) -> Error(NotPlayback)
+    Ok(Some(report)) ->
+      Ok(Verdict(
+        mismatched: list.map(report.mismatched, fn(miss) {
+          Mismatch(miss.position, miss.expected, miss.actual)
+        }),
+        exhausted: report.exhausted,
+        unused: report.unused,
+        dropped: report.dropped,
+      ))
+  }
 }

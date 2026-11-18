@@ -62,6 +62,12 @@
       pending-entry(title: "Resolve recording cleanup promise strength", kind: "ruling", since: "2026-10-06", adr: 10)[
         Abort and failure attempt staging removal. The implementation ignores removal failures and can return while a blocked writer's cleaner waits. The public contract is either best-effort cleanup or typed cleanup completion; the owner has not ruled.
       ],
+      pending-entry(title: "Choose the cassette text layout", kind: "ruling", since: "2026-11-17", adr: 18)[
+        A re-record diff today is one line for the whole file, as the schema subsection states. A multi-line stored layout would isolate exchanges, headers and statuses (bodies stay one line each under the current schema); it needs one layout shared by encoding and the recorder's fragments, grows files against the recording budget and caller read limits, and changes encoded output. Keeping storage compact and rendering a script for review (a pure renderer, usable as a diff driver) leaves storage untouched, but needs per-repository diff configuration and hosted diff views ignore it. A layout of one line per exchange sits between them. The owner has not ruled.
+      ],
+      pending-entry(title: "Decide the release version for the record and replay additions", kind: "ruling", since: "2026-11-18", adr: 18)[
+        The verify call, the masking additions and the verdict's dropped count are unreleased. The owner decides the version at release.
+      ],
       pending-entry(title: "Check carried-over defaults and native claims against code", kind: "verify", since: "2026-10-17")[
         The default-settings table, the native assumption inventory and the destination and offline-playback rules were carried over from the retired usage, testing and dependency-upgrade guides. The compiled usage examples exercise the public paths. The stated default values, budgets and native assumptions have not been compared with the source.
       ],
@@ -96,7 +102,7 @@
       ([Admission and pool], [Request validity, destination decisions and lease membership], [Origin queue; resolution; H1 readiness; H2 capacity; release]),
       ([Body], [`open`, `with_response`, `body.next`, `next_within`, `close`], [Head admission; demand; byte retention; terminal delivery; cleanup]),
       ([Collection], [`send`, `body.collect`, `batch`], [Per-response overflow; shared batch budget; bounded workers]),
-      ([Fixtures], [`testing`, `cassette`, `redaction`], [Match keys; schema; capture reservations; writer; finalization; publication]),
+      ([Fixtures], [`testing`, `cassette`, `redaction`], [Match keys; playback verdict; schema; stored-form redaction; capture reservations; writer; finalization; publication]),
       ([Observation], [`telemetry`, client labels and correlation], [Milestones; delivery mode; application forwarders]),
       ([Foreign boundary], [Gun/OTP and filesystem operations], [Event decoding; typed causes; atomics; time; scope cleanup; upgrade audit]),
     ))
@@ -513,8 +519,11 @@
         [`testing.playback` validates complete configuration, whole-byte request/chunk bodies, final statuses 200–599 and estimated script size before starting. It creates a #term("term-playback-session") with one global admission-ordered cursor. Concurrency does not define a reusable first-match lookup.],
         [Exact match keys apply configured redaction to both expected and actual requests. Host and header names become lowercase, empty path becomes slash, ignored headers disappear and remaining headers sort by name while duplicate-name order remains. Method, URI fields and bytes otherwise remain exact.],
         [An explicit custom matcher receives these normalized forms. It owns only equality; common validation, lifetime and response admission still run. A mismatch reports the zero-based position and consumes nothing. Exhaustion fails without network fallback. Custom callbacks are trusted code and can block the pool.],
+        [A script can repeat (`testing.repeating`): after its last exchange the cursor returns to the first, so a non-empty repeating script is never exhausted. Positions stay within the script. Once a pass has completed, every exchange counts as used. Repetition is a playback setting like ignored headers and is not stored in a cassette. #adr(18)],
         [A loaded `testing.Script` (#term("term-script")) is immutable input. Each `testing.playback` call starts a separate client at its first exchange, so one script serves independent runs. Client views share their client's cursor; `with_correlation` changes observation metadata and selects no sequence. Concurrent requests on one client consume exchanges in admission order.],
         [Offline requests skip destination resolution/address authorization and open no network socket. Required-view selection still applies. Bodies pass the same post-delivery header/byte admission and collection logic with negotiated protocol Offline.],
+        [A playback session keeps the first 64 requests it refused by mismatch, with the position and the request of the exchange it was compared against, the first 64 it refused by exhaustion, and a count of every refusal of either kind beyond those. Kept requests, actual and expected, are in match-key form without the headers the script ignores (`testing.ignoring_headers`), so they carry only what the configured redaction leaves. Requests refused before matching, such as invalid, cancelled or expired ones, are not kept.],
+        [`testing.verify` returns the kept requests oldest first, the exchanges not yet used in their stored form, and the count of refusals not kept, as a `Verdict`. It reports what reached matching before the call; code under test finishes its requests first. The caller of the refused request still receives its failure. A live or recording client returns `NotPlayback`, a stopped one `ClientStopped`. Views share one report. Once released, the verdict types are closed: later additions arrive as separate functions, never as new fields or variants. #adr(18)],
       )
       #behavior(title: "Playback mismatch preserves the next exchange", level: "boundary", area: "Playback matching")[
         #given[an offline session has an unused next exchange]
@@ -522,25 +531,65 @@
         #then[the request fails with the current position]
         #then[the next matching request consumes that same exchange]
       ]
+      #behavior(title: "A repeating script answers past its end", level: "boundary", area: "Playback matching")[
+        #given[a playback client whose non-empty script repeats]
+        #when[a request arrives after the last exchange was used]
+        #then[it is compared with the first exchange again, at position zero]
+        #then[no request is refused as exhausted]
+      ]
+      #behavior(title: "Verify reports what playback refused and left", level: "boundary", area: "Playback matching")[
+        #given[a running playback client]
+        #when[a test calls `testing.verify` on it or on any of its views]
+        #then[the verdict lists the first 64 mismatched requests with their positions and expected requests, and the first 64 exhausted requests, oldest first, all in match-key form]
+        #then[refusals beyond the first 64 of each kind are counted in the verdict and not listed]
+        #then[the verdict lists the exchanges not yet used, in order, and none once a repeating script has completed a pass]
+        #then[an empty verdict with no refusals dropped means every request that reached matching before the call matched, and every exchange was used]
+      ]
     ])
     #subsection(title: "Cassette schema and bounded file input", [
       #points(
         [A #term("term-cassette") has marker `http_gun: 2` and an exchanges array. Each exchange has method, URL, ordered header pairs and body; its reply is reject(failure) or response(status, headers, chunks, ending). Ending is finished(trailers), aborted(failure) or abandoned.],
         [Whole bytes encode as text when valid UTF-8, otherwise base64. Invalid required fields, methods/URLs, header-pair shapes, base64 or final status produce Corrupt. Another integer format marker produces UnsupportedVersion. There is one current decoder and no compatibility fallback. #adr(5)],
         [Required fields are decoded; unknown extra JSON fields are not a closed-object rejection contract. If both text and base64 are present, the text branch has precedence. Parse does not perform the playback script-data budget check until playback startup.],
+        [Encoding writes the whole cassette as one line of JSON; the recorder writes the same layout.],
+        [One codec step owns the stored form of an exchange under a redaction: the request through the request redaction, response headers, trailers and the headers a stored failure holds filtered, a rewritten response body held as one chunk. Encoding uses it and `cassette.redact` exposes it.],
+        [`cassette.redact` maps a script to a script, keeping its matching settings. Comparing the result with the stored exchanges shows what a policy that contains the old one would still change; `cassette.encode` of the result gives the cleaned text of an old cassette without a live run. Encoding applies the default redaction again, so the text equals the result when the default redaction leaves the result unchanged. The consumer writes that text itself, without the recorder's atomic publication or file mode, and cleaning a file does not withdraw a secret already published in it or its history.],
         [`parse(text, max_bytes)` checks encoded string size before JSON decoding. `load(path, max_bytes)` uses raw reads of at most max_bytes plus one without read-ahead. A negative file limit clamps to zero. Empty/non-UTF-8/malformed data is corrupt; missing and I/O failures remain typed.],
       )
     ])
     #subsection(title: "Secret ownership and whole-body rewriting", [
       #points(
-        [#term("term-redaction") always removes authorization, proxy-authorization, cookie, set-cookie, x-api-key, api-key, x-goog-api-key, x-auth-token, x-access-token, x-amz-security-token and x-csrf-token. Added header names are case-insensitive and affect stored request/response headers, trailers and collected failure headers.],
-        [One normalized credential-name list serves query parameters, form pairs and JSON keys. Names compare after percent-decoding (plus as space), lowercasing and removing `-` and `_`. Listed names keep their original encoded spelling with value REDACTED. Parameter order and all unselected query bytes remain exact. The default list holds key, api_key, apikey, access_token, token, client_secret, code, refresh_token, id_token, signature, sig, x-amz-security-token, x-goog-api-key, x-amz-signature, x-amz-credential, password, secret and authorization; `with_query_parameters` and `with_body_fields` both add to it.],
+        [#term("term-redaction") holds a header deny-list that always removes authorization, proxy-authorization, cookie, set-cookie, x-api-key, api-key, x-goog-api-key, x-auth-token, x-access-token, x-amz-security-token and x-csrf-token. Added header names are case-insensitive and affect stored request/response headers, trailers and collected failure headers.],
+        [One normalized credential-name list (the credential list) serves query parameters, form pairs and JSON keys. Names compare after percent-decoding (plus as space), lowercasing and removing `-` and `_`. Listed names keep their original encoded spelling with value REDACTED. Parameter order and all unselected query bytes remain exact. The default list holds key, api_key, apikey, access_token, token, client_secret, code, refresh_token, id_token, signature, sig, x-amz-security-token, x-goog-api-key, x-amz-signature, x-amz-credential, password, secret and authorization; `with_query_parameters` and `with_body_fields` both add to it.],
         [Default field redaction selects by the body's content-type header. A form body applies the query rule to pairs split at `&` and `;`. A JSON or +json body is byte-scanned, not decoded: the value after a listed object key, at any depth, becomes the string REDACTED and every other byte remains, so repeated redaction is stable. Key escapes are not decoded; the value of any key containing a backslash escape, or not UTF-8, is replaced whatever the key spells. Form and JSON redaction fails closed: a non-UTF-8 form body, JSON that does not scan (an unterminated string or missing value, as in a truncated or aborted body) and a body above 16 MiB become the whole body REDACTED-UNPARSABLE. Other content types remain unchanged. Field redaction runs before any body hook.],
         [A body hook rewrites each request body and each response body as a whole. Recording holds response chunks within its capture budget then stores one rewritten chunk, so split secrets are visible to that hook. Form and JSON response bodies are held the same way for field redaction. A later hook replaces the earlier one. The live request/response delivery remains unchanged.],
-        [Matching applies the same hook to expected and incoming request values. A recorder can redact a request before storage and matching can redact it again; callback authors therefore supply stable repeatable rewriting. Callbacks own their execution time, allocations and retained captures. There is no general secret detector or callback sandbox.],
+        [Matching applies the same hook to expected and incoming request values. Callbacks own their execution time, allocations and retained captures. There is no general secret detector or callback sandbox.],
         [Matching therefore treats a redacted query value or body field as equal to any live value.],
-        [Unlisted headers, query parameters, body fields and other body data remain in fixtures. Safe logging of failures and observations does not imply that user-supplied fixtures, callback state, native VM crash data or arbitrary application logs contain no secrets.],
+        [A redaction can keep request headers by allow-list, with names compared without case. Once the allow-list is switched on, even with no names, a stored or compared request keeps only the named headers and `content-type`. The deny-list still applies after the allow-list, so a named credential header is removed. Repeated calls add names. Response headers, trailers and the response headers a failure keep follow the deny-list alone. Adding deny-listed headers or credential names, or switching on an allow-list, never stores more. #adr(18)],
+        [An allow-list removes the dropped headers from matching on both sides, so a change in an unlisted request header no longer makes a cassette stale. Files recorded under an allow-list lack those headers; matching them without the allow-list needs a re-record, ignored headers, or a matcher that compares only the header names the expected request holds.],
+        [A request-body rewrite applies to request bodies only, wherever a request is redacted: storage and both sides of matching, after field redaction and the body hook. It never touches a response. A later rewrite replaces the earlier one. #adr(18)],
+        [Matching redacts an already stored request again, and `cassette.redact` re-applies a policy to stored data. Both are exact only when redacting a stored form once more changes nothing: field redaction leaves the body hook's and the rewrite's output unchanged, the body hook leaves the rewrite's output unchanged, and each returns its own output unchanged. Redacting twice and comparing tells an unstable redaction from policy drift.],
+        [Headers not on the deny-list (under an allow-list, only the named request headers and the content type), query parameters and body fields not on the credential list, and other body data remain in fixtures and in a playback verdict, whose actual requests come from the code under test. Safe logging of failures and observations does not imply that user-supplied fixtures, verdicts printed by tests, callback state, native VM crash data or arbitrary application logs contain no secrets.],
       )
+      #behavior(title: "An allow-list keeps credentials out and replies whole", level: "boundary", area: "Redaction")[
+        #given[a redaction that keeps named request headers]
+        #when[a request is stored or compared]
+        #then[only the named request headers and the content type remain]
+        #then[a named credential header is still removed]
+        #then[response headers, trailers and the headers a failure keeps follow the deny-list alone]
+      ]
+      #behavior(title: "A request-body rewrite never changes a recorded answer", level: "boundary", area: "Redaction")[
+        #given[a redaction with a request-body rewrite]
+        #when[an exchange is recorded, encoded or matched]
+        #then[every request body is rewritten]
+        #then[every response body is stored and replayed exactly as a redaction without the request-body rewrite leaves it]
+      ]
+      #behavior(title: "Redacting stored data matches what a recording stores", level: "boundary", area: "Redaction")[
+        #given[a loaded script and a redaction]
+        #when[the script is redacted]
+        #then[each exchange equals what a recording under that redaction stores for the same live exchange]
+        #then[an exchange already stored under that redaction is unchanged when redacting its stored form once more changes nothing]
+      ]
     ])
   ])
 
@@ -605,6 +654,7 @@
         [An application routes the `http_gun` event prefix to a forwarder at startup so handlers never run inside the pool. A node-wide handler sees the events of every client, including those libraries own, and filters on the client label.],
         [A library receiving a view reads `http_gun.correlation` and copies it into its own event vocabulary. It preserves caller settings. A library owning a private client labels it with the library name; silence is an explicit alternative. Application startup owns route installation and removal.],
         [Resolver, body redactor, playback matcher and scoped response callback are the variable-behavior ports. Common client admission, failure evidence and actor cleanup remain local to HTTP Gun. Callback authors own finite captured state and resources they spawn; custom matcher/redactor execution is not isolated by a timer.],
+        [Record-and-replay consumers own mapping volatile values back into replies, choosing a cassette per concurrent run, refusing to publish a recording that captured a transient failure, guarding who may record and driving re-records. #adr(18)],
         [Provider adapters own authentication, request encoding, expected status/media type, cumulative semantic response bounds, SSE/provider framing and outcome reduction. MCP clients own MCP correlation/protocol semantics. OIDC clients own URL/trust restrictions and identity validation. No shared retry/runtime/error/durability abstraction is introduced.],
         [Body transfer has no public operation. An async consumer opens inside the process that will read. Introducing transfer would require revocation, in-flight read, death and cancellation semantics; it is not inferred from body copying.],
       )

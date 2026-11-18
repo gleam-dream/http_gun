@@ -4,12 +4,50 @@
 
 ### Added
 
+- `testing.verify(client) -> Result(testing.Verdict, testing.VerifyError)`
+  reports what a playback client refused and left: each mismatched request
+  beside the exchange it was compared against (`testing.Mismatch` with
+  `position`, `expected` and `actual`), each request after the last exchange,
+  all in `match_key` form and oldest first (the first 64 of each kind, with
+  the rest counted in `dropped`),
+  and the exchanges not yet used. A test can fail on a stale or half-used
+  script even when the code under test handled the playback failure. A live
+  or recording client gives `NotPlayback`, a stopped one `ClientStopped`.
+- `redaction.keeping_request_headers(redaction, names)` stores and compares
+  only the named request headers and `content-type`. Credential and other
+  removed headers stay removed even when named; response headers, trailers
+  and failure headers are unaffected. See ADR 0018.
+- `redaction.with_request_body(redaction, rewrite)` rewrites request bodies
+  only, in recordings and on both sides of playback matching, so normalising
+  volatile request values never edits a recorded answer.
+- `testing.repeating(script)` starts playback again at the first exchange
+  after the last, so a non-empty script is never exhausted. With a matcher
+  that accepts any request, one exchange answers every request, for example
+  with a built provider failure.
+- `cassette.redact(script, redaction)` applies a redaction to stored
+  exchanges as a recording would store them, to find what a grown policy
+  would still change in old cassettes and to clean them with `encode`
+  without recording again.
 - `config.with_cipher_suites` with `config.CipherSuites`: `OtpDefaults`
   (the default) or `OtpDefaultsAndTls12Cbc`, which also offers the TLS 1.2
   ECDHE AES-CBC suites with HMAC-SHA-256/384 after OTP's defaults. OTP left
   CBC suites out of its defaults, and some servers (for example the São Paulo
   NFS-e web service) accept only them. Verification, trust and destination
   policy are unchanged. See ADR 0017.
+
+### Fixed
+
+- A request whose host, path or query held a space followed by a combining
+  mark passed admission, because the check matched whole characters as
+  displayed rather than code points; the space then reached the request
+  line. It is now refused as `InvalidRequest(InvalidTarget)` (or
+  `InvalidOrigin` for the host), like any other space.
+
+- `cassette.encode` removed credential headers from requests, responses and
+  trailers but wrote the headers held inside a scripted failure (a `Reject`
+  or an `Aborted` ending) as given, although its documentation says credential
+  headers are never written. It now filters them too. Recordings were not
+  affected: a recorded failure holds no headers.
 
 ## 0.1.1 - 2026-11-04
 
