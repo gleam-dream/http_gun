@@ -12,6 +12,17 @@
   and the exchanges not yet used. A test can fail on a stale or half-used
   script even when the code under test handled the playback failure. A live
   or recording client gives `NotPlayback`, a stopped one `ClientStopped`.
+- `redaction.keeping_request_headers(redaction, names)` stores and compares
+  only the named request headers and `content-type`. Credential and other
+  removed headers stay removed even when named; response headers, trailers
+  and failure headers are unaffected. See ADR 0018.
+- `redaction.with_request_body(redaction, rewrite)` rewrites request bodies
+  only, in recordings and on both sides of playback matching, so normalising
+  volatile request values never edits a recorded answer.
+- `cassette.redact(script, redaction)` applies a redaction to stored
+  exchanges as a recording would store them, to find what a grown policy
+  would still change in old cassettes and to clean them with `encode`
+  without recording again.
 - `config.with_cipher_suites` with `config.CipherSuites`: `OtpDefaults`
   (the default) or `OtpDefaultsAndTls12Cbc`, which also offers the TLS 1.2
   ECDHE AES-CBC suites with HMAC-SHA-256/384 after OTP's defaults. OTP left

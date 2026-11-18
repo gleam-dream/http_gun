@@ -113,6 +113,37 @@ http_gun.stop(client)
 
 <!-- prettier-ignore-end -->
 
+A test that normalises volatile request values (a time, an id) can rewrite
+request bodies only, so a recorded answer is never edited, and can store only
+the request headers it names. `cassette.redact` applies a grown policy to a
+cassette already on disk without recording again.
+
+<!-- prettier-ignore-start -->
+
+<!-- snips: examples/ordinary/src/usage_offline.gleam#masked-requests -->
+```gleam
+let policy =
+  redaction.default()
+  |> redaction.keeping_request_headers(["accept"])
+  |> redaction.with_request_body(fn(body) {
+    case body {
+      <<"asked at ":utf8, _:bytes>> -> <<"asked at <time>":utf8>>
+      other -> other
+    }
+  })
+// The stored form a recording under `policy` writes. Encode it to clean
+// an old cassette without recording again.
+let assert [stored] = testing.exchanges(cassette.redact(old, policy))
+let assert [#("accept", "application/json")] = testing.request(stored).headers
+let assert <<"asked at <time>":utf8>> = testing.request(stored).body
+// The answer is never rewritten.
+let assert testing.Respond(reply, _) = testing.reply(stored)
+let assert [<<"due 20/11 14:30":utf8>>] = reply.body
+let cleaned = cassette.encode(cassette.redact(old, policy))
+```
+
+<!-- prettier-ignore-end -->
+
 ## Runtime ownership
 
 Each client has a pool process that admits requests and assigns connection

@@ -1,6 +1,6 @@
 //// Offline use: scripted playback, mismatch and exhaustion, verification, a
-//// failure that
-//// keeps its response head, and cassette redaction.
+//// failure that keeps its response head, cassette redaction, and masking
+//// for requests a consumer normalises.
 
 import gleam/http/request
 import gleam/http/response
@@ -29,6 +29,7 @@ pub fn main() -> Nil {
   scripted()
   retry_after()
   redacted_cassette()
+  masked_requests()
 }
 
 // A script answers requests in order; playback never opens a connection.
@@ -150,4 +151,49 @@ fn redacted_cassette() -> Nil {
   let assert <<"abc":utf8>> = buffered.response.body
   http_gun.stop(replay)
   // snips-end: record-and-load
+}
+
+// Masking for a consumer that normalises its requests: keep only named
+// request headers, rewrite request bodies only, and apply a grown policy to
+// a cassette already on disk without recording again.
+fn masked_requests() -> Nil {
+  let assert Ok(req) = request.to("https://api.example.test/ask")
+  let req =
+    req
+    |> request.set_header("accept", "application/json")
+    |> request.set_header("x-trace", "run-7")
+    |> request.set_body(<<"asked at 20/11 14:30":utf8>>)
+  let old =
+    testing.script([
+      testing.exchange(
+        req,
+        testing.Respond(
+          response.new(200) |> response.set_body([<<"due 20/11 14:30":utf8>>]),
+          testing.Finished([]),
+        ),
+      ),
+    ])
+
+  // snips-start: masked-requests
+  let policy =
+    redaction.default()
+    |> redaction.keeping_request_headers(["accept"])
+    |> redaction.with_request_body(fn(body) {
+      case body {
+        <<"asked at ":utf8, _:bytes>> -> <<"asked at <time>":utf8>>
+        other -> other
+      }
+    })
+  // The stored form a recording under `policy` writes. Encode it to clean
+  // an old cassette without recording again.
+  let assert [stored] = testing.exchanges(cassette.redact(old, policy))
+  let assert [#("accept", "application/json")] = testing.request(stored).headers
+  let assert <<"asked at <time>":utf8>> = testing.request(stored).body
+  // The answer is never rewritten.
+  let assert testing.Respond(reply, _) = testing.reply(stored)
+  let assert [<<"due 20/11 14:30":utf8>>] = reply.body
+  let cleaned = cassette.encode(cassette.redact(old, policy))
+  // snips-end: masked-requests
+  let assert False = string.contains(cleaned, "run-7")
+  Nil
 }

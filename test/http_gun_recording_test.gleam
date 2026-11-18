@@ -781,3 +781,173 @@ pub fn published_cassette_is_private_to_its_owner_test() {
   simplifile.file_info_permissions_octal(info) |> should.equal(0o600)
   remove(destination)
 }
+
+// A request-body rewrite normalises what the code sends; the answer the
+// service gave is stored and replayed as it came.
+fn normalise_times(bytes: BitArray) -> BitArray {
+  case bit_array.to_string(bytes) {
+    Ok(text) ->
+      text
+      |> string.replace("20/11 14:30", "<time>")
+      |> string.replace("21/11 09:00", "<time>")
+      |> bit_array.from_string
+    Error(Nil) -> bytes
+  }
+}
+
+pub fn request_body_rewrite_never_changes_a_recorded_answer_test() {
+  let answer = "Vence dia 20/11 14:30"
+  let port =
+    serve(bit_array.from_string(
+      "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: "
+      <> int.to_string(string.byte_size(answer))
+      <> "\r\n\r\n"
+      <> answer,
+    ))
+  let settings =
+    local_config()
+    |> config.with_redaction(
+      redaction.default() |> redaction.with_request_body(normalise_times),
+    )
+  let asked = fn(time) {
+    let assert Ok(req) =
+      request.to("http://localhost:" <> int.to_string(port) <> "/ask")
+    req
+    |> request.set_method(http.Post)
+    |> request.set_header("content-type", "text/plain")
+    |> request.set_body(bit_array.from_string("Now is " <> time))
+  }
+  let destination = path()
+  let assert Ok(recorded) =
+    cassette.record(settings, destination, cassette.options())
+  let assert Ok(live) = http_gun.send(recorded.client, asked("20/11 14:30"))
+  live.response.body |> should.equal(bit_array.from_string(answer))
+  let assert Ok(_) =
+    cassette.finish(recorded.recording, duration.milliseconds(1000))
+  http_gun.stop(recorded.client)
+
+  let assert Ok(tape) = cassette.load(destination, 100_000)
+  let assert [stored] = testing.exchanges(tape)
+  testing.request(stored).body |> should.equal(<<"Now is <time>":utf8>>)
+  let assert testing.Respond(stored_response, _) = testing.reply(stored)
+  bit_array.concat(stored_response.body)
+  |> should.equal(bit_array.from_string(answer))
+
+  // Another run sends another time; it still matches, and the code receives
+  // the answer the service wrote.
+  let assert Ok(client) = testing.playback(tape, settings)
+  let assert Ok(replayed) = http_gun.send(client, asked("21/11 09:00"))
+  replayed.response.body |> should.equal(bit_array.from_string(answer))
+  testing.verify(client) |> should.equal(Ok(testing.Verdict([], [], [])))
+  http_gun.stop(client)
+  remove(destination)
+}
+
+// A request header allow-list stores and compares only the named request
+// headers and the content type. Credentials stay out even when named, and
+// response headers keep the deny-list alone.
+pub fn request_header_allow_list_test() {
+  let port =
+    serve(<<
+      "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nX-Kept: yes\r\nX-Signature: resp-sig-secret\r\nContent-Length: 2\r\n\r\nok":utf8,
+    >>)
+  let settings =
+    local_config()
+    |> config.with_redaction(
+      redaction.default()
+      |> redaction.with_headers(["x-signature"])
+      |> redaction.keeping_request_headers(["Accept"])
+      |> redaction.keeping_request_headers(["x-goog-api-key", "x-signature"]),
+    )
+  let asked = fn(session) {
+    let assert Ok(req) =
+      request.to("http://localhost:" <> int.to_string(port) <> "/ask")
+    req
+    |> request.set_method(http.Post)
+    |> request.set_header("accept", "text/plain")
+    |> request.set_header("content-type", "text/plain")
+    |> request.set_header("x-goog-api-key", "key-secret")
+    |> request.set_header("x-signature", "sig-secret")
+    |> request.set_header("x-session", session)
+    |> request.set_body(<<"hello":utf8>>)
+  }
+  let destination = path()
+  let assert Ok(recorded) =
+    cassette.record(settings, destination, cassette.options())
+  let assert Ok(_) = http_gun.send(recorded.client, asked("first-run"))
+  let assert Ok(_) =
+    cassette.finish(recorded.recording, duration.milliseconds(1000))
+  http_gun.stop(recorded.client)
+
+  let assert Ok(text) = simplifile.read(destination)
+  list.each(
+    ["key-secret", "sig-secret", "first-run", "resp-sig-secret"],
+    fn(leaked) { string.contains(text, leaked) |> should.be_false },
+  )
+  let assert Ok(tape) = cassette.load(destination, 100_000)
+  let assert [stored] = testing.exchanges(tape)
+  testing.request(stored).headers
+  |> should.equal([#("accept", "text/plain"), #("content-type", "text/plain")])
+  let assert testing.Respond(stored_response, _) = testing.reply(stored)
+  list.key_find(stored_response.headers, "x-kept") |> should.equal(Ok("yes"))
+  list.key_find(stored_response.headers, "content-type")
+  |> should.equal(Ok("text/plain"))
+
+  // An unlisted request header takes no part in matching; a listed one does.
+  let assert Ok(client) = testing.playback(tape, settings)
+  let assert Ok(replayed) = http_gun.send(client, asked("second-run"))
+  replayed.response.body |> should.equal(<<"ok":utf8>>)
+  let assert Error(_) =
+    http_gun.send(client, request.set_header(asked("x"), "accept", "*/*"))
+  http_gun.stop(client)
+  remove(destination)
+}
+
+// What a recording stores is what `cassette.redact` makes of the exchange
+// the live client saw: one rule for the stored form.
+pub fn recording_stores_what_redact_makes_of_the_live_exchange_test() {
+  let port =
+    serve(<<
+      "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nX-Signature: resp-sig\r\nTransfer-Encoding: chunked\r\n\r\n9\r\n{\"token\":\r\n10\r\n\"t-1\",\"n\":\"20/\"}\r\n0\r\nX-Signature: trailer-sig\r\nX-End: yes\r\n\r\n":utf8,
+    >>)
+  let policy =
+    redaction.default()
+    |> redaction.with_headers(["x-signature"])
+    |> redaction.with_body(scrub)
+    |> redaction.with_request_body(normalise_times)
+    |> redaction.keeping_request_headers(["accept"])
+  let settings = local_config() |> config.with_redaction(policy)
+  let assert Ok(req) =
+    request.to("http://localhost:" <> int.to_string(port) <> "/ask?token=t-2")
+  let req =
+    req
+    |> request.set_method(http.Post)
+    |> request.set_header("accept", "application/json")
+    |> request.set_header("x-session", "s-1")
+    |> request.set_header("content-type", "application/x-www-form-urlencoded")
+    |> request.set_body(<<"card=4111-1111&at=20/11 14:30&token=t-3":utf8>>)
+  let destination = path()
+  let assert Ok(recorded) =
+    cassette.record(settings, destination, cassette.options())
+  let assert Ok(live) = http_gun.send(recorded.client, req)
+  let assert Ok(_) =
+    cassette.finish(recorded.recording, duration.milliseconds(1000))
+  http_gun.stop(recorded.client)
+
+  let seen =
+    testing.exchange(
+      req,
+      testing.Respond(
+        response.Response(live.response.status, live.response.headers, [
+          live.response.body,
+        ]),
+        testing.Finished(live.trailers),
+      ),
+    )
+  let assert Ok(tape) = cassette.load(destination, 100_000)
+  testing.exchanges(tape)
+  |> should.equal(
+    testing.exchanges(cassette.redact(testing.script([seen]), policy)),
+  )
+  remove(destination)
+}

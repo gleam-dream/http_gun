@@ -41,6 +41,7 @@
 
 import gleam/bit_array
 import gleam/int
+import gleam/list
 import gleam/result
 import gleam/string
 import gleam/time/duration.{type Duration}
@@ -146,6 +147,26 @@ pub fn replace_existing(options: RecordOptions) -> RecordOptions {
 /// Encode a script as a cassette. Credential headers are never written.
 pub fn encode(script: testing.Script) -> String {
   codec.encode(testing.exchanges(script), redaction.default())
+}
+
+/// Apply `redaction` to stored exchanges, as a recording under it would have
+/// stored them: requests redacted, response headers and trailers filtered,
+/// and a rewritten response body held as one chunk. The matching settings of
+/// `script` are kept.
+///
+/// Compare the result with the script to find what a grown policy would
+/// still change in old cassettes, and `encode` the result to clean them
+/// without recording again; writing the file is the caller's. Both rely on
+/// body functions returning their own output unchanged: redact twice and
+/// compare to tell an unstable function from a policy change.
+pub fn redact(
+  script: testing.Script,
+  redaction: redaction.Redaction,
+) -> testing.Script {
+  script.Script(
+    ..script,
+    exchanges: list.map(script.exchanges, codec.store(redaction, _)),
+  )
 }
 
 /// Parse a cassette of at most `max_bytes`.

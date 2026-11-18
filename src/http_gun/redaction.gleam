@@ -42,6 +42,8 @@
 //// applied: listed headers are removed, listed query parameters keep their
 //// name with the value `REDACTED`, credential body fields are replaced, and
 //// the body function rewrites request bodies and whole response bodies. A
+//// request-body rewrite (`with_request_body`) applies to request bodies only,
+//// so it can normalise volatile request values without touching an answer. A
 //// playback client applies the same redaction to the scripted request and to
 //// each incoming request before comparing them, so a recorded cassette
 //// matches the live code that made it. A redacted value therefore matches
@@ -68,6 +70,9 @@ pub opaque type Redaction {
     headers: List(String),
     names: List(String),
     body: Option(fn(BitArray) -> BitArray),
+    request_body: Option(fn(BitArray) -> BitArray),
+    /// Lowercased request header names to keep, once any are named.
+    kept_request_headers: Option(List(String)),
   )
 }
 
@@ -132,6 +137,8 @@ pub fn default() -> Redaction {
     headers: credential_headers,
     names: add_names([], list.append(credential_parameters, credential_fields)),
     body: None,
+    request_body: None,
+    kept_request_headers: None,
   )
 }
 
@@ -195,6 +202,39 @@ pub fn with_body(
   Redaction(..redaction, body: Some(redact))
 }
 
+/// Rewrite request bodies only, after the credential fields are replaced and
+/// after `with_body`: the body a recording stores, and both the scripted and
+/// the incoming body that playback compares. Response bodies are never
+/// passed to `rewrite`, so normalising volatile request values (a time, an
+/// id, inline image data) cannot edit a recorded answer. Playback applies
+/// `rewrite` to a body it already rewrote, so it must return its own output
+/// unchanged. Calling it again replaces the function.
+pub fn with_request_body(
+  redaction: Redaction,
+  rewrite: fn(BitArray) -> BitArray,
+) -> Redaction {
+  Redaction(..redaction, request_body: Some(rewrite))
+}
+
+/// Store and compare only these request headers, compared without case, and
+/// `content-type`, which field redaction reads. A request header nobody named
+/// is then left out of recordings and out of matching on both sides, so a
+/// new header a client starts sending is never stored. The removed headers
+/// still apply: a named credential header is removed. Repeated calls add
+/// names. Response headers, trailers and the headers a failure keeps are not
+/// affected.
+pub fn keeping_request_headers(
+  redaction: Redaction,
+  names: List(String),
+) -> Redaction {
+  let names = list.map(names, string.lowercase)
+  let kept = case redaction.kept_request_headers {
+    Some(kept) -> list.unique(list.append(kept, names))
+    None -> list.unique(["content-type", ..names])
+  }
+  Redaction(..redaction, kept_request_headers: Some(kept))
+}
+
 /// Remove the redacted headers from a header list.
 pub fn headers(
   redaction: Redaction,
@@ -205,17 +245,22 @@ pub fn headers(
   })
 }
 
-/// Apply the redaction to a request: remove headers, replace query values and
-/// rewrite the body for its `content-type`, as `body_for` does.
+/// Apply the redaction to a request: keep only the allowed request headers,
+/// if any are named, remove headers, replace query values,
+/// rewrite the body for its `content-type`, as `body_for` does, then apply the
+/// request-body rewrite, if any.
 pub fn request(
   redaction: Redaction,
   req: Request(BitArray),
 ) -> Request(BitArray) {
   request.Request(
     ..req,
-    headers: headers(redaction, req.headers),
+    headers: headers(redaction, request_headers(redaction, req.headers)),
     query: option.map(req.query, query(redaction, _)),
-    body: body_for(redaction, req.headers, req.body),
+    body: case redaction.request_body {
+      Some(rewrite) -> rewrite(body_for(redaction, req.headers, req.body))
+      None -> body_for(redaction, req.headers, req.body)
+    },
   )
 }
 
@@ -252,6 +297,19 @@ pub fn body(redaction: Redaction, bytes: BitArray) -> BitArray {
 /// whatever this returns; see `rewrites_body_for`.
 pub fn rewrites_bodies(redaction: Redaction) -> Bool {
   option.is_some(redaction.body)
+}
+
+fn request_headers(
+  redaction: Redaction,
+  headers: List(#(String, String)),
+) -> List(#(String, String)) {
+  case redaction.kept_request_headers {
+    None -> headers
+    Some(kept) ->
+      list.filter(headers, fn(header) {
+        list.contains(kept, string.lowercase(header.0))
+      })
+  }
 }
 
 fn query(redaction: Redaction, query: String) -> String {

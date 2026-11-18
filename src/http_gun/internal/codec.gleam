@@ -31,17 +31,26 @@ pub fn encode(exchanges: List(script.Exchange), policy: Redaction) -> String {
     #(
       "exchanges",
       json.array(exchanges, fn(exchange) {
+        let exchange = store(policy, exchange)
         json.object([
-          #(
-            "request",
-            request_json(redaction.request(policy, exchange.request)),
-          ),
-          #("reply", reply_json(redact_reply(policy, exchange.reply))),
+          #("request", request_json(exchange.request)),
+          #("reply", reply_json(exchange.reply)),
         ])
       }),
     ),
   ])
   |> json.to_string
+}
+
+/// The form a recording under `policy` stores an exchange in: the request
+/// redacted, response headers and trailers filtered, and a rewritten
+/// response body held as one chunk. Encoding uses it; the recorder's streamed
+/// fragments are tested against it.
+pub fn store(policy: Redaction, exchange: script.Exchange) -> script.Exchange {
+  script.Exchange(
+    redaction.request(policy, exchange.request),
+    redact_reply(policy, exchange.reply),
+  )
 }
 
 fn redact_reply(policy: Redaction, reply: script.Reply) -> script.Reply {

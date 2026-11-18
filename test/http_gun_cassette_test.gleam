@@ -561,3 +561,68 @@ pub fn verify_refuses_a_client_that_does_not_play_back_test() {
   testing.verify(client) |> should.equal(Error(testing.NotPlayback))
   http_gun.stop(client)
 }
+
+pub fn redact_applies_a_grown_policy_to_stored_exchanges_test() {
+  let assert Ok(base) = request.to("http://offline.invalid/ask")
+  let stored_request =
+    base
+    |> request.set_header("x-session", "s-1")
+    |> request.set_header("accept", "text/plain")
+    |> request.set_body(<<>>)
+  let stored =
+    testing.exchange(
+      stored_request,
+      respond(
+        200,
+        [#("content-type", "application/json"), #("x-session", "s-1")],
+        [<<"{\"session\":":utf8>>, <<"\"s-1\",\"ok\":true}":utf8>>],
+        [#("x-session", "s-1"), #("x-end", "yes")],
+      ),
+    )
+  let script = testing.script([stored])
+  let grown =
+    redaction.default()
+    |> redaction.with_headers(["x-session"])
+    |> redaction.with_body_fields(["session"])
+
+  // The stored form a recording under the grown policy would have written.
+  let assert [cleaned] = testing.exchanges(cassette.redact(script, grown))
+  testing.request(cleaned).headers |> should.equal([#("accept", "text/plain")])
+  testing.reply(cleaned)
+  |> should.equal(
+    respond(
+      200,
+      [#("content-type", "application/json")],
+      [<<"{\"session\":\"REDACTED\",\"ok\":true}":utf8>>],
+      [#("x-end", "yes")],
+    ),
+  )
+
+  // Applying it again changes nothing. Under the default policy the only
+  // change is the one a recording makes: the JSON body held as one chunk.
+  testing.exchanges(cassette.redact(cassette.redact(script, grown), grown))
+  |> should.equal([cleaned])
+  testing.exchanges(cassette.redact(script, redaction.default()))
+  |> should.equal([
+    testing.exchange(
+      stored_request,
+      respond(
+        200,
+        [#("content-type", "application/json"), #("x-session", "s-1")],
+        [<<"{\"session\":\"s-1\",\"ok\":true}":utf8>>],
+        [#("x-session", "s-1"), #("x-end", "yes")],
+      ),
+    ),
+  ])
+
+  // Encoding the result gives the cleaned cassette, which still replays.
+  let assert Ok(reloaded) =
+    cassette.parse(cassette.encode(cassette.redact(script, grown)), 100_000)
+  testing.exchanges(reloaded) |> should.equal([cleaned])
+  let assert Ok(client) =
+    testing.playback(reloaded, config.default() |> config.with_redaction(grown))
+  let assert Ok(replayed) = http_gun.send(client, stored_request)
+  replayed.response.body
+  |> should.equal(<<"{\"session\":\"REDACTED\",\"ok\":true}":utf8>>)
+  http_gun.stop(client)
+}
