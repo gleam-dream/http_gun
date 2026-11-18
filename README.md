@@ -186,6 +186,13 @@ flowchart LR
   redaction for application secrets and inspect fixtures before sharing them.
   Cassette files are created with mode `0600`. Publication is atomic, but
   crash durability is not promised.
+- Cassettes use schema 3: one field per line, and a text body containing a
+  newline stored as its lines, so a re-recorded answer diffs line by line and
+  reads back byte for byte. Schema 2 files still load; convert them with
+  `cassette.upgrade`, not with `parse` then `encode`, which would apply the
+  default redaction to recorded answers. Files are larger than in schema 2
+  (about a quarter for a streamed answer), so raise `max_bytes` on `load`
+  where it was tight.
 - Sinal events are best effort. Without a forwarder route, handlers run inside
   client processes and a slow handler can delay requests.
 - Streamed uploads, redirect following, decompression, proxies, cookie/cache

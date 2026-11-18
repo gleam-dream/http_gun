@@ -24,6 +24,8 @@
   after the last, so a non-empty script is never exhausted. With a matcher
   that accepts any request, one exchange answers every request, for example
   with a built provider failure.
+- `cassette.upgrade(text, max_bytes)` lays out a stored cassette of schema 2
+  or 3 in schema 3 without redacting it again; it is how old files convert.
 - `cassette.redact(script, redaction)` applies a redaction to stored
   exchanges as a recording would store them, to find what a grown policy
   would still change in old cassettes and to clean them with `encode`
@@ -34,6 +36,35 @@
   CBC suites out of its defaults, and some servers (for example the São Paulo
   NFS-e web service) accept only them. Verification, trust and destination
   policy are unchanged. See ADR 0017.
+
+### Changed
+
+- Cassettes are written in schema 3 (`"http_gun": 3`), and schema 2 files
+  still load. Schema 3 lays a cassette out one field per line, each header
+  pair, chunk and body line on a line of its own, and stores a UTF-8 body or
+  chunk that contains a newline as `{"lines": [...]}`, the strings between
+  its newlines, rebuilt exactly by joining them. Every body reads back byte
+  for byte. Recorded files and `cassette.encode` output share this layout.
+  See ADR 0019.
+- The recording budget is charged on every byte the file holds, its envelope
+  and separators included, so a recording within budget B loads with
+  `max_bytes` B. A budget below the 42-byte envelope is refused with
+  `CaptureLimit`.
+
+### Upgrading cassettes
+
+- Convert each schema 2 file with `cassette.upgrade(text, max_bytes)`: read
+  the file, upgrade the text, write it back. No credentials, no network.
+  `upgrade` does not redact again, so no recorded answer changes. Do not
+  convert with `parse` then `encode`: `encode` applies the default redaction
+  and can rewrite an answer recorded before field redaction existed. To clean
+  such a file on purpose, use `cassette.redact`.
+- Who breaks: an older HTTP Gun reading a schema 3 file fails with
+  `UnsupportedVersion(3)`; code comparing `cassette.encode` output with a
+  stored string sees the new layout; a `load` limit set close to a file's
+  schema 2 size can fail with `TooLarge` (a streamed answer grows by about a
+  quarter). Convert in one commit, after moving to this version, so no
+  re-record mixes a format change with a content change.
 
 ### Fixed
 

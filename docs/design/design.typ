@@ -62,9 +62,6 @@
       pending-entry(title: "Resolve recording cleanup promise strength", kind: "ruling", since: "2026-10-06", adr: 10)[
         Abort and failure attempt staging removal. The implementation ignores removal failures and can return while a blocked writer's cleaner waits. The public contract is either best-effort cleanup or typed cleanup completion; the owner has not ruled.
       ],
-      pending-entry(title: "Schema 3: lines bodies and the shared text layout", kind: "build", since: "2026-11-18", adr: 19)[
-        Accepted: a lines body kind for UTF-8 bodies containing a newline, one text layout owned by the codec and written by encoding, upgrading and the recorder, marker 3 written and markers 2 and 3 read, and `cassette.upgrade`.
-      ],
       pending-entry(title: "Align the repository's fixture-schema instruction", kind: "ruling", since: "2026-11-18", adr: 19)[
         AGENTS.md asks to keep one strict, version-marked fixture schema, while schema 3 writes one marker and reads two. Proposed wording: write one strict, version-marked fixture schema and read only the versions the design lists. The owner has not ruled.
       ],

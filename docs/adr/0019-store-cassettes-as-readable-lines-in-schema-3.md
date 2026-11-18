@@ -98,3 +98,7 @@ Status: Accepted
 - llm_wire encodes request bodies with `json.to_string`, compact on one line.
 - Whether dash-crm's recorded answers are streamed or buffered, and indented
   or compact, is not yet measured; its first real recordings settle it.
+- Growth measured on synthetic Gemini-shaped exchanges with a 1.6 KB prompt:
+  a 200-event SSE answer went from 49,518 bytes in schema 2 to 63,116 in
+  schema 3 (27 % more), and an indented 1.2 KB JSON answer from 3,494 to
+  3,969 bytes (14 % more).

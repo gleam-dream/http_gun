@@ -138,7 +138,9 @@ pub fn capture_budget_failure_preserves_http_outcome_test() {
     cassette.record(
       local_config(),
       destination,
-      cassette.options() |> cassette.with_max_bytes(1),
+      cassette.options()
+        // Room for the envelope only, so the first request does not fit.
+        |> cassette.with_max_bytes(42),
     )
   let assert Ok(response) = http_gun.send(recorded.client, req(port))
   response.response.body |> should.equal(<<0, 255, 128>>)
@@ -972,4 +974,142 @@ pub fn verify_refuses_a_recording_client_test() {
   testing.verify(recorded.client) |> should.equal(Error(testing.NotPlayback))
   let assert Ok(Nil) = cassette.abort(recorded.recording)
   http_gun.stop(recorded.client)
+}
+
+// A recorded schema 3 file is already in the codec's layout, and a streamed
+// answer reads back byte for byte.
+pub fn recorded_file_is_its_own_upgrade_test() {
+  let port =
+    serve(<<
+      "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nTransfer-Encoding: chunked\r\n\r\n12\r\ndata: {\"a\":\"é\"}\n\n\r\nE\r\ndata: [DONE]\n\n\r\n0\r\nX-End: yes\r\n\r\n":utf8,
+    >>)
+  let settings = local_config()
+  let destination = path()
+  let assert Ok(recorded) =
+    cassette.record(settings, destination, cassette.options())
+  let asked = fn() {
+    let assert Ok(req) =
+      request.to("http://localhost:" <> int.to_string(port) <> "/stream")
+    req
+    |> request.set_method(http.Post)
+    |> request.set_header("content-type", "application/json")
+    |> request.set_body(<<"{\n  \"prompt\": \"olá\"\n}\n":utf8>>)
+  }
+  let assert Ok(live) = http_gun.send(recorded.client, asked())
+  // A name that does not resolve is recorded as a reject.
+  let assert Error(_) =
+    http_gun.send(
+      recorded.client,
+      request.set_host(asked(), "127.0.0.1.invalid"),
+    )
+  // A JSON answer is held for redaction and stored as one chunk.
+  let json_port =
+    serve(<<
+      "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 21\r\n\r\n{\n  \"token\": \"t-1\"\n}\n":utf8,
+    >>)
+  let assert Ok(json_req) =
+    request.to("http://localhost:" <> int.to_string(json_port) <> "/json")
+  let assert Ok(_) =
+    http_gun.send(recorded.client, request.set_body(json_req, <<>>))
+  // A body the client closes early is recorded as abandoned.
+  let slow =
+    serve(<<
+      "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 100\r\n\r\npartial":utf8,
+    >>)
+  let assert Ok(slow_req) =
+    request.to("http://localhost:" <> int.to_string(slow) <> "/slow")
+  let assert Ok(opened) =
+    http_gun.open(recorded.client, request.set_body(slow_req, <<>>))
+  body.close(opened.body)
+  let assert Ok(_) =
+    cassette.finish(recorded.recording, duration.milliseconds(1000))
+  http_gun.stop(recorded.client)
+
+  let assert Ok(text) = simplifile.read(destination)
+  cassette.upgrade(text, 1_000_000) |> should.equal(Ok(text))
+  string.contains(text, "\"data: [DONE]\"") |> should.be_true
+  string.contains(text, "\"kind\": \"reject\"") |> should.be_true
+  string.contains(text, "\"kind\": \"abandoned\"") |> should.be_true
+
+  let assert Ok(tape) = cassette.load(destination, string.byte_size(text))
+  let assert Ok(client) = testing.playback(tape, settings)
+  let assert Ok(replayed) = http_gun.send(client, asked())
+  replayed.response.body |> should.equal(live.response.body)
+  replayed.trailers |> should.equal(live.trailers)
+  http_gun.stop(client)
+  remove(destination)
+}
+
+// The budget is charged on every byte the file holds: a budget that cannot
+// hold the envelope is refused, and a recording within budget B loads with
+// `max_bytes` B.
+pub fn recording_budget_counts_stored_bytes_test() {
+  cassette.record(
+    local_config(),
+    path(),
+    cassette.options() |> cassette.with_max_bytes(41),
+  )
+  |> result.map(fn(recorded) { recorded.recording })
+  |> should.equal(Error(cassette.CaptureLimit))
+
+  let port = serve(<<"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok":utf8>>)
+  let destination = path()
+  let budget = 2000
+  let assert Ok(recorded) =
+    cassette.record(
+      local_config(),
+      destination,
+      cassette.options() |> cassette.with_max_bytes(budget),
+    )
+  let assert Ok(_) = http_gun.send(recorded.client, req(port))
+  let assert Ok(_) =
+    cassette.finish(recorded.recording, duration.milliseconds(1000))
+  http_gun.stop(recorded.client)
+  let assert Ok(text) = simplifile.read(destination)
+  { string.byte_size(text) <= budget } |> should.be_true
+  cassette.load(destination, budget) |> should.be_ok
+  remove(destination)
+
+  // The charge is the stored size exactly: a budget of the file's size
+  // records it, one byte less does not.
+  let exact = fn(budget) {
+    let target = path()
+    let assert Ok(recorded) =
+      cassette.record(
+        local_config(),
+        target,
+        cassette.options() |> cassette.with_max_bytes(budget),
+      )
+    let sent =
+      http_gun.send(
+        recorded.client,
+        req(serve(<<"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok":utf8>>)),
+      )
+    let finished =
+      cassette.finish(recorded.recording, duration.milliseconds(1000))
+    http_gun.stop(recorded.client)
+    let assert Ok(_) = sent
+    let size = case simplifile.read(target) {
+      Ok(text) -> string.byte_size(text)
+      Error(_) -> -1
+    }
+    remove(target)
+    #(finished |> result.is_ok, size)
+  }
+  let assert #(True, stored) = exact(2000)
+  exact(stored) |> should.equal(#(True, stored))
+  exact(stored - 1) |> should.equal(#(False, -1))
+
+  // An empty recording is the envelope alone and fits within its budget.
+  let empty = path()
+  let assert Ok(recorded) =
+    cassette.record(
+      local_config(),
+      empty,
+      cassette.options() |> cassette.with_max_bytes(42),
+    )
+  let assert Ok(_) = cassette.finish(recorded.recording, duration.seconds(1))
+  http_gun.stop(recorded.client)
+  cassette.load(empty, 42) |> should.be_ok
+  remove(empty)
 }

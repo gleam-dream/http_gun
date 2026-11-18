@@ -15,10 +15,12 @@
 //// let assert Ok(client) = testing.playback(script, settings)
 //// ```
 ////
-//// A cassette is readable JSON (`"http_gun": 2`): a body or chunk that is
-//// valid UTF-8 is stored as `{"text": ..}`, anything else as
-//// `{"base64": ..}`. There is one schema; a file of another version fails
-//// with `UnsupportedVersion`.
+//// A cassette is readable JSON (`"http_gun": 3`), one field per line: a body
+//// or chunk that is valid UTF-8 containing a newline is stored as
+//// `{"lines": [..]}`, one string per line, other UTF-8 as `{"text": ..}`,
+//// and anything else as `{"base64": ..}`. Every body reads back byte for
+//// byte. Schema 2 files still load; `upgrade` converts them. A file of
+//// another version fails with `UnsupportedVersion`.
 ////
 //// What a cassette stores follows the configuration's redaction
 //// (`config.with_redaction`). By default credential headers are removed, and
@@ -108,7 +110,8 @@ pub opaque type RecordOptions {
 pub type RecordError {
   ClientFailed(http_gun.StartError)
   /// The capture exceeded its byte budget or 10,000 exchanges, or the budget
-  /// is outside 1 byte to 16 MiB.
+  /// cannot hold the 42 bytes of envelope charged at start, or is above
+  /// 16 MiB.
   CaptureLimit
   IoFailure(operation: FileOperation, cause: FileCause)
   /// The destination exists and `replace_existing` was not set.
@@ -128,13 +131,17 @@ pub type FinishError {
   CaptureFailed(RecordError)
 }
 
-/// Capture at most 16 MiB of encoded data and refuse to replace an existing
-/// file.
+/// Store at most 16 MiB and refuse to replace an existing file.
 pub fn options() -> RecordOptions {
   RecordOptions(max_bytes: 16_777_216, replace: False)
 }
 
-/// The capture's byte budget, 1 byte to 16 MiB.
+/// The capture's byte budget, from the 42 bytes of envelope charged at
+/// start to 16 MiB. It is
+/// charged on every byte the file will hold, and also on a response body
+/// while it is held for redaction, so a recording within the budget loads
+/// with the same `max_bytes`. A session that needs more is split into several
+/// recordings.
 pub fn with_max_bytes(options: RecordOptions, bytes: Int) -> RecordOptions {
   RecordOptions(..options, max_bytes: bytes)
 }
@@ -170,6 +177,22 @@ pub fn redact(
     ..script,
     exchanges: list.map(script.exchanges, codec.store(redaction, _)),
   )
+}
+
+/// Lay out the text of a stored cassette, schema 2 or 3, in schema 3,
+/// without redacting it again, so every body keeps its bytes. This is how a
+/// schema 2 file is converted: read it, upgrade it, and write the result
+/// over it yourself (without the recorder's atomic publication or file mode).
+/// A recorded schema 3 file is returned unchanged, and upgrading is
+/// idempotent. `max_bytes` bounds the input, as `parse` checks it, and the
+/// errors are those of `parse`. Fields the decoder ignores are not kept.
+///
+/// Do not convert with `parse` then `encode`: `encode` applies the default
+/// redaction, which can rewrite an answer recorded before that redaction
+/// existed. To clean such a file on purpose, use `redact`.
+pub fn upgrade(text: String, max_bytes: Int) -> Result(String, CassetteError) {
+  parse(text, max_bytes)
+  |> result.map(fn(script) { codec.render(testing.exchanges(script)) })
 }
 
 /// Parse a cassette of at most `max_bytes`.

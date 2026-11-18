@@ -8,7 +8,6 @@ import gleam/erlang/process
 import gleam/erlang/reference
 import gleam/http/request
 import gleam/int
-import gleam/json
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/otp/actor
@@ -135,13 +134,20 @@ type Message {
   Discard(process.Subject(Result(Nil, CaptureError)))
 }
 
+// The envelope a published file holds around its exchanges, with its longer
+// closing; a recording charges it when it starts.
+fn envelope_bytes() -> Int {
+  string.byte_size(codec.envelope_open)
+  + string.byte_size(codec.envelope_close(True))
+}
+
 pub fn start(
   destination: String,
   options: Options,
 ) -> Result(Recording, CaptureError) {
   use Nil <- result.try(
     case
-      options.max_bytes > 0
+      options.max_bytes >= envelope_bytes()
       && options.max_bytes <= 16_777_216
       && destination != ""
     {
@@ -172,7 +178,7 @@ pub fn start(
           options: options,
           streams: dict.new(),
           count: 0,
-          bytes: 64,
+          bytes: envelope_bytes(),
           queue: [],
           working: None,
           phase: Active,
@@ -330,10 +336,7 @@ fn reserve_request(
 ) -> State {
   case state.phase {
     Active -> {
-      let fragment =
-        "{\"request\":"
-        <> json.to_string(codec.request_json(req))
-        <> ",\"reply\":"
+      let fragment = codec.exchange_open(state.count == 0, req)
       case
         state.count >= 10_000
         || state.bytes + string.byte_size(fragment) > state.options.max_bytes
@@ -431,8 +434,7 @@ fn append_observation(
             }
             Ok(#(text, stage)) ->
               case
-                state.bytes + string.byte_size(text) + 1
-                > state.options.max_bytes
+                state.bytes + string.byte_size(text) > state.options.max_bytes
               {
                 True -> {
                   ack(Error(CaptureLimit))
@@ -451,7 +453,7 @@ fn append_observation(
                   State(
                     ..state,
                     streams: dict.insert(state.streams, id, stage),
-                    bytes: state.bytes + string.byte_size(text) + 1,
+                    bytes: state.bytes + string.byte_size(text),
                     queue: list.append(state.queue, [job]),
                   )
                 }
@@ -470,13 +472,7 @@ fn fragment(
     AwaitHead, obs.Head(status, headers) ->
       Ok(
         #(
-          "{\"kind\":\"response\",\"status\":"
-            <> int.to_string(status)
-            <> ",\"headers\":"
-            <> json.to_string(
-            codec.headers_json(redaction.headers(policy, headers)),
-          )
-            <> ",\"chunks\":[",
+          codec.response_head(status, redaction.headers(policy, headers)),
           case redaction.rewrites_body_for(policy, headers) {
             True -> Buffering(headers, [])
             False -> Receiving(False)
@@ -484,14 +480,7 @@ fn fragment(
         ),
       )
     Receiving(has_chunks), obs.Bytes(bytes) ->
-      Ok(#(
-        case has_chunks {
-          True -> ","
-          False -> ""
-        }
-          <> json.to_string(codec.bytes_json(bytes)),
-        Receiving(True),
-      ))
+      Ok(#(codec.chunk(!has_chunks, bytes), Receiving(True)))
     Buffering(headers, chunks), obs.Bytes(bytes) ->
       Ok(#("", Buffering(headers, [bytes, ..chunks])))
     Buffering(headers, chunks), _ -> {
@@ -501,41 +490,33 @@ fn fragment(
           headers,
           bit_array.concat(list.reverse(chunks)),
         )
-      let chunk = case bit_array.byte_size(body) {
-        0 -> ""
-        _ -> json.to_string(codec.bytes_json(body))
+      let #(chunk, written) = case bit_array.byte_size(body) {
+        0 -> #("", False)
+        _ -> #(codec.chunk(True, body), True)
       }
       use #(ending, stage) <- result.try(fragment(
         policy,
-        Receiving(False),
+        Receiving(written),
         event,
       ))
       Ok(#(chunk <> ending, stage))
     }
-    Receiving(_), obs.Complete(headers) ->
+    Receiving(has_chunks), obs.Complete(headers) ->
       Ok(#(
-        "],\"ending\":"
-          <> json.to_string(
-          codec.ending_json(script.Finished(redaction.headers(policy, headers))),
-        )
-          <> "}}",
+        codec.response_end(
+          has_chunks,
+          script.Finished(redaction.headers(policy, headers)),
+        ),
         Ended,
       ))
-    Receiving(_), obs.Failed(failure) -> {
+    Receiving(has_chunks), obs.Failed(failure) -> {
       let ending = case error.reason(failure) {
         error.Closed -> script.Abandoned
         _ -> script.Aborted(failure)
       }
-      Ok(#(
-        "],\"ending\":" <> json.to_string(codec.ending_json(ending)) <> "}}",
-        Ended,
-      ))
+      Ok(#(codec.response_end(has_chunks, ending), Ended))
     }
-    AwaitHead, obs.Failed(failure) ->
-      Ok(#(
-        json.to_string(codec.reply_json(script.Reject(failure))) <> "}",
-        Ended,
-      ))
+    AwaitHead, obs.Failed(failure) -> Ok(#(codec.reject(failure), Ended))
     _, _ -> Error(Interrupted)
   }
 }
@@ -730,17 +711,16 @@ fn notify_waiter(state: State, outcome: Result(String, FinishError)) -> State {
 fn publish(state: Publication) -> Result(Nil, CaptureError) {
   let output = state.directory <> "/complete.json"
   use Nil <- result.try(
-    file.write_new(
-      output,
-      bit_array.from_string(
-        "{\"http_gun\":" <> int.to_string(codec.version) <> ",\"exchanges\":[",
-      ),
-    )
+    file.write_new(output, bit_array.from_string(codec.envelope_open))
     |> result.map_error(file_error),
   )
   use Nil <- result.try(copy_exchanges(state, output, 0))
   use Nil <- result.try(
-    file.append(output, <<"]}":utf8>>) |> result.map_error(file_error),
+    file.append(
+      output,
+      bit_array.from_string(codec.envelope_close(state.count > 0)),
+    )
+    |> result.map_error(file_error),
   )
   use Nil <- result.try(
     file.publish(
@@ -769,12 +749,8 @@ fn copy_exchanges(
         )
         |> result.map_error(file_error),
       )
-      let prefix = case index {
-        0 -> <<>>
-        _ -> <<",":utf8>>
-      }
       use Nil <- result.try(
-        file.append(output, <<prefix:bits, bytes:bits>>)
+        file.append(output, bytes)
         |> result.map_error(file_error),
       )
       copy_exchanges(state, output, index + 1)

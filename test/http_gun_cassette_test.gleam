@@ -1,5 +1,4 @@
 import gleam/bit_array
-import gleam/dict
 import gleam/dynamic/decode
 import gleam/erlang/process
 import gleam/http/request
@@ -75,14 +74,28 @@ pub fn binary_codec_roundtrip_and_strict_errors_test() {
   |> should.equal(Error(cassette.Missing))
 }
 
-fn chunks_decoder() -> decode.Decoder(List(dict.Dict(String, String))) {
-  decode.at(
-    ["reply", "chunks"],
-    decode.list(decode.dict(decode.string, decode.string)),
+// A stored body or chunk as its kind and its strings.
+fn stored_decoder() -> decode.Decoder(#(String, List(String))) {
+  decode.one_of(
+    decode.field("text", decode.string, fn(text) {
+      decode.success(#("text", [text]))
+    }),
+    [
+      decode.field("base64", decode.string, fn(encoded) {
+        decode.success(#("base64", [encoded]))
+      }),
+      decode.field("lines", decode.list(decode.string), fn(lines) {
+        decode.success(#("lines", lines))
+      }),
+    ],
   )
 }
 
-pub fn schema_two_stores_text_and_base64_chunks_test() {
+fn chunks_decoder() -> decode.Decoder(List(#(String, List(String)))) {
+  decode.at(["reply", "chunks"], decode.list(stored_decoder()))
+}
+
+pub fn stored_schema_keeps_text_lines_and_base64_chunks_test() {
   let text_chunk = <<"héllo, wörld\n":utf8>>
   let control_chunk = <<0, 1, 2>>
   let binary_chunk = <<0, 255, 128>>
@@ -104,19 +117,18 @@ pub fn schema_two_stores_text_and_base64_chunks_test() {
   ]
   let text = cassette.encode(testing.script(exchanges))
 
-  // The stored schema: version 2, readable text where the bytes are UTF-8.
-  json.parse(text, decode.at(["http_gun"], decode.int)) |> should.equal(Ok(2))
+  // The stored schema: version 3, readable text where the bytes are UTF-8,
+  // and text with a newline as its lines.
+  json.parse(text, decode.at(["http_gun"], decode.int)) |> should.equal(Ok(3))
   let assert Ok(stored_chunks) =
     json.parse(text, decode.at(["exchanges"], decode.list(chunks_decoder())))
   stored_chunks
   |> should.equal([
     [
-      dict.from_list([#("text", "héllo, wörld\n")]),
-      dict.from_list([#("base64", bit_array.base64_encode(binary_chunk, True))]),
-      dict.from_list([#("text", "\u{0000}\u{0001}\u{0002}")]),
-      dict.from_list([
-        #("base64", bit_array.base64_encode(invalid_utf8_chunk, True)),
-      ]),
+      #("lines", ["héllo, wörld", ""]),
+      #("base64", [bit_array.base64_encode(binary_chunk, True)]),
+      #("text", ["\u{0000}\u{0001}\u{0002}"]),
+      #("base64", [bit_array.base64_encode(invalid_utf8_chunk, True)]),
     ],
     [],
   ])
@@ -125,18 +137,13 @@ pub fn schema_two_stores_text_and_base64_chunks_test() {
       text,
       decode.at(
         ["exchanges"],
-        decode.list(decode.at(
-          ["request", "body"],
-          decode.dict(decode.string, decode.string),
-        )),
+        decode.list(decode.at(["request", "body"], stored_decoder())),
       ),
     )
   bodies
   |> should.equal([
-    dict.from_list([#("text", "{\"name\":\"ünïcode\"}")]),
-    dict.from_list([
-      #("base64", bit_array.base64_encode(<<0xFF, 0xFE>>, True)),
-    ]),
+    #("text", ["{\"name\":\"ünïcode\"}"]),
+    #("base64", [bit_array.base64_encode(<<0xFF, 0xFE>>, True)]),
   ])
   // Text stays readable in the file itself.
   string.contains(text, "wörld") |> should.be_true
@@ -190,13 +197,13 @@ pub fn corrupt_and_too_large_cassettes_are_rejected_test() {
     "{\"http_gun\":2}",
     "{\"http_gun\":2,\"exchanges\":{}}",
     // A chunk that is neither text nor base64.
-    string.replace(valid, "{\"text\":\"ok\"}", "{\"hex\":\"6f6b\"}"),
+    string.replace(valid, "{\"text\": \"ok\"}", "{\"hex\": \"6f6b\"}"),
     // Invalid base64.
-    string.replace(valid, "{\"text\":\"ok\"}", "{\"base64\":\"!!\"}"),
+    string.replace(valid, "{\"text\": \"ok\"}", "{\"base64\": \"!!\"}"),
     // A chunk stored as a bare base64 string, as schema 1 did.
-    string.replace(valid, "{\"text\":\"ok\"}", "\"b2s=\""),
+    string.replace(valid, "{\"text\": \"ok\"}", "\"b2s=\""),
     // A status outside 200..599.
-    string.replace(valid, "\"status\":200", "\"status\":101"),
+    string.replace(valid, "\"status\": 200", "\"status\": 101"),
     // An unknown ending.
     string.replace(valid, "\"finished\"", "\"complete\""),
     // A truncated file.

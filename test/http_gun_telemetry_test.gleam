@@ -582,7 +582,9 @@ pub fn recording_and_strict_playback_keep_telemetry_out_of_matching_test() {
     cassette.record(
       settings,
       failed_path,
-      cassette.options() |> cassette.with_max_bytes(1),
+      cassette.options()
+        // Room for the envelope only, so the first request does not fit.
+        |> cassette.with_max_bytes(42),
     )
   let assert Ok(_) = http_gun.send(limited.client, local_request(server()))
   let captured =

@@ -610,7 +610,7 @@ pub fn limit_fixture_requires_an_observed_size_test() {
       ),
     ])
   let encoded = cassette.encode(tape)
-  string.contains(encoded, "\"http_gun\":2") |> should.be_true
+  string.contains(encoded, "\"http_gun\": 3") |> should.be_true
   string.contains(encoded, "\"observed\":3") |> should.be_true
   let corrupt = Error(cassette.Corrupt)
   list.each(
@@ -626,10 +626,10 @@ pub fn limit_fixture_requires_an_observed_size_test() {
     },
   )
   cassette.parse(
-    string.replace(encoded, "\"http_gun\":2", "\"http_gun\":3"),
+    string.replace(encoded, "\"http_gun\": 3", "\"http_gun\": 4"),
     10_000,
   )
-  |> should.equal(Error(cassette.UnsupportedVersion(3)))
+  |> should.equal(Error(cassette.UnsupportedVersion(4)))
 }
 
 @external(erlang, "http_gun_test_server", "late_monitor_refusal")
