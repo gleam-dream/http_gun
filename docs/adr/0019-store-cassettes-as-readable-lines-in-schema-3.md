@@ -23,6 +23,8 @@ Status: Accepted
   whether the array held an element, so the recorder streams fragments with
   no lookahead. The recorder writes only codec fragments, and the budget is
   charged on every byte the file holds.
+- Schema 3 stores a request's scheme, host, port, path and query as separate
+  fields, read back without URL parsing; schema 2 keeps its single URL.
 - Converting is `cassette.upgrade`: it lays a stored cassette of either
   marker out in schema 3 without redacting it again, so no recorded answer
   changes. Upgrading needs no credentials and makes no live request.
@@ -67,6 +69,13 @@ Status: Accepted
 - Compact storage with a renderer for review was rejected because hosted diff
   views ignore diff drivers; one line per exchange still leaves every body on
   one line.
+- A single URL was rejected for schema 3: reading it back through a URL
+  parser loses targets that live requests accept. A query with brackets,
+  braces, a pipe or quotes, a non-ASCII path or a control character makes
+  the file fail to load; an IPv6 host or a `?` or `#` in a path loads as a
+  different request. Refusing those targets on live requests would change
+  what clients accept; refusing them only when recording would fail
+  recordings late. Separate fields need no parsing and read back exactly.
 - Reading schema 2 costs one branch in the body decoder; dropping it would
   break every committed cassette to save one branch.
 - Writing fragments from the codec, instead of reformatting the assembled
@@ -76,6 +85,9 @@ Status: Accepted
 ## Consequences
 
 - An older HTTP Gun reading a schema 3 file fails with `UnsupportedVersion`.
+- A schema 2 file holding a target its URL cannot carry stays as it was: it
+  either failed to load already and cannot be upgraded, or it loads, and
+  upgrades, as the different request it always replayed as.
 - `cassette.encode` output changes for anyone comparing it to a stored string.
 - Files grow by their indentation and line structure, against the recording
   budget, whose 16 MiB ceiling is unchanged, and a caller's `load` limit. A
