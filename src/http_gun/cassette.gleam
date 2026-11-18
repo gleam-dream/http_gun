@@ -151,7 +151,10 @@ pub fn replace_existing(options: RecordOptions) -> RecordOptions {
   RecordOptions(..options, replace: True)
 }
 
-/// Encode a script as a cassette. Credential headers are never written.
+/// Encode a script as a cassette. Credential headers are never written. An
+/// exchange whose target a client could not send (an empty host, port 0, a
+/// path without a leading `/`) is written, but `parse` refuses the file as
+/// `Corrupt`.
 pub fn encode(script: testing.Script) -> String {
   codec.encode(testing.exchanges(script), redaction.default())
 }

@@ -65,8 +65,13 @@
   host, or a `?` or `#` in a path. A schema 2 file stored one URL, which
   could not carry those targets. Such a file either never loaded (`load`
   and `upgrade` return `Corrupt`, and HTTP Gun cannot recover it: record it
-  again) or loaded as a different request, which `upgrade` keeps.
-- Who breaks: an older HTTP Gun reading a schema 3 file fails with
+  again) or loaded as a different request, which `upgrade` keeps. A schema 2
+  file that loads but holds a target a client could not send, such as port 0
+  or an empty host, is refused by `upgrade` as `Corrupt`.
+- Who breaks: `cassette.encode` of a hand-built script whose target a client
+  could not send (an empty host, port 0, a path without a leading `/`) writes
+  a file `parse` refuses as `Corrupt`; schema 2 loaded such files. An older
+  HTTP Gun reading a schema 3 file fails with
   `UnsupportedVersion(3)`; code comparing `cassette.encode` output with a
   stored string sees the new layout; a `load` limit set close to a file's
   schema 2 size can fail with `TooLarge` (a streamed answer grows by about a

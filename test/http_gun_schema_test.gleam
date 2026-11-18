@@ -358,3 +358,20 @@ pub fn hand_built_scripts_keep_their_shapes_test() {
   cassette.parse(port_zero, 10_000) |> should.be_ok
   cassette.upgrade(port_zero, 10_000) |> should.equal(Error(cassette.Corrupt))
 }
+
+// A hand-built target a client could not send is encoded, and the file is
+// refused on parse.
+pub fn encoded_unsendable_target_is_refused_on_parse_test() {
+  let assert Ok(base) = request.to("http://offline.invalid/ask")
+  let unsendable = request.Request(..base, port: option.Some(0))
+  cassette.encode(
+    testing.script([
+      testing.exchange(
+        request.set_body(unsendable, <<>>),
+        testing.Reject(error.new(error.ClientClosed, error.NotSent)),
+      ),
+    ]),
+  )
+  |> cassette.parse(10_000)
+  |> should.equal(Error(cassette.Corrupt))
+}

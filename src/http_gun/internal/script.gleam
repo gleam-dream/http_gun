@@ -40,8 +40,9 @@ pub type Matching {
 
 pub const exact = Matching([], None)
 
-/// The comparable form of a request: the redaction applied, the host
-/// lowercased, an empty path as `/`, header names lowercased, ignored
+/// The comparable form of a request: the redaction applied, the method in
+/// one spelling (`Other("GET")` as `Get`), the host lowercased, an empty path
+/// as `/`, header names lowercased, ignored
 /// headers removed and headers sorted by name, keeping the order of
 /// repeated names.
 pub fn key(

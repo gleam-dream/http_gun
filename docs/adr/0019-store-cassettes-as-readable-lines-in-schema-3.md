@@ -16,7 +16,7 @@ Status: Accepted
   Schema 2 has no `lines` kind.
 - The codec owns one text layout and every fragment of it, separators and
   closing brackets included:
-  one field per line, indented by nesting, each header pair, chunk and body
+  laid out over many lines, indented by nesting, each header pair, chunk and body
   line on a line of its own, and a final newline; body, chunk, ending
   and reject objects open on their field's line, and a stored failure stays
   on one line. Separators lead elements and a closing bracket depends only on
@@ -86,8 +86,10 @@ Status: Accepted
 
 - An older HTTP Gun reading a schema 3 file fails with `UnsupportedVersion`.
 - A schema 2 file holding a target its URL cannot carry stays as it was: it
-  either failed to load already and cannot be upgraded, or it loads, and
-  upgrades, as the different request it always replayed as.
+  either failed to load already and cannot be upgraded, or it loads as the
+  different request it always replayed as and upgrades as that request. A
+  file that loads but holds a target a client could not send, such as port
+  0, is refused by `upgrade` as `Corrupt`.
 - `cassette.encode` output changes for anyone comparing it to a stored string.
 - Files grow by their indentation and line structure, against the recording
   budget, whose 16 MiB ceiling is unchanged, and a caller's `load` limit. A

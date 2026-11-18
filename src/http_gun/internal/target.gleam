@@ -1,7 +1,7 @@
 //// The rule a request must meet before it is sent: whole-byte body, a known
-//// method, a host and port, a path and query without whitespace, control
-//// bytes or a missing leading slash, and lowercase token header names with
-//// clean values. Admission applies `check` to live requests; the codec
+//// method, a host and port, a path with a leading slash, a host, path and
+//// query without space, CR, LF, TAB or NUL (compared by code point), and
+//// lowercase token header names with values free of CR, LF and NUL. Admission applies `check` to live requests; the codec
 //// applies `check_target`, the host, port, path and query part, to a stored
 //// schema 3 request, so a cassette's targets are ones a client could send.
 
