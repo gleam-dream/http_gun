@@ -1,0 +1,100 @@
+<a id="adr-0019"></a>
+
+# 0019: Store cassettes as readable lines in schema 3
+
+Date: 2026-11-18
+Status: Accepted
+
+## Decision
+
+- Cassettes carry marker `http_gun: 3`. HTTP Gun writes 3 and reads 2 and 3.
+  This supersedes ADR 0005's "one current schema": two markers are read, one
+  is written, and there is still no fallback to a live request.
+- A UTF-8 body or chunk that contains a newline is stored as `lines`, the
+  strings between its newlines, and rebuilt by joining them with a newline.
+  Other UTF-8 bytes stay `text`; bytes that are not UTF-8 stay `base64`.
+  Schema 2 has no `lines` kind.
+- The codec owns one text layout and every fragment of it, separators and
+  closing brackets included:
+  one field per line, indented by nesting, each header pair, chunk and body
+  line on a line of its own, a stored failure on one line, and a final
+  newline. Separators lead elements and a closing bracket depends only on
+  whether the array held an element, so the recorder streams fragments with
+  no lookahead. The recorder writes only codec fragments, and the budget is
+  charged on every byte the file holds.
+- Converting is `cassette.upgrade`: it lays a stored cassette of either
+  marker out in schema 3 without redacting it again, so no recorded answer
+  changes. Upgrading needs no credentials and makes no live request.
+- This settles the cassette text layout left as an open ruling by ADR 0018.
+
+## Rationale and alternatives
+
+- A cassette of an LLM conversation is mostly body. On one line, a
+  re-record shows as one changed line for the whole file. Lines make an
+  indented answer or a streamed reply diff line by line.
+- `lines` is exact by construction: splitting at every newline and joining
+  with a newline is the identity on any string, so carriage returns, a final
+  newline and empty lines come back as they were. No answer can be altered,
+  as the owner requires of every recorded answer.
+- Storing JSON bodies as parsed JSON was rejected: parsing and writing back
+  loses key order, number spelling, string escapes, duplicate keys and
+  whitespace, so replay would not return the provider's bytes, and streamed
+  replies are not JSON at all.
+- Storing a JSON body verbatim as a JSON value, recovered by scanning its span
+  in the file, and storing a compact body indented, recovered by removing
+  whitespace outside strings, would also make compact request bodies
+  and compact response bodies readable. Both need
+  a span scanner over the cassette text, a strict validity check and an exact
+  whitespace remover, and a bug in any of them returns different bytes, the
+  failure the owner forbids. They are kept as a possible later addition.
+  An older decoder takes the first kind it knows and reports Corrupt when it
+  finds none, so a new kind would be misread or reported as corrupt rather
+  than as an unsupported version; such an addition would be schema 4, read
+  alongside 2 and 3.
+  The verbatim and indented kinds are worth reconsidering only if a
+  re-record shows a prompt change or a changed answer as one changed body
+  line; a cheaper path for requests is then for the model library to send
+  indented request JSON, which lines already stores exactly.
+- Converting through `cassette.load` then `cassette.encode` was rejected:
+  encoding applies the default redaction, which would rewrite fields in a
+  file recorded before field redaction existed, or turn a truncated JSON
+  body into `REDACTED-UNPARSABLE`, altering a recorded answer.
+- A stored failure stays one line: its fields come from `error.to_json`, and
+  laying them out field by field would need a second serializer kept in step
+  with it. OTP's `json:format` was not used: its output is not specified to
+  stay the same across OTP releases, and it cannot write streamed fragments.
+- Compact storage with a renderer for review was rejected because hosted diff
+  views ignore diff drivers; one line per exchange still leaves every body on
+  one line.
+- Reading schema 2 costs one branch in the body decoder; dropping it would
+  break every committed cassette to save one branch.
+- Writing fragments from the codec, instead of reformatting the assembled
+  file at publication, keeps the recorder's streaming writes and its bounded
+  memory (ADR 0005), and leaves one copy of the layout.
+
+## Consequences
+
+- An older HTTP Gun reading a schema 3 file fails with `UnsupportedVersion`.
+- `cassette.encode` output changes for anyone comparing it to a stored string.
+- Files grow by their indentation and line structure, against the recording
+  budget, whose 16 MiB ceiling is unchanged, and a caller's `load` limit. A
+  streamed reply grows most, since every chunk carries its own lines. The
+  measured growth of a streamed and a buffered cassette is recorded under
+  Evidence when built.
+- A compact request or response body stays one line: lines help only bodies
+  with a raw newline, such as indented JSON and streamed replies.
+- Chunk boundaries are part of a recorded answer, so two recordings of the
+  same streamed answer with different chunking differ at every boundary, and
+  an event split across chunks shows as broken lines.
+- `cassette.encode` of a loaded file equals the file only when the default
+  redaction leaves it unchanged.
+
+## Evidence
+
+- The owner chose lines after the comparison of JSON storage, verbatim
+  storage and lines for byte fidelity, and accepted `cassette.upgrade` as the
+  documented conversion, with recorded-file identity stated on `upgrade`, in
+  the planning of pull request gleam-dream/http_gun#8 and its follow-up.
+- llm_wire encodes request bodies with `json.to_string`, compact on one line.
+- Whether dash-crm's recorded answers are streamed or buffered, and indented
+  or compact, is not yet measured; its first real recordings settle it.

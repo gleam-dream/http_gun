@@ -62,11 +62,14 @@
       pending-entry(title: "Resolve recording cleanup promise strength", kind: "ruling", since: "2026-10-06", adr: 10)[
         Abort and failure attempt staging removal. The implementation ignores removal failures and can return while a blocked writer's cleaner waits. The public contract is either best-effort cleanup or typed cleanup completion; the owner has not ruled.
       ],
-      pending-entry(title: "Choose the cassette text layout", kind: "ruling", since: "2026-11-17", adr: 18)[
-        A re-record diff today is one line for the whole file, as the schema subsection states. A multi-line stored layout would isolate exchanges, headers and statuses (bodies stay one line each under the current schema); it needs one layout shared by encoding and the recorder's fragments, grows files against the recording budget and caller read limits, and changes encoded output. Keeping storage compact and rendering a script for review (a pure renderer, usable as a diff driver) leaves storage untouched, but needs per-repository diff configuration and hosted diff views ignore it. A layout of one line per exchange sits between them. The owner has not ruled.
+      pending-entry(title: "Schema 3: lines bodies and the shared text layout", kind: "build", since: "2026-11-18", adr: 19)[
+        Accepted: a lines body kind for UTF-8 bodies containing a newline, one text layout owned by the codec and written by encoding, upgrading and the recorder, marker 3 written and markers 2 and 3 read, and `cassette.upgrade`.
+      ],
+      pending-entry(title: "Align the repository's fixture-schema instruction", kind: "ruling", since: "2026-11-18", adr: 19)[
+        AGENTS.md asks to keep one strict, version-marked fixture schema, while schema 3 writes one marker and reads two. Proposed wording: write one strict, version-marked fixture schema and read only the versions the design lists. The owner has not ruled.
       ],
       pending-entry(title: "Decide the release version for the record and replay additions", kind: "ruling", since: "2026-11-18", adr: 18)[
-        The verify call, the masking additions and the verdict's dropped count are unreleased. The owner decides the version at release.
+        The verify call, the masking additions, the verdict's dropped count and schema 3 are unreleased; schema 3 breaks older readers of new files and anyone comparing `cassette.encode` output to a stored string. The owner decides the version at release.
       ],
       pending-entry(title: "Check carried-over defaults and native claims against code", kind: "verify", since: "2026-10-17")[
         The default-settings table, the native assumption inventory and the destination and offline-playback rules were carried over from the retired usage, testing and dependency-upgrade guides. The compiled usage examples exercise the public paths. The stated default values, budgets and native assumptions have not been compared with the source.
@@ -174,7 +177,7 @@
       #entity(id: "recording", title: "Recording session", description: [The aggregate owning exchange order, writer acknowledgment and publication.], kind: "aggregate", owner: "HTTP exchange", lifecycle: "stateful", domain: "HTTP exchange", tint: "teal")[
         #attribute(id: "phase", name: "Phase", type: "Recording phase", provenance: "derived", state-type: "recording-phase", state-machine: "recording-lifetime")[Finalization transitions derive from reservations, jobs and publication acknowledgment.]
         #attribute(name: "Exchange positions", type: "Ordered capture reservations", provenance: "derived")[Monotonic zero-based positions assigned at reservation, not at HTTP completion.]
-        #attribute(name: "Storage budget", type: "Encoded bytes plus held bodies", provenance: "derived")[Conservatively charged before enqueueing fragments or retaining whole-body redaction input.]
+        #attribute(name: "Storage budget", type: "Stored bytes plus held bodies", provenance: "derived")[Conservatively charged before enqueueing fragments or retaining whole-body redaction input.]
         #attribute(name: "Publication choice", type: "Destination and replacement policy", provenance: "authored")[Explicitly chosen at record startup; destination is not part of safe error detail.]
         #relates(cardinality: "1 : 0..n")[owns capture reservations]
         #relates(cardinality: "1 : 0..1")[owns a current writer and a finish waiter]
@@ -439,7 +442,7 @@
       ([Batch], [10,000 inputs; 1–1,024 workers; 64 MiB], [Before worker creation / shared charging before retaining collected chunks]),
       ([Script data], [16 MiB estimated], [Before playback actor startup; not measured VM memory]),
       ([Cassette read], [Caller max_bytes], [Read at most max_bytes + 1 raw bytes; parse checks encoded string length]),
-      ([Recording], [16 MiB encoded; 10,000 exchanges], [Before reservation/fragment enqueue; held redaction bodies charged]),
+      ([Recording], [16 MiB stored; 10,000 exchanges], [At start for the envelope, then before reservation/fragment enqueue, on the bytes the file holds; held redaction bodies charged]),
       ([Connect], [5 seconds], [One absolute budget from DNS start through TCP/TLS]),
       ([Pool wait], [5 seconds], [Admission to lease; new connection starter can use connect wait]),
       ([Request], [30 seconds or view replacement], [Invocation entry through response consumption; Infinity explicit]),
@@ -513,7 +516,7 @@
     ])
   ])
 
-  #section(title: "Playback cassettes and redaction", lead: "Offline sequence ownership and one current data format.", body: [
+  #section(title: "Playback cassettes and redaction", lead: "Offline sequence ownership and one written data format.", body: [
     #subsection(title: "Playback matching and cursor", [
       #points(
         [`testing.playback` validates complete configuration, whole-byte request/chunk bodies, final statuses 200–599 and estimated script size before starting. It creates a #term("term-playback-session") with one global admission-ordered cursor. Concurrency does not define a reusable first-match lookup.],
@@ -548,14 +551,31 @@
     ])
     #subsection(title: "Cassette schema and bounded file input", [
       #points(
-        [A #term("term-cassette") has marker `http_gun: 2` and an exchanges array. Each exchange has method, URL, ordered header pairs and body; its reply is reject(failure) or response(status, headers, chunks, ending). Ending is finished(trailers), aborted(failure) or abandoned.],
-        [Whole bytes encode as text when valid UTF-8, otherwise base64. Invalid required fields, methods/URLs, header-pair shapes, base64 or final status produce Corrupt. Another integer format marker produces UnsupportedVersion. There is one current decoder and no compatibility fallback. #adr(5)],
-        [Required fields are decoded; unknown extra JSON fields are not a closed-object rejection contract. If both text and base64 are present, the text branch has precedence. Parse does not perform the playback script-data budget check until playback startup.],
-        [Encoding writes the whole cassette as one line of JSON; the recorder writes the same layout.],
+        [A #term("term-cassette") has a format marker and an exchanges array. Each exchange has method, URL, ordered header pairs and body; its reply is reject(failure) or response(status, headers, chunks, ending). Ending is finished(trailers), aborted(failure) or abandoned.],
+        [HTTP Gun writes marker `http_gun: 3` and reads markers 2 and 3. Another integer marker produces UnsupportedVersion. Their JSON differs only in body kinds, and the decoder ignores layout: both store whole bytes as text when they are valid UTF-8 without a newline, and as base64 when they are not UTF-8; marker 3 stores UTF-8 bytes containing a newline as lines, the strings between newlines, and rebuilds them by joining with a newline. Marker 2 stores those as text. Every body and chunk decodes to exactly the bytes that were encoded. #adr(19)],
+        [A body object decodes as the first of text, then base64, then (under marker 3 only) lines that decodes; other fields are ignored, and an object for which none decodes is Corrupt, so a lines-only body under marker 2 is Corrupt. Lines decode only as an array of at least two strings. Invalid required fields, methods/URLs, header-pair shapes or final status are Corrupt too.],
+        [Parse does not perform the playback script-data budget check until playback startup.],
+        [The codec owns one text layout and every piece of it: one field per line, indented by nesting, a header pair, a chunk or a body line on a line of its own, a stored failure on one line, and a final newline. Separators lead the element they precede and a closing bracket depends only on whether the array held an element, so a streamed writer needs no lookahead. The recorder writes only fragments the codec makes, so its file has the codec's layout; how the recorder charges them is in Reservation order and acknowledged writer. A caller loading files in this layout sets `max_bytes` for their stored size, which the layout makes larger than schema 2. #adr(19)],
+        [`cassette.upgrade(text, max_bytes)` takes the text of a stored cassette of either marker, at most `max_bytes` long, checked as `parse` checks, and returns it in the schema 3 layout without redacting it again, so every body keeps its bytes; it fails as `parse` fails. Fields the decoder ignores are not carried over. Upgrading is idempotent, so a recorded schema 3 file is unchanged by it; this relies on the URL, the method and a stored failure each writing back the text they were read from. The caller reads the file and writes the result, without the recorder's atomic publication or file mode. #adr(19)],
         [One codec step owns the stored form of an exchange under a redaction: the request through the request redaction, response headers, trailers and the headers a stored failure holds filtered, a rewritten response body held as one chunk. Encoding uses it and `cassette.redact` exposes it.],
         [`cassette.redact` maps a script to a script, keeping its matching settings. Comparing the result with the stored exchanges shows what a policy that contains the old one would still change; `cassette.encode` of the result gives the cleaned text of an old cassette without a live run. Encoding applies the default redaction again, so the text equals the result when the default redaction leaves the result unchanged. The consumer writes that text itself, without the recorder's atomic publication or file mode, and cleaning a file does not withdraw a secret already published in it or its history.],
         [`parse(text, max_bytes)` checks encoded string size before JSON decoding. `load(path, max_bytes)` uses raw reads of at most max_bytes plus one without read-ahead. A negative file limit clamps to zero. Empty/non-UTF-8/malformed data is corrupt; missing and I/O failures remain typed.],
       )
+      #behavior(title: "A cassette gives back every body byte for byte", level: "boundary", area: "Cassette schema")[
+        #given[a recorded or encoded exchange whose bodies and chunks hold any bytes]
+        #when[the cassette is loaded and replayed]
+        #then[every request body and response chunk reads back exactly as it was stored, whatever its line ends, final newline, emptiness or encoding]
+      ]
+      #behavior(title: "A recorded cassette is already in the codec layout", level: "boundary", area: "Cassette schema")[
+        #given[a cassette published by a recording]
+        #when[it is upgraded]
+        #then[the text is byte-identical to the published file]
+      ]
+      #behavior(title: "A schema 2 cassette keeps loading and upgrades exactly", level: "boundary", area: "Cassette schema")[
+        #given[a cassette with marker 2]
+        #when[it is loaded, or upgraded and loaded]
+        #then[it plays back the same exchanges, byte for byte, either way]
+      ]
     ])
     #subsection(title: "Secret ownership and whole-body rewriting", [
       #points(
@@ -598,7 +618,7 @@
       #points(
         [`cassette.record` validates configuration and capture options, creates one exclusive sibling staging directory and applies mode 0700 before request data is stored. Every staged file, including the assembled cassette, receives mode 0600 at creation before data is written, and publication keeps that mode. It then starts the recorder and live pool. Failed pool startup discards the recorder's staging area.],
         [Each #term("term-capture-reservation") receives a zero-based position before live execution. Concurrent completion writes separate exchange spool files; final assembly follows reservation order. Capacity/policy/connect/open failures can be recorded as reject outcomes. Refusals preceding capture reservation are not stored exchanges.],
-        [The recorder has one active writer and an admitted job queue. Request fragment reservation and each head/chunk/terminal fragment are budgeted before enqueue. Body owners wait for capture acknowledgment before delivering successful data or demanding more; capture limits also bound held whole-body redaction input.],
+        [The recorder has one active writer and an admitted job queue. The budget is charged on the bytes the file will hold and also on whole-body redaction input while it is held, so it is an upper bound on the file size. It charges the envelope, with its longer closing, when the recording starts, refusing with CaptureLimit a budget that cannot hold it; each separator with its exchange's reservation; and the request, head, chunk and terminal fragments before enqueue. A caller whose session needs more than the 16 MiB ceiling splits it into several recordings. Body owners wait for capture acknowledgment before delivering successful data or demanding more.],
         [Acknowledgment follows completed normal write and file close. There is no delayed-write buffer or fsync guarantee. Capture failure detaches recording from HTTP; live outcomes continue independently. A recorder closed by accepted finish refuses new requests with RecordingClosed; a broken capture may let live requests continue uncaptured.],
         [A body with pending capture acknowledgment after HTTP EOF can retain its timer until capture settles. Deadline may separately abandon capture without retrospectively changing completed HTTP. Capture is not an eager HTTP reader and cannot drain an unread response to make finish succeed.],
       )
@@ -607,7 +627,7 @@
       #points(
         [Nonpositive finish waits request immediate completion. Active unfinished capture returns Busy without closing new reservations. Positive waits close reservations, wait for all streams/jobs and initiate final assembly. Only one waiter is accepted; concurrent contention returns Busy.],
         [WaitTimeout or waiting-process death removes only the waiter. Closing/Sealing continues; a later finish sees the final result. The recorder's creator death interrupts unfinished capture. Normal live-client stop does not itself discard completed capture; abnormal client loss interrupts it.],
-        [Sealing builds a complete JSON file beside the destination from bounded spool reads. RefuseExisting publishes by hard link; ReplaceExisting publishes by rename. No check-then-overwrite fallback exists. AlreadyExists and other I/O causes remain explicit. #adr(5)],
+        [Sealing builds a complete JSON file beside the destination from bounded spool reads, writing only codec fragments already charged. RefuseExisting publishes by hard link; ReplaceExisting publishes by rename. No check-then-overwrite fallback exists. AlreadyExists and other I/O causes remain explicit. #adr(5)],
         [#term("term-publication") is atomic on a filesystem supporting the selected link/rename operations. Cross-filesystem publication and power-loss survival are not promised. Published data is complete; interrupted staging data is not a replayable cassette.],
         [Abort is local to capture and leaves the live client usable. It cannot undo an already committed filesystem operation. The actor only observes publication through writer acknowledgment, so an abort/owner-loss race after atomic commit can leave a visible file while finish reports interruption. No stronger transaction barrier is inferred.],
       )
@@ -737,7 +757,7 @@
         [`dev/check_downstream.py` explicitly selects current LLM Wire source and builds isolated copies of its local dependency closure. Credential names are excluded before reading or copying source, and no command runs in a sibling checkout. Output contains HTTP observations rather than a custom provenance receipt. This opt-in integration check stays outside ordinary validation.],
         [Local Erlang HTTP, H2 and TLS servers use the test certificates; `dev/ip-fixture` generates the IP-SAN case. `dev/nghttpd.py` drives the development nghttpd package for real peer-capacity and trailer checks and owns no provider semantics. A native connection-refusal regression waits for Gun to exit before installing a second monitor, so the monitor reports `noproc` while the preceding terminal event retains ConnectionRefused.],
         [`build/evidence` holds current runtime output. `docs/evidence` preserves the raw source, hash and measurement data that `docs/ORACLE.md` and `docs/BENCHMARKS.md` cite; those paths carry no design contract. `NOTICE`, dependency licenses and fixture attribution remain authoritative for source reuse.],
-        [`dev/convert_cassette.py` is an explicit offline schema-1-to-2 conversion tool. Runtime playback has one decoder and never migrates or rerecords.],
+        [`dev/convert_cassette.py` is an explicit offline schema-1-to-2 conversion tool; `cassette.upgrade` of its output gives schema 3. Runtime playback reads schemas 2 and 3 and never migrates or rerecords.],
       )
     ])
     #subsection(title: "Comparison and benchmark method", [
