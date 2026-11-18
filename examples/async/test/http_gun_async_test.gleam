@@ -515,7 +515,8 @@ fn recording_prefix_and_failure() -> Nil {
   // A capture failure is separate from the HTTP outcome: the request
   // succeeds, the recording fails and publishes nothing.
   let path = "build/capture-limit.json"
-  let assert Ok(recorded) = cassette.record(local_config(), path, replacing(1))
+  // Room for the file's envelope only, so the first request does not fit.
+  let assert Ok(recorded) = cassette.record(local_config(), path, replacing(42))
   let job = start(recorded.client, req(persistent()))
   let assert Ok(feed_job.Eof(3, [])) = feed_job.await(job, 1000)
   let assert Error(cassette.CaptureFailed(cassette.CaptureLimit)) =

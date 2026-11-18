@@ -20,6 +20,14 @@ import http_gun/redaction
 import http_gun/testing
 import simplifile
 
+// Converts a stored cassette to schema 3: parse, then encode.
+fn convert(
+  text: String,
+  max_bytes: Int,
+) -> Result(String, cassette.CassetteError) {
+  cassette.parse(text, max_bytes) |> result.map(cassette.encode)
+}
+
 @external(erlang, "http_gun_test_server", "start")
 fn server() -> Int
 
@@ -138,7 +146,9 @@ pub fn capture_budget_failure_preserves_http_outcome_test() {
     cassette.record(
       local_config(),
       destination,
-      cassette.options() |> cassette.with_max_bytes(1),
+      cassette.options()
+        // Room for the envelope only, so the first request does not fit.
+        |> cassette.with_max_bytes(42),
     )
   let assert Ok(response) = http_gun.send(recorded.client, req(port))
   response.response.body |> should.equal(<<0, 255, 128>>)
@@ -972,4 +982,262 @@ pub fn verify_refuses_a_recording_client_test() {
   testing.verify(recorded.client) |> should.equal(Error(testing.NotPlayback))
   let assert Ok(Nil) = cassette.abort(recorded.recording)
   http_gun.stop(recorded.client)
+}
+
+// A recorded schema 3 file is already in the codec's layout, and a streamed
+// answer reads back byte for byte.
+pub fn recorded_file_is_its_own_conversion_test() {
+  let port =
+    serve(<<
+      "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nTransfer-Encoding: chunked\r\n\r\n12\r\ndata: {\"a\":\"é\"}\n\n\r\nE\r\ndata: [DONE]\n\n\r\n0\r\nX-End: yes\r\n\r\n":utf8,
+    >>)
+  let settings = local_config()
+  let destination = path()
+  let assert Ok(recorded) =
+    cassette.record(settings, destination, cassette.options())
+  let asked = fn() {
+    let assert Ok(req) =
+      request.to("http://localhost:" <> int.to_string(port) <> "/stream")
+    req
+    |> request.set_method(http.Post)
+    |> request.set_header("content-type", "application/json")
+    |> request.set_body(<<"{\n  \"prompt\": \"olá\"\n}\n":utf8>>)
+  }
+  let assert Ok(live) = http_gun.send(recorded.client, asked())
+  // A name that does not resolve is recorded as a reject.
+  let assert Error(live_failure) =
+    http_gun.send(
+      recorded.client,
+      request.set_host(asked(), "127.0.0.1.invalid"),
+    )
+  // A JSON answer is held for redaction and stored as one chunk.
+  let json_port =
+    serve(<<
+      "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 21\r\n\r\n{\n  \"token\": \"t-1\"\n}\n":utf8,
+    >>)
+  let assert Ok(json_req) =
+    request.to("http://localhost:" <> int.to_string(json_port) <> "/json")
+  let assert Ok(_) =
+    http_gun.send(recorded.client, request.set_body(json_req, <<>>))
+  // A body the client closes early is recorded as abandoned.
+  let slow =
+    serve(<<
+      "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 100\r\n\r\npartial":utf8,
+    >>)
+  let assert Ok(slow_req) =
+    request.to("http://localhost:" <> int.to_string(slow) <> "/slow")
+  let assert Ok(opened) =
+    http_gun.open(recorded.client, request.set_body(slow_req, <<>>))
+  body.close(opened.body)
+  let assert Ok(_) =
+    cassette.finish(recorded.recording, duration.milliseconds(1000))
+  http_gun.stop(recorded.client)
+
+  let assert Ok(text) = simplifile.read(destination)
+  convert(text, 1_000_000) |> should.equal(Ok(text))
+  string.contains(text, "\"data: [DONE]\"") |> should.be_true
+  string.contains(text, "\"kind\": \"reject\"") |> should.be_true
+  string.contains(text, "\"kind\": \"abandoned\"") |> should.be_true
+
+  let assert Ok(tape) = cassette.load(destination, string.byte_size(text))
+  let assert Ok(client) = testing.playback(tape, settings)
+  let assert Ok(replayed) = http_gun.send(client, asked())
+  replayed.response.body |> should.equal(live.response.body)
+  replayed.trailers |> should.equal(live.trailers)
+  // The reject replays as the failure the live client saw.
+  let assert Error(replayed_failure) =
+    http_gun.send(client, request.set_host(asked(), "127.0.0.1.invalid"))
+  error.reason(replayed_failure) |> should.equal(error.reason(live_failure))
+  http_gun.stop(client)
+  remove(destination)
+}
+
+// The budget is charged on every byte the file holds: a budget that cannot
+// hold the envelope is refused, and a recording within budget B loads with
+// `max_bytes` B.
+pub fn recording_budget_counts_stored_bytes_test() {
+  cassette.record(
+    local_config(),
+    path(),
+    cassette.options() |> cassette.with_max_bytes(41),
+  )
+  |> result.map(fn(recorded) { recorded.recording })
+  |> should.equal(Error(cassette.CaptureLimit))
+
+  let port = serve(<<"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok":utf8>>)
+  let destination = path()
+  let budget = 2000
+  let assert Ok(recorded) =
+    cassette.record(
+      local_config(),
+      destination,
+      cassette.options() |> cassette.with_max_bytes(budget),
+    )
+  let assert Ok(_) = http_gun.send(recorded.client, req(port))
+  let assert Ok(_) =
+    cassette.finish(recorded.recording, duration.milliseconds(1000))
+  http_gun.stop(recorded.client)
+  let assert Ok(text) = simplifile.read(destination)
+  { string.byte_size(text) <= budget } |> should.be_true
+  cassette.load(destination, budget) |> should.be_ok
+  remove(destination)
+
+  // The charge is the stored size exactly: a budget of the file's size
+  // records it, one byte less does not.
+  let exact = fn(budget) {
+    let target = path()
+    let assert Ok(recorded) =
+      cassette.record(
+        local_config(),
+        target,
+        cassette.options() |> cassette.with_max_bytes(budget),
+      )
+    let sent =
+      http_gun.send(
+        recorded.client,
+        req(serve(<<"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok":utf8>>)),
+      )
+    let finished =
+      cassette.finish(recorded.recording, duration.milliseconds(1000))
+    http_gun.stop(recorded.client)
+    let assert Ok(_) = sent
+    let size = case simplifile.read(target) {
+      Ok(text) -> string.byte_size(text)
+      Error(_) -> -1
+    }
+    remove(target)
+    #(finished |> result.is_ok, size)
+  }
+  let assert #(True, stored) = exact(2000)
+  exact(stored) |> should.equal(#(True, stored))
+  exact(stored - 1) |> should.equal(#(False, -1))
+
+  // An empty recording is the envelope alone and fits within its budget.
+  let empty = path()
+  let assert Ok(recorded) =
+    cassette.record(
+      local_config(),
+      empty,
+      cassette.options() |> cassette.with_max_bytes(42),
+    )
+  let assert Ok(_) = cassette.finish(recorded.recording, duration.seconds(1))
+  http_gun.stop(recorded.client)
+  cassette.load(empty, 42) |> should.be_ok
+  remove(empty)
+}
+
+// With requests-only field redaction, a request's credential field is
+// replaced and a JSON answer is stored exactly as received, chunk for chunk.
+pub fn request_fields_only_keeps_answers_exact_test() {
+  let port =
+    serve(<<
+      "HTTP/1.1 429 Too Many Requests\r\nContent-Type: application/json\r\nTransfer-Encoding: chunked\r\n\r\na\r\n{\"error\":{\r\nd\r\n\"code\":429}}\n\r\n0\r\n\r\n":utf8,
+    >>)
+  let policy = redaction.default() |> redaction.request_fields_only
+  let settings = local_config() |> config.with_redaction(policy)
+  let assert Ok(req) =
+    request.to("http://localhost:" <> int.to_string(port) <> "/ask")
+  let req =
+    req
+    |> request.set_method(http.Post)
+    |> request.set_header("content-type", "application/json")
+    |> request.set_body(<<"{\"token\":\"t-1\",\"q\":1}":utf8>>)
+  let destination = path()
+  let assert Ok(recorded) =
+    cassette.record(settings, destination, cassette.options())
+  let assert Ok(live) = http_gun.send(recorded.client, req)
+  let assert Ok(_) =
+    cassette.finish(recorded.recording, duration.milliseconds(1000))
+  http_gun.stop(recorded.client)
+
+  let assert Ok(tape) = cassette.load(destination, 100_000)
+  let assert [stored] = testing.exchanges(tape)
+  testing.request(stored).body
+  |> should.equal(<<"{\"token\":\"REDACTED\",\"q\":1}":utf8>>)
+  let assert testing.Respond(stored_response, _) = testing.reply(stored)
+  // The chunks are as the transport delivered them; their bytes are the
+  // answer as sent.
+  bit_array.concat(stored_response.body)
+  |> should.equal(<<"{\"error\":{\"code\":429}}\n":utf8>>)
+
+  // The stored response is what `cassette.redact` makes of the live one.
+  let seen =
+    testing.exchange(
+      req,
+      testing.Respond(
+        response.Response(live.response.status, live.response.headers, [
+          live.response.body,
+        ]),
+        testing.Finished(live.trailers),
+      ),
+    )
+  let assert [redacted] =
+    testing.exchanges(cassette.redact(testing.script([seen]), policy))
+  let assert testing.Respond(redacted_response, _) = testing.reply(redacted)
+  bit_array.concat(redacted_response.body)
+  |> should.equal(bit_array.concat(stored_response.body))
+  testing.request(redacted) |> should.equal(testing.request(stored))
+
+  let assert Ok(client) = testing.playback(tape, settings)
+  let assert Ok(replayed) = http_gun.send(client, req)
+  replayed.response.status |> should.equal(429)
+  replayed.response.body |> should.equal(live.response.body)
+  http_gun.stop(client)
+  remove(destination)
+}
+
+// Records a JSON answer delivered as two chunks under `policy` and returns
+// the stored chunks.
+fn recorded_chunks(policy: redaction.Redaction) -> List(BitArray) {
+  let #(port, peer) = gated()
+  // Queued until the request arrives.
+  process.spawn(fn() {
+    emit(peer, <<
+      "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nTransfer-Encoding: chunked\r\n\r\n":utf8,
+    >>)
+  })
+  let destination = path()
+  let assert Ok(recorded) =
+    cassette.record(
+      local_config() |> config.with_redaction(policy),
+      destination,
+      cassette.options(),
+    )
+  let assert Ok(opened) = http_gun.open(recorded.client, req(port))
+  emit(peer, <<"A\r\n{\"error\":{\r\n":utf8>>)
+  let assert Ok(Some(body.Chunk(<<"{\"error\":{":utf8>>))) =
+    body.next_within(opened.body, duration.milliseconds(1000))
+  emit(peer, <<"D\r\n\"code\":429}}\n\r\n0\r\n\r\n":utf8>>)
+  let assert Ok(Some(body.Chunk(_))) =
+    body.next_within(opened.body, duration.milliseconds(1000))
+  let assert Ok(Some(body.End(_))) =
+    body.next_within(opened.body, duration.milliseconds(1000))
+  let assert Ok(_) =
+    cassette.finish(recorded.recording, duration.milliseconds(1000))
+  http_gun.stop(recorded.client)
+  let assert Ok(tape) = cassette.load(destination, 100_000)
+  remove(destination)
+  let assert [stored] = testing.exchanges(tape)
+  let assert testing.Respond(stored_response, _) = testing.reply(stored)
+  stored_response.body
+}
+
+// Under requests-only field redaction a recording keeps a response's chunks
+// as they arrived; the default holds the body and stores it rewritten whole.
+pub fn request_fields_only_keeps_recorded_chunks_test() {
+  recorded_chunks(redaction.default() |> redaction.request_fields_only)
+  |> should.equal([<<"{\"error\":{":utf8>>, <<"\"code\":429}}\n":utf8>>])
+  recorded_chunks(redaction.default())
+  |> should.equal([<<"{\"error\":{\"code\":\"REDACTED\"}}\n":utf8>>])
+  // With a body hook the body is held and rewritten by the hook alone.
+  let hook = fn(bytes) {
+    let assert Ok(text) = bit_array.to_string(bytes)
+    bit_array.from_string(string.replace(text, "error", "fault"))
+  }
+  recorded_chunks(
+    redaction.default()
+    |> redaction.request_fields_only
+    |> redaction.with_body(hook),
+  )
+  |> should.equal([<<"{\"fault\":{\"code\":429}}\n":utf8>>])
 }

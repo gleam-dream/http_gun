@@ -251,7 +251,13 @@ pub fn encoded_and_parsed_cassettes_omit_credentials_test() {
         testing.Finished([#("set-cookie", "secret-set-cookie")]),
       ),
     )
-  let text = cassette.encode(testing.script([exchange]))
+  // Keeping credentials out of a hand-built script is `redact`'s job;
+  // encoding only lays it out.
+  let text =
+    cassette.encode(cassette.redact(
+      testing.script([exchange]),
+      redaction.default(),
+    ))
   list.each(
     [
       "secret-authorization",
@@ -401,7 +407,9 @@ pub fn encoded_aborted_json_response_keeps_no_secret_test() {
         ),
       ),
     ])
-  let text = cassette.encode(script)
+  // Keeping credentials out of a hand-built script is `redact`'s job;
+  // encoding only lays it out.
+  let text = cassette.encode(cassette.redact(script, redaction.default()))
   string.contains(text, "S3CR") |> should.be_false
   string.contains(text, "REDACTED-UNPARSABLE") |> should.be_true
 }

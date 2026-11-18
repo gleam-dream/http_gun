@@ -186,6 +186,13 @@ flowchart LR
   redaction for application secrets and inspect fixtures before sharing them.
   Cassette files are created with mode `0600`. Publication is atomic, but
   crash durability is not promised.
+- Cassettes use schema 3: laid out over many lines, with a text body containing a
+  newline stored as its lines, so a re-recorded answer diffs line by line and
+  reads back byte for byte. Cassettes written by HTTP Gun 0.1.x (schema 2)
+  are no longer read; convert them on the commit the
+  [changelog](CHANGELOG.md#upgrading-cassettes) names before upgrading.
+  Files are larger than in schema 2 (about a quarter for a streamed answer),
+  so raise `max_bytes` on `load` where it was tight.
 - Sinal events are best effort. Without a forwarder route, handlers run inside
   client processes and a slow handler can delay requests.
 - Streamed uploads, redirect following, decompression, proxies, cookie/cache

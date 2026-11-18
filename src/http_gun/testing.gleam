@@ -197,8 +197,8 @@ pub fn playback(
 }
 
 /// The form of a request that playback compares: `redaction` applied, the
-/// host lowercased, an empty path as `/`, header names lowercased and headers
-/// sorted by name.
+/// method in one spelling (`Other("GET")` as `Get`), the host lowercased, an
+/// empty path as `/`, header names lowercased and headers sorted by name.
 pub fn match_key(
   redaction: Redaction,
   request: Request(BitArray),

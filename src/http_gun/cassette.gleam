@@ -15,10 +15,13 @@
 //// let assert Ok(client) = testing.playback(script, settings)
 //// ```
 ////
-//// A cassette is readable JSON (`"http_gun": 2`): a body or chunk that is
-//// valid UTF-8 is stored as `{"text": ..}`, anything else as
-//// `{"base64": ..}`. There is one schema; a file of another version fails
-//// with `UnsupportedVersion`.
+//// A cassette is readable JSON (`"http_gun": 3`), laid out over many
+//// lines: a body or chunk that is valid UTF-8 containing a newline is stored
+//// as `{"lines": [..]}`, one string per line, other UTF-8 as
+//// `{"text": ..}`, and anything else as `{"base64": ..}`. Every body reads
+//// back byte for byte. A file of another version fails with
+//// `UnsupportedVersion`; `describe_error` says how to convert a schema 2
+//// file written by HTTP Gun 0.1.x.
 ////
 //// What a cassette stores follows the configuration's redaction
 //// (`config.with_redaction`). By default credential headers are removed, and
@@ -86,6 +89,8 @@ pub type CassetteError {
   Io(operation: FileOperation, cause: FileCause)
   /// Not UTF-8 JSON in the cassette schema.
   Corrupt
+  /// A schema this version does not read. Schema 2, written by HTTP Gun
+  /// 0.1.x, is converted on an earlier commit; `describe_error` says how.
   UnsupportedVersion(version: Int)
   TooLarge(limit: Int, observed: Int)
 }
@@ -108,7 +113,8 @@ pub opaque type RecordOptions {
 pub type RecordError {
   ClientFailed(http_gun.StartError)
   /// The capture exceeded its byte budget or 10,000 exchanges, or the budget
-  /// is outside 1 byte to 16 MiB.
+  /// cannot hold the 42 bytes of envelope charged at start, or is above
+  /// 16 MiB.
   CaptureLimit
   IoFailure(operation: FileOperation, cause: FileCause)
   /// The destination exists and `replace_existing` was not set.
@@ -128,13 +134,17 @@ pub type FinishError {
   CaptureFailed(RecordError)
 }
 
-/// Capture at most 16 MiB of encoded data and refuse to replace an existing
-/// file.
+/// Store at most 16 MiB and refuse to replace an existing file.
 pub fn options() -> RecordOptions {
   RecordOptions(max_bytes: 16_777_216, replace: False)
 }
 
-/// The capture's byte budget, 1 byte to 16 MiB.
+/// The capture's byte budget, from the 42 bytes of envelope charged at
+/// start to 16 MiB. It is
+/// charged on every byte the file will hold, and also on a response body
+/// held for redaction, whose bytes stay charged, so a recording within the budget loads
+/// with the same `max_bytes`. A session that needs more is split into several
+/// recordings.
 pub fn with_max_bytes(options: RecordOptions, bytes: Int) -> RecordOptions {
   RecordOptions(..options, max_bytes: bytes)
 }
@@ -144,9 +154,16 @@ pub fn replace_existing(options: RecordOptions) -> RecordOptions {
   RecordOptions(..options, replace: True)
 }
 
-/// Encode a script as a cassette. Credential headers are never written.
+/// Lay a script out as cassette text, schema 3, and nothing else: no
+/// redaction is applied, so every header, query value and body is written as
+/// the script holds it. A recording redacts as it captures; to keep
+/// credentials out of a hand-built or older script, `redact` it first. A
+/// stored cassette converts to schema 3, every body kept, as
+/// `parse(text, max_bytes)` then `encode`. An exchange whose target a client
+/// could not send (an empty host, port 0, a path without a leading `/`) is
+/// written, but `parse` refuses the file as `Corrupt`.
 pub fn encode(script: testing.Script) -> String {
-  codec.encode(testing.exchanges(script), redaction.default())
+  codec.render(testing.exchanges(script))
 }
 
 /// Apply `redaction` to stored exchanges, as a recording under it would have
@@ -290,6 +307,12 @@ pub fn describe_error(problem: CassetteError) -> String {
     Missing -> "cassette missing"
     Io(operation, cause) -> describe_io(operation, cause)
     Corrupt -> "cassette corrupt"
+    // Schema 2 is what HTTP Gun 0.1.x wrote. The CHANGELOG names the commit
+    // that converts it, so this text stays true after later releases.
+    UnsupportedVersion(2) ->
+      "cassette schema 2, written by HTTP Gun 0.1.x, is no longer read: "
+      <> "convert it to schema 3 with cassette.parse then cassette.encode on the "
+      <> "HTTP Gun commit named under \"Upgrading cassettes\" in the CHANGELOG"
     UnsupportedVersion(version) ->
       "cassette version " <> int.to_string(version) <> " unsupported"
     TooLarge(limit, observed) ->

@@ -1,52 +1,217 @@
-//// The one strict cassette schema, version 2. Dynamic decoding is confined
-//// to this boundary.
+//// The cassette schema: version 3 is written and read.
+//// Dynamic decoding is confined to this boundary.
 ////
-//// A chunk or body is `{"text": ..}` when it is valid UTF-8 and
-//// `{"base64": ..}` otherwise. Failures use `error.to_json`.
+//// A chunk or body is `{"lines": [..]}` when it is valid UTF-8 containing a
+//// newline, `{"text": ..}` when it is other valid UTF-8 and
+//// `{"base64": ..}` otherwise. Failures use `error.to_json`, on one line.
+////
+//// The layout is owned here as fragments: `render` concatenates them, and
+//// the recorder writes the same fragments as it captures, so a recorded
+//// file and its parsed and re-rendered form are the same text. Separators lead the element they
+//// precede and a closing bracket depends only on whether its array held an
+//// element, so a streamed writer needs no lookahead.
 
 import gleam/bit_array
 import gleam/dynamic/decode
 import gleam/http
 import gleam/http/request
+import gleam/int
 import gleam/json
+import gleam/list
+import gleam/option.{None, Some}
 import gleam/result
-import gleam/uri
+import gleam/string
 import http_gun/error
 import http_gun/internal/script
+import http_gun/internal/target as target_rule
 import http_gun/redaction.{type Redaction}
 
-pub const version = 2
+pub const version = 3
 
 pub type ParseError {
   Corrupt
   UnsupportedVersion(Int)
 }
 
-/// Encode exchanges with `redaction` applied to every request and to
-/// response headers, bodies and trailers. A rewritten response body is
-/// stored as one chunk, as a recording stores it.
-pub fn encode(exchanges: List(script.Exchange), policy: Redaction) -> String {
-  json.object([
-    #("http_gun", json.int(version)),
-    #(
-      "exchanges",
-      json.array(exchanges, fn(exchange) {
-        let exchange = store(policy, exchange)
-        json.object([
-          #("request", request_json(exchange.request)),
-          #("reply", reply_json(exchange.reply)),
-        ])
-      }),
-    ),
-  ])
-  |> json.to_string
+/// Lay out exchanges already in their stored form, without redacting them.
+pub fn render(exchanges: List(script.Exchange)) -> String {
+  let #(text, any) =
+    list.fold(exchanges, #(envelope_open, False), fn(acc, exchange) {
+      let #(text, any) = acc
+      #(text <> exchange_text(!any, exchange), True)
+    })
+  text <> envelope_close(any)
+}
+
+fn exchange_text(first: Bool, exchange: script.Exchange) -> String {
+  exchange_open(first, exchange.request)
+  <> case exchange.reply {
+    script.Reject(failure) -> reject(failure)
+    script.Respond(status, headers, chunks, ending) -> {
+      let #(body, any) =
+        list.fold(chunks, #("", False), fn(acc, bytes) {
+          #(acc.0 <> chunk(!acc.1, bytes), True)
+        })
+      response_head(status, headers) <> body <> response_end(any, ending)
+    }
+  }
+}
+
+/// Opens the file; the exchanges follow.
+pub const envelope_open = "{\n  \"http_gun\": 3,\n  \"exchanges\": ["
+
+/// Closes the file after its exchanges, if `any`.
+pub fn envelope_close(any: Bool) -> String {
+  case any {
+    True -> "\n  ]\n}\n"
+    False -> "]\n}\n"
+  }
+}
+
+/// An exchange's separator, its stored request and the opening of its reply.
+pub fn exchange_open(first: Bool, req: request.Request(BitArray)) -> String {
+  separator(first)
+  <> "    {\n      \"request\": {\n        \"method\": "
+  <> quoted(http.method_to_string(req.method))
+  <> ",\n        \"scheme\": "
+  <> quoted(http.scheme_to_string(req.scheme))
+  <> ",\n        \"host\": "
+  <> quoted(req.host)
+  <> ",\n        \"port\": "
+  <> case req.port {
+    Some(port) -> int.to_string(port)
+    None -> "null"
+  }
+  <> ",\n        \"path\": "
+  <> quoted(req.path)
+  <> ",\n        \"query\": "
+  <> case req.query {
+    Some(query) -> quoted(query)
+    None -> "null"
+  }
+  <> ",\n        \"headers\": "
+  <> pairs(req.headers, 10)
+  <> ",\n        \"body\": "
+  <> bytes_text(req.body, 8)
+  <> "\n      },\n      \"reply\": "
+}
+
+/// A rejected reply, closing its exchange.
+pub fn reject(failure: error.Failure) -> String {
+  "{\"kind\": \"reject\", \"failure\": "
+  <> json.to_string(error.to_json(failure))
+  <> "}"
+  <> exchange_close
+}
+
+/// A response's status and headers, opening its chunks.
+pub fn response_head(status: Int, headers: List(#(String, String))) -> String {
+  "{\n        \"kind\": \"response\",\n        \"status\": "
+  <> int.to_string(status)
+  <> ",\n        \"headers\": "
+  <> pairs(headers, 10)
+  <> ",\n        \"chunks\": ["
+}
+
+/// One chunk, led by its separator.
+pub fn chunk(first: Bool, bytes: BitArray) -> String {
+  case first {
+    True -> "\n"
+    False -> ",\n"
+  }
+  <> indent(10)
+  <> bytes_text(bytes, 10)
+}
+
+/// Closes the chunks, if `any`, writes the ending and closes the exchange.
+pub fn response_end(any: Bool, ending: script.Ending) -> String {
+  case any {
+    True -> "\n" <> indent(8) <> "]"
+    False -> "]"
+  }
+  <> ",\n        \"ending\": "
+  <> case ending {
+    script.Finished(trailers) ->
+      "{\"kind\": \"finished\", \"trailers\": " <> pairs(trailers, 10) <> "}"
+    script.Aborted(failure) ->
+      "{\"kind\": \"aborted\", \"failure\": "
+      <> json.to_string(error.to_json(failure))
+      <> "}"
+    script.Abandoned -> "{\"kind\": \"abandoned\"}"
+  }
+  <> "\n      }"
+  <> exchange_close
+}
+
+const exchange_close = "\n    }"
+
+fn separator(first: Bool) -> String {
+  case first {
+    True -> "\n"
+    False -> ",\n"
+  }
+}
+
+fn indent(width: Int) -> String {
+  string.repeat(" ", width)
+}
+
+fn quoted(text: String) -> String {
+  json.to_string(json.string(text))
+}
+
+// Header pairs, one per line at `depth`, the closing bracket two less.
+fn pairs(headers: List(#(String, String)), depth: Int) -> String {
+  case headers {
+    [] -> "[]"
+    _ ->
+      "["
+      <> {
+        list.map(headers, fn(pair) {
+          "\n"
+          <> indent(depth)
+          <> "["
+          <> quoted(pair.0)
+          <> ", "
+          <> quoted(pair.1)
+          <> "]"
+        })
+        |> string.join(",")
+      }
+      <> "\n"
+      <> indent(depth - 2)
+      <> "]"
+  }
+}
+
+// A body or chunk whose own line is indented `depth`: its lines, if any, go
+// two deeper and the closing bracket back at `depth`.
+fn bytes_text(bytes: BitArray, depth: Int) -> String {
+  case bit_array.to_string(bytes) {
+    Ok(text) ->
+      case string.contains(text, "\n") {
+        True ->
+          "{\"lines\": ["
+          <> {
+            string.split(text, "\n")
+            |> list.map(fn(line) { "\n" <> indent(depth + 2) <> quoted(line) })
+            |> string.join(",")
+          }
+          <> "\n"
+          <> indent(depth)
+          <> "]}"
+        False -> "{\"text\": " <> quoted(text) <> "}"
+      }
+    Error(Nil) ->
+      "{\"base64\": " <> quoted(bit_array.base64_encode(bytes, True)) <> "}"
+  }
 }
 
 /// The form a recording under `policy` stores an exchange in: the request
 /// redacted, response headers, trailers and the headers a stored failure
 /// holds filtered, and a rewritten
-/// response body held as one chunk. Encoding uses it; the recorder's streamed
-/// fragments are tested against it.
+/// response body held as one chunk. `cassette.redact` uses it; the
+/// recorder's streamed fragments are tested against it.
 pub fn store(policy: Redaction, exchange: script.Exchange) -> script.Exchange {
   script.Exchange(
     redaction.request(policy, exchange.request),
@@ -65,10 +230,16 @@ fn redact_reply(policy: Redaction, reply: script.Reply) -> script.Reply {
       script.Respond(
         status,
         redaction.headers(policy, headers),
-        case redaction.rewrites_body_for(policy, headers) {
+        case redaction.rewrites_response_body_for(policy, headers) {
           False -> chunks
           True ->
-            case redaction.body_for(policy, headers, bit_array.concat(chunks)) {
+            case
+              redaction.response_body_for(
+                policy,
+                headers,
+                bit_array.concat(chunks),
+              )
+            {
               <<>> -> []
               body -> [body]
             }
@@ -92,73 +263,15 @@ pub fn parse(text: String) -> Result(List(script.Exchange), ParseError) {
   use found <- result.try(
     json.parse(text, version_decoder) |> result.replace_error(Corrupt),
   )
-  case found == version {
-    False -> Error(UnsupportedVersion(found))
-    True -> {
+  case found {
+    3 -> {
       let decoder = {
         use values <- decode.field("exchanges", decode.list(exchange_decoder()))
         decode.success(values)
       }
       json.parse(text, decoder) |> result.replace_error(Corrupt)
     }
-  }
-}
-
-/// The request as stored. The caller applies the redaction first.
-pub fn request_json(req: request.Request(BitArray)) -> json.Json {
-  json.object([
-    #("method", json.string(http.method_to_string(req.method))),
-    #("url", json.string(uri.to_string(request.to_uri(req)))),
-    #("headers", headers_json(req.headers)),
-    #("body", bytes_json(req.body)),
-  ])
-}
-
-pub fn headers_json(headers: List(#(String, String))) -> json.Json {
-  json.array(headers, fn(h) { json.array([h.0, h.1], json.string) })
-}
-
-pub fn bytes_json(bytes: BitArray) -> json.Json {
-  case bit_array.to_string(bytes) {
-    Ok(text) -> json.object([#("text", json.string(text))])
-    Error(Nil) ->
-      json.object([
-        #("base64", json.string(bit_array.base64_encode(bytes, True))),
-      ])
-  }
-}
-
-pub fn reply_json(reply: script.Reply) -> json.Json {
-  case reply {
-    script.Reject(failure) ->
-      json.object([
-        #("kind", json.string("reject")),
-        #("failure", error.to_json(failure)),
-      ])
-    script.Respond(status, headers, chunks, ending) ->
-      json.object([
-        #("kind", json.string("response")),
-        #("status", json.int(status)),
-        #("headers", headers_json(headers)),
-        #("chunks", json.array(chunks, bytes_json)),
-        #("ending", ending_json(ending)),
-      ])
-  }
-}
-
-pub fn ending_json(ending: script.Ending) -> json.Json {
-  case ending {
-    script.Finished(trailers) ->
-      json.object([
-        #("kind", json.string("finished")),
-        #("trailers", headers_json(trailers)),
-      ])
-    script.Aborted(failure) ->
-      json.object([
-        #("kind", json.string("aborted")),
-        #("failure", error.to_json(failure)),
-      ])
-    script.Abandoned -> json.object([#("kind", json.string("abandoned"))])
+    _ -> Error(UnsupportedVersion(found))
   }
 }
 
@@ -169,15 +282,45 @@ fn exchange_decoder() -> decode.Decoder(script.Exchange) {
 }
 
 fn request_decoder() -> decode.Decoder(request.Request(BitArray)) {
+  let failed = request.set_body(request.new(), <<>>)
   use method <- decode.field("method", decode.string)
-  use url <- decode.field("url", decode.string)
   use headers <- decode.field("headers", headers_decoder())
   use body <- decode.field("body", bytes_decoder())
-  case request.to(url), http.parse_method(method) {
-    Ok(req), Ok(method) ->
-      decode.success(request.Request(..req, method:, headers:, body:))
-    _, _ ->
-      decode.failure(request.set_body(request.new(), <<>>), "HTTP request")
+  // The target is stored in fields, read back as stored.
+  use scheme <- decode.field("scheme", decode.string)
+  use host <- decode.field("host", decode.string)
+  use port <- decode.field("port", decode.optional(decode.int))
+  use path <- decode.field("path", decode.string)
+  use query <- decode.field("query", decode.optional(decode.string))
+  use scheme <- decode.then(case http.scheme_from_string(scheme) {
+    Ok(scheme) -> decode.success(scheme)
+    Error(Nil) -> decode.failure(http.Http, "HTTP scheme")
+  })
+  case http.parse_method(method) {
+    Ok(method) -> {
+      let req =
+        request.Request(
+          method:,
+          headers:,
+          body:,
+          scheme:,
+          host:,
+          port:,
+          path:,
+          query:,
+        )
+      // A stored target must be one a client could have sent; admission
+      // sends an empty path as `/`.
+      let sendable = case req.path {
+        "" -> request.Request(..req, path: "/")
+        _ -> req
+      }
+      case target_rule.check_target(sendable) {
+        Ok(Nil) -> decode.success(req)
+        Error(_) -> decode.failure(failed, "HTTP request target")
+      }
+    }
+    Error(Nil) -> decode.failure(failed, "HTTP method")
   }
 }
 
@@ -192,21 +335,29 @@ fn headers_decoder() -> decode.Decoder(List(#(String, String))) {
   decode.list(pair)
 }
 
+// The first of text, base64 and lines that decodes.
 fn bytes_decoder() -> decode.Decoder(BitArray) {
+  let base64 = {
+    use encoded <- decode.field("base64", decode.string)
+    case bit_array.base64_decode(encoded) {
+      Ok(bytes) -> decode.success(bytes)
+      Error(Nil) -> decode.failure(<<>>, "base64 bytes")
+    }
+  }
+  let lines = {
+    use lines <- decode.field("lines", decode.list(decode.string))
+    case lines {
+      [_, _, ..] ->
+        decode.success(bit_array.from_string(string.join(lines, "\n")))
+      _ -> decode.failure(<<>>, "at least two lines")
+    }
+  }
   decode.one_of(
     {
       use text <- decode.field("text", decode.string)
       decode.success(bit_array.from_string(text))
     },
-    [
-      {
-        use encoded <- decode.field("base64", decode.string)
-        case bit_array.base64_decode(encoded) {
-          Ok(bytes) -> decode.success(bytes)
-          Error(Nil) -> decode.failure(<<>>, "base64 bytes")
-        }
-      },
-    ],
+    [base64, lines],
   )
 }
 

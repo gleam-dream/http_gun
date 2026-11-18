@@ -17,6 +17,9 @@
 ////   with a listed name at any depth, which becomes `"REDACTED"`. Every other
 ////   byte of the body is kept.
 ////
+//// `request_fields_only` limits the last two to request bodies, so response
+//// bodies are stored as received apart from the body function.
+////
 //// Names are compared without case and ignoring `-` and `_`, so `api_key`
 //// also selects `API-KEY`, `apiKey` and `ApiKey`. Escapes in a JSON key are
 //// not decoded: the value of any key that contains a backslash escape is
@@ -66,7 +69,8 @@ import gleam/string
 import gleam/uri
 
 /// What to remove from stored exchanges. The `default()` credentials are
-/// always removed; the functions below only add to the lists.
+/// always removed; the functions below only add to the lists, except
+/// `request_fields_only`, which stops replacing fields in response bodies.
 pub opaque type Redaction {
   Redaction(
     headers: List(String),
@@ -76,6 +80,8 @@ pub opaque type Redaction {
     /// Lowercased request header names to keep, once
     /// `keeping_request_headers` is called, even with no names.
     kept_request_headers: Option(List(String)),
+    /// Whether credential fields are replaced in response bodies too.
+    response_fields: Bool,
   )
 }
 
@@ -142,6 +148,7 @@ pub fn default() -> Redaction {
     body: None,
     request_body: None,
     kept_request_headers: None,
+    response_fields: True,
   )
 }
 
@@ -239,6 +246,44 @@ pub fn keeping_request_headers(
   Redaction(..redaction, kept_request_headers: Some(kept))
 }
 
+/// Replace credential fields in request bodies and the query only, and
+/// store response bodies as received apart from `with_body`: with no body
+/// function, a response body keeps its received chunks. Use it when a
+/// recorded answer must replay exactly, for example a JSON error body with a
+/// `code` field; you then own keeping secrets, such as an OAuth token answer,
+/// out of your cassettes. It is the one call that stores more, it cannot be
+/// undone, and calling it again changes nothing.
+pub fn request_fields_only(redaction: Redaction) -> Redaction {
+  Redaction(..redaction, response_fields: False)
+}
+
+/// Rewrite a response body as a recording stores it: credential fields, if
+/// this redaction replaces them in responses, then the body function.
+@internal
+pub fn response_body_for(
+  redaction: Redaction,
+  headers: List(#(String, String)),
+  bytes: BitArray,
+) -> BitArray {
+  case redaction.response_fields {
+    True -> body_for(redaction, headers, bytes)
+    False -> body(redaction, bytes)
+  }
+}
+
+/// Whether `response_body_for` can change a response body with these
+/// headers, so a recording holds it whole.
+@internal
+pub fn rewrites_response_body_for(
+  redaction: Redaction,
+  headers: List(#(String, String)),
+) -> Bool {
+  case redaction.response_fields {
+    True -> rewrites_body_for(redaction, headers)
+    False -> rewrites_bodies(redaction)
+  }
+}
+
 /// Remove the redacted headers from a header list. The request header
 /// allow-list is not applied; `request` applies it.
 pub fn headers(
@@ -271,8 +316,9 @@ pub fn request(
 
 /// Rewrite a request or response body with the `content-type` in `headers`:
 /// replace the credential fields of a form or JSON body, then apply the body
-/// function, if any. The request-body rewrite is not applied; `request`
-/// applies it.
+/// function, if any. This ignores `request_fields_only`, so it does not
+/// predict a recorded response under that option; `cassette.redact` does.
+/// The request-body rewrite is not applied; `request` applies it.
 pub fn body_for(
   redaction: Redaction,
   headers: List(#(String, String)),
@@ -282,7 +328,9 @@ pub fn body_for(
 }
 
 /// Whether `body_for` can change a body with these headers: a body function
-/// is set, or the content type is form or JSON.
+/// is set, or the content type is form or JSON. Like `body_for`, this
+/// ignores `request_fields_only`; `cassette.redact` shows what a recording
+/// stores.
 pub fn rewrites_body_for(
   redaction: Redaction,
   headers: List(#(String, String)),
@@ -300,7 +348,8 @@ pub fn body(redaction: Redaction, bytes: BitArray) -> BitArray {
 }
 
 /// Whether this redaction has a body function. Credential fields are replaced
-/// whatever this returns; see `rewrites_body_for`.
+/// whatever this returns (in responses too, unless `request_fields_only`);
+/// see `rewrites_body_for`.
 pub fn rewrites_bodies(redaction: Redaction) -> Bool {
   option.is_some(redaction.body)
 }

@@ -18,11 +18,14 @@ Status: Accepted
   and the deny-list applies after it, so a named credential header is still
   removed. Repeated calls add names. Response headers, trailers and failure
   headers keep the deny-list.
+- A redaction can replace credential fields in requests only
+  (`request_fields_only`), leaving response bodies as received apart from
+  the body hook. The default still replaces them in both directions.
 - A redaction can rewrite request bodies only. The rewrite runs wherever a
   request is redacted and never on a response.
 - One codec step turns an exchange into its stored form under a redaction.
-  Encoding uses it, `cassette.redact` exposes it, and the recorder's streamed
-  fragments are tested against it. `cassette.redact` serves both the check
+  `cassette.redact` exposes it, encoding does not apply it, and the
+  recorder's streamed fragments are tested against it. `cassette.redact` serves both the check
   of old cassettes against a grown policy and their cleaning without a live
   run.
 - A script can repeat: after its last exchange playback starts again at the
@@ -51,7 +54,16 @@ Status: Accepted
   `content-type` as opaque, which fails open. Letting a named credential
   survive was rejected: no allow-list may store a credential header.
   Intersecting repeated allow-list calls was rejected as inconsistent with
-  every other redaction call, which adds.
+  the other list calls, which add.
+- Default field redaction also rewrites response bodies, so a JSON answer
+  or error body with a listed key (`{"error": {"code": 429}}`) was stored
+  with `"code": "REDACTED"` and replayed as a different answer. The default
+  stays, because it keeps OAuth token answers out of cassettes; an opt-in
+  lets a consumer that must replay answers exactly keep them. Narrowing the
+  default list for responses was rejected: it silently weakens a published
+  security default and fixes only the names someone thought of. Under the
+  opt-in, an OAuth token answer is stored as received; the consumer that
+  opts in owns keeping such answers out of its cassettes.
 - The existing body hook cannot tell a request from a response, so a
   consumer normalising request times through it would also rewrite recorded
   answers. Telling the hook which side it rewrites would change its type, a

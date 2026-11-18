@@ -62,11 +62,8 @@
       pending-entry(title: "Resolve recording cleanup promise strength", kind: "ruling", since: "2026-10-06", adr: 10)[
         Abort and failure attempt staging removal. The implementation ignores removal failures and can return while a blocked writer's cleaner waits. The public contract is either best-effort cleanup or typed cleanup completion; the owner has not ruled.
       ],
-      pending-entry(title: "Choose the cassette text layout", kind: "ruling", since: "2026-11-17", adr: 18)[
-        A re-record diff today is one line for the whole file, as the schema subsection states. A multi-line stored layout would isolate exchanges, headers and statuses (bodies stay one line each under the current schema); it needs one layout shared by encoding and the recorder's fragments, grows files against the recording budget and caller read limits, and changes encoded output. Keeping storage compact and rendering a script for review (a pure renderer, usable as a diff driver) leaves storage untouched, but needs per-repository diff configuration and hosted diff views ignore it. A layout of one line per exchange sits between them. The owner has not ruled.
-      ],
       pending-entry(title: "Decide the release version for the record and replay additions", kind: "ruling", since: "2026-11-18", adr: 18)[
-        The verify call, the masking additions and the verdict's dropped count are unreleased. The owner decides the version at release.
+        The verify call, the masking additions, the verdict's dropped count and schema 3 are unreleased; schema 3 breaks older readers of new files, anyone comparing `cassette.encode` output to a stored string, recordings with a budget below the envelope, and recordings near their budget. `cassette.encode` stops removing credentials from hand-built scripts, and retiring the schema 2 reader makes every 0.1.x cassette unreadable until converted. The owner decides the version at release.
       ],
       pending-entry(title: "Check carried-over defaults and native claims against code", kind: "verify", since: "2026-10-17")[
         The default-settings table, the native assumption inventory and the destination and offline-playback rules were carried over from the retired usage, testing and dependency-upgrade guides. The compiled usage examples exercise the public paths. The stated default values, budgets and native assumptions have not been compared with the source.
@@ -174,7 +171,7 @@
       #entity(id: "recording", title: "Recording session", description: [The aggregate owning exchange order, writer acknowledgment and publication.], kind: "aggregate", owner: "HTTP exchange", lifecycle: "stateful", domain: "HTTP exchange", tint: "teal")[
         #attribute(id: "phase", name: "Phase", type: "Recording phase", provenance: "derived", state-type: "recording-phase", state-machine: "recording-lifetime")[Finalization transitions derive from reservations, jobs and publication acknowledgment.]
         #attribute(name: "Exchange positions", type: "Ordered capture reservations", provenance: "derived")[Monotonic zero-based positions assigned at reservation, not at HTTP completion.]
-        #attribute(name: "Storage budget", type: "Encoded bytes plus held bodies", provenance: "derived")[Conservatively charged before enqueueing fragments or retaining whole-body redaction input.]
+        #attribute(name: "Storage budget", type: "Stored bytes plus held bodies", provenance: "derived")[Conservatively charged before enqueueing fragments or retaining whole-body redaction input.]
         #attribute(name: "Publication choice", type: "Destination and replacement policy", provenance: "authored")[Explicitly chosen at record startup; destination is not part of safe error detail.]
         #relates(cardinality: "1 : 0..n")[owns capture reservations]
         #relates(cardinality: "1 : 0..1")[owns a current writer and a finish waiter]
@@ -289,7 +286,7 @@
     #subsection(title: "Request admission order", [
       #points(
         [The invocation entry instant is captured before caller-side validation. Already cancelled tokens, expired absolute deadlines and negative body limits fail early. Body bit size must be divisible by eight. The method and lowercase header names must be tokens. Origin/port and target reject invalid forms.],
-        [Paths start with a slash. Host, path and query reject whitespace/control forms checked by admission. Header values reject CR/LF/NUL and delivered request headers also pass the shared token/control/size check. Limits count name plus value bytes rather than wire delimiters.],
+        [Paths start with a slash. Host, path and query reject space, CR, LF, TAB and NUL, compared by code point. Header values reject CR/LF/NUL and delivered request headers also pass the shared token/control/size check. Limits count name plus value bytes rather than wire delimiters.],
         [The pool checks required view destination and request body/header limits, then reserves capture when appropriate. Deadline, monitors and timers belong to the pending entry before leasing. A new request never overtakes an existing request in its origin lane.],
         [The #term("term-origin") is cached after validation. Pending entries, owner indexes, cancellation indexes, FIFO links and waiting count mutate together. Removing expired/dead work unlinks it immediately, including work behind a blocked origin head.],
         [Connecting reservations are distinct from waiting queue entries. A request starting a connection may wait for its connect timer beyond ordinary checkout expiry, while its overall deadline still caps the attempt. Resolving and connecting reservations consume connection capacity.],
@@ -439,7 +436,7 @@
       ([Batch], [10,000 inputs; 1–1,024 workers; 64 MiB], [Before worker creation / shared charging before retaining collected chunks]),
       ([Script data], [16 MiB estimated], [Before playback actor startup; not measured VM memory]),
       ([Cassette read], [Caller max_bytes], [Read at most max_bytes + 1 raw bytes; parse checks encoded string length]),
-      ([Recording], [16 MiB encoded; 10,000 exchanges], [Before reservation/fragment enqueue; held redaction bodies charged]),
+      ([Recording], [16 MiB stored; 10,000 exchanges], [At start for the envelope, then before reservation/fragment enqueue, on the bytes the file holds; held redaction bodies charged]),
       ([Connect], [5 seconds], [One absolute budget from DNS start through TCP/TLS]),
       ([Pool wait], [5 seconds], [Admission to lease; new connection starter can use connect wait]),
       ([Request], [30 seconds or view replacement], [Invocation entry through response consumption; Infinity explicit]),
@@ -513,11 +510,11 @@
     ])
   ])
 
-  #section(title: "Playback cassettes and redaction", lead: "Offline sequence ownership and one current data format.", body: [
+  #section(title: "Playback cassettes and redaction", lead: "Offline sequence ownership and one written data format.", body: [
     #subsection(title: "Playback matching and cursor", [
       #points(
         [`testing.playback` validates complete configuration, whole-byte request/chunk bodies, final statuses 200–599 and estimated script size before starting. It creates a #term("term-playback-session") with one global admission-ordered cursor. Concurrency does not define a reusable first-match lookup.],
-        [Exact match keys apply configured redaction to both expected and actual requests. Host and header names become lowercase, empty path becomes slash, ignored headers disappear and remaining headers sort by name while duplicate-name order remains. Method, URI fields and bytes otherwise remain exact.],
+        [Exact match keys apply configured redaction to both expected and actual requests. Host and header names become lowercase, a method spelled as another known method (such as `Other("GET")`) becomes that method, empty path becomes slash, ignored headers disappear and remaining headers sort by name while duplicate-name order remains. Method, URI fields and bytes otherwise remain exact.],
         [An explicit custom matcher receives these normalized forms. It owns only equality; common validation, lifetime and response admission still run. A mismatch reports the zero-based position and consumes nothing. Exhaustion fails without network fallback. Custom callbacks are trusted code and can block the pool.],
         [A script can repeat (`testing.repeating`): after its last exchange the cursor returns to the first, so a non-empty repeating script is never exhausted. Positions stay within the script. Once a pass has completed, every exchange counts as used. Repetition is a playback setting like ignored headers and is not stored in a cassette. #adr(18)],
         [A loaded `testing.Script` (#term("term-script")) is immutable input. Each `testing.playback` call starts a separate client at its first exchange, so one script serves independent runs. Client views share their client's cursor; `with_correlation` changes observation metadata and selects no sequence. Concurrent requests on one client consume exchanges in admission order.],
@@ -548,24 +545,43 @@
     ])
     #subsection(title: "Cassette schema and bounded file input", [
       #points(
-        [A #term("term-cassette") has marker `http_gun: 2` and an exchanges array. Each exchange has method, URL, ordered header pairs and body; its reply is reject(failure) or response(status, headers, chunks, ending). Ending is finished(trailers), aborted(failure) or abandoned.],
-        [Whole bytes encode as text when valid UTF-8, otherwise base64. Invalid required fields, methods/URLs, header-pair shapes, base64 or final status produce Corrupt. Another integer format marker produces UnsupportedVersion. There is one current decoder and no compatibility fallback. #adr(5)],
-        [Required fields are decoded; unknown extra JSON fields are not a closed-object rejection contract. If both text and base64 are present, the text branch has precedence. Parse does not perform the playback script-data budget check until playback startup.],
-        [Encoding writes the whole cassette as one line of JSON; the recorder writes the same layout.],
-        [One codec step owns the stored form of an exchange under a redaction: the request through the request redaction, response headers, trailers and the headers a stored failure holds filtered, a rewritten response body held as one chunk. Encoding uses it and `cassette.redact` exposes it.],
-        [`cassette.redact` maps a script to a script, keeping its matching settings. Comparing the result with the stored exchanges shows what a policy that contains the old one would still change; `cassette.encode` of the result gives the cleaned text of an old cassette without a live run. Encoding applies the default redaction again, so the text equals the result when the default redaction leaves the result unchanged. The consumer writes that text itself, without the recorder's atomic publication or file mode, and cleaning a file does not withdraw a secret already published in it or its history.],
+        [A #term("term-cassette") has a format marker and an exchanges array. Each exchange has a request target, method, ordered header pairs and body; its reply is reject(failure) or response(status, headers, chunks, ending). Ending is finished(trailers), aborted(failure) or abandoned.],
+        [HTTP Gun writes marker `http_gun: 3` and reads markers 2 and 3. Another integer marker produces UnsupportedVersion. Their JSON differs only in body kinds, and the decoder ignores layout: both store whole bytes as text when they are valid UTF-8 without a newline, and as base64 when they are not UTF-8; marker 3 stores UTF-8 bytes containing a newline as lines, the strings between newlines, and rebuilds them by joining with a newline. Marker 2 stores those as text. Every body and chunk decodes to exactly the bytes that were encoded. #adr(19)],
+        [Marker 3 stores a request's scheme, host, port, path and query as separate fields and reads them back as stored, with no URL parsing, so every request admission accepts reads back exactly; a stored target admission would refuse is Corrupt. Marker 2 stores one URL, parsed on load: a target it cannot carry, such as a query with brackets, a non-ASCII path or a `?` in a path, either fails to load, making the whole file Corrupt, or loads as a different request. #adr(19)],
+        [A body object decodes as the first of text, then base64, then (under marker 3 only) lines that decodes; other fields are ignored, and an object for which none decodes is Corrupt, so a lines-only body under marker 2 is Corrupt. Lines decode only as an array of at least two strings. Invalid required fields, methods/URLs, header-pair shapes or final status are Corrupt too.],
+        [Parse does not perform the playback script-data budget check until playback startup.],
+        [The codec owns one text layout and every piece of it: laid out over many lines, indented by nesting, a header pair, a chunk or a body line on a line of its own, and a final newline; a body or chunk object, an ending and a reject open on their field's line, and a stored failure stays on one line. Separators lead the element they precede and a closing bracket depends only on whether the array held an element, so a streamed writer needs no lookahead. The recorder writes only fragments the codec makes, so its file has the codec's layout; how the recorder charges them is in Reservation order and acknowledged writer. A caller loading files in this layout sets `max_bytes` for their stored size, which the layout makes larger than schema 2. #adr(19)],
+        [`cassette.encode` lays a script out and nothing else: it applies no redaction, so `encode(parse(text))` of a recorded schema 3 file is byte-identical to it, and a hand-built script whose target a client could not send encodes to text `parse` refuses. Keeping credentials out of a file belongs to recording and to `cassette.redact`. This relies on the method and a stored failure each writing back the text they were read from. Schema 2, which HTTP Gun 0.1.x wrote, is not read: its files are converted by parsing and encoding them on the last commit that read both schemas, which the changelog names, and the refusal's description points there rather than carrying the commit itself. #adr(19)],
+        [One codec step owns the stored form of an exchange under a redaction: the request through the request redaction, response headers, trailers and the headers a stored failure holds filtered, a rewritten response body held as one chunk. `cassette.redact` exposes it; encoding does not apply it.],
+        [`cassette.redact` maps a script to a script, keeping its matching settings. Comparing the result with the stored exchanges shows what a policy that contains the old one would still change; `cassette.encode` of the result gives the cleaned text of an old cassette without a live run. The consumer writes that text itself, without the recorder's atomic publication or file mode, and cleaning a file does not withdraw a secret already published in it or its history.],
         [`parse(text, max_bytes)` checks encoded string size before JSON decoding. `load(path, max_bytes)` uses raw reads of at most max_bytes plus one without read-ahead. A negative file limit clamps to zero. Empty/non-UTF-8/malformed data is corrupt; missing and I/O failures remain typed.],
       )
+      #behavior(title: "A cassette gives back every body byte for byte", level: "boundary", area: "Cassette schema")[
+        #given[a recorded or encoded exchange whose bodies and chunks hold any bytes]
+        #when[the cassette is loaded and replayed]
+        #then[every request body and response chunk reads back exactly as it was stored, whatever its line ends, final newline, emptiness or encoding]
+      ]
+      #behavior(title: "A recorded cassette is already in the codec layout", level: "boundary", area: "Cassette schema")[
+        #given[a cassette published by a recording]
+        #when[it is parsed and encoded again]
+        #then[the text is byte-identical to the published file]
+      ]
+      #behavior(title: "A schema 2 cassette is refused with conversion guidance", level: "interface", area: "Cassette schema")[
+        #given[a cassette with marker 2, as the 0.1 releases wrote it]
+        #when[it is loaded or parsed]
+        #then[it is refused as an unsupported version, and the error's description names the schema, the releases that wrote it, the conversion step and where the conversion commit is recorded]
+      ]
     ])
     #subsection(title: "Secret ownership and whole-body rewriting", [
       #points(
         [#term("term-redaction") holds a header deny-list that always removes authorization, proxy-authorization, cookie, set-cookie, x-api-key, api-key, x-goog-api-key, x-auth-token, x-access-token, x-amz-security-token and x-csrf-token. Added header names are case-insensitive and affect stored request/response headers, trailers and collected failure headers.],
         [One normalized credential-name list (the credential list) serves query parameters, form pairs and JSON keys. Names compare after percent-decoding (plus as space), lowercasing and removing `-` and `_`. Listed names keep their original encoded spelling with value REDACTED. Parameter order and all unselected query bytes remain exact. The default list holds key, api_key, apikey, access_token, token, client_secret, code, refresh_token, id_token, signature, sig, x-amz-security-token, x-goog-api-key, x-amz-signature, x-amz-credential, password, secret and authorization; `with_query_parameters` and `with_body_fields` both add to it.],
         [Default field redaction selects by the body's content-type header. A form body applies the query rule to pairs split at `&` and `;`. A JSON or +json body is byte-scanned, not decoded: the value after a listed object key, at any depth, becomes the string REDACTED and every other byte remains, so repeated redaction is stable. Key escapes are not decoded; the value of any key containing a backslash escape, or not UTF-8, is replaced whatever the key spells. Form and JSON redaction fails closed: a non-UTF-8 form body, JSON that does not scan (an unterminated string or missing value, as in a truncated or aborted body) and a body above 16 MiB become the whole body REDACTED-UNPARSABLE. Other content types remain unchanged. Field redaction runs before any body hook.],
-        [A body hook rewrites each request body and each response body as a whole. Recording holds response chunks within its capture budget then stores one rewritten chunk, so split secrets are visible to that hook. Form and JSON response bodies are held the same way for field redaction. A later hook replaces the earlier one. The live request/response delivery remains unchanged.],
+        [A body hook rewrites each request body and each response body as a whole. Recording holds response chunks within its capture budget then stores one rewritten chunk, so split secrets are visible to that hook. Form and JSON response bodies are held the same way for field redaction, unless `request_fields_only` is applied and no body hook is set, when a response body keeps its received chunks and is not held. A later hook replaces the earlier one. The live request/response delivery remains unchanged.],
         [Matching applies the same hook to expected and incoming request values. Callbacks own their execution time, allocations and retained captures. There is no general secret detector or callback sandbox.],
         [Matching therefore treats a redacted query value or body field as equal to any live value.],
-        [A redaction can keep request headers by allow-list, with names compared without case. Once the allow-list is switched on, even with no names, a stored or compared request keeps only the named headers and `content-type`. The deny-list still applies after the allow-list, so a named credential header is removed. Repeated calls add names. Response headers, trailers and the response headers a failure keep follow the deny-list alone. Adding deny-listed headers or credential names, or switching on an allow-list, never stores more. #adr(18)],
+        [A redaction can keep response bodies as received: once `request_fields_only` is applied, credential fields are replaced in request bodies and the query only, and a response body is stored unchanged apart from the body hook. Without it, the default replaces credential fields in both directions. A consumer that keeps responses this way owns keeping secrets out of them. #adr(18)],
+        [A redaction can keep request headers by allow-list, with names compared without case. Once the allow-list is switched on, even with no names, a stored or compared request keeps only the named headers and `content-type`. The deny-list still applies after the allow-list, so a named credential header is removed. Repeated calls add names. Response headers, trailers and the response headers a failure keep follow the deny-list alone. Adding deny-listed headers or credential names, or switching on an allow-list, never stores more; `request_fields_only` is the one call that stores more, it cannot be undone on a redaction, and applying it twice changes nothing more. #adr(18)],
         [An allow-list removes the dropped headers from matching on both sides, so a change in an unlisted request header no longer makes a cassette stale. Files recorded under an allow-list lack those headers; matching them without the allow-list needs a re-record, ignored headers, or a matcher that compares only the header names the expected request holds.],
         [A request-body rewrite applies to request bodies only, wherever a request is redacted: storage and both sides of matching, after field redaction and the body hook. It never touches a response. A later rewrite replaces the earlier one. #adr(18)],
         [Matching redacts an already stored request again, and `cassette.redact` re-applies a policy to stored data. Both are exact only when redacting a stored form once more changes nothing: field redaction leaves the body hook's and the rewrite's output unchanged, the body hook leaves the rewrite's output unchanged, and each returns its own output unchanged. Redacting twice and comparing tells an unstable redaction from policy drift.],
@@ -578,9 +594,15 @@
         #then[a named credential header is still removed]
         #then[response headers, trailers and the headers a failure keeps follow the deny-list alone]
       ]
+      #behavior(title: "Requests-only field redaction keeps answers exact", level: "boundary", area: "Redaction")[
+        #given[a redaction with `request_fields_only`]
+        #when[an exchange whose request and JSON response both hold a listed field is recorded and replayed]
+        #then[the stored request field is replaced]
+        #then[the response body replays exactly as received, chunk for chunk]
+      ]
       #behavior(title: "A request-body rewrite never changes a recorded answer", level: "boundary", area: "Redaction")[
         #given[a redaction with a request-body rewrite]
-        #when[an exchange is recorded, encoded or matched]
+        #when[an exchange is recorded, redacted with `cassette.redact`, or matched]
         #then[every request body is rewritten]
         #then[every response body is stored and replayed exactly as a redaction without the request-body rewrite leaves it]
       ]
@@ -598,7 +620,7 @@
       #points(
         [`cassette.record` validates configuration and capture options, creates one exclusive sibling staging directory and applies mode 0700 before request data is stored. Every staged file, including the assembled cassette, receives mode 0600 at creation before data is written, and publication keeps that mode. It then starts the recorder and live pool. Failed pool startup discards the recorder's staging area.],
         [Each #term("term-capture-reservation") receives a zero-based position before live execution. Concurrent completion writes separate exchange spool files; final assembly follows reservation order. Capacity/policy/connect/open failures can be recorded as reject outcomes. Refusals preceding capture reservation are not stored exchanges.],
-        [The recorder has one active writer and an admitted job queue. Request fragment reservation and each head/chunk/terminal fragment are budgeted before enqueue. Body owners wait for capture acknowledgment before delivering successful data or demanding more; capture limits also bound held whole-body redaction input.],
+        [The recorder has one active writer and an admitted job queue. The budget is charged on the bytes the file will hold and also on whole-body redaction input while it is held, so it is an upper bound on the file size: held bytes stay charged after the rewritten body is. It charges the envelope, with its longer closing, when the recording starts, refusing with CaptureLimit a budget that cannot hold it; each separator with its exchange's reservation; and the request, head, chunk and terminal fragments before enqueue. A caller whose session needs more than the 16 MiB ceiling splits it into several recordings. Body owners wait for capture acknowledgment before delivering successful data or demanding more.],
         [Acknowledgment follows completed normal write and file close. There is no delayed-write buffer or fsync guarantee. Capture failure detaches recording from HTTP; live outcomes continue independently. A recorder closed by accepted finish refuses new requests with RecordingClosed; a broken capture may let live requests continue uncaptured.],
         [A body with pending capture acknowledgment after HTTP EOF can retain its timer until capture settles. Deadline may separately abandon capture without retrospectively changing completed HTTP. Capture is not an eager HTTP reader and cannot drain an unread response to make finish succeed.],
       )
@@ -607,7 +629,7 @@
       #points(
         [Nonpositive finish waits request immediate completion. Active unfinished capture returns Busy without closing new reservations. Positive waits close reservations, wait for all streams/jobs and initiate final assembly. Only one waiter is accepted; concurrent contention returns Busy.],
         [WaitTimeout or waiting-process death removes only the waiter. Closing/Sealing continues; a later finish sees the final result. The recorder's creator death interrupts unfinished capture. Normal live-client stop does not itself discard completed capture; abnormal client loss interrupts it.],
-        [Sealing builds a complete JSON file beside the destination from bounded spool reads. RefuseExisting publishes by hard link; ReplaceExisting publishes by rename. No check-then-overwrite fallback exists. AlreadyExists and other I/O causes remain explicit. #adr(5)],
+        [Sealing builds a complete JSON file beside the destination from bounded spool reads, writing only codec fragments already charged. RefuseExisting publishes by hard link; ReplaceExisting publishes by rename. No check-then-overwrite fallback exists. AlreadyExists and other I/O causes remain explicit. #adr(5)],
         [#term("term-publication") is atomic on a filesystem supporting the selected link/rename operations. Cross-filesystem publication and power-loss survival are not promised. Published data is complete; interrupted staging data is not a replayable cassette.],
         [Abort is local to capture and leaves the live client usable. It cannot undo an already committed filesystem operation. The actor only observes publication through writer acknowledgment, so an abort/owner-loss race after atomic commit can leave a visible file while finish reports interruption. No stronger transaction barrier is inferred.],
       )
@@ -737,7 +759,7 @@
         [`dev/check_downstream.py` explicitly selects current LLM Wire source and builds isolated copies of its local dependency closure. Credential names are excluded before reading or copying source, and no command runs in a sibling checkout. Output contains HTTP observations rather than a custom provenance receipt. This opt-in integration check stays outside ordinary validation.],
         [Local Erlang HTTP, H2 and TLS servers use the test certificates; `dev/ip-fixture` generates the IP-SAN case. `dev/nghttpd.py` drives the development nghttpd package for real peer-capacity and trailer checks and owns no provider semantics. A native connection-refusal regression waits for Gun to exit before installing a second monitor, so the monitor reports `noproc` while the preceding terminal event retains ConnectionRefused.],
         [`build/evidence` holds current runtime output. `docs/evidence` preserves the raw source, hash and measurement data that `docs/ORACLE.md` and `docs/BENCHMARKS.md` cite; those paths carry no design contract. `NOTICE`, dependency licenses and fixture attribution remain authoritative for source reuse.],
-        [`dev/convert_cassette.py` is an explicit offline schema-1-to-2 conversion tool. Runtime playback has one decoder and never migrates or rerecords.],
+        [`dev/convert_cassette.py` is an explicit offline schema-1-to-2 conversion tool; its output reaches schema 3 by parsing and encoding it on the conversion commit the changelog names. Runtime playback reads schema 3 only and never migrates or rerecords.],
       )
     ])
     #subsection(title: "Comparison and benchmark method", [

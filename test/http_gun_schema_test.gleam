@@ -1,0 +1,436 @@
+//// Cassette schema 3: byte-exact bodies, the shared layout, and refusing
+//// schema 2 with conversion guidance.
+
+import gleam/bit_array
+import gleam/http
+import gleam/http/request
+import gleam/http/response
+import gleam/int
+import gleam/list
+import gleam/option
+import gleam/result
+import gleam/string
+import gleeunit/should
+import http_gun
+import http_gun/cassette
+import http_gun/config
+import http_gun/error
+import http_gun/redaction
+import http_gun/testing
+
+// Converts a stored cassette to schema 3: parse, then encode.
+fn convert(
+  text: String,
+  max_bytes: Int,
+) -> Result(String, cassette.CassetteError) {
+  cassette.parse(text, max_bytes) |> result.map(cassette.encode)
+}
+
+fn exchange_with(body: BitArray, chunks: List(BitArray)) -> testing.Exchange {
+  let assert Ok(req) = request.to("http://offline.invalid/ask")
+  testing.exchange(
+    request.set_body(req, body),
+    testing.Respond(response.Response(200, [], chunks), testing.Finished([])),
+  )
+}
+
+// Bodies a cassette must give back byte for byte.
+fn bodies() -> List(BitArray) {
+  [
+    <<>>,
+    <<"one line":utf8>>,
+    <<"ends with a newline\n":utf8>>,
+    <<"two\nlines":utf8>>,
+    <<"crlf\r\nline ends\r\n":utf8>>,
+    <<"\n":utf8>>,
+    <<"\n\n\n":utf8>>,
+    <<"\r":utf8>>,
+    <<"não é ASCII — 日本語\nsegunda linha\n":utf8>>,
+    <<"data: {\"candidates\":[{\"text\":\"Olá\\n\"}]}\n\n":utf8>>,
+    <<"{\n  \"n\": 1.0e5,\n  \"z\": -0,\n  \"a\": \"\\u00e9\"\n}\n":utf8>>,
+    <<"tab\tand \"quotes\" and \\ backslash\n":utf8>>,
+    <<0, 255, 10, 13>>,
+  ]
+}
+
+pub fn every_body_reads_back_byte_for_byte_test() {
+  let exchanges =
+    list.map(bodies(), fn(body) { exchange_with(body, [body, <<"tail":utf8>>]) })
+  let text = cassette.encode(testing.script(exchanges))
+  let assert Ok(loaded) = cassette.parse(text, 1_000_000)
+  list.zip(testing.exchanges(loaded), bodies())
+  |> list.each(fn(pair) {
+    let #(exchange, body) = pair
+    testing.request(exchange).body |> should.equal(body)
+    let assert testing.Respond(reply, _) = testing.reply(exchange)
+    reply.body |> should.equal([body, <<"tail":utf8>>])
+  })
+}
+
+// Generated bodies over a small alphabet that stresses line ends.
+pub fn generated_bodies_read_back_byte_for_byte_test() {
+  let alphabet = ["a", "\n", "\r", "é", " ", "\"", "\\", ""]
+  let generated =
+    int.range(0, 300, [], fn(acc, seed) {
+      let body =
+        int.range(0, seed % 9, "", fn(text, step) {
+          let index = { seed * 7 + step * 13 } % list.length(alphabet)
+          let assert Ok(piece) = list.drop(alphabet, index) |> list.first
+          text <> piece
+        })
+      [bit_array.from_string(body), ..acc]
+    })
+  let text =
+    cassette.encode(
+      testing.script(
+        list.map(generated, fn(body) { exchange_with(body, [body]) }),
+      ),
+    )
+  let assert Ok(loaded) = cassette.parse(text, 10_000_000)
+  list.map(testing.exchanges(loaded), fn(exchange) {
+    testing.request(exchange).body
+  })
+  |> should.equal(generated)
+}
+
+// A schema 2 file, written by HTTP Gun 0.1.x, is refused, and its
+// description says what the file is and how to convert it.
+pub fn schema_2_cassettes_are_refused_with_conversion_guidance_test() {
+  let schema_2 =
+    "{\"http_gun\":2,\"exchanges\":[{\"request\":{\"method\":\"GET\",\"url\":\"http://offline.invalid/ask\",\"headers\":[],\"body\":{\"text\":\"a\"}},\"reply\":{\"kind\":\"reject\",\"failure\":{\"name\":\"client_closed\",\"evidence\":\"not_sent\"}}}]}"
+  let refused = cassette.parse(schema_2, 10_000)
+  refused |> should.equal(Error(cassette.UnsupportedVersion(2)))
+  let assert Error(problem) = refused
+  cassette.describe_error(problem)
+  |> should.equal(
+    "cassette schema 2, written by HTTP Gun 0.1.x, is no longer read: "
+    <> "convert it to schema 3 with cassette.parse then cassette.encode on the "
+    <> "HTTP Gun commit named under \"Upgrading cassettes\" in the CHANGELOG",
+  )
+  cassette.describe_error(cassette.UnsupportedVersion(4))
+  |> should.equal("cassette version 4 unsupported")
+}
+
+pub fn lines_bodies_are_checked_test() {
+  let body = fn(marker, value) {
+    "{\"http_gun\":"
+    <> marker
+    <> ",\"exchanges\":[{\"request\":{\"method\":\"GET\","
+    <> "\"scheme\":\"http\",\"host\":\"offline.invalid\",\"port\":null,\"path\":\"/\",\"query\":null,"
+    <> "\"headers\":[],\"body\":"
+    <> value
+    <> "},\"reply\":{\"kind\":\"reject\",\"failure\":{\"name\":\"client_closed\",\"evidence\":\"not_sent\"}}}]}"
+  }
+  // Lines need at least two strings.
+  cassette.parse(body("3", "{\"lines\":[\"a\"]}"), 10_000)
+  |> should.equal(Error(cassette.Corrupt))
+  cassette.parse(body("3", "{\"lines\":[]}"), 10_000)
+  |> should.equal(Error(cassette.Corrupt))
+  let assert Ok(loaded) =
+    cassette.parse(body("3", "{\"lines\":[\"a\",\"\"]}"), 10_000)
+  let assert [exchange] = testing.exchanges(loaded)
+  testing.request(exchange).body |> should.equal(<<"a\n":utf8>>)
+  // The first kind that decodes wins.
+  let assert Ok(loaded) =
+    cassette.parse(body("3", "{\"text\":5,\"lines\":[\"x\",\"y\"]}"), 10_000)
+  let assert [exchange] = testing.exchanges(loaded)
+  testing.request(exchange).body |> should.equal(<<"x\ny":utf8>>)
+  // A target is read from its fields, which must hold a target
+  // admission would accept.
+  let valid = body("3", "{\"text\":\"\"}")
+  cassette.parse(valid, 10_000) |> should.be_ok
+  [
+    #("\"scheme\":\"http\"", "\"scheme\":\"ftp\""),
+    #("\"host\":\"offline.invalid\"", "\"host\":\"\""),
+    #("\"port\":null", "\"port\":0"),
+    #("\"port\":null", "\"port\":70000"),
+    #("\"path\":\"/\"", "\"path\":\"no-slash\""),
+    #("\"path\":\"/\"", "\"path\":\"/a b\""),
+    #("\"query\":null", "\"query\":\"a\\r\\nb\""),
+    #("\"port\":null,", ""),
+    #(",\"query\":null", ""),
+  ]
+  |> list.each(fn(change) {
+    let changed = string.replace(valid, change.0, change.1)
+    { changed != valid } |> should.be_true
+    cassette.parse(changed, 10_000) |> should.equal(Error(cassette.Corrupt))
+  })
+  cassette.parse(body("4", "{\"text\":\"\"}"), 10_000)
+  |> should.equal(Error(cassette.UnsupportedVersion(4)))
+}
+
+// The layout, pinned byte for byte: one field per line, a header pair, a
+// chunk or a body line on its own line, a failure on one line.
+pub fn encoding_writes_the_schema_3_layout_test() {
+  let assert Ok(req) = request.to("http://offline.invalid/ask?q=1")
+  let first =
+    testing.exchange(
+      req
+        |> request.set_header("accept", "text/plain")
+        |> request.set_body(<<"line one\nline two\n":utf8>>),
+      testing.Respond(
+        response.Response(200, [#("content-type", "text/event-stream")], [
+          <<"data: a\n\n":utf8>>,
+          <<"ok":utf8>>,
+        ]),
+        testing.Finished([#("x-end", "yes")]),
+      ),
+    )
+  let second =
+    testing.exchange(
+      request.set_body(req, <<>>),
+      testing.Respond(response.Response(204, [], []), testing.Finished([])),
+    )
+  cassette.encode(testing.script([first, second]))
+  |> should.equal(
+    "{
+  \"http_gun\": 3,
+  \"exchanges\": [
+    {
+      \"request\": {
+        \"method\": \"GET\",
+        \"scheme\": \"http\",
+        \"host\": \"offline.invalid\",
+        \"port\": null,
+        \"path\": \"/ask\",
+        \"query\": \"q=1\",
+        \"headers\": [
+          [\"accept\", \"text/plain\"]
+        ],
+        \"body\": {\"lines\": [
+          \"line one\",
+          \"line two\",
+          \"\"
+        ]}
+      },
+      \"reply\": {
+        \"kind\": \"response\",
+        \"status\": 200,
+        \"headers\": [
+          [\"content-type\", \"text/event-stream\"]
+        ],
+        \"chunks\": [
+          {\"lines\": [
+            \"data: a\",
+            \"\",
+            \"\"
+          ]},
+          {\"text\": \"ok\"}
+        ],
+        \"ending\": {\"kind\": \"finished\", \"trailers\": [
+          [\"x-end\", \"yes\"]
+        ]}
+      }
+    },
+    {
+      \"request\": {
+        \"method\": \"GET\",
+        \"scheme\": \"http\",
+        \"host\": \"offline.invalid\",
+        \"port\": null,
+        \"path\": \"/ask\",
+        \"query\": \"q=1\",
+        \"headers\": [],
+        \"body\": {\"text\": \"\"}
+      },
+      \"reply\": {
+        \"kind\": \"response\",
+        \"status\": 204,
+        \"headers\": [],
+        \"chunks\": [],
+        \"ending\": {\"kind\": \"finished\", \"trailers\": []}
+      }
+    }
+  ]
+}
+",
+  )
+  cassette.encode(testing.script([]))
+  |> should.equal("{\n  \"http_gun\": 3,\n  \"exchanges\": []\n}\n")
+}
+
+// Converting a schema 3 file, as a consumer did from schema 2, is
+// idempotent, and fails as parsing fails.
+pub fn conversion_is_idempotent_test() {
+  let text =
+    cassette.encode(
+      testing.script([
+        exchange_with(<<"{\"token\":\"t-1\"}":utf8>>, [
+          <<"{\"token\":":utf8>>,
+          <<"\"t-1\"}\n":utf8>>,
+        ]),
+      ]),
+    )
+  convert(text, 100_000) |> should.equal(Ok(text))
+  convert(text, 10)
+  |> should.equal(Error(cassette.TooLarge(10, string.byte_size(text))))
+  convert("not JSON", 100) |> should.equal(Error(cassette.Corrupt))
+}
+
+// Target edges read back exactly through encode, parse and conversion.
+pub fn target_fields_read_back_exactly_test() {
+  let assert Ok(base) = request.to("http://offline.invalid/ask")
+  let targets = [
+    base,
+    request.Request(..base, query: option.Some("")),
+    request.Request(..base, query: option.None),
+    request.Request(..base, port: option.None),
+    request.Request(..base, port: option.Some(8443), scheme: http.Https),
+    request.Request(..base, host: "API.Example.TEST"),
+    request.Request(
+      ..base,
+      path: "/a%2Fb/%E2%9C%93",
+      query: option.Some("x=%20&y"),
+    ),
+  ]
+  let exchanges =
+    list.map(targets, fn(target) {
+      testing.exchange(
+        request.set_body(target, <<>>),
+        testing.Reject(error.new(error.ClientClosed, error.NotSent)),
+      )
+    })
+  let text = cassette.encode(testing.script(exchanges))
+  let assert Ok(loaded) = cassette.parse(text, 100_000)
+  testing.exchanges(loaded) |> should.equal(exchanges)
+  convert(text, 100_000) |> should.equal(Ok(text))
+}
+
+// Hand-built scripts keep the shapes matching accepts: an uppercase header
+// name encodes and parses back, and a method spelled Other("GET") matches
+// itself.
+pub fn hand_built_scripts_keep_their_shapes_test() {
+  let assert Ok(base) = request.to("http://offline.invalid/ask")
+  let sent =
+    base
+    |> request.set_method(http.Other("GET"))
+    |> request.set_body(<<>>)
+  let scripted = request.Request(..sent, headers: [#("Accept", "text/plain")])
+  let script =
+    testing.script([
+      testing.exchange(
+        scripted,
+        testing.Respond(
+          response.Response(200, [], [<<"ok":utf8>>]),
+          testing.Finished([]),
+        ),
+      ),
+    ])
+  let assert Ok(parsed) = cassette.parse(cassette.encode(script), 100_000)
+  let assert Ok(client) = testing.playback(script, config.default())
+  let assert Ok(reply) =
+    http_gun.send(client, request.set_header(sent, "accept", "text/plain"))
+  reply.response.body |> should.equal(<<"ok":utf8>>)
+  http_gun.stop(client)
+  let assert Ok(client) = testing.playback(parsed, config.default())
+  let assert Ok(_) =
+    http_gun.send(client, request.set_header(sent, "accept", "text/plain"))
+  http_gun.stop(client)
+}
+
+// A hand-built target a client could not send is encoded, and the file is
+// refused on parse.
+pub fn encoded_unsendable_target_is_refused_on_parse_test() {
+  let assert Ok(base) = request.to("http://offline.invalid/ask")
+  let unsendable = request.Request(..base, port: option.Some(0))
+  cassette.encode(
+    testing.script([
+      testing.exchange(
+        request.set_body(unsendable, <<>>),
+        testing.Reject(error.new(error.ClientClosed, error.NotSent)),
+      ),
+    ]),
+  )
+  |> cassette.parse(10_000)
+  |> should.equal(Error(cassette.Corrupt))
+}
+
+// Encoding lays a script out and nothing else: a credential header and a
+// credential-named answer field are written as given, and a stored answer
+// survives parse then encode byte for byte.
+pub fn encode_applies_no_redaction_test() {
+  // `testing.exchange` redacts the request; the response is as given.
+  let assert Ok(base) = request.to("http://offline.invalid/ask")
+  let exchange =
+    testing.exchange(
+      request.set_body(base, <<>>),
+      testing.Respond(
+        response.Response(
+          429,
+          [#("content-type", "application/json"), #("set-cookie", "s=1")],
+          [<<"{\"error\":{\"code\":429,\"token\":\"t-1\"}}":utf8>>],
+        ),
+        testing.Finished([]),
+      ),
+    )
+  let text = cassette.encode(testing.script([exchange]))
+  string.contains(text, "set-cookie") |> should.be_true
+  string.contains(text, "\\\"code\\\":429") |> should.be_true
+  let assert Ok(parsed) = cassette.parse(text, 100_000)
+  testing.exchanges(parsed) |> should.equal([exchange])
+  cassette.encode(parsed) |> should.equal(text)
+}
+
+// Requests-only field redaction keeps a response's chunks and bytes as
+// stored, while the request's field is replaced.
+pub fn request_fields_only_keeps_response_chunks_test() {
+  let assert Ok(base) = request.to("http://offline.invalid/ask")
+  let exchange =
+    testing.exchange(
+      base
+        |> request.set_header("content-type", "application/json")
+        |> request.set_body(<<"{\"token\":\"t-1\"}":utf8>>),
+      testing.Respond(
+        response.Response(429, [#("content-type", "application/json")], [
+          <<"{\"error\":{":utf8>>,
+          <<"\"code\":429}}":utf8>>,
+        ]),
+        testing.Finished([]),
+      ),
+    )
+  let assert [kept] =
+    testing.exchanges(cassette.redact(
+      testing.script([exchange]),
+      redaction.default() |> redaction.request_fields_only,
+    ))
+  // `testing.exchange` already redacted the request; the recording test
+  // shows the opt-in replacing a live request's field.
+  testing.reply(kept) |> should.equal(testing.reply(exchange))
+  // The default still replaces the field in the answer.
+  let assert [default] =
+    testing.exchanges(cassette.redact(
+      testing.script([exchange]),
+      redaction.default(),
+    ))
+  { testing.reply(default) == testing.reply(exchange) } |> should.be_false
+}
+
+// Under requests-only field redaction a body hook still rewrites a response
+// body, which is then held whole; only the credential fields stay.
+pub fn request_fields_only_still_applies_the_body_hook_test() {
+  let assert Ok(base) = request.to("http://offline.invalid/ask")
+  let exchange =
+    testing.exchange(
+      request.set_body(base, <<>>),
+      testing.Respond(
+        response.Response(200, [#("content-type", "application/json")], [
+          <<"{\"code\":429,":utf8>>,
+          <<"\"note\":\"card 4111\"}":utf8>>,
+        ]),
+        testing.Finished([]),
+      ),
+    )
+  let hook = fn(bytes) {
+    let assert Ok(text) = bit_array.to_string(bytes)
+    bit_array.from_string(string.replace(text, "4111", "[card]"))
+  }
+  let policy =
+    redaction.default()
+    |> redaction.request_fields_only
+    |> redaction.with_body(hook)
+  let assert [stored] =
+    testing.exchanges(cassette.redact(testing.script([exchange]), policy))
+  let assert testing.Respond(reply, _) = testing.reply(stored)
+  reply.body
+  |> should.equal([<<"{\"code\":429,\"note\":\"card [card]\"}":utf8>>])
+}

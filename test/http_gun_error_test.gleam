@@ -548,7 +548,7 @@ pub fn obsolete_fixture_errors_are_rejected_test() {
     "{\"http_gun\":1,\"exchanges\":[{\"request\":{\"url\":\"http://localhost/\",\"method\":\"GET\",\"headers\":[],\"body\":{\"bytes\":0,\"base64\":\"\"}},\"reply\":{\"kind\":\"reject\",\"failure\":{\"reason\":\"limit\",\"detail\":\"collection\",\"count\":2,\"evidence\":\"may_have_been_sent\"}}}]}"
   cassette.parse(text, 10_000)
   |> should.equal(Error(cassette.UnsupportedVersion(1)))
-  // A schema 2 file carrying the obsolete failure shape is corrupt.
+  // A file carrying an obsolete failure shape is corrupt.
   let req = request.new() |> request.set_body(<<>>)
   let failure = error.new(error.ClientClosed, error.NotSent)
   let encoded =
@@ -623,7 +623,7 @@ pub fn limit_fixture_requires_an_observed_size_test() {
       ),
     ])
   let encoded = cassette.encode(tape)
-  string.contains(encoded, "\"http_gun\":2") |> should.be_true
+  string.contains(encoded, "\"http_gun\": 3") |> should.be_true
   string.contains(encoded, "\"observed\":3") |> should.be_true
   let corrupt = Error(cassette.Corrupt)
   list.each(
@@ -639,10 +639,10 @@ pub fn limit_fixture_requires_an_observed_size_test() {
     },
   )
   cassette.parse(
-    string.replace(encoded, "\"http_gun\":2", "\"http_gun\":3"),
+    string.replace(encoded, "\"http_gun\": 3", "\"http_gun\": 4"),
     10_000,
   )
-  |> should.equal(Error(cassette.UnsupportedVersion(3)))
+  |> should.equal(Error(cassette.UnsupportedVersion(4)))
 }
 
 @external(erlang, "http_gun_test_server", "late_monitor_refusal")

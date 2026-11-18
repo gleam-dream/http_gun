@@ -2,6 +2,7 @@
 //// definition of how a playback request matches an expected one.
 
 import gleam/bit_array
+import gleam/http
 import gleam/http/request.{type Request}
 import gleam/list
 import gleam/option.{type Option, None, Some}
@@ -39,8 +40,9 @@ pub type Matching {
 
 pub const exact = Matching([], None)
 
-/// The comparable form of a request: the redaction applied, the host
-/// lowercased, an empty path as `/`, header names lowercased, ignored
+/// The comparable form of a request: the redaction applied, the method in
+/// one spelling (`Other("GET")` as `Get`), the host lowercased, an empty path
+/// as `/`, header names lowercased, ignored
 /// headers removed and headers sorted by name, keeping the order of
 /// repeated names.
 pub fn key(
@@ -51,6 +53,11 @@ pub fn key(
   let req = redaction.request(policy, req)
   request.Request(
     ..req,
+    // One spelling per method: `Other("GET")` is `Get`.
+    method: case http.parse_method(http.method_to_string(req.method)) {
+      Ok(method) -> method
+      Error(Nil) -> req.method
+    },
     host: string.lowercase(req.host),
     path: case req.path {
       "" -> "/"

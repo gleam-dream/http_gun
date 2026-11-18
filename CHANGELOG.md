@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+> [!WARNING]
+> This release does not read the cassettes HTTP Gun 0.1.0 and 0.1.1 wrote
+> (schema 2): loading one fails with `UnsupportedVersion(2)`. Convert every
+> cassette on commit `0974868` before moving to this release, as
+> [Upgrading cassettes](#upgrading-cassettes) describes. `cassette.encode`
+> also no longer removes credentials; see [Security](#security).
+
 ### Added
 
 - `testing.verify(client) -> Result(testing.Verdict, testing.VerifyError)`
@@ -24,8 +31,15 @@
   after the last, so a non-empty script is never exhausted. With a matcher
   that accepts any request, one exchange answers every request, for example
   with a built provider failure.
+- `redaction.request_fields_only(redaction)` replaces credential fields in
+  request bodies and the query only, and stores response bodies as received
+  (apart from `with_body`), so a JSON answer or error body with a listed key,
+  such as `{"error":{"code":429}}`, replays exactly. The default is
+  unchanged; a consumer that opts in owns keeping secrets such as OAuth token
+  answers out of its cassettes.
 - `cassette.redact(script, redaction)` applies a redaction to stored
-  exchanges as a recording would store them, to find what a grown policy
+  exchanges as a recording would store them, including the headers held
+  inside a scripted failure, to find what a grown policy
   would still change in old cassettes and to clean them with `encode`
   without recording again.
 - `config.with_cipher_suites` with `config.CipherSuites`: `OtpDefaults`
@@ -35,19 +49,86 @@
   NFS-e web service) accept only them. Verification, trust and destination
   policy are unchanged. See ADR 0017.
 
+### Security
+
+- `cassette.encode` no longer removes credentials: it lays a script out as
+  given. Since 0.1.0 it promised never to write credential headers, and since
+  0.1.1 it replaced credential fields. Code that encodes hand-built or parsed
+  scripts must apply `cassette.redact(script, redaction.default())` first;
+  recordings are redacted as they are captured, as before.
+
+### Changed
+
+- Cassettes are written and read in schema 3 (`"http_gun": 3`); schema 2
+  files are no longer read, and `cassette.describe_error` of
+  `UnsupportedVersion(2)` says how to convert one. Schema 3 lays a cassette out over many lines, each header
+  pair, chunk and body line on a line of its own, and stores a UTF-8 body or
+  chunk that contains a newline as `{"lines": [...]}`, the strings between
+  its newlines, rebuilt exactly by joining them. Every body reads back byte
+  for byte. Recorded files and `cassette.encode` output share this layout.
+  See ADR 0019.
+- The recording budget is charged on every byte the file holds, its envelope
+  and separators included, so a recording within budget B loads with
+  `max_bytes` B. A budget below the 42-byte envelope is refused with
+  `CaptureLimit`.
+
+### Upgrading cassettes
+
+- This release reads schema 3 only. Commit
+  `0974868199378dd774e5979bff8f503cf645fd4c` is the last that reads schema
+  2, and it writes the same schema 3 as this release. Convert on it, then
+  move on:
+  1. Depend on that commit:
+     `http_gun = { git = "https://github.com/gleam-dream/http_gun", ref = "0974868199378dd774e5979bff8f503cf645fd4c" }`.
+  2. For each cassette, read the file, apply `cassette.parse(text, max_bytes)`
+     then `cassette.encode`, parse the result to check it, and write it back.
+     No credentials, no network. `encode` applies no redaction, so no
+     recorded answer changes. To clean a file recorded before field
+     redaction existed, apply `cassette.redact` on purpose.
+  3. Commit the converted files, then depend on this release.
+- Schema 3 stores a request's scheme, host, port, path and query as
+  separate fields, so every request a client accepts reads back exactly:
+  a query with brackets, braces, a pipe or quotes, a non-ASCII path, an IPv6
+  host, or a `?` or `#` in a path. A schema 2 file stored one URL, which
+  could not carry those targets. Such a file either never loaded (`parse`
+  returns `Corrupt`, and HTTP Gun cannot recover it: record it again) or
+  loaded as a different request, which converts as that request. A schema 2
+  file that loads but holds a target a client could not send, such as port 0
+  or an empty host, converts to text `parse` refuses: check before writing.
+- Who breaks: `cassette.encode` applies no redaction any more. Since 0.1.0 it
+  promised never to write credential headers, and since 0.1.1 it replaced
+  credential fields; a hand-built or parsed script now keeps, when encoded,
+  every credential it holds: a `set-cookie` or other credential response or
+  trailer header, failure headers, credential fields in bodies, and, for a
+  parsed or hand-edited script, request credentials too (`testing.exchange`
+  still redacts the request it builds). Apply
+  `cassette.redact(script, redaction.default())` first, as recording already
+  does. `cassette.encode` of a hand-built script whose target a client
+  could not send (an empty host, port 0, a path without a leading `/`) writes
+  a file `parse` refuses as `Corrupt`; schema 2 loaded such files. An older
+  HTTP Gun reading a schema 3 file fails with
+  `UnsupportedVersion(3)`, and this release reading a schema 2 file fails
+  with `UnsupportedVersion(2)`; code comparing `cassette.encode` output with a
+  stored string sees the new layout; a `load` limit set close to a file's
+  schema 2 size can fail with `TooLarge` (a streamed answer grows by about a
+  quarter); `cassette.record` with a budget below 42 bytes now fails at once
+  with `CaptureLimit` instead of at the first request; and a recording that
+  fit its budget under schema 2 can now exceed it, since the same exchanges
+  store more bytes and every stored byte is charged. Convert in one commit
+  of your own, so no re-record mixes a format change with a content change.
+
 ### Fixed
+
+- A request whose method was spelled as another known method, such as
+  `http.Other("GET")`, was recorded as `Get` and then never matched its own
+  live form on replay. Matching now compares methods in one spelling, so
+  `Other("GET")` and `Get` are the same method; requests sent are unchanged.
 
 - A request whose host, path or query held a space followed by a combining
   mark passed admission, because the check matched whole characters as
   displayed rather than code points; the space then reached the request
   line. It is now refused as `InvalidRequest(InvalidTarget)` (or
   `InvalidOrigin` for the host), like any other space.
-
-- `cassette.encode` removed credential headers from requests, responses and
-  trailers but wrote the headers held inside a scripted failure (a `Reject`
-  or an `Aborted` ending) as given, although its documentation says credential
-  headers are never written. It now filters them too. Recordings were not
-  affected: a recorded failure holds no headers.
 
 ## 0.1.1 - 2026-11-04
 
