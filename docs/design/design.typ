@@ -62,9 +62,6 @@
       pending-entry(title: "Resolve recording cleanup promise strength", kind: "ruling", since: "2026-10-06", adr: 10)[
         Abort and failure attempt staging removal. The implementation ignores removal failures and can return while a blocked writer's cleaner waits. The public contract is either best-effort cleanup or typed cleanup completion; the owner has not ruled.
       ],
-      pending-entry(title: "Align the repository's fixture-schema instruction", kind: "ruling", since: "2026-11-18", adr: 19)[
-        AGENTS.md asks to keep one strict, version-marked fixture schema, while schema 3 writes one marker and reads two. Proposed wording: write one strict, version-marked fixture schema and read only the versions the design lists. The owner has not ruled.
-      ],
       pending-entry(title: "Decide the release version for the record and replay additions", kind: "ruling", since: "2026-11-18", adr: 18)[
         The verify call, the masking additions, the verdict's dropped count and schema 3 are unreleased; schema 3 breaks older readers of new files, anyone comparing `cassette.encode` output to a stored string, recordings with a budget below the envelope, and recordings near their budget. The owner decides the version at release.
       ],
