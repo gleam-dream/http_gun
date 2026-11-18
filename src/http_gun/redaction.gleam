@@ -53,7 +53,9 @@
 //// request header. A `send` or `batch` failure after the response head
 //// arrived keeps the response headers (`error.headers`) with the listed
 //// headers removed. A waiting request's headers are held in a closure that
-//// crash reports print as a function reference.
+//// crash reports print as a function reference. A playback client keeps the
+//// requests it refused, redacted, for `testing.verify`; a crash report of
+//// that client can print them.
 
 import gleam/bit_array
 import gleam/http/request.{type Request}
@@ -71,7 +73,8 @@ pub opaque type Redaction {
     names: List(String),
     body: Option(fn(BitArray) -> BitArray),
     request_body: Option(fn(BitArray) -> BitArray),
-    /// Lowercased request header names to keep, once any are named.
+    /// Lowercased request header names to keep, once
+    /// `keeping_request_headers` is called, even with no names.
     kept_request_headers: Option(List(String)),
   )
 }
@@ -236,7 +239,8 @@ pub fn keeping_request_headers(
   Redaction(..redaction, kept_request_headers: Some(kept))
 }
 
-/// Remove the redacted headers from a header list.
+/// Remove the redacted headers from a header list. The request header
+/// allow-list is not applied; `request` applies it.
 pub fn headers(
   redaction: Redaction,
   headers: List(#(String, String)),
@@ -267,7 +271,8 @@ pub fn request(
 
 /// Rewrite a request or response body with the `content-type` in `headers`:
 /// replace the credential fields of a form or JSON body, then apply the body
-/// function, if any.
+/// function, if any. The request-body rewrite is not applied; `request`
+/// applies it.
 pub fn body_for(
   redaction: Redaction,
   headers: List(#(String, String)),

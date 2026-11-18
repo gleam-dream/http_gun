@@ -665,3 +665,35 @@ pub fn verify_reports_refusals_oldest_first_at_the_cursor_test() {
   )
   http_gun.stop(client)
 }
+
+pub fn request_header_allow_list_leaves_failures_and_empty_lists_test() {
+  // An empty allow-list keeps only the content type.
+  let assert Ok(base) = request.to("http://offline.invalid/ask")
+  let asked =
+    base
+    |> request.set_header("accept", "text/plain")
+    |> request.set_header("content-type", "text/plain")
+    |> request.set_body(<<>>)
+  let only_type = redaction.default() |> redaction.keeping_request_headers([])
+  let script =
+    testing.script([
+      testing.exchange(
+        asked,
+        respond(429, [#("retry-after", "30")], [<<"too large":utf8>>], []),
+      ),
+    ])
+  let assert [stored] = testing.exchanges(cassette.redact(script, only_type))
+  testing.request(stored).headers
+  |> should.equal([#("content-type", "text/plain")])
+
+  // A failure that kept its response head keeps its headers.
+  let assert Ok(client) =
+    testing.playback(
+      script,
+      config.default() |> config.with_redaction(only_type),
+    )
+  let assert Error(failure) =
+    http_gun.send(client |> http_gun.with_body_limit(4, http_gun.Fail), asked)
+  list.key_find(error.headers(failure), "retry-after") |> should.equal(Ok("30"))
+  http_gun.stop(client)
+}

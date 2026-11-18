@@ -909,7 +909,7 @@ pub fn request_header_allow_list_test() {
 pub fn recording_stores_what_redact_makes_of_the_live_exchange_test() {
   let port =
     serve(<<
-      "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nX-Signature: resp-sig\r\nTransfer-Encoding: chunked\r\n\r\n9\r\n{\"token\":\r\n10\r\n\"t-1\",\"n\":\"20/\"}\r\n0\r\nX-Signature: trailer-sig\r\nX-End: yes\r\n\r\n":utf8,
+      "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nX-Signature: resp-sig\r\nTransfer-Encoding: chunked\r\n\r\n9\r\n{\"token\":\r\n18\r\n\"t-1\",\"n\":\"20/11 14:30\"}\r\n0\r\nX-Signature: trailer-sig\r\nX-End: yes\r\n\r\n":utf8,
     >>)
   let policy =
     redaction.default()
@@ -955,9 +955,13 @@ pub fn recording_stores_what_redact_makes_of_the_live_exchange_test() {
   let assert [stored] = testing.exchanges(tape)
   testing.request(stored).body
   |> should.equal(<<"card=[card]&at=<time>&token=REDACTED":utf8>>)
-  let assert testing.Respond(_, testing.Finished(trailers)) =
+  let assert testing.Respond(stored_response, testing.Finished(trailers)) =
     testing.reply(stored)
   trailers |> should.equal([#("x-end", "yes")])
+  // The buffered JSON answer is rewritten by fields and the body function
+  // only; its time stays as the service wrote it.
+  stored_response.body
+  |> should.equal([<<"{\"token\":\"REDACTED\",\"n\":\"20/11 14:30\"}":utf8>>])
   remove(destination)
 }
 
