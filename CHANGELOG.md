@@ -31,7 +31,8 @@
   unchanged; a consumer that opts in owns keeping secrets such as OAuth token
   answers out of its cassettes.
 - `cassette.redact(script, redaction)` applies a redaction to stored
-  exchanges as a recording would store them, to find what a grown policy
+  exchanges as a recording would store them, including the headers held
+  inside a scripted failure, to find what a grown policy
   would still change in old cassettes and to clean them with `encode`
   without recording again.
 - `config.with_cipher_suites` with `config.CipherSuites`: `OtpDefaults`
@@ -104,11 +105,6 @@
   displayed rather than code points; the space then reached the request
   line. It is now refused as `InvalidRequest(InvalidTarget)` (or
   `InvalidOrigin` for the host), like any other space.
-
-- `cassette.redact` filtered credential headers from requests, responses and
-  trailers but not the headers held inside a scripted failure (a `Reject` or
-  an `Aborted` ending). It now filters them too. Recordings were not
-  affected: a recorded failure holds no headers.
 
 ## 0.1.1 - 2026-11-04
 

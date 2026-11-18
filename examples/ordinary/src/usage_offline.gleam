@@ -204,6 +204,9 @@ fn masked_requests() -> Nil {
   let policy =
     redaction.default()
     |> redaction.keeping_request_headers(["accept"])
+    // Keep answers exactly as received; credential fields are replaced in
+    // requests only.
+    |> redaction.request_fields_only
     |> redaction.with_request_body(fn(body) {
       case body {
         <<"asked at ":utf8, _:bytes>> -> <<"asked at <time>":utf8>>

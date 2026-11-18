@@ -387,7 +387,8 @@ pub fn encoded_unsendable_target_is_refused_on_parse_test() {
 // credential-named answer field are written as given, and a stored answer
 // survives parse then encode byte for byte.
 pub fn encode_applies_no_redaction_test() {
-  let assert Ok(base) = request.to("http://offline.invalid/ask?key=live-key")
+  // `testing.exchange` redacts the request; the response is as given.
+  let assert Ok(base) = request.to("http://offline.invalid/ask")
   let exchange =
     testing.exchange(
       request.set_body(base, <<>>),

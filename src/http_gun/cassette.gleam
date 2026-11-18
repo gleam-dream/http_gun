@@ -15,12 +15,13 @@
 //// let assert Ok(client) = testing.playback(script, settings)
 //// ```
 ////
-//// A cassette is readable JSON (`"http_gun": 3`), laid out over many lines: a body
-//// or chunk that is valid UTF-8 containing a newline is stored as
-//// `{"lines": [..]}`, one string per line, other UTF-8 as `{"text": ..}`,
-//// and anything else as `{"base64": ..}`. Every body reads back byte for
-//// byte. Schema 2 files still load; `parse` then `encode` converts them. A file of
-//// another version fails with `UnsupportedVersion`.
+//// A cassette is readable JSON (`"http_gun": 3`), laid out over many
+//// lines: a body or chunk that is valid UTF-8 containing a newline is stored
+//// as `{"lines": [..]}`, one string per line, other UTF-8 as
+//// `{"text": ..}`, and anything else as `{"base64": ..}`. Every body reads
+//// back byte for byte. Schema 2 files still load; `parse` then `encode`
+//// converts them. A file of another version fails with
+//// `UnsupportedVersion`.
 ////
 //// What a cassette stores follows the configuration's redaction
 //// (`config.with_redaction`). By default credential headers are removed, and

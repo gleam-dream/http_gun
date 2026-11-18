@@ -127,6 +127,9 @@ the result and writes the file.
 let policy =
   redaction.default()
   |> redaction.keeping_request_headers(["accept"])
+  // Keep answers exactly as received; credential fields are replaced in
+  // requests only.
+  |> redaction.request_fields_only
   |> redaction.with_request_body(fn(body) {
     case body {
       <<"asked at ":utf8, _:bytes>> -> <<"asked at <time>":utf8>>
@@ -190,7 +193,8 @@ flowchart LR
   newline stored as its lines, so a re-recorded answer diffs line by line and
   reads back byte for byte. Schema 2 files still load; convert them with
   `cassette.parse` then `cassette.encode`, which applies no redaction, so no
-  recorded answer changes. Files are larger than in schema 2
+  recorded answer changes; parse the result before writing it over the old
+  file. Files are larger than in schema 2
   (about a quarter for a streamed answer), so raise `max_bytes` on `load`
   where it was tight.
 - Sinal events are best effort. Without a forwarder route, handlers run inside
