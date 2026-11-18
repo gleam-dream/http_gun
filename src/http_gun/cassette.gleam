@@ -150,7 +150,8 @@ pub fn encode(script: testing.Script) -> String {
 }
 
 /// Apply `redaction` to stored exchanges, as a recording under it would have
-/// stored them: requests redacted, response headers and trailers filtered,
+/// stored them: requests redacted, response headers, trailers and the
+/// headers a stored failure holds filtered,
 /// and a rewritten response body held as one chunk. The matching settings of
 /// `script` are kept.
 ///

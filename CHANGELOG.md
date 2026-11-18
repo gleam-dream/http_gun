@@ -31,6 +31,14 @@
   NFS-e web service) accept only them. Verification, trust and destination
   policy are unchanged. See ADR 0017.
 
+### Fixed
+
+- `cassette.encode` removed credential headers from requests, responses and
+  trailers but wrote the headers held inside a scripted failure (a `Reject`
+  or an `Aborted` ending) as given, although its documentation says credential
+  headers are never written. It now filters them too. Recordings were not
+  affected: a recorded failure holds no headers.
+
 ## 0.1.1 - 2026-11-04
 
 ### Security

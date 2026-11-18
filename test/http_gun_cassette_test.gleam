@@ -723,3 +723,42 @@ pub fn verify_keeps_the_first_refusals_and_counts_the_rest_test() {
   verdict.dropped |> should.equal(8)
   http_gun.stop(client)
 }
+
+pub fn stored_failures_keep_no_redacted_header_test() {
+  let failure =
+    error.new(error.RequestFailed(error.UnknownTransport), error.MaybeSent)
+    |> error.with_headers([
+      #("authorization", "Bearer failure-secret"),
+      #("x-session", "s-1"),
+      #("retry-after", "30"),
+    ])
+  let script =
+    testing.script([
+      testing.exchange(req(), testing.Reject(failure)),
+      testing.exchange(
+        req(),
+        testing.Respond(
+          response.new(200) |> response.set_body([]),
+          testing.Aborted(failure),
+        ),
+      ),
+    ])
+
+  // Encoding never writes a credential header, wherever it is held.
+  let text = cassette.encode(script)
+  string.contains(text, "failure-secret") |> should.be_false
+  string.contains(text, "retry-after") |> should.be_true
+
+  // A grown policy removes its headers from stored failures too.
+  let grown = redaction.default() |> redaction.with_headers(["x-session"])
+  let kept = error.with_headers(failure, [#("retry-after", "30")])
+  testing.exchanges(cassette.redact(script, grown))
+  |> list.map(testing.reply)
+  |> should.equal([
+    testing.Reject(kept),
+    testing.Respond(
+      response.new(200) |> response.set_body([]),
+      testing.Aborted(kept),
+    ),
+  ])
+}

@@ -43,7 +43,8 @@ pub fn encode(exchanges: List(script.Exchange), policy: Redaction) -> String {
 }
 
 /// The form a recording under `policy` stores an exchange in: the request
-/// redacted, response headers and trailers filtered, and a rewritten
+/// redacted, response headers, trailers and the headers a stored failure
+/// holds filtered, and a rewritten
 /// response body held as one chunk. Encoding uses it; the recorder's streamed
 /// fragments are tested against it.
 pub fn store(policy: Redaction, exchange: script.Exchange) -> script.Exchange {
@@ -53,9 +54,13 @@ pub fn store(policy: Redaction, exchange: script.Exchange) -> script.Exchange {
   )
 }
 
+fn redact_failure(policy: Redaction, failure: error.Failure) -> error.Failure {
+  error.with_headers(failure, redaction.headers(policy, error.headers(failure)))
+}
+
 fn redact_reply(policy: Redaction, reply: script.Reply) -> script.Reply {
   case reply {
-    script.Reject(_) -> reply
+    script.Reject(failure) -> script.Reject(redact_failure(policy, failure))
     script.Respond(status, headers, chunks, ending) ->
       script.Respond(
         status,
@@ -71,7 +76,9 @@ fn redact_reply(policy: Redaction, reply: script.Reply) -> script.Reply {
         case ending {
           script.Finished(trailers) ->
             script.Finished(redaction.headers(policy, trailers))
-          other -> other
+          script.Aborted(failure) ->
+            script.Aborted(redact_failure(policy, failure))
+          script.Abandoned -> script.Abandoned
         },
       )
   }
