@@ -156,9 +156,11 @@ pub fn encode(script: testing.Script) -> String {
 ///
 /// Compare the result with the script to find what a grown policy would
 /// still change in old cassettes, and `encode` the result to clean them
-/// without recording again; writing the file is the caller's. Both rely on
-/// body functions returning their own output unchanged: redact twice and
-/// compare to tell an unstable function from a policy change.
+/// without recording again; writing the file is the caller's, without the
+/// recorder's atomic publication or file mode, and cleaning a file does not
+/// withdraw a secret already published in it. Both rely on redacting a stored
+/// form once more changing nothing: redact twice and compare to tell an
+/// unstable body function from a policy change.
 pub fn redact(
   script: testing.Script,
   redaction: redaction.Redaction,

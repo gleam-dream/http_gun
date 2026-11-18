@@ -27,6 +27,7 @@ fn remove_fixture(path: String) -> Nil
 
 pub fn main() -> Nil {
   scripted()
+  verified()
   retry_after()
   redacted_cassette()
   masked_requests()
@@ -61,7 +62,6 @@ fn scripted() -> Nil {
   let assert Error(exhausted) = http_gun.send(client, expected)
   let assert error.PlaybackExhausted = error.reason(exhausted)
   http_gun.stop(client)
-  verified()
 }
 
 // Code under test may handle a playback failure as one more provider error.

@@ -115,8 +115,9 @@ http_gun.stop(client)
 
 A test that normalises volatile request values (a time, an id) can rewrite
 request bodies only, so a recorded answer is never edited, and can store only
-the request headers it names. `cassette.redact` applies a grown policy to a
-cassette already on disk without recording again.
+the request headers it names, plus `content-type`. `cassette.redact` applies a
+grown policy to a loaded cassette without recording again; the caller encodes
+the result and writes the file.
 
 <!-- prettier-ignore-start -->
 

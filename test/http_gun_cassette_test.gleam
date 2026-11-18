@@ -626,3 +626,42 @@ pub fn redact_applies_a_grown_policy_to_stored_exchanges_test() {
   |> should.equal(<<"{\"session\":\"REDACTED\",\"ok\":true}":utf8>>)
   http_gun.stop(client)
 }
+
+pub fn verify_reports_refusals_oldest_first_at_the_cursor_test() {
+  let first = testing.exchange(req(), respond(200, [], [<<1>>], []))
+  let second =
+    testing.exchange(
+      request.set_path(req(), "/second"),
+      respond(201, [], [<<2>>], []),
+    )
+  let assert Ok(client) =
+    testing.playback(testing.script([first, second]), config.default())
+  let key = testing.match_key(redaction.default(), _)
+  let assert Error(_) = http_gun.send(client, request.set_path(req(), "/a"))
+  let assert Ok(_) = http_gun.send(client, req())
+  let assert Error(_) = http_gun.send(client, request.set_path(req(), "/b"))
+  let assert Ok(_) = http_gun.send(client, request.set_path(req(), "/second"))
+  let assert Error(_) = http_gun.send(client, request.set_path(req(), "/c"))
+  let assert Error(_) = http_gun.send(client, request.set_path(req(), "/d"))
+  testing.verify(client)
+  |> should.equal(
+    Ok(
+      testing.Verdict(
+        mismatched: [
+          testing.Mismatch(0, key(req()), key(request.set_path(req(), "/a"))),
+          testing.Mismatch(
+            1,
+            key(request.set_path(req(), "/second")),
+            key(request.set_path(req(), "/b")),
+          ),
+        ],
+        exhausted: [
+          key(request.set_path(req(), "/c")),
+          key(request.set_path(req(), "/d")),
+        ],
+        unused: [],
+      ),
+    ),
+  )
+  http_gun.stop(client)
+}

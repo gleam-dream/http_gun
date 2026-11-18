@@ -86,7 +86,12 @@ type Owned {
 pub type Mode {
   Record(recorder.Recording)
   Live
-  Playback(
+  Playback(Replay)
+}
+
+/// A playback session's cursor and what it refused.
+pub type Replay {
+  Replay(
     remaining: List(script.Exchange),
     position: Int,
     matching: script.Matching,
@@ -101,7 +106,7 @@ pub fn playback(
   exchanges: List(script.Exchange),
   matching: script.Matching,
 ) -> Mode {
-  Playback(exchanges, 0, matching, [], [])
+  Playback(Replay(exchanges, 0, matching, [], []))
 }
 
 type Phase {
@@ -395,11 +400,11 @@ fn handle(state: State, message: Message) -> actor.Next(State, Message) {
       process.send(
         reply,
         Ok(case state.mode {
-          Playback(remaining:, mismatched:, exhausted:, ..) ->
+          Playback(replay) ->
             Some(script.Report(
-              list.reverse(mismatched),
-              list.reverse(exhausted),
-              remaining,
+              list.reverse(replay.mismatched),
+              list.reverse(replay.exhausted),
+              replay.remaining,
             ))
           Live | Record(_) -> None
         }),
@@ -938,8 +943,7 @@ fn admit(state: State, p: Pending) -> Admission {
         False ->
           case state.mode {
             Live | Record(_) -> admit_live(state, p)
-            Playback(exchanges, position, matching, ..) ->
-              Taken(admit_playback(state, p, exchanges, position, matching))
+            Playback(replay) -> Taken(admit_playback(state, p, replay))
           }
       }
   }
@@ -956,17 +960,18 @@ fn checking_count(state: State) -> Int {
   })
 }
 
-fn admit_playback(
-  state: State,
-  p: Pending,
-  exchanges: List(script.Exchange),
-  position: Int,
-  matching: script.Matching,
-) -> State {
-  case exchanges {
+fn admit_playback(state: State, p: Pending, replay: Replay) -> State {
+  let refuse = fn(against) {
+    State(
+      ..state,
+      mode: Playback(note_miss(replay, state.config.redaction, p, against)),
+    )
+  }
+  let Replay(remaining:, position:, matching:, ..) = replay
+  case remaining {
     [] -> {
       reject(p, error.PlaybackExhausted)
-      note_miss(state, p, None)
+      refuse(None)
     }
     [exchange, ..rest] ->
       case
@@ -979,7 +984,7 @@ fn admit_playback(
       {
         False -> {
           reject(p, error.PlaybackMismatch(position))
-          note_miss(state, p, Some(#(position, exchange.request)))
+          refuse(Some(#(position, exchange.request)))
         }
         True -> {
           lifecycle.emit(p.observation, telemetry.AdmissionGranted)
@@ -1013,11 +1018,9 @@ fn admit_playback(
               settle(p)
               State(
                 ..state,
-                mode: case state.mode {
-                  Playback(..) as mode ->
-                    Playback(..mode, remaining: rest, position: position + 1)
-                  other -> other
-                },
+                mode: Playback(
+                  Replay(..replay, remaining: rest, position: position + 1),
+                ),
                 owners: dict.insert(
                   state.owners,
                   started.pid,
@@ -1035,25 +1038,20 @@ fn admit_playback(
 // `verify`. `against` is the exchange it was compared with; `None` means the
 // script was exhausted.
 fn note_miss(
-  state: State,
+  replay: Replay,
+  policy: redaction.Redaction,
   p: Pending,
   against: Option(#(Int, request.Request(BitArray))),
-) -> State {
-  case state.mode {
-    Playback(matching:, mismatched:, exhausted:, ..) as mode -> {
-      let key = script.key(state.config.redaction, matching.ignored, _)
-      let actual = key(p.request())
-      let mode = case against {
-        Some(#(at, expected)) ->
-          Playback(..mode, mismatched: [
-            script.Missed(at, key(expected), actual),
-            ..mismatched
-          ])
-        None -> Playback(..mode, exhausted: [actual, ..exhausted])
-      }
-      State(..state, mode:)
-    }
-    Live | Record(_) -> state
+) -> Replay {
+  let key = script.key(policy, replay.matching.ignored, _)
+  let actual = key(p.request())
+  case against {
+    Some(#(at, expected)) ->
+      Replay(..replay, mismatched: [
+        script.Missed(at, key(expected), actual),
+        ..replay.mismatched
+      ])
+    None -> Replay(..replay, exhausted: [actual, ..replay.exhausted])
   }
 }
 

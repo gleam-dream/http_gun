@@ -206,9 +206,10 @@ pub fn with_body(
 /// after `with_body`: the body a recording stores, and both the scripted and
 /// the incoming body that playback compares. Response bodies are never
 /// passed to `rewrite`, so normalising volatile request values (a time, an
-/// id, inline image data) cannot edit a recorded answer. Playback applies
-/// `rewrite` to a body it already rewrote, so it must return its own output
-/// unchanged. Calling it again replaces the function.
+/// id, inline image data) cannot edit a recorded answer. Playback redacts a
+/// stored body again, so redacting the rewrite's output once more must change
+/// nothing: `rewrite`, the credential fields and `with_body` must each leave
+/// it as it is. Calling it again replaces the function.
 pub fn with_request_body(
   redaction: Redaction,
   rewrite: fn(BitArray) -> BitArray,

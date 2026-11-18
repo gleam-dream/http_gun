@@ -893,12 +893,13 @@ pub fn request_header_allow_list_test() {
   list.key_find(stored_response.headers, "content-type")
   |> should.equal(Ok("text/plain"))
 
-  // An unlisted request header takes no part in matching; a listed one does.
+  // A listed request header takes part in matching; an unlisted one does not.
   let assert Ok(client) = testing.playback(tape, settings)
+  let assert Error(changed) =
+    http_gun.send(client, request.set_header(asked("x"), "accept", "*/*"))
+  error.reason(changed) |> should.equal(error.PlaybackMismatch(0))
   let assert Ok(replayed) = http_gun.send(client, asked("second-run"))
   replayed.response.body |> should.equal(<<"ok":utf8>>)
-  let assert Error(_) =
-    http_gun.send(client, request.set_header(asked("x"), "accept", "*/*"))
   http_gun.stop(client)
   remove(destination)
 }
@@ -949,5 +950,22 @@ pub fn recording_stores_what_redact_makes_of_the_live_exchange_test() {
   |> should.equal(
     testing.exchanges(cassette.redact(testing.script([seen]), policy)),
   )
+  // The values themselves: fields, then the body function, then the
+  // request rewrite; trailers keep the deny-list alone.
+  let assert [stored] = testing.exchanges(tape)
+  testing.request(stored).body
+  |> should.equal(<<"card=[card]&at=<time>&token=REDACTED":utf8>>)
+  let assert testing.Respond(_, testing.Finished(trailers)) =
+    testing.reply(stored)
+  trailers |> should.equal([#("x-end", "yes")])
   remove(destination)
+}
+
+pub fn verify_refuses_a_recording_client_test() {
+  let destination = path()
+  let assert Ok(recorded) =
+    cassette.record(local_config(), destination, cassette.options())
+  testing.verify(recorded.client) |> should.equal(Error(testing.NotPlayback))
+  let assert Ok(Nil) = cassette.abort(recorded.recording)
+  http_gun.stop(recorded.client)
 }
