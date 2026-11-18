@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.0 - 2026-11-18
 
 > [!WARNING]
 > This release does not read the cassettes HTTP Gun 0.1.0 and 0.1.1 wrote
