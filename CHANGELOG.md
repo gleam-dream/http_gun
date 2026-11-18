@@ -40,7 +40,7 @@
 ### Changed
 
 - Cassettes are written in schema 3 (`"http_gun": 3`), and schema 2 files
-  still load. Schema 3 lays a cassette out one field per line, each header
+  still load. Schema 3 lays a cassette out over many lines, each header
   pair, chunk and body line on a line of its own, and stores a UTF-8 body or
   chunk that contains a newline as `{"lines": [...]}`, the strings between
   its newlines, rebuilt exactly by joining them. Every body reads back byte
@@ -66,8 +66,9 @@
   quarter); `cassette.record` with a budget below 42 bytes now fails at once
   with `CaptureLimit` instead of at the first request; and a recording that
   fit its budget under schema 2 can now exceed it, since the same exchanges
-  store more bytes and every stored byte is charged. Convert in one commit, after moving to this version, so no
-  re-record mixes a format change with a content change.
+  store more bytes and every stored byte is charged. Convert in one commit,
+  after moving to this version, so no re-record mixes a format change with a
+  content change.
 
 ### Fixed
 
