@@ -39,6 +39,14 @@ protocol_changed(Event, Owner) -> gun_default_event_h:protocol_changed(Event, Ow
 origin_changed(Event, Owner) -> gun_default_event_h:origin_changed(Event, Owner).
 cancel(Event, Owner) -> gun_default_event_h:cancel(Event, Owner).
 disconnect(Event, Owner) -> gun_default_event_h:disconnect(Event, Owner).
+%% A connection opened with a signer identity also carries the flag its
+%% signer sets on refusal; report the refusal, not ssl's handshake_failure.
+terminate(Event = #{reason := Reason}, {Owner, Refused}) ->
+    Cause = case atomics:get(Refused, 1) of
+        1 -> client_signing_failed;
+        0 -> Reason
+    end,
+    terminate(Event#{reason := Cause}, Owner);
 terminate(Event = #{reason := Reason}, Owner) ->
     Owner ! {gun_error, self(), Reason},
     gun_default_event_h:terminate(Event, Owner).

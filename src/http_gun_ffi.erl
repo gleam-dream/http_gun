@@ -2,7 +2,7 @@
 -module(http_gun_ffi).
 -export([start/0, open/11, request/5, credit/3, cancel/2, close/1, now/0, scoped/2, decode/1]).
 -export([on_exception/2, cause/1]).
--export([parse_address/1, lookup/3, client_identity/2]).
+-export([parse_address/1, lookup/3, client_identity/2, certificates/1]).
 -export([reusable/1]).
 -export([counter_new/0, counter_add/2]).
 counter_new() -> atomics:new(1, [{signed, true}]).
@@ -59,16 +59,20 @@ open(Address, ServerName, Port, Tls, Protocol, Trust, CipherSuites, Identity, Ti
                     {custom_ca, Path} -> {cacertfile, binary_to_list(Path)};
                     {anchors, Certificates} -> {cacerts, Certificates}
                 end,
-                Credentials = case Identity of
-                    none -> [];
-                    {some, Snapshot} -> [{certs_keys, [Snapshot]}]
+                {Credentials, Handler} = case Identity of
+                    none -> {[], self()};
+                    {some, {snapshot, Snapshot}} -> {[{certs_keys, [Snapshot]}], self()};
+                    {some, {external, Chain, Algorithm, Sign}} ->
+                        Refused = atomics:new(1, []),
+                        Key = #{algorithm => Algorithm, sign_fun => sign_fun(Sign, Refused)},
+                        {[{certs_keys, [#{cert => Chain, key => Key}]}], {self(), Refused}}
                 end,
                 Name = case ServerName of
                     none -> [];
                     {some, Host} -> [{server_name_indication, binary_to_list(Host)}]
                 end,
                 Ciphers = ciphers(CipherSuites),
-                Base#{transport => tls, tls_opts => Ciphers ++ [Ca, {verify, verify_peer},
+                Base#{transport => tls, event_handler => {http_gun_event_h, Handler}, tls_opts => Ciphers ++ [Ca, {verify, verify_peer},
                     {send_timeout, Send}, {send_timeout_close, true},
                     {customize_hostname_check, [{match_fun, public_key:pkix_verify_hostname_match_fun(https)}]} | Name ++ Credentials]}
         end,
@@ -111,6 +115,22 @@ decode({gun_inform, _, R, _, H}) -> {inform, R, H};
 decode({gun_upgrade, _, R, _, _}) -> {failed, R, unexpected_protocol};
 decode(_) -> ignore.
 
+%% ssl calls this as public_key:sign/4 does, in the connection's ssl process,
+%% for each full handshake that signs. The message, options, signature and any
+%% exception stay here. A refusal sets the connection's flag, which
+%% http_gun_event_h reports, and raises a fixed reason: ssl turns any signing
+%% error into a handshake_failure alert, the same term a server alert gives.
+sign_fun(Sign, Refused) ->
+    fun(Message, Hash, Options) ->
+        try Sign(iolist_to_binary(Message), Hash, Options) of
+            {ok, Signature} when is_binary(Signature) -> Signature;
+            _ -> refuse(Refused)
+        catch _:_ -> refuse(Refused) end
+    end.
+refuse(Refused) ->
+    atomics:put(Refused, 1, 1),
+    erlang:error(client_signing_failed).
+
 %% Classify supported runtime reasons; never format arbitrary peer/runtime terms.
 cause({shutdown, Reason}) -> cause(Reason);
 cause({error, Reason}) -> cause(Reason);
@@ -124,6 +144,7 @@ cause(normal) -> peer_closed;
 cause(closing) -> peer_draining;
 cause(timeout) -> transport_timeout;
 cause(etimedout) -> transport_timeout;
+cause(client_signing_failed) -> client_signing_failed;
 cause({tls_alert, {Alert, _}}) when Alert =:= unknown_ca; Alert =:= bad_certificate;
     Alert =:= certificate_expired; Alert =:= certificate_revoked;
     Alert =:= certificate_unknown; Alert =:= certificate_required -> certificate_rejected;

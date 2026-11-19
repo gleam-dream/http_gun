@@ -177,6 +177,7 @@ fn transport_causes() -> List(error.TransportCause) {
     error.HeaderLimitReached,
     error.TransportTimeout,
     error.UnexpectedProtocol,
+    error.ClientSigningFailed,
     error.UnknownTransport,
   ]
 }
@@ -431,6 +432,10 @@ pub fn names_are_stable_identifiers_test() {
     #(
       error.RequestFailed(error.UnexpectedProtocol),
       "request_failed.unexpected_protocol",
+    ),
+    #(
+      error.ConnectionFailed(error.ClientSigningFailed),
+      "connection_failed.client_signing_failed",
     ),
     #(
       error.RequestFailed(error.UnknownTransport),

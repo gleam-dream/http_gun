@@ -1,5 +1,31 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- `client_identity.from_signer(certificates, signer)` builds a client identity
+  whose private key never enters HTTP Gun: `client_identity.RsaSigner(sign)`
+  receives a `client_identity.RsaRequest` (the message to sign, its `Hash`
+  and its `RsaScheme`, PKCS#1 v1.5 or PSS with salt length and MGF1 hash) and
+  returns the signature or `Error(Nil)`. `Signer` may gain variants for other
+  key kinds. The signer runs in the connection's ssl process once per full
+  handshake that requests a client certificate; see the function's
+  documentation for timing, timeouts and renegotiation. `from_pem` is
+  unchanged. See ADR 0020.
+
+### New variants
+
+These types may gain variants in minor releases. Match the variants you handle
+explicitly and keep a catch-all for the rest, or classify failures with
+`error.kind`.
+
+- `error.TransportCause`: `ClientSigningFailed`. A signer identity's signer
+  refused or failed during the opening TLS handshake, so the client ended it.
+  The request fails with `ConnectionFailed(ClientSigningFailed)` and
+  `NotSent`; its name is `connection_failed.client_signing_failed`. A server
+  refusal stays `CertificateRejected` or `TlsFailed`.
+
 ## 0.2.0 - 2026-11-18
 
 > [!WARNING]

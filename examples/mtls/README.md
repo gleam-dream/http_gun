@@ -9,6 +9,12 @@ requires a trusted client certificate and reports the peer identity and
 connection. The application projects HTTP responses into its own `Receipt` and
 `FetchError` types.
 
+Its signer groups build identities with `client_identity.from_signer`: an actor
+holds the RSA key and the identity holds only a function that asks it to sign.
+They show which scheme each TLS version asks for, when the signer runs (once per
+full handshake, again on renegotiation, never for connection reuse or a resumed
+session) and how a refusing, crashing, slow or mismatched signer fails.
+
 ## Run
 
 ```sh

@@ -128,6 +128,11 @@ pub type TransportCause {
   HeaderLimitReached
   TransportTimeout
   UnexpectedProtocol
+  /// The client identity's signer did not sign during the opening TLS
+  /// handshake (`client_identity.from_signer`), so the client ended the
+  /// handshake. Only the client reports this; a server refusal is
+  /// `CertificateRejected` or `TlsFailed`.
+  ClientSigningFailed
   UnknownTransport
 }
 
@@ -593,6 +598,7 @@ const causes = [
   HeaderLimitReached,
   TransportTimeout,
   UnexpectedProtocol,
+  ClientSigningFailed,
   UnknownTransport,
 ]
 
@@ -609,6 +615,7 @@ fn cause_tag(cause: TransportCause) -> String {
     HeaderLimitReached -> "header_limit_reached"
     TransportTimeout -> "transport_timeout"
     UnexpectedProtocol -> "unexpected_protocol"
+    ClientSigningFailed -> "client_signing_failed"
     UnknownTransport -> "unknown_transport"
   }
 }
