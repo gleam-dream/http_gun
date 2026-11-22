@@ -5,19 +5,11 @@
 # of coderabbit-config itself, and `repository` marks a rule beyond the catalog.
 #
 # Catalogs read:
-#   practice catalog (not public)  879841a61c3f83cd809edca9229c4a6bb7f909f8
-#   gleam-agent-tools  6a9ea2f647e787a32d3c7fa88d9c58c5b81ae9d7
+#   practice catalog (not public)  a56636a4eed7a0d644b89f5bb7c7d7c9692e0887
+#   gleam-agent-tools  d7b541cb885b3edbf25563b06aee97b28b66074f
 #
 # Governing skills: coderabbit-config (policy), gleam, gleam-lib, gleam-ffi,
 # http-gun, gleam-otp, sinal, testing, python, design, tracker, gate, git.
-#
-# Governing dependency versions: http_gun 0.2.0 (this package, gleam.toml).
-# The http-gun skill's install line names 0.1.0; every rule taken from it was
-# checked against the 0.2.0 public API, which still has each function cited.
-# Locked in manifest.toml: gun 2.6.0, cowlib 2.21.0, gleam_otp 1.3.0,
-# gleam_erlang 1.3.0, sinal 0.1.0, telemetry 1.4.2, gleam_http 4.4.0,
-# gleam_json 3.1.0, file_streams 1.7.0, simplifile 2.7.0, gleam_stdlib 1.0.5,
-# gleeunit 1.11.0.
 language: en-US
 tone_instructions: >-
   Literal and concise. Report only defects you can evidence from the diff, its
@@ -181,7 +173,7 @@ reviews:
 
     - path: "src/**/*.gleam"
       instructions: |
-        HTTP Gun contracts (http-gun; checked against 0.2.0).
+        HTTP Gun contracts (http-gun).
         - Flag an automatic retry, redirect, decompression or generic SSE
           parsing added to the client.
         - Flag a failure that loses its submission evidence, reports
@@ -205,11 +197,20 @@ reviews:
         - Flag recording redaction changeable after startup, a recording
           whose publication result is not returned to the caller, and
           default redaction documented as removing every secret.
+        - Flag a change that stops default redaction from removing common
+          credential headers or replacing listed credential query and
+          form/JSON fields, and `cassette.encode` or
+          `redaction.request_fields_only` documented as redacting what it
+          leaves: `encode` applies no redaction, and `request_fields_only`
+          stores response bodies as received.
+        - Flag a TLS 1.2 CBC compatibility path that weakens server
+          verification instead of selecting
+          `config.with_cipher_suites(settings, config.OtpDefaultsAndTls12Cbc)`.
 
     - path: "{examples,dev}/**/*.gleam"
       instructions: |
-        HTTP Gun consumers (http-gun; checked against 0.2.0). Apply to a
-        module that imports `http_gun`.
+        HTTP Gun consumers (http-gun). Apply to a module that imports
+        `http_gun`.
         - Flag a response body decoded before `buffered.response.status` is
           inspected; an `Ok` transport result can hold a 404 or 503.
         - Flag a truncated collection decoded as a complete document without
@@ -225,14 +226,23 @@ reviews:
           out where the module retries.
         - Flag a local service or test reached without
           `destination.allow_loopback` set explicitly.
-        - Flag recording without provider headers, query tokens or body
-          rewriting added to the redaction, and a recording finished without
+        - Flag recording of a provider whose secrets the defaults do not name
+          without adding them: headers with `redaction.with_headers`, field
+          names with `with_query_parameters` or `with_body_fields`, and
+          `with_body` for other bodies. Flag a recording finished without
           handling its result.
+        - Flag `cassette.encode` of a hand-built or parsed script that can
+          hold credentials without `cassette.redact(script, policy)` first,
+          and a cassette saved under `redaction.request_fields_only` whose
+          response bodies carry tokens.
+        - Flag TLS verification weakened to reach a server that accepts only
+          TLS 1.2 CBC suites; use `config.with_cipher_suites(settings,
+          config.OtpDefaultsAndTls12Cbc)`.
 
     - path: "{src,dev,examples}/**/*.gleam"
       instructions: |
-        Processes (gleam-otp; rules for gleam_otp 1.3.0, gleam_erlang 1.3.0).
-        Apply to a module that imports `gleam/otp` or `gleam/erlang/process`.
+        Processes (gleam-otp). Apply to a module that imports `gleam/otp` or
+        `gleam/erlang/process`.
         - Flag `process.call` whose timeout or callee exit is handled as a
           returned error or as proof the request had no effect, and a call
           timeout that triggers an unconditional retry of a request.
@@ -252,8 +262,7 @@ reviews:
 
     - path: "{src,test,examples}/**/*.gleam"
       instructions: |
-        Telemetry (sinal; rules for sinal 0.1.0, telemetry 1.4.2). Apply to a
-        module that imports `sinal`.
+        Telemetry (sinal). Apply to a module that imports `sinal`.
         - Flag an event name, field key or route prefix built from request
           input; put request ids and other unbounded values in metadata
           values.
