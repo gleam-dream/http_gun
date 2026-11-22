@@ -88,8 +88,10 @@ reviews:
         - Migration, never a legacy path. Flag a compatibility shim, a
           fallback to an old format, a dual read or write, a deprecated alias,
           and a flag that keeps old behavior; a cassette reader accepts only
-          the schema versions the design lists (ADR-0019). A change to a
-          public module ships as a breaking release with a migration note.
+          the schema versions the design lists (ADR-0019). A change that
+          breaks the public API or the cassette schema ships as a breaking
+          release, decided explicitly, with a migration note; an addition
+          that keeps every existing caller compiling and behaving needs none.
         - Composable. In a public module, flag hidden call ordering, global
           state, a mandatory framework where functions compose, a concept the
           common caller must learn and does not need, and a module with two
@@ -323,11 +325,11 @@ reviews:
         - Flag an AI-written comment that does not start with
           `AI-assisted contribution.`
 
-    - path: "{dev/*,flake.nix,lefthook.yml,.github/**}"
+    - path: "{dev/**,flake.nix,lefthook.yml,.github/**}"
       instructions: |
         Gate (gate). Apply to the gate scripts under dev/ (`gate`, `env`,
-        `matrix`, the consumer runners and the Python checks), the flake, the
-        hooks and CI.
+        `matrix`, the consumer runners, the comparison runner and the Python
+        checks), the flake, the hooks and CI.
         - Flag a check that passes or skips when its tool is missing; it
           fails or reports unmeasured.
         - Flag a tool not supplied through the Nix flake, and a command that
@@ -366,10 +368,13 @@ reviews:
         instructions: |
           Source: policy, design. Warn if the diff changes public behavior, an
           invariant, the cassette schema or a native assumption in src/ or
-          gleam.toml with no change under docs/design or docs/adr, and the
-          pull request description does not say the change restores designed
-          behavior or preserves behavior. Pass for tests, tooling and
-          documentation-only changes.
+          gleam.toml, unless either holds: the diff changes the design
+          section or ADR that owns that part (docs/COVERAGE.md names the
+          owner), or the pull request description names the owning design
+          section whose behavior the change restores or preserves and the
+          diff does what that section states. An edit to an unrelated design
+          section or ADR, or a bare claim that behavior is preserved, does
+          not pass. Pass for tests, tooling and documentation-only changes.
       - name: Breaking change is declared
         mode: warning
         instructions: |
