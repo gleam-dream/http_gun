@@ -25,10 +25,13 @@ Status: Accepted
   function runs. The adapter discards any exception and raises one fixed
   reason, which OTP turns into a `handshake_failure` alert.
 - A refusal sets a per-connection `atomics` flag created when the connection
-  opens. `http_gun_event_h` reads it when Gun terminates and reports the new
-  `TransportCause` variant `ClientSigningFailed` instead of the alert, so a
-  failed opening handshake is `ConnectionFailed(ClientSigningFailed)` with
-  NotSent.
+  opens. `http_gun_event_h` carries the flag in its state until the opening
+  handshake ends. If the handshake fails, it reads the flag when Gun
+  terminates and reports the new `TransportCause` variant
+  `ClientSigningFailed` instead of the alert, so a failed opening handshake
+  is `ConnectionFailed(ClientSigningFailed)` with NotSent. If the handshake
+  succeeds, the state drops the flag, and a later termination is reported
+  with its own reason.
 - `error.kind` classifies `ConnectionFailed(ClientSigningFailed)` and
   `RequestFailed(ClientSigningFailed)` as `Refused`, so `error.is_retryable`
   is false for them whatever the evidence.
@@ -36,6 +39,28 @@ Status: Accepted
   reclassified. It happens after submission, and OTP closes the socket
   without notifying the owner, so the request ends at its own deadline or
   idle timeout with MaybeSent.
+
+## How it works
+
+```mermaid
+flowchart TD
+    open["open: create the refusal flag; handler state is {Owner, Flag}"]
+    open --> hs["opening TLS handshake: ssl calls the key's sign_fun"]
+    hs --> adapter["sign_fun adapter: decode the request, call the application's signer"]
+    adapter -->|signature| ok["handshake succeeds"]
+    adapter -->|refusal, panic or bad result| refuse["set the flag; raise a fixed reason; ssl sends handshake_failure"]
+    refuse --> failend["Gun: tls_handshake_end with an error key"]
+    failend --> term1["terminate: the flag is set, so report client_signing_failed"]
+    term1 --> notsent["ConnectionFailed(ClientSigningFailed), NotSent, kind Refused"]
+    ok --> okend["Gun: tls_handshake_end without an error key; state becomes Owner"]
+    okend --> later["requests; a TLS 1.2 renegotiation may call the signer again"]
+    later --> term2["terminate: no flag in the state, so report Gun's own reason"]
+```
+
+The application's signer runs in the connection's ssl process. Only the
+adapter sees the message, the signature and any exception; the flag carries
+the single fact that the signer did not sign, and only the opening handshake
+turns it into a failure cause.
 
 ## Rationale and alternatives
 
@@ -76,6 +101,12 @@ Status: Accepted
   reaches `gen_statem` as an invalid return. The flag is set before the
   error is raised and read after Gun receives the failed handshake, so the
   event handler reports the cause in order before Gun exits.
+- The flag covers only the opening handshake. A refusal during a later
+  renegotiation also sets it, and the flag is never cleared, so reading it on
+  every termination would report any later end of that connection as a
+  signing failure. Dropping the flag when Gun reports a successful
+  `tls_handshake_end` keeps the cause truthful without a second flag or a
+  reset that could race with a renegotiation in the ssl process.
 - Running the signer under a library timer would require a process per
   signature and still could not stop the work the signer started. The
   connect timeout bounds the opening handshake; the signer bounds itself.
@@ -103,6 +134,12 @@ Status: Accepted
   name while `tls_client_connection` selects by the connected address; an
   OTP server that verifies clients resumes no session by default
   (`ssl_config:opt_reuse_sessions/3`).
+- `test/http_gun_event_handler_test.gleam` drives `http_gun_event_h` with a
+  signer identity's state: a set flag after a failed opening handshake is
+  reported as `client_signing_failed`, and a flag set after a successful one
+  leaves the termination reason unchanged. No public path observes the
+  second case today, because the pool ignores the cause of a connection
+  that already came up.
 - A direct `ssl` client with `{active, once}` receives no `ssl_error` or
   `ssl_closed` message when its own signing fails during a server-initiated
   renegotiation; the socket is simply closed.
