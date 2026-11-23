@@ -177,6 +177,7 @@ fn transport_causes() -> List(error.TransportCause) {
     error.HeaderLimitReached,
     error.TransportTimeout,
     error.UnexpectedProtocol,
+    error.ClientSigningFailed,
     error.UnknownTransport,
   ]
 }
@@ -220,9 +221,15 @@ fn reasons() -> List(#(error.Reason, error.Kind, String)) {
       #(error.LimitExceeded(k, 2, 3), error.TooLarge, "")
     }),
     list.flat_map(transport_causes(), fn(c) {
+      // A signer that did not sign is the application's own refusal; every
+      // other cause is the network's.
+      let kind = case c {
+        error.ClientSigningFailed -> error.Refused
+        _ -> error.Network
+      }
       [
-        #(error.ConnectionFailed(c), error.Network, ""),
-        #(error.RequestFailed(c), error.Network, ""),
+        #(error.ConnectionFailed(c), kind, ""),
+        #(error.RequestFailed(c), kind, ""),
       ]
     }),
     [
@@ -310,6 +317,11 @@ pub fn kind_and_retryability_truth_table_test() {
     error.DestinationRejected(destination.HostNotAllowed),
     error.NotSent,
   )
+  |> error.is_retryable(idempotent: True)
+  |> should.be_false
+  // A signer that did not sign is never worth the same request again: each
+  // attempt would open a connection and ask the signer once more.
+  error.new(error.ConnectionFailed(error.ClientSigningFailed), error.NotSent)
   |> error.is_retryable(idempotent: True)
   |> should.be_false
 }
@@ -431,6 +443,10 @@ pub fn names_are_stable_identifiers_test() {
     #(
       error.RequestFailed(error.UnexpectedProtocol),
       "request_failed.unexpected_protocol",
+    ),
+    #(
+      error.ConnectionFailed(error.ClientSigningFailed),
+      "connection_failed.client_signing_failed",
     ),
     #(
       error.RequestFailed(error.UnknownTransport),

@@ -18,6 +18,11 @@ domain_lookup_end(Event, Owner) -> gun_default_event_h:domain_lookup_end(Event, 
 connect_start(Event, Owner) -> gun_default_event_h:connect_start(Event, Owner).
 connect_end(Event, Owner) -> gun_default_event_h:connect_end(Event, Owner).
 tls_handshake_start(Event, Owner) -> gun_default_event_h:tls_handshake_start(Event, Owner).
+%% Only the opening handshake reports a signer refusal. Once it succeeds the
+%% state drops the flag, so a refusal during a later TLS 1.2 renegotiation
+%% does not relabel the connection's eventual termination.
+tls_handshake_end(Event, {Owner, _Refused}) when not is_map_key(error, Event) ->
+    gun_default_event_h:tls_handshake_end(Event, Owner);
 tls_handshake_end(Event, Owner) -> gun_default_event_h:tls_handshake_end(Event, Owner).
 request_start(Event, Owner) -> gun_default_event_h:request_start(Event, Owner).
 request_headers(Event, Owner) -> gun_default_event_h:request_headers(Event, Owner).
@@ -39,6 +44,15 @@ protocol_changed(Event, Owner) -> gun_default_event_h:protocol_changed(Event, Ow
 origin_changed(Event, Owner) -> gun_default_event_h:origin_changed(Event, Owner).
 cancel(Event, Owner) -> gun_default_event_h:cancel(Event, Owner).
 disconnect(Event, Owner) -> gun_default_event_h:disconnect(Event, Owner).
+%% A connection opened with a signer identity carries the flag its signer sets
+%% on refusal until its opening handshake succeeds; report the refusal, not
+%% ssl's handshake_failure.
+terminate(Event = #{reason := Reason}, {Owner, Refused}) ->
+    Cause = case atomics:get(Refused, 1) of
+        1 -> client_signing_failed;
+        0 -> Reason
+    end,
+    terminate(Event#{reason := Cause}, Owner);
 terminate(Event = #{reason := Reason}, Owner) ->
     Owner ! {gun_error, self(), Reason},
     gun_default_event_h:terminate(Event, Owner).

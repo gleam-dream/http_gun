@@ -14,7 +14,8 @@ or response body means.
 - A client that can be linked to its caller or started under an OTP supervisor;
   per-call views share the same pool.
 - Reused HTTP/1.1 connections, optional HTTP/2, verified server TLS, and
-  optional client certificate identities.
+  optional client certificate identities, with the private key in memory or
+  kept by an application signer.
 - Destination policies that check resolved addresses and can narrow a client's
   access by host and address class.
 - Collected responses with per-response and batch limits, plus streamed bodies
@@ -203,7 +204,8 @@ flowchart LR
 The [ordinary consumer](examples/ordinary/README.md) runs the public API
 examples. See the [async feed recipe](examples/async/README.md) for application
 owned jobs and sinks, and the [mTLS consumer](examples/mtls/README.md) for
-client identity setup and rotation. The [public API](src/http_gun.gleam),
+client identity setup, rotation and signers that keep the private key outside
+the client. The [public API](src/http_gun.gleam),
 [design](docs/design/design-layer.pdf), and [coverage map](docs/COVERAGE.md) describe
 the package contracts. [Benchmark notes](docs/BENCHMARKS.md) report retained local
 workload measurements; they predate this checkout and make no performance
