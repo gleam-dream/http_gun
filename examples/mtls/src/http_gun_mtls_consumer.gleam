@@ -643,6 +643,10 @@ fn signer_failures() {
       let assert error.ConnectionFailed(error.ClientSigningFailed) =
         error.reason(failure)
       let assert error.NotSent = error.evidence(failure)
+      // The signer is the application's own; HTTP Gun never advises asking
+      // it again.
+      let assert error.Refused = error.kind(failure)
+      let assert False = error.is_retryable(failure, idempotent: True)
       credentials_absent(error.describe(failure))
       http_gun.stop(client)
     })
@@ -671,7 +675,7 @@ fn signer_failures() {
       client_identity.RsaSigner(fn(_) { Error(Nil) }),
     )
   io.println(
-    "PASS a refusing or crashing signer is ClientSigningFailed; a wrong key is the server's refusal",
+    "PASS a refusing or crashing signer is ClientSigningFailed, Refused and not retryable; a wrong key is the server's refusal",
   )
 }
 

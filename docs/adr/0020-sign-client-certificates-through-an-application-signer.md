@@ -29,6 +29,9 @@ Status: Accepted
   `TransportCause` variant `ClientSigningFailed` instead of the alert, so a
   failed opening handshake is `ConnectionFailed(ClientSigningFailed)` with
   NotSent.
+- `error.kind` classifies `ConnectionFailed(ClientSigningFailed)` and
+  `RequestFailed(ClientSigningFailed)` as `Refused`, so `error.is_retryable`
+  is false for them whatever the evidence.
 - A refusal during a server-initiated TLS 1.2 renegotiation is not
   reclassified. It happens after submission, and OTP closes the socket
   without notifying the owner, so the request ends at its own deadline or
@@ -54,6 +57,12 @@ Status: Accepted
   refusal, so an error type with variants it discards would promise a
   distinction with no behavior; the application already knows why its own
   signer refused.
+- A signing failure is `Refused`, not `Network`. The signer returns no
+  reason, so HTTP Gun cannot tell a signer that declined from one whose
+  signing service was briefly unreachable. Calling the failure retryable
+  would advise a caller to open another connection and ask the signer
+  again, which repeats a refusal and loads the signer; the application owns
+  the signer and can retry when it knows the cause was passing.
 - PSS keeps OTP's salt length and MGF1 hash as fields rather than deriving
   them from the hash. Signing services take them as parameters, and HTTP Gun
   passes OTP's values unchanged instead of restating TLS's rule.
@@ -78,7 +87,8 @@ Status: Accepted
   certificate request, PSS over TLS 1.2 defaults, TLS 1.3 and H2 (each
   SHA-512 with a 64-byte salt on OTP 29), one signature per full handshake,
   none for connection reuse or IP-literal session resumption, another on
-  renegotiation, refusal and panic as `ClientSigningFailed`, a mismatched
+  renegotiation, refusal and panic as `ClientSigningFailed` of kind `Refused` and not
+  retryable, a mismatched
   key as the server's refusal, a renegotiation refusal ending at the
   request deadline, and a slow signer ending at `ConnectTimeout`.
 - One request can cost more than one signature. The pool marks an H2

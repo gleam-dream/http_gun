@@ -23,8 +23,11 @@ explicitly and keep a catch-all for the rest, or classify failures with
 - `error.TransportCause`: `ClientSigningFailed`. A signer identity's signer
   refused or failed during the opening TLS handshake, so the client ended it.
   The request fails with `ConnectionFailed(ClientSigningFailed)` and
-  `NotSent`; its name is `connection_failed.client_signing_failed`. A server
-  refusal stays `CertificateRejected` or `TlsFailed`.
+  `NotSent`; its name is `connection_failed.client_signing_failed`. Its kind
+  is `error.Refused`, so `error.is_retryable` is false: HTTP Gun cannot tell
+  a signer that declined from one that was unreachable, and the application
+  that owns the signer decides whether to try again. A server refusal stays
+  `CertificateRejected` or `TlsFailed`.
 
 ## 0.2.0 - 2026-11-18
 

@@ -52,8 +52,10 @@ pub type Evidence {
 pub type Kind {
   /// The request or a per-call setting is malformed. Fix the caller.
   InvalidInput
-  /// The destination policy refused the host or a resolved address, or the
-  /// client requires a view destination and the view set none.
+  /// The application's own side refused the request: the destination policy
+  /// refused the host or a resolved address, the client requires a view
+  /// destination and the view set none, or the client identity's signer did
+  /// not sign (`ClientSigningFailed`).
   Refused
   /// The client is stopped, restarting or full, it timed out waiting for a
   /// connection from its pool, or its recording closed.
@@ -131,7 +133,10 @@ pub type TransportCause {
   /// The client identity's signer did not sign during the opening TLS
   /// handshake (`client_identity.from_signer`), so the client ended the
   /// handshake. Only the client reports this; a server refusal is
-  /// `CertificateRejected` or `TlsFailed`.
+  /// `CertificateRejected` or `TlsFailed`. Its kind is `Refused`, not
+  /// `Network`: HTTP Gun cannot tell a signer that declined from one that was
+  /// unreachable, so it never calls the failure retryable. The application
+  /// owns the signer and knows which it was.
   ClientSigningFailed
   UnknownTransport
 }
@@ -237,7 +242,10 @@ pub fn headers(failure: Failure) -> List(#(String, String)) {
 pub fn kind(failure: Failure) -> Kind {
   case failure.reason {
     InvalidRequest(_) -> InvalidInput
-    DestinationRejected(_) | ViewDestinationRequired -> Refused
+    DestinationRejected(_)
+    | ViewDestinationRequired
+    | ConnectionFailed(ClientSigningFailed)
+    | RequestFailed(ClientSigningFailed) -> Refused
     ClientClosed | AdmissionFull | PoolTimeout | RecordingClosed -> Unavailable
     ResolutionFailed | ConnectionFailed(_) | RequestFailed(_) -> Network
     ConnectTimeout | DeadlineExceeded | IdleTimeout -> TimedOut
@@ -253,7 +261,9 @@ pub fn kind(failure: Failure) -> Kind {
 /// A `NotSent` failure of kind `Unavailable`, `Network` or `TimedOut` is
 /// retryable. A `MaybeSent` failure of those kinds is retryable only for an
 /// idempotent request, because the server may already have acted on it. No
-/// other kind is retryable. HTTP Gun itself never retries.
+/// other kind is retryable: a `Refused` failure, a signer that did not sign
+/// among them, would be refused again and would ask the signer again. HTTP
+/// Gun itself never retries.
 pub fn is_retryable(failure: Failure, idempotent idempotent: Bool) -> Bool {
   case kind(failure), failure.evidence {
     Unavailable, NotSent | Network, NotSent | TimedOut, NotSent -> True

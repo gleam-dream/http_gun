@@ -246,7 +246,7 @@
         #when[a client with a signer identity opens a TLS 1.2 or TLS 1.3 connection]
         #then[the signer receives one typed request in a scheme the server accepts, and the server observes the admitted certificate]
         #then[later requests on that connection and a resumed session call no signer; a server-initiated renegotiation calls it again]
-        #then[a signer refusal fails the opening request with ClientSigningFailed and NotSent, which a server refusal never yields]
+        #then[a signer refusal fails the opening request with ClientSigningFailed and NotSent, of kind Refused and not retryable, which a server refusal never yields]
       ]
       #behavior(title: "Rotation preserves in-flight identity", level: "boundary", area: "Client identity")[
         #given[an old client has an active exchange and a new client has a different identity]
@@ -501,9 +501,9 @@
       )
       #facts(([Closed Kind], [Reasons grouped here], [Caller action]), (
         ([InvalidInput], [InvalidRequest], [Correct input or settings]),
-        ([Refused], [DestinationRejected; ViewDestinationRequired], [Choose authorized destination]),
+        ([Refused], [DestinationRejected; ViewDestinationRequired; ConnectionFailed and RequestFailed with ClientSigningFailed], [Choose authorized destination; check the application's own signer]),
         ([Unavailable], [ClientClosed; AdmissionFull; PoolTimeout; RecordingClosed], [May retry if evidence permits]),
-        ([Network], [ResolutionFailed; ConnectionFailed; RequestFailed], [Inspect typed transport cause and evidence]),
+        ([Network], [ResolutionFailed; ConnectionFailed and RequestFailed with any other cause], [Inspect typed transport cause and evidence]),
         ([TimedOut], [ConnectTimeout; DeadlineExceeded; IdleTimeout], [Retry only under evidence/idempotency policy]),
         ([TooLarge], [Measured LimitExceeded], [Change bounds or consumption policy]),
         ([CancelledLocally], [Closed; Cancelled], [Reconcile application intent]),
@@ -511,7 +511,7 @@
         ([Playback], [PlaybackMismatch; PlaybackExhausted], [Correct explicit fixture]),
       ))
       #points(
-        [Only Unavailable, Network and TimedOut are retryable through `is_retryable`. NotSent permits another attempt; MaybeSent requires caller-declared idempotency. This helper does not schedule retries, interpret Retry-After or validate business idempotency.],
+        [Only Unavailable, Network and TimedOut are retryable through `is_retryable`. A signer that did not sign is Refused, not Network: the signer returns no reason, so HTTP Gun cannot tell a refusal from an unreachable signing service and never advises another handshake; the application owns the signer and decides. NotSent permits another attempt; MaybeSent requires caller-declared idempotency. This helper does not schedule retries, interpret Retry-After or validate business idempotency.],
         [`error.Reason`, `error.TransportCause`, `error.LimitKind` and `error.RequestProblem` may gain variants in a minor release, so a caller matches them with a catch-all arm. `Kind` is closed. #adr(15)],
         [Known transport categories include name resolution, refused/reset/closed/draining connections, certificate/TLS rejection, protocol, dependency header limit, timeout and unexpected protocol. Unknown terms remain UnknownTransport without exposing raw dependency text or stack traces.],
         [`name` is a stable machine identifier; `describe` omits free-form request/config/fixture data. Failure never contains request headers, URL, query or body. Collection may retain response headers after redaction; serialization stores those retained headers. Explicit `with_headers` authors safe data and does not automatically apply a redaction policy.],
