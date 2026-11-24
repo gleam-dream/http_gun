@@ -22,6 +22,13 @@ HTTP Gun is an Erlang/OTP HTTP client written in Gleam. Read `docs/design/design
 - Use observable public tests, one failing scenario at a time, then minimal implementation and refactoring while green. Missing functionality is unfinished. Retain exact qualification evidence and claim no unexecuted workflow.
 - Published `0.1.0` is the compatibility baseline. Proposed breaking API or schema changes require an explicit release and version decision. Update owned tests and examples together and write one strict, version-marked fixture schema; read only the versions the design lists.
 
+## Releasing
+
+- `nix run github:gleam-dream/.github#release -- <version>` opens the version-bump pull request from a clean, current `main`. It never tags and never publishes. Nix supplies every tool it calls.
+- After the merge, tag the merge commit `v<version>` and push the tag. The `Release` workflow uploads the package to Hex, where it stays staged.
+- Staged publishing is on for this package on hex.pm, so a release becomes public only when a Hex maintainer approves it there with a second factor. If that setting is ever turned off, a pushed tag publishes at once; never push a release tag while it is off. An agent stops after pushing the tag and reports whether the release waits for approval or is public.
+- Push a release tag only on an explicit request that names the version. The steps and the way to undo a release are in the [shared workflow's README](https://github.com/gleam-dream/.github#publishing-a-package-to-hex).
+
 ## References
 
 - `docs/ORACLE.md` pins the external references compared with HTTP Gun (the Dream client commit, the Gun and Cowlib archives, `nghttpd`), says what is compared and how outcomes are classified, and states the limits of each claim.
