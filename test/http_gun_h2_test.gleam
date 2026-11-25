@@ -285,6 +285,70 @@ pub fn goaway_allows_existing_sibling_to_finish_without_replay_test() {
   http_gun.stop(client)
 }
 
+// The peer announced GOAWAY while an earlier stream still runs, so Gun keeps
+// the connection and refuses new streams on it. Gun reports no GOAWAY event,
+// so one request can still meet the refusal; none after it may. With one
+// connection allowed, the next request waits for the going-away connection
+// to end and then uses a fresh one.
+pub fn draining_connection_admits_no_stream_after_a_refusal_test() {
+  let port = server()
+  let assert Ok(client) = http_gun.start(settings())
+  let assert Ok(slow) = http_gun.open(client, req(port, "/slow"))
+  next(slow.body) |> should.equal(Ok(body.Chunk(<<"first":utf8>>)))
+  let assert Ok(_) = http_gun.send(client, req(port, "/goaway-hold"))
+  let assert Error(refused) = http_gun.send(client, req(port, "/fast"))
+  #(error.reason(refused), error.evidence(refused))
+  |> should.equal(#(error.RequestFailed(error.PeerDraining), error.MaybeSent))
+  let outcome = process.new_subject()
+  process.spawn_unlinked(fn() {
+    process.send(outcome, http_gun.send(client, req(port, "/fast")))
+  })
+  // The request waits in the queue instead of being refused; the accepted
+  // stream is undisturbed and still holds the connection.
+  await_stats(client, 1000, fn(stats) { stats.queued_requests == 1 })
+  |> should.equal(Ok(http_gun.Stats(1, 1, 1)))
+  body.close(slow.body)
+  let assert Ok(Ok(fresh)) = process.receive(outcome, 2000)
+  {
+    response_header(fresh.response.headers, "x-connection")
+    != response_header(slow.headers, "x-connection")
+  }
+  |> should.be_true
+  http_gun.stop(client)
+}
+
+// The first stats that satisfy `wanted`, or the last seen when the wait ends.
+fn await_stats(
+  client: http_gun.Client,
+  wait_ms: Int,
+  wanted: fn(http_gun.Stats) -> Bool,
+) -> Result(http_gun.Stats, http_gun.Stats) {
+  await_stats_until(
+    client,
+    deadline.after(duration.milliseconds(wait_ms)),
+    wanted,
+  )
+}
+
+fn await_stats_until(
+  client: http_gun.Client,
+  budget: deadline.Deadline,
+  wanted: fn(http_gun.Stats) -> Bool,
+) -> Result(http_gun.Stats, http_gun.Stats) {
+  let assert Ok(stats) = http_gun.stats(client)
+  case
+    wanted(stats),
+    duration.to_milliseconds(deadline.remaining(budget)) <= 0
+  {
+    True, _ -> Ok(stats)
+    False, True -> Error(stats)
+    False, False -> {
+      process.sleep(1)
+      await_stats_until(client, budget, wanted)
+    }
+  }
+}
+
 pub fn cancellation_token_preserves_h2_sibling_and_connection_test() {
   let port = server()
   let assert Ok(client) = http_gun.start(settings())
