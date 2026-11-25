@@ -10,6 +10,7 @@ import gleeunit/should
 import http_gun
 import http_gun/body
 import http_gun/config
+import http_gun/destination
 import http_gun/error
 
 @external(erlang, "http_gun_test_server", "controlled")
@@ -630,4 +631,39 @@ pub fn eligible_origins_take_turns_under_shared_body_capacity_test() {
 // These exercises connect only to explicitly permitted local test servers.
 fn local_config() -> config.Config {
   config.default() |> config.allow_loopback
+}
+
+// A burst to a fresh origin prepares one connection per waiter, up to the
+// per-origin limit, at the same time instead of one after another.
+pub fn cold_origin_prepares_connections_concurrently_test() {
+  let port = persistent()
+  let entered = process.new_subject()
+  let assert Ok(client) =
+    local_config()
+    |> config.with_max_connections_per_origin(3)
+    |> config.with_resolver(fn(_, _) {
+      // Each preparation announces itself, then waits for the test.
+      let gate = process.new_subject()
+      process.send(entered, gate)
+      let _ = process.receive(gate, 5000)
+      Ok([destination.Ipv4(127, 0, 0, 1)])
+    })
+    |> http_gun.start
+  let done = process.new_subject()
+  list.each(list.repeat(Nil, 5), fn(_) {
+    process.spawn(fn() { process.send(done, http_gun.send(client, req(port))) })
+  })
+  // Three preparations start without waiting for one another; the other
+  // two waiters do not add a fourth.
+  let gates =
+    list.filter_map(list.repeat(Nil, 4), fn(_) { process.receive(entered, 500) })
+  list.length(gates) |> should.equal(3)
+  list.each(gates, fn(gate) { process.send(gate, Nil) })
+  list.each(list.repeat(Nil, 5), fn(_) {
+    let assert Ok(Ok(_)) = process.receive(done, 5000)
+  })
+  // A connection that finishes after the last waiter left is not kept.
+  let assert Ok(stats) = http_gun.stats(client)
+  { stats.connections <= 3 } |> should.be_true
+  http_gun.stop(client)
 }
