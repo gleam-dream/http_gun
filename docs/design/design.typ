@@ -195,7 +195,7 @@
     #subsection(title: "Configuration validation and mode choice", [
       #points(
         [`Config`, `Policy`, `Redaction` and `RecordOptions` are opaque caller-built values. Value-first setters permit extension without forcing callers to construct all fields. Returned Buffered and Stats records are read by label; consumers leave room for added fields. #adr(2)],
-        [Positive capacities are required for connections, per-origin connections, H2 streams, open bodies, header bytes/count, buffered bytes and batch bytes. Queue, request-body and response-body limits may be zero. Connect, pool and pooled-idle timeouts are positive; shutdown may be zero. Request/idle timeout may be explicit Infinity.],
+        [Positive capacities are required for connections, per-origin connections, H2 streams, open bodies, header bytes/count, buffered bytes and batch bytes. Queue, request-body and response-body limits may be zero. Connect, pool and pooled-idle timeouts are positive; shutdown may be zero. The idle timeout may be explicit Infinity. The request timeout is not configuration: it belongs to each call.],
         [In-memory trust anchors must be nonempty whole-byte values and their list must be nonempty. Invalid host-list entries fail configuration validation. Actual certificate or CA-file validity is established by OTP when connecting, rather than by pure settings construction.],
         [Live startup, offline startup and recording startup return the same Client type. Recording also returns a Recording capability. Application startup chooses a mode explicitly; requests read no environment variables and contain no automatic mode fallback.],
       )
@@ -208,7 +208,7 @@
     ])
     #subsection(title: "Default settings", [
       #points(
-        [Every timeout, deadline and wait is a `gleam/time/duration.Duration` held as whole milliseconds; a sub-millisecond remainder rounds away from zero. Unbounded request or idle timeout is `config.Infinity`; a bounded one is `config.After(duration)`. Lifting the request timeout never lifts the connect, pool or idle timeout, and each request phase is also capped by the time left in the request.],
+        [Every timeout, deadline and wait is a `gleam/time/duration.Duration` held as whole milliseconds; a sub-millisecond remainder rounds away from zero. An unbounded idle timeout is `config.Infinity`; a bounded one is `config.After(duration)`. Every request has a finite deadline, and each request phase is also capped by the time left in the request.],
         [`config.validate` checks settings without starting a process. `start` returns InvalidConfig for an out-of-range value. Capacity and timeout defaults appear in Budgets and effect timing.],
       )
       #facts(([Setting], [Default], [Selected with]), (
@@ -261,7 +261,8 @@
         [A #term("term-client-view") copies only a handle and its view values. Scalar setters replace their prior value. Destination setters append policies whose intersection is the #term("term-destination-policy") applied at every operation. Later correlation replaces earlier correlation.],
         [with_cancellation replaces the view's cancellation tokens with one token. with_additional_cancellation retains existing tokens and adds a distinct token. Any retained token can cancel requests through that view without cancelling another token or changing another view.],
         [`cancellation.with_token` creates one #term("term-cancellation-token") process for its lexical scope. Cancellation kills the token process, which makes every copy remain cancelled. Current pending and body owners receive their monitors' death signal; a later attempt sees the dead token before submission. Pending rejection, admission handoff and body termination remove every owned token monitor. Adding cancellation creates no process and takes no token lifetime ownership. #adr(12) records the library-composition requirement. Callback return, exception or creator death ends the token. Applications bound the number and lifetime of token scopes.],
-        [A view's relative request timeout or absolute deadline replaces the startup request timeout, whether shorter or longer. With both supplied, the earlier applies. With neither, the startup timeout starts from the invocation's monotonic entry instant before admission.],
+        [Every request has a finite deadline, fixed by the calling process at the invocation's monotonic entry instant before admission: the view's absolute deadline, the view's relative timeout from entry, the earlier of the two when both are set, or 30 seconds from entry when neither is. A timeout of zero or less fails before admission with DeadlineExceeded and NotSent. #adr(21)],
+        [The calling process enforces the deadline. It waits for the pool and then the body owner until the deadline plus a short grace, and on expiry returns DeadlineExceeded with MaybeSent, because the process holding the reply may have submitted the request. Body reads and closes wait until the later of the deadline and the call, plus the same grace. Replies reach the caller through a per-call alias that the caller deactivates when its wait ends, so no reply of an abandoned call stays in its mailbox.],
         [The absolute Deadline is VM-local and cannot be serialized as durable policy. Reading remaining duration never renews it. Every public duration is converted to whole milliseconds with sub-millisecond remainders rounded away from zero. Nonpositive Deadline creation is immediately expired.],
         [Views do not change immutable client identity, connection trust, protocol, resolver or startup socket timeout options. Idle read can be replaced per view; pooled socket send settings continue to use startup idle timeout. The body owner's independent overall timer still cancels an earlier request budget.],
         [`with_body_limit` replaces collection policy only. Negative view collection limits fail before submission. A zero limit permits an empty body; Truncate can return an empty prefix on overflow.],
@@ -280,7 +281,7 @@
         [`start` links the pool to its caller. `supervised(config, name)` supplies a child specification; `named(name)` is pure and targets the current registered process. During restart absence, operations return ClientClosed with NotSent. An old body is never revived by pool restart.],
         [`stop` refuses new admission, fails queued work with ClientClosed/NotSent and waits for active leases within the #term("term-shutdown-grace"). Grace expiry locally closes unfinished bodies and native connections. Completed retained body actors lose the client authority when the pool exits. Repeated stop is harmless.],
         [Shutdown grace bounds the planned drain. Serial body close calls, actor scheduling and synchronous observation handlers are additional work; this is not a hard real-time stop bound.],
-        [Pool notifications go to the pool actor. Gun replies go directly to the body owner. Public calls monitor only their own target, consume the typed result and flush that monitor on completion. An open call waits on two targets in turn: the pool until admission, then also the body owner, which announces itself to the caller before it can answer. A body owner that exits before answering yields RequestFailed(UnknownTransport) with MaybeSent, so no fault in the process holding the reply leaves the caller waiting. Response data and stale monitor notifications are not forwarded to the HTTP caller.],
+        [Pool notifications go to the pool actor. Gun replies go directly to the body owner. Public calls monitor only their own target, consume the typed result and flush that monitor on completion. An open call waits on two targets in turn: the pool until admission, then also the body owner, which announces itself to the caller before it can answer. A body owner that exits before answering yields RequestFailed(UnknownTransport) with MaybeSent, and one that stays alive without answering is bounded by the caller's deadline, so no fault in the process holding the reply leaves the caller waiting. Response data and stale monitor notifications are not forwarded to the HTTP caller.],
       )
       #behavior(title: "Stop ends admission before draining", level: "boundary", area: "Client lifecycle")[
         #given[the client has pending and active work]
@@ -449,14 +450,14 @@
       ([Recording], [16 MiB stored; 10,000 exchanges], [At start for the envelope, then before reservation/fragment enqueue, on the bytes the file holds; held redaction bodies charged]),
       ([Connect], [5 seconds], [One absolute budget from DNS start through TCP/TLS]),
       ([Pool wait], [5 seconds], [Admission to lease; new connection starter can use connect wait]),
-      ([Request], [30 seconds or view replacement], [Invocation entry through response consumption; Infinity explicit]),
+      ([Request], [30 seconds or view replacement], [Invocation entry through response consumption; always finite, enforced by the caller with a short grace]),
       ([Idle read], [30 seconds or view replacement], [While opener waits for head or reader waits on empty queue; events reset activity]),
       ([Pooled idle / shutdown drain], [60 seconds / 5 seconds], [Ready unused connection / stop before forced local close]),
       ([Recording waiter], [One], [Wait timeout/death clears only the waiter; finalization continues]),
     ))
     #points(
       [The connect timer includes DNS, TCP and TLS. Native connect/handshake limits receive its remainder. DNS worker lifetime ends under the connection budget; pending request expiry discards unused preparation. Idle read is active only while demand is outstanding, rather than while application code holds a chunk.],
-      [Native TCP/TLS send_timeout and send_timeout_close use startup idle timeout. Request-owner expiry independently bounds fresh and reused buffered uploads. H1 expiry closes its exclusive connection; H2 stream cancellation preserves healthy siblings. No bound is claimed when the corresponding option is Infinity.],
+      [Native TCP/TLS send_timeout and send_timeout_close use startup idle timeout. Request-owner expiry independently bounds fresh and reused buffered uploads. H1 expiry closes its exclusive connection; H2 stream cancellation preserves healthy siblings. No idle bound is claimed when the idle timeout is Infinity.],
     )
     #facts(([Boundary], [Effect committed or observed], [Failure and uncertainty]), (
       ([Validated invocation], [No network action], [Invalid/refused/capacity failure has NotSent]),

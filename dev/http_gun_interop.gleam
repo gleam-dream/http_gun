@@ -223,7 +223,6 @@ pub fn main() -> Nil {
     local_config()
     |> config.with_protocol(config.RequireHttp2)
     |> config.with_trust(config.CustomCa("test/fixtures/ca.crt"))
-    |> config.with_request_timeout(config.After(duration.seconds(60)))
     |> config.with_max_connections(1)
     |> config.with_max_connections_per_origin(1)
     |> config.with_max_queued_requests(1024)

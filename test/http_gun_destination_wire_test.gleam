@@ -19,7 +19,6 @@ fn serve(bytes: BitArray) -> Int
 
 fn settings() -> config.Config {
   config.default()
-  |> config.with_request_timeout(config.After(duration.milliseconds(1000)))
   |> config.allow_loopback
 }
 
@@ -152,9 +151,6 @@ pub fn stalled_sends_end_and_leave_no_caller_messages_test() {
       let baseline = mailbox_size()
       let c =
         settings()
-        |> config.with_request_timeout(
-          config.After(duration.milliseconds(5000)),
-        )
         |> config.with_trust(config.CustomCa("test/fixtures/ip_ca.crt"))
         |> config.with_max_request_body_bytes(16_777_216)
       let assert Ok(client) = http_gun.start(c)
@@ -175,7 +171,7 @@ pub fn stalled_sends_end_and_leave_no_caller_messages_test() {
       let bytes = payload(16_777_216)
       let budget = deadline.after(duration.milliseconds(300))
       let before = now()
-      // The view deadline replaces the client's 5 s request timeout.
+      // The view deadline replaces the default request timeout.
       let assert Error(failure) =
         http_gun.send(
           client |> http_gun.with_deadline(budget),
@@ -225,11 +221,8 @@ fn await_closed(server: process.Pid) -> Bool
 
 pub fn cancellation_and_body_deadline_leave_long_lived_caller_clean_test() {
   list.each([True, False], fn(cancel) {
-    let assert Ok(client) =
-      http_gun.start(
-        settings()
-        |> config.with_request_timeout(config.After(duration.milliseconds(300))),
-      )
+    let assert Ok(client) = http_gun.start(settings())
+    let client = http_gun.with_timeout(client, duration.milliseconds(300))
     let #(port, server) = controlled()
     let finished = process.new_subject()
     let inspect = process.new_subject()

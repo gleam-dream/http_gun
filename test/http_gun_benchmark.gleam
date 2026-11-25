@@ -49,7 +49,6 @@ fn req(port: Int, tls: Bool, path: String) -> request.Request(BitArray) {
 
 fn settings(tls: Bool) -> config.Config {
   local_config()
-  |> config.with_request_timeout(config.After(duration.milliseconds(60_000)))
   |> config.with_protocol(case tls {
     True -> config.RequireHttp2
     False -> config.Http1

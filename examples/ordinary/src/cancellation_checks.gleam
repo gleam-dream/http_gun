@@ -153,7 +153,6 @@ fn cancel_one(
 fn local_config() -> config.Config {
   config.default()
   |> config.with_destination(destination.loopback_only())
-  |> config.with_request_timeout(config.After(duration.seconds(5)))
 }
 
 fn local_request(port: Int) -> request.Request(BitArray) {

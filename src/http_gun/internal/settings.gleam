@@ -75,7 +75,6 @@ pub type Settings {
     client_identity: Option(client_identity.Identity),
     connect_timeout: Int,
     pool_timeout: Int,
-    request_timeout: Bound,
     idle_timeout: Bound,
     connection_idle_timeout: Int,
     shutdown_timeout: Int,

@@ -30,6 +30,8 @@ pub opaque type Body {
     subject: process.Subject(Message),
     protocol: settings.Negotiated,
     status: Int,
+    /// The request deadline, which also bounds each wait for this owner.
+    deadline: Int,
   )
 }
 
@@ -75,7 +77,7 @@ type CaptureState {
 
 /// Request timing as the pool resolved it for one invocation.
 pub type Timing {
-  Timing(deadline: Option(Int), idle: settings.Bound)
+  Timing(deadline: Int, idle: settings.Bound)
 }
 
 type State {
@@ -87,7 +89,7 @@ type State {
     capture: CaptureState,
     protocol: settings.Negotiated,
     persistent: Bool,
-    deadline: Option(Int),
+    deadline: Int,
     deadline_timer: Option(process.Timer),
     idle: settings.Bound,
     idle_ref: Option(reference.Reference),
@@ -121,19 +123,33 @@ pub opaque type Message {
 /// Wait for the next event. `until` bounds this wait only: when it passes,
 /// `Ok(None)` returns and the stream stays intact.
 pub fn read(body: Body, until: Option(Int)) -> Result(Option(Event), Failure) {
-  call.run(body.subject, Read(process.self(), until, _))
-  |> result.map_error(fn(failure) {
-    case error.reason(failure) {
-      error.ClientClosed ->
-        error.new(error.Closed, MaybeSent) |> error.with_status(body.status)
-      _ -> failure
-    }
-  })
+  case
+    call.ask(body.subject, Read(process.self(), until, _), wait_until(body))
+  {
+    Ok(answer) -> answer
+    Error(call.NotRunning) | Error(call.Lost) ->
+      Error(
+        error.new(error.Closed, MaybeSent) |> error.with_status(body.status),
+      )
+    // The owner is alive but did not answer by the deadline.
+    Error(call.Expired) ->
+      Error(
+        error.new(error.DeadlineExceeded, MaybeSent)
+        |> error.with_status(body.status),
+      )
+  }
 }
 
 pub fn close(body: Body) -> Nil {
-  let _ = call.run(body.subject, Close)
+  let _ = call.ask(body.subject, Close, wait_until(body))
   Nil
+}
+
+// The owner answers by the deadline; after it, an owner that has finished
+// still answers at once with what it holds, so the caller allows a grace
+// period from now.
+fn wait_until(body: Body) -> Int {
+  int.max(body.deadline, bridge.now())
 }
 
 pub fn protocol(body: Body) -> settings.Negotiated {
@@ -265,10 +281,7 @@ pub fn start(
       Script(reply) -> Ok(#(Scripted(script_steps(reply)), settings.Offline))
     })
     process.send(subject, Advance)
-    let deadline_timer =
-      option.map(timing.deadline, fn(at) {
-        process.send_after(subject, int.max(0, at - bridge.now()), Deadline)
-      })
+    let deadline_timer = Some(deadline_timer(subject, timing.deadline))
     let state =
       State(
         subject:,
@@ -309,7 +322,7 @@ pub fn start(
     Ok(
       actor.initialised(state)
       |> actor.selecting(selector)
-      |> actor.returning(Body(subject, protocol, 0)),
+      |> actor.returning(Body(subject, protocol, 0, timing.deadline)),
     )
   })
   |> actor.on_message(handle)
@@ -385,10 +398,17 @@ pub fn authority(req: request.Request(a)) -> String {
 }
 
 fn expired(state: State) -> Bool {
-  case state.deadline {
-    Some(at) -> bridge.now() >= at
-    None -> False
-  }
+  bridge.now() >= state.deadline
+}
+
+// A timer delay is at most 2^32 - 1 ms, so a far deadline fires early and
+// is armed again.
+fn deadline_timer(subject: process.Subject(Message), at: Int) -> process.Timer {
+  process.send_after(
+    subject,
+    int.clamp(at - bridge.now(), min: 0, max: 86_400_000),
+    Deadline,
+  )
 }
 
 fn failure(state: State, reason: error.Reason) -> Failure {
@@ -462,7 +482,17 @@ fn handle(state: State, message: Message) -> actor.Next(State, Message) {
               }
           }
       }
-    Deadline -> continue(deliver(state))
+    Deadline ->
+      case expired(state) {
+        True -> continue(deliver(state))
+        False ->
+          continue(
+            State(
+              ..state,
+              deadline_timer: Some(deadline_timer(state.subject, state.deadline)),
+            ),
+          )
+      }
     IdleExpired(id) ->
       case state.idle_ref, state.idle {
         Some(expected), settings.Within(ms) if id == expected -> {
@@ -691,7 +721,12 @@ fn observe(state: State, event: obs.Observation) -> State {
                     Ok(response.Response(
                       status,
                       headers,
-                      Body(state.subject, state.protocol, status),
+                      Body(
+                        state.subject,
+                        state.protocol,
+                        status,
+                        state.deadline,
+                      ),
                     )),
                   )
                   capture_event(

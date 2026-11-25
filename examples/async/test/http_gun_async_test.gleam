@@ -162,12 +162,11 @@ fn budgets_and_read_waits() -> Nil {
     duration.to_milliseconds(
       deadline.remaining(deadline.after(duration.milliseconds(-5))),
     )
-  // A view's deadline replaces the client's request timeout, longer or
-  // shorter: this client allows 100 ms, the view 5000 ms.
+  // A view's deadline replaces the default request timeout, longer or
+  // shorter: here 5000 ms.
   let #(port, peer) = controlled()
   let assert Ok(client) =
     local_config()
-    |> config.with_request_timeout(config.After(duration.milliseconds(100)))
     |> http_gun.start
   let longer = deadline.after(duration.seconds(5))
   let assert Ok(reply) =
@@ -179,15 +178,19 @@ fn budgets_and_read_waits() -> Nil {
   let assert Ok(body.Chunk(<<"x":utf8>>)) = body.next(reply.body)
   let assert True = duration.to_milliseconds(deadline.remaining(longer)) > 3000
   io.println(
-    "Deadline probe: client 100 ms, view 5000 ms, stream still open with "
+    "Deadline probe: view 5000 ms, stream still open with "
     <> int.to_string(duration.to_milliseconds(deadline.remaining(longer)))
     <> " ms left",
   )
   body.close(reply.body)
   let assert True = closed(peer)
-  // Without the view, the client's 100 ms request timeout ends the read.
+  // A view's 100 ms request timeout ends the read.
   let #(port, peer) = controlled()
-  let assert Ok(reply) = http_gun.open(client, req(port))
+  let assert Ok(reply) =
+    http_gun.open(
+      client |> http_gun.with_timeout(duration.milliseconds(100)),
+      req(port),
+    )
   let assert Error(failure) = body.next(reply.body)
   let assert error.DeadlineExceeded = error.reason(failure)
   let assert error.TimedOut = error.kind(failure)

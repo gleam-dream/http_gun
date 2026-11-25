@@ -48,9 +48,9 @@ pub type Collected {
   Collected(bytes: BitArray, trailers: List(#(String, String)))
 }
 
-/// Wait for the next chunk or the end of the body. The request timeout, the
-/// idle timeout and cancellation bound the wait; with both timeouts set to
-/// `Infinity` it waits as long as the stream stays open.
+/// Wait for the next chunk or the end of the body. The request deadline, the
+/// idle timeout and cancellation bound the wait. The request deadline is
+/// always finite, so the wait always ends.
 pub fn next(body: Body) -> Result(Event, Failure) {
   case owner.read(body, None) {
     Ok(Some(event)) -> Ok(event_of(event))

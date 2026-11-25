@@ -26,8 +26,7 @@ pub fn rest(
   client: http_gun.Client,
   req: request.Request(BitArray),
 ) -> Result(http_gun.Buffered, error.Failure) {
-  let client =
-    client |> http_gun.with_timeout(config.After(duration.seconds(2)))
+  let client = client |> http_gun.with_timeout(duration.seconds(2))
   attempt(client, req, 2)
 }
 
@@ -65,7 +64,7 @@ pub fn download(
 ) -> Result(Int, AppError) {
   let client =
     client
-    |> http_gun.with_timeout(config.After(duration.seconds(300)))
+    |> http_gun.with_timeout(duration.seconds(300))
   use reply <- http_gun.with_response(client, req, Http)
   count(reply.body, 0)
 }

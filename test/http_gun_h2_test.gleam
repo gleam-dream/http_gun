@@ -93,11 +93,7 @@ fn controlled() -> Int
 pub fn h2_window_credit_after_buffered_frames_test() {
   let port = controlled()
   let config = settings()
-  let assert Ok(client) =
-    http_gun.start(
-      config
-      |> config.with_request_timeout(config.After(duration.milliseconds(1000))),
-    )
+  let assert Ok(client) = http_gun.start(config)
   let assert Ok(value) = http_gun.send(client, req(port, "/window-demand"))
   bit_array.byte_size(value.response.body) |> should.equal(16_387)
   http_gun.stop(client)
@@ -106,10 +102,8 @@ pub fn h2_window_credit_after_buffered_frames_test() {
 pub fn zero_peer_capacity_expires_without_submission_test() {
   let port = server()
   let c = settings()
-  let assert Ok(client) =
-    http_gun.start(
-      c |> config.with_request_timeout(config.After(duration.milliseconds(300))),
-    )
+  let assert Ok(client) = http_gun.start(c)
+  let client = http_gun.with_timeout(client, duration.milliseconds(300))
   let assert Ok(_) = http_gun.send(client, req(port, "/capacity-zero"))
   let assert Error(failure) = http_gun.send(client, req(port, "/fast"))
   error.evidence(failure) |> should.equal(error.NotSent)
@@ -123,8 +117,7 @@ pub fn untrusted_tls_fails_without_submission_test() {
   let assert Ok(client) =
     http_gun.start(
       c
-      |> config.with_trust(config.SystemTrust)
-      |> config.with_request_timeout(config.After(duration.milliseconds(1000))),
+      |> config.with_trust(config.SystemTrust),
     )
   let assert Error(failure) = http_gun.send(client, req(port, "/fast"))
   error.evidence(failure) |> should.equal(error.NotSent)

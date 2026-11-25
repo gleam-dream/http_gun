@@ -5,6 +5,21 @@
 -export([parse_address/1, lookup/3, client_identity/2, certificates/1]).
 -export([reusable/1]).
 -export([counter_new/0, counter_add/2]).
+-export([reply_alias/0, retire_alias/1]).
+%% A reply subject addressed to a process alias. Once retired, the runtime
+%% drops every message sent to it, so a reply that arrives after its caller
+%% stopped waiting never reaches the mailbox. The tuple is gleam_erlang's
+%% subject representation, with the alias as both destination and tag.
+reply_alias() ->
+    Alias = erlang:alias([explicit_unalias]),
+    {subject, Alias, Alias}.
+retire_alias({subject, Alias, Alias}) ->
+    erlang:unalias(Alias),
+    flush(Alias).
+flush(Alias) ->
+    receive {Alias, _} -> flush(Alias)
+    after 0 -> nil
+    end.
 counter_new() -> atomics:new(1, [{signed, true}]).
 counter_add(Ref, Amount) -> atomics:add_get(Ref, 1, Amount).
 reusable(Pid) ->

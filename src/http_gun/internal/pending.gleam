@@ -37,7 +37,7 @@ pub type Pending {
     reply: fn(Result(response.Response(owner.Body), Failure)) -> Nil,
     /// Run by the body owner, in its own process, once it holds `reply`.
     launched: fn() -> Nil,
-    deadline: Option(Int),
+    deadline: Int,
     pool_until: Int,
     idle: settings.Bound,
     policies: List(destination.Policy),

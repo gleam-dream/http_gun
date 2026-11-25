@@ -27,7 +27,7 @@ pub fn main() -> Nil {
   let order = correlation.unique()
   let stream =
     client
-    |> http_gun.with_timeout(config.Infinity)
+    |> http_gun.with_timeout(duration.hours(1))
     |> http_gun.with_idle_timeout(config.After(duration.seconds(60)))
     |> http_gun.with_correlation(order)
   // snips-end: client-view

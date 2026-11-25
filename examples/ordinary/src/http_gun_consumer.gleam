@@ -158,8 +158,7 @@ fn failures(req: request.Request(BitArray)) -> Nil {
   // The server received the request but sends no response within 200 ms. It
   // may have acted on it, so only an idempotent request is retried.
   let #(port, peer) = gated()
-  let slow =
-    client |> http_gun.with_timeout(config.After(duration.milliseconds(200)))
+  let slow = client |> http_gun.with_timeout(duration.milliseconds(200))
   let assert Error(timed_out) = http_gun.send(slow, local_request(port))
   arrived(peer)
   let assert error.TimedOut = error.kind(timed_out)
