@@ -137,11 +137,8 @@ pub fn paused_reader_is_not_failed_by_idle_timeout_test() {
 
 pub fn overall_deadline_is_terminal_test() {
   let #(port, server) = controlled()
-  let assert Ok(client) =
-    http_gun.start(
-      local_config()
-      |> config.with_request_timeout(config.After(duration.milliseconds(100))),
-    )
+  let assert Ok(client) = http_gun.start(local_config())
+  let client = http_gun.with_timeout(client, duration.milliseconds(100))
   let assert Ok(response) = http_gun.open(client, req(port))
   let assert Error(failure) =
     body.next_within(response.body, duration.milliseconds(1000))

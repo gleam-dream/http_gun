@@ -283,51 +283,14 @@ pub fn supplied_deadline_covers_body_test() {
   http_gun.stop(client)
 }
 
-// Regression: a view deadline replaces the client's request timeout instead
-// of taking the earlier of the two, so a per-call budget may exceed the
-// client's default.
-pub fn view_deadline_longer_than_client_request_timeout_succeeds_test() {
-  let #(port, server) = controlled()
+pub fn long_view_timeout_does_not_lift_the_idle_timeout_test() {
   let assert Ok(client) =
     http_gun.start(
       local_config()
-      |> config.with_request_timeout(config.After(duration.milliseconds(100))),
-    )
-  let assert Ok(response) =
-    http_gun.open(
-      client
-        |> http_gun.with_deadline(deadline.after(duration.milliseconds(5000))),
-      req(port),
-    )
-  // Outlive the client's 100 ms request timeout before the body arrives.
-  process.sleep(300)
-  send_control(server, <<"3\r\nabc\r\n0\r\n\r\n":utf8>>)
-  body.collect(response.body, 100)
-  |> should.equal(Ok(body.Collected(<<"abc":utf8>>, [])))
-  body.close(response.body)
-  // The same wait through the client itself still meets its own timeout.
-  let #(port, server) = controlled()
-  let assert Ok(response) = http_gun.open(client, req(port))
-  process.sleep(300)
-  body.next_within(response.body, duration.milliseconds(1000))
-  |> should.equal(Error(
-    error.new(error.DeadlineExceeded, error.MaybeSent)
-    |> error.with_status(200),
-  ))
-  closed(server) |> should.be_true
-  body.close(response.body)
-  http_gun.stop(client)
-}
-
-pub fn infinite_view_timeout_outlives_request_timeout_but_not_idle_timeout_test() {
-  let assert Ok(client) =
-    http_gun.start(
-      local_config()
-      |> config.with_request_timeout(config.After(duration.milliseconds(200)))
       |> config.with_idle_timeout(config.After(duration.milliseconds(300))),
     )
-  let stream = client |> http_gun.with_timeout(config.Infinity)
-  // A body that keeps flowing for longer than the request timeout.
+  let stream = client |> http_gun.with_timeout(duration.hours(1))
+  // A body that keeps flowing for longer than the idle timeout.
   let #(port, server) = controlled()
   let before = now()
   let assert Ok(response) = http_gun.open(stream, req(port))

@@ -45,10 +45,10 @@ fn run(
 pub fn main() -> Nil {
   let assert Ok(client) =
     local_config()
-    |> config.with_request_timeout(config.After(duration.seconds(60)))
     |> config.with_max_connections(4)
     |> config.with_max_connections_per_origin(4)
     |> http_gun.start
+  let client = http_gun.with_timeout(client, duration.seconds(60))
   let assert Ok(req) =
     request.to("http://localhost:" <> int.to_string(server()) <> "/")
   let req = request.set_body(req, <<>>)

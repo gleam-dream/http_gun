@@ -38,7 +38,7 @@ import sinal/correlation.{type Correlation}
 /// token and destination lists retain independent view constraints.
 pub type View {
   View(
-    timeout: Option(settings.Bound),
+    timeout: Option(Int),
     deadline: Option(Int),
     idle: Option(settings.Bound),
     tokens: List(token.Token),
@@ -159,6 +159,7 @@ type Invocation {
     request: fn() -> request.Request(BitArray),
     origin: Origin,
     entered: Int,
+    deadline: Int,
     view: View,
     owner: process.Pid,
   )
@@ -203,17 +204,31 @@ pub fn named(name: process.Name(Message)) -> Client {
 }
 
 pub fn stats(client: Client) -> Result(#(Int, Int, Int), Failure) {
-  call.run(client.subject, Inspect)
+  query(client, Inspect)
 }
 
 /// What a playback client met that did not match its script; `None` for a
 /// client that does not play back.
 pub fn verify(client: Client) -> Result(Option(script.Report), Failure) {
-  call.run(client.subject, Verify)
+  query(client, Verify)
 }
 
 pub fn settings(client: Client) -> Result(Settings, Failure) {
-  call.run(client.subject, Configuration)
+  query(client, Configuration)
+}
+
+// Ask the pool a question that submits nothing, bounded by the deadline a
+// request through the same view would have.
+fn query(
+  client: Client,
+  make: fn(process.Subject(Result(value, Failure))) -> Message,
+) -> Result(value, Failure) {
+  case call.ask(client.subject, make, deadline(client.view, bridge.now())) {
+    Ok(answer) -> answer
+    Error(call.NotRunning) | Error(call.Lost) ->
+      Error(error.new(error.ClientClosed, NotSent))
+    Error(call.Expired) -> Error(error.new(error.DeadlineExceeded, NotSent))
+  }
 }
 
 pub fn view(client: Client) -> View {
@@ -230,14 +245,14 @@ pub fn open(
 ) -> Result(Opened, Failure) {
   let view = client.view
   let entered = bridge.now()
+  let deadline = deadline(view, entered)
   use Nil <- result.try(case list.any(view.tokens, token.is_cancelled) {
     True -> Error(error.new(error.Cancelled, NotSent))
     False -> Ok(Nil)
   })
-  use Nil <- result.try(case view.deadline {
-    Some(at) if at <= entered ->
-      Error(error.new(error.DeadlineExceeded, NotSent))
-    _ -> Ok(Nil)
+  use Nil <- result.try(case deadline <= entered {
+    True -> Error(error.new(error.DeadlineExceeded, NotSent))
+    False -> Ok(Nil)
   })
   use Nil <- result.try(case view.body_limit {
     Some(#(limit, _)) if limit < 0 ->
@@ -252,19 +267,42 @@ pub fn open(
   case process.subject_owner(client.subject) {
     Error(Nil) -> Error(error.new(error.ClientClosed, NotSent))
     Ok(pool) -> {
-      let reply = process.new_subject()
+      let reply = call.reply()
       let monitor = process.monitor(pool)
       process.send(
         client.subject,
         Open(
-          Invocation(fn() { req }, origin, entered, view, process.self()),
+          Invocation(
+            fn() { req },
+            origin,
+            entered,
+            deadline,
+            view,
+            process.self(),
+          ),
           reply,
         ),
       )
-      let outcome = await(reply, monitor, None)
+      let outcome = await(reply, monitor, None, deadline + call.grace)
       process.demonitor_process(monitor)
+      // Whatever ended the wait, a later answer is dropped by the runtime.
+      call.retire(reply)
       outcome
     }
+  }
+}
+
+/// The request timeout when the view sets neither a timeout nor a deadline.
+const default_timeout = 30_000
+
+// The absolute time by which a request made through `view` ends. Every
+// request has one: the caller's own process stops waiting shortly after it.
+fn deadline(view: View, entered: Int) -> Int {
+  case view.deadline, view.timeout {
+    Some(at), Some(timeout) -> int.min(at, entered + timeout)
+    Some(at), None -> at
+    None, Some(timeout) -> entered + timeout
+    None, None -> entered + default_timeout
   }
 }
 
@@ -277,11 +315,14 @@ type Waited {
 // Wait for the one answer to `Open`. Before launch the pool holds the reply;
 // after it only the body owner does, so both are monitored and neither death
 // leaves the caller waiting. A reply the owner sent before dying precedes its
-// exit signal and is still taken.
+// exit signal and is still taken. The pool and the owner answer at the
+// deadline; `until` lies a little later, so the caller ends a wait that a
+// live but stuck process never answers.
 fn await(
   reply: process.Subject(Answer),
   pool: process.Monitor,
   owner: Option(process.Monitor),
+  until: Int,
 ) -> Result(Opened, Failure) {
   let selector =
     process.new_selector()
@@ -292,15 +333,16 @@ fn await(
       process.select_specific_monitor(selector, monitor, fn(_) { OwnerDown })
     None -> selector
   }
-  case process.selector_receive_forever(selector) {
-    Reply(Launched(pid)) -> await(reply, pool, Some(process.monitor(pid)))
-    Reply(Answered(outcome)) -> {
+  case call.receive_until(selector, until) {
+    Ok(Reply(Launched(pid))) ->
+      await(reply, pool, Some(process.monitor(pid)), until)
+    Ok(Reply(Answered(outcome))) -> {
       option.map(owner, process.demonitor_process)
       outcome
     }
     // Nothing was sent when the client is not registered or already dead; a
     // client that exits while handling the call may have submitted it.
-    PoolDown(down) -> {
+    Ok(PoolDown(down)) -> {
       option.map(owner, process.demonitor_process)
       let noproc = process.Abnormal(atom.to_dynamic(atom.create("noproc")))
       case down {
@@ -310,8 +352,14 @@ fn await(
       }
     }
     // The owner had submitted the request and can no longer answer.
-    OwnerDown ->
+    Ok(OwnerDown) ->
       Error(error.new(error.RequestFailed(error.UnknownTransport), MaybeSent))
+    // The process holding the reply is alive but did not answer by the
+    // deadline. It may have submitted the request.
+    Error(Nil) -> {
+      option.map(owner, process.demonitor_process)
+      Error(error.new(error.DeadlineExceeded, MaybeSent))
+    }
   }
 }
 
@@ -476,9 +524,9 @@ fn handle(state: State, message: Message) -> actor.Next(State, Message) {
         None -> actor.continue(state)
         Some(p) -> {
           let now = bridge.now()
-          let reason = case p.deadline {
-            Some(at) if at <= now -> error.DeadlineExceeded
-            _ -> error.PoolTimeout
+          let reason = case p.deadline <= now {
+            True -> error.DeadlineExceeded
+            False -> error.PoolTimeout
           }
           reject(p, reason)
           actor.continue(
@@ -819,10 +867,8 @@ fn admit_connection(state: State, p: Pending) -> Admission {
             )
           // The request that opens a connection may wait for it to connect.
           let _ = process.cancel_timer(p.timer)
-          let until = case p.deadline {
-            Some(at) -> int.min(at, int.max(p.pool_until, connect_until + 1))
-            None -> int.max(p.pool_until, connect_until + 1)
-          }
+          let until =
+            int.min(p.deadline, int.max(p.pool_until, connect_until + 1))
           let timer =
             process.send_after(
               state.self,
@@ -967,10 +1013,7 @@ fn settle(p: Pending) -> Nil {
 
 fn admit(state: State, p: Pending) -> Admission {
   let cancelled = list.any(p.cancellation, token.is_cancelled)
-  let expired = case p.deadline {
-    Some(at) -> bridge.now() >= at
-    None -> False
-  }
+  let expired = bridge.now() >= p.deadline
   case cancelled, expired {
     True, _ -> {
       reject(p, error.Cancelled)
@@ -1165,20 +1208,6 @@ fn make_room(state: State, wanted: Origin) -> State {
   }
 }
 
-fn effective_deadline(config: Settings, invocation: Invocation) -> Option(Int) {
-  let view = invocation.view
-  case view.deadline, view.timeout {
-    Some(at), Some(timeout) ->
-      case settings.until(timeout, invocation.entered) {
-        Some(until) -> Some(int.min(at, until))
-        None -> Some(at)
-      }
-    Some(at), None -> Some(at)
-    None, Some(timeout) -> settings.until(timeout, invocation.entered)
-    None, None -> settings.until(config.request_timeout, invocation.entered)
-  }
-}
-
 fn open_request(
   state: State,
   invocation: Invocation,
@@ -1229,13 +1258,10 @@ fn open_request(
       actor.continue(state)
     }
     Ok(capture) -> {
-      let deadline = effective_deadline(state.config, invocation)
+      let deadline = invocation.deadline
       let now = bridge.now()
       let pool_until = now + state.config.pool_timeout
-      let first = case deadline {
-        Some(at) -> int.min(at, pool_until)
-        None -> pool_until
-      }
+      let first = int.min(deadline, pool_until)
       let id = reference.new()
       let timer =
         process.send_after(state.self, int.max(0, first - now), Expire(id))
@@ -1471,10 +1497,7 @@ fn resolved(
           fail_reason(without, group, error.ConnectTimeout)
         Error(reason), _ -> fail_reason(without, group, reason)
         Ok(target), Ok(p) -> {
-          let remaining = case p.deadline {
-            Some(at) -> at - bridge.now()
-            None -> state.config.connect_timeout
-          }
+          let remaining = p.deadline - bridge.now()
           case remaining <= 0 {
             True -> without
             False ->

@@ -233,13 +233,10 @@ pub fn stalled_writer_keeps_control_and_completed_http_test() {
   let #(port, server) = controlled()
   let destination = path()
   let assert Ok(recorded) =
-    cassette.record(
-      local_config()
-        |> config.with_request_timeout(config.After(duration.milliseconds(300))),
-      destination,
-      cassette.options(),
-    )
-  let assert Ok(response) = http_gun.open(recorded.client, req(port))
+    cassette.record(local_config(), destination, cassette.options())
+  let client =
+    http_gun.with_timeout(recorded.client, duration.milliseconds(300))
+  let assert Ok(response) = http_gun.open(client, req(port))
   emit(server, <<"1\r\na\r\n":utf8>>)
   body.next_within(response.body, duration.milliseconds(1000))
   |> should.equal(chunk(<<"a":utf8>>))

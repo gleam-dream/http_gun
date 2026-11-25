@@ -103,9 +103,9 @@ pub fn queued_deadline_is_not_submitted_test() {
   let assert Ok(client) =
     http_gun.start(
       local_config()
-      |> config.with_request_timeout(config.After(duration.milliseconds(150)))
       |> config.with_max_open_bodies(1),
     )
+  let client = http_gun.with_timeout(client, duration.milliseconds(150))
   let assert Ok(slow) = http_gun.open(client, req(port))
   let assert Error(failure) = http_gun.send(client, req(port))
   error.evidence(failure) |> should.equal(error.NotSent)
@@ -434,9 +434,9 @@ pub fn idle_connection_yields_capacity_to_other_origin_test() {
   let assert Ok(client) =
     http_gun.start(
       local_config()
-      |> config.with_request_timeout(config.After(duration.milliseconds(500)))
       |> config.with_max_connections(1),
     )
+  let client = http_gun.with_timeout(client, duration.milliseconds(500))
   let assert Ok(_) = http_gun.send(client, req(persistent()))
   let assert Ok(_) = http_gun.send(client, req(persistent()))
   http_gun.stop(client)
@@ -463,9 +463,6 @@ pub fn burst_work_scales_with_requests_test() {
   let assert Ok(client) =
     http_gun.start(
       local_config()
-      |> config.with_request_timeout(
-        config.After(duration.milliseconds(10_000)),
-      )
       |> config.with_max_connections(4)
       |> config.with_max_connections_per_origin(4)
       |> config.with_max_open_bodies(1024)
@@ -569,10 +566,10 @@ pub fn queued_deadlines_remove_entries_and_restore_capacity_test() {
   let assert Ok(client) =
     http_gun.start(
       local_config()
-      |> config.with_request_timeout(config.After(duration.milliseconds(150)))
       |> config.with_max_open_bodies(1)
       |> config.with_max_queued_requests(32),
     )
+  let client = http_gun.with_timeout(client, duration.milliseconds(150))
   let port = persistent()
   let assert Ok(held) = http_gun.open(client, req(port))
   let done = process.new_subject()

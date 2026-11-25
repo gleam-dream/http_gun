@@ -47,9 +47,14 @@ fn req(port: Int, tls: Bool, path: String) -> request.Request(BitArray) {
   |> request.set_body(<<>>)
 }
 
+// Every benchmark request may take up to a minute, including the slow reader.
+fn start(settings: config.Config) -> http_gun.Client {
+  let assert Ok(client) = http_gun.start(settings)
+  http_gun.with_timeout(client, duration.seconds(60))
+}
+
 fn settings(tls: Bool) -> config.Config {
   local_config()
-  |> config.with_request_timeout(config.After(duration.milliseconds(60_000)))
   |> config.with_protocol(case tls {
     True -> config.RequireHttp2
     False -> config.Http1
@@ -120,7 +125,7 @@ fn concurrent(tls: Bool, count: Int) {
     True -> h2()
     False -> h1()
   }
-  let assert Ok(client) = http_gun.start(settings(tls))
+  let client = start(settings(tls))
   let sampler = sampler()
   let started = now()
   let done = process.new_subject()
@@ -172,8 +177,8 @@ fn drain(body: body.Body, total: Int, slow: Bool) -> Int {
 fn large_stream(slow: Bool) {
   let bytes = 33_554_432
   // One buffered-bytes limit now bounds both the queue and a single chunk.
-  let assert Ok(client) =
-    http_gun.start(settings(False) |> config.with_max_buffered_bytes(1_048_576))
+  let client =
+    start(settings(False) |> config.with_max_buffered_bytes(1_048_576))
   let sample = sampler()
   let started = now()
   let assert Ok(actual) =
@@ -201,7 +206,7 @@ fn large_stream(slow: Bool) {
 
 fn mixed() {
   let port = h2()
-  let assert Ok(client) = http_gun.start(settings(True))
+  let client = start(settings(True))
   let sample = sampler()
   let started = now()
   let assert Ok(slow) = http_gun.open(client, req(port, True, "/slow"))

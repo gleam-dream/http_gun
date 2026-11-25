@@ -33,7 +33,6 @@ pub fn start(name: String, connections: Int) -> Client {
     "gun" -> {
       let assert Ok(client) =
         local_config()
-        |> config.with_request_timeout(config.After(duration.seconds(60)))
         |> config.with_trust(config.CustomCa("test/fixtures/ca.crt"))
         |> config.with_max_connections(connections)
         |> config.with_max_connections_per_origin(connections)
@@ -41,7 +40,7 @@ pub fn start(name: String, connections: Int) -> Client {
         |> config.with_max_queued_requests(1024)
         |> config.with_max_buffered_bytes(1_048_576)
         |> http_gun.start
-      Gun(client)
+      Gun(http_gun.with_timeout(client, duration.seconds(60)))
     }
     _ -> {
       let assert Ok(profile) =

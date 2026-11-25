@@ -28,12 +28,15 @@
 //// ```gleam
 //// let stream =
 ////   client
-////   |> http_gun.with_timeout(config.Infinity)   // a long-lived SSE stream
+////   |> http_gun.with_timeout(duration.hours(1))   // a long-lived SSE stream
 ////   |> http_gun.with_correlation(order)
 //// ```
 ////
-//// `with_timeout` and `with_deadline` replace the client's request timeout,
-//// shorter or longer; the connect, pool and idle timeouts still apply.
+//// Every request has a deadline: 30 seconds from the call, replaced by
+//// `with_timeout` or `with_deadline`, shorter or longer. The calling process
+//// enforces it: it stops waiting shortly after the deadline even when the
+//// client cannot answer, and drops any later answer. The connect, pool and
+//// idle timeouts still apply within it.
 //// `with_destination` can only narrow the destinations the client admits.
 //// A client that serves several tenants admits the union of their
 //// destinations, which any call holding the handle without a view reaches;
@@ -66,6 +69,7 @@ import gleam/option.{type Option, None, Some}
 import gleam/otp/actor
 import gleam/otp/supervision
 import gleam/result
+import gleam/time/duration.{type Duration}
 import http_gun/body
 import http_gun/cancellation
 import http_gun/config
@@ -328,17 +332,22 @@ pub fn stats(client: Client) -> Result(Stats, Failure) {
   |> result.map(fn(counts) { Stats(counts.0, counts.1, counts.2) })
 }
 
-/// Bound each request made through this view from admission to its last
-/// byte, replacing the client's request timeout, shorter or longer.
-/// `config.Infinity` lifts the bound for a long-lived stream; the connect,
-/// pool and idle timeouts still apply.
-pub fn with_timeout(client: Client, timeout: config.Timeout) -> Client {
+/// Bound each request made through this view from the call to its last
+/// byte, replacing the default of 30 seconds, shorter or longer. A long-lived
+/// stream chooses a long timeout and opens a new request when it ends; no
+/// request waits without a bound. Zero or a negative timeout fails the call
+/// at once with `DeadlineExceeded` and `NotSent`. The connect, pool and idle
+/// timeouts still apply.
+pub fn with_timeout(client: Client, timeout: Duration) -> Client {
   let view = pool.view(client)
-  pool.with_view(client, pool.View(..view, timeout: Some(bound(timeout))))
+  pool.with_view(
+    client,
+    pool.View(..view, timeout: Some(settings.milliseconds(timeout))),
+  )
 }
 
 /// End every request made through this view by an absolute deadline shared
-/// across calls. It replaces the client's request timeout; combined with
+/// across calls. It replaces the default request timeout; combined with
 /// `with_timeout`, the earlier of the two applies.
 pub fn with_deadline(client: Client, deadline: deadline.Deadline) -> Client {
   let view = pool.view(client)

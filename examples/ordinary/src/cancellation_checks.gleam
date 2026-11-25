@@ -4,7 +4,6 @@ import gleam/erlang/process
 import gleam/http/request
 import gleam/http/response
 import gleam/int
-import gleam/time/duration
 import http_gun
 import http_gun/body
 import http_gun/cancellation
@@ -153,7 +152,6 @@ fn cancel_one(
 fn local_config() -> config.Config {
   config.default()
   |> config.with_destination(destination.loopback_only())
-  |> config.with_request_timeout(config.After(duration.seconds(5)))
 }
 
 fn local_request(port: Int) -> request.Request(BitArray) {

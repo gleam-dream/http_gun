@@ -694,9 +694,9 @@ fn signer_renegotiation() {
   let once = key_holder("a.key", 1)
   let assert Ok(client) =
     settings()
-    |> config.with_request_timeout(config.After(duration.milliseconds(500)))
     |> config.with_client_identity(signer_identity(once))
     |> http_gun.start
+  let client = http_gun.with_timeout(client, duration.milliseconds(500))
   let assert Error(failure) = http_gun.send(client, renegotiate)
   let assert error.DeadlineExceeded = error.reason(failure)
   let assert error.MaybeSent = error.evidence(failure)

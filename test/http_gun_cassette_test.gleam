@@ -244,7 +244,6 @@ pub fn failure_before_headers_releases_admission_test() {
     testing.playback(
       testing.script([rejection, rejection]),
       config.default()
-        |> config.with_request_timeout(config.After(duration.milliseconds(100)))
         |> config.with_max_open_bodies(1),
     )
   let assert Error(first) = http_gun.send(client, req())
@@ -527,7 +526,7 @@ pub fn verify_reports_mismatches_exhaustion_and_unused_exchanges_test() {
 
   // Both sides are reported as match_key forms them: credentials removed,
   // ignored headers dropped. Views share the client's report.
-  let view = http_gun.with_timeout(client, config.After(duration.seconds(5)))
+  let view = http_gun.with_timeout(client, duration.seconds(5))
   testing.verify(view)
   |> should.equal(
     Ok(testing.Verdict(
