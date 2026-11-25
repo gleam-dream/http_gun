@@ -2,6 +2,7 @@
 
 -export([unused_port/0, late_monitor_refusal/1]).
 -export([remove_fixture/1]).
+-export([closing_stream/2]).
 
 -export([start/0,
          serve/1,
@@ -30,6 +31,30 @@ serve(Response) ->
                   gen_tcp:close(L)
           end),
     Port.
+
+%% Answer one request with `connection: close` and a chunked body: one
+%% `Chunks`-numbered chunk every `IntervalMs`, then the last chunk.
+closing_stream(Chunks, IntervalMs) ->
+    {ok, L} = gen_tcp:listen(0,
+                             [binary, {active, false}, {reuseaddr, true}, {ip, {127, 0, 0, 1}}]),
+    {ok, {_, Port}} = inet:sockname(L),
+    spawn(fun () ->
+                  {ok, S} = gen_tcp:accept(L, 5000),
+                  gen_tcp:close(L),
+                  {ok, _} = gen_tcp:recv(S, 0, 5000),
+                  ok = gen_tcp:send(S, <<"HTTP/1.1 200 OK\r\nConnection: close\r\n"
+                                         "Transfer-Encoding: chunked\r\n\r\n">>),
+                  stream_chunks(S, 1, Chunks, IntervalMs)
+          end),
+    Port.
+
+stream_chunks(S, N, Chunks, _IntervalMs) when N > Chunks ->
+    _ = gen_tcp:send(S, <<"0\r\n\r\n">>),
+    gen_tcp:close(S);
+stream_chunks(S, N, Chunks, IntervalMs) ->
+    ok = gen_tcp:send(S, <<"1\r\n", (N rem 10 + $0), "\r\n">>),
+    timer:sleep(IntervalMs),
+    stream_chunks(S, N + 1, Chunks, IntervalMs).
 
 persistent() -> persistent(undefined).
 observed() -> persistent(self()).

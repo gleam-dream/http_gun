@@ -2,6 +2,7 @@ import gleam/erlang/process
 import gleam/http/request
 import gleam/int
 import gleam/option.{None, Some}
+import gleam/otp/static_supervisor
 import gleam/result
 import gleam/time/duration
 import gleeunit/should
@@ -329,4 +330,36 @@ pub fn fallible_scope_success_and_exception_cleanup_test() {
 // These exercises connect only to explicitly permitted local test servers.
 fn local_config() -> config.Config {
   config.default() |> config.allow_loopback
+}
+
+@external(erlang, "http_gun_test_server", "closing_stream")
+fn closing_stream(chunks: Int, interval_ms: Int) -> Int
+
+// Gun's own closing timer (15 s) once cut a response that announced
+// `connection: close`. Only the caller's deadline may end a call.
+pub fn connection_close_response_streams_past_fifteen_seconds_test() {
+  let port = closing_stream(17, 1000)
+  // The default 30 s request timeout is the only deadline.
+  let assert Ok(client) = http_gun.start(local_config())
+  let assert Ok(received) = http_gun.send(client, req(port))
+  received.response.status |> should.equal(200)
+  received.response.body |> should.equal(<<"12345678901234567":utf8>>)
+  http_gun.stop(client)
+}
+
+// A connection must not outlive its client: with no closing timer of Gun's
+// own, nothing else would end a stream whose client stopped under it.
+pub fn supervisor_shutdown_closes_connection_with_open_stream_test() {
+  let #(port, server) = controlled()
+  let name = process.new_name("http_gun_stream_test_shutdown")
+  let assert Ok(supervisor) =
+    static_supervisor.new(static_supervisor.OneForOne)
+    |> static_supervisor.add(http_gun.supervised(local_config(), name))
+    |> static_supervisor.start
+  let assert Ok(response) = http_gun.open(http_gun.named(name), req(port))
+  emit(server, <<"3\r\nabc\r\n":utf8>>)
+  process.unlink(supervisor.pid)
+  process.send_exit(supervisor.pid)
+  closed(server) |> should.be_true
+  body.close(response.body)
 }
