@@ -298,7 +298,9 @@ pub fn draining_connection_admits_no_stream_after_a_refusal_test() {
   let assert Ok(_) = http_gun.send(client, req(port, "/goaway-hold"))
   let assert Error(refused) = http_gun.send(client, req(port, "/fast"))
   #(error.reason(refused), error.evidence(refused))
-  |> should.equal(#(error.RequestFailed(error.PeerDraining), error.MaybeSent))
+  |> should.equal(#(error.RequestFailed(error.PeerDraining), error.NotSent))
+  // Gun refused it before writing it, so even a POST may be sent again.
+  error.is_retryable(refused, idempotent: False) |> should.be_true
   let outcome = process.new_subject()
   process.spawn_unlinked(fn() {
     process.send(outcome, http_gun.send(client, req(port, "/fast")))
