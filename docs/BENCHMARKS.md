@@ -54,6 +54,25 @@ Median elapsed milliseconds with minimum and maximum across successful trials:
 - One Dream burst trial failed and is excluded from the aggregate: 48 connection-timeout failures, 393 distinct connections and 5,013.866 ms elapsed. The successful Dream burst trials used 6 and 30 distinct connections and HTTP Gun used 4 in each. The observations do not identify the cause.
 - Raw data stays beside the receipts as non-markdown files: `docs/evidence/comparison/benchmark.jsonl`, `summary.json`, `inputs.json` and `failed-trial-observation.json`.
 
+## Cold-start preparation
+
+Run of 2026-11-25, for [ADR 0022](adr/0022-prepare-one-connection-per-waiting-request.md). N concurrent requests go to an origin the client has never connected to. A local TLS server waits 100 ms before each handshake and 50 ms before each response, so a busy connection cannot serve the next request at once. Each run starts a new client with N connections allowed per origin.
+
+```sh
+./dev/env gleam run -m http_gun_cold_start_benchmark
+```
+
+- **Environment:** OTP 29, macOS ARM64, Apple M4, 10 cores, shared with other builds during the run, so absolute times are noisy.
+- Three invocations of each version alternated back to back, five runs each. Median wall time until the last response, in milliseconds, with minimum and maximum:
+
+| Concurrent requests | One preparation per origin | One per waiting request |
+| ------------------- | -------------------------- | ----------------------- |
+| 1                   | 164.0 [160.3–200.0]        | 163.9 [158.6–200.0]     |
+| 4                   | 271.5 [261.0–273.7]        | 163.3 [157.8–169.1]     |
+| 8                   | 374.2 [364.1–380.7]        | 165.1 [163.4–167.1]     |
+
+- With no response delay, the two versions measured the same (about 110 ms for 1, 4 and 8 requests): one connection serves each short request before the next handshake would finish, so concurrent preparation does not shorten the burst.
+
 ## Limits
 
 - Three local trials on one machine establish scheduling behavior for these workloads only.

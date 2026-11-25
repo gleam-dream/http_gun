@@ -774,6 +774,7 @@ fn dispatch_group(state: State, group: pending.Group) -> State {
       case admit(state, p) {
         Deferred(next, p) ->
           State(..next, pending: pending.replace(next.pending, p))
+          |> prepare_ahead(group)
         Taken(next) -> {
           let #(_, queue) = pending.remove(next.pending, p.id)
           dispatch_group(
@@ -839,55 +840,121 @@ fn admit_connection(state: State, p: Pending) -> Admission {
         Ok(Nil) -> admit_eligible(state, p, connection)
       }
     Error(Nil) -> {
+      // A request that arrives with an empty lane is not queued yet.
+      let waiting = int.max(1, pending.size(state.pending, group(state, p)))
       let state = make_room(state, p.origin)
-      let same = list.filter(state.connections, fn(c) { c.origin == p.origin })
-      case
-        list.length(state.connections) < state.config.limits.connections
-        && list.length(same) < state.config.limits.per_origin
-        && !list.any(same, fn(c) { preparing(c.status) })
-      {
+      case room(state, p.origin, waiting) > 0 {
         False -> Deferred(state, p)
         True -> {
-          let self = state.self
-          let connect_until = bridge.now() + state.config.connect_timeout
-          let pid =
-            resolution.start(
-              process.self(),
-              policies(state, p),
-              state.config.resolver,
-              p.origin.host,
-              p.origin.port,
-              p.origin.tls,
-              connect_until,
-              fn(pid, result) { process.send(self, Resolved(pid, result)) },
-            )
-          let _ = process.monitor(pid)
-          let _ =
-            process.send_after(
-              state.self,
-              state.config.connect_timeout,
-              ConnectExpired(pid),
-            )
-          // The request that opens a connection may wait for it to connect.
-          let _ = process.cancel_timer(p.timer)
-          let until =
-            int.min(p.deadline, int.max(p.pool_until, connect_until + 1))
-          let timer =
-            process.send_after(
-              state.self,
-              int.max(0, until - bridge.now()),
-              Expire(p.id),
-            )
-          Deferred(
-            State(..state, connections: [
-              Connection(pid, p.origin, Resolving, 0, [], None, connect_until),
-              ..state.connections
-            ]),
-            Pending(..p, reservation: Some(pid), timer:),
-          )
+          let #(state, p) = prepare(state, p)
+          Deferred(state, p)
         }
       }
     }
+  }
+}
+
+// How many more connections the origin may start now: one preparation per
+// waiting request, within the per-origin and total connection limits.
+fn room(state: State, origin: Origin, waiting: Int) -> Int {
+  int.min(
+    wanted(state, origin, waiting),
+    state.config.limits.connections - list.length(state.connections),
+  )
+}
+
+// The same, ignoring the total connection limit.
+fn wanted(state: State, origin: Origin, waiting: Int) -> Int {
+  let same = list.filter(state.connections, fn(c) { c.origin == origin })
+  int.min(
+    state.config.limits.per_origin - list.length(same),
+    waiting - list.count(same, fn(c) { preparing(c.status) }),
+  )
+}
+
+// Start preparing a new connection on behalf of `p`. The connection is not
+// bound to `p`: the lane head takes the first connection that becomes ready.
+fn prepare(state: State, p: Pending) -> #(State, Pending) {
+  let self = state.self
+  let connect_until = bridge.now() + state.config.connect_timeout
+  let pid =
+    resolution.start(
+      process.self(),
+      policies(state, p),
+      state.config.resolver,
+      p.origin.host,
+      p.origin.port,
+      p.origin.tls,
+      connect_until,
+      fn(pid, result) { process.send(self, Resolved(pid, result)) },
+    )
+  let _ = process.monitor(pid)
+  let _ =
+    process.send_after(
+      state.self,
+      state.config.connect_timeout,
+      ConnectExpired(pid),
+    )
+  // The request that opens a connection may wait for it to connect.
+  let _ = process.cancel_timer(p.timer)
+  let until = int.min(p.deadline, int.max(p.pool_until, connect_until + 1))
+  let timer =
+    process.send_after(
+      state.self,
+      int.max(0, until - bridge.now()),
+      Expire(p.id),
+    )
+  #(
+    State(..state, connections: [
+      Connection(pid, p.origin, Resolving, 0, [], None, connect_until),
+      ..state.connections
+    ]),
+    Pending(..p, reservation: Some(pid), timer:),
+  )
+}
+
+// Behind a deferred lane head, start connections for the requests that wait
+// without one, oldest first. Nothing here launches a request, so no request
+// overtakes the head; it only shortens the wait of the head and its
+// followers. The walk visits at most the requests it prepares for, after
+// those already holding a reservation, so a long lane costs nothing extra.
+fn prepare_ahead(state: State, group: pending.Group) -> State {
+  case group, state.mode {
+    pending.ForOrigin(origin), Live | pending.ForOrigin(origin), Record(_) -> {
+      let waiting = pending.size(state.pending, group)
+      // Evict an idle connection of another origin only when this origin
+      // could use the slot.
+      let state = case wanted(state, origin, waiting) > 0 {
+        True -> make_room(state, origin)
+        False -> state
+      }
+      let room = room(state, origin, waiting)
+      let bodies =
+        state.config.limits.open_bodies
+        - dict.size(state.owners)
+        - checking_count(state)
+      case room > 0 && bodies > 0 {
+        False -> state
+        True ->
+          pending.unreserved(state.pending, group, room)
+          |> list.filter(fn(p) {
+            !list.any(p.cancellation, token.is_cancelled)
+            && resolution.admit(
+              policies(state, p),
+              origin.host,
+              origin.port,
+              origin.tls,
+              [],
+            )
+            == Ok(Nil)
+          })
+          |> list.fold(state, fn(state, p) {
+            let #(state, p) = prepare(state, p)
+            State(..state, pending: pending.replace(state.pending, p))
+          })
+      }
+    }
+    _, _ -> state
   }
 }
 
@@ -1309,7 +1376,8 @@ fn open_request(
             False -> {
               lifecycle.emit(p.observation, telemetry.AdmissionWaiting)
               actor.continue(
-                State(..next, pending: pending.push(next.pending, group, p)),
+                State(..next, pending: pending.push(next.pending, group, p))
+                |> prepare_ahead(group),
               )
             }
           }

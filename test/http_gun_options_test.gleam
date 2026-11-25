@@ -225,6 +225,19 @@ pub fn queued_cancellation_removes_waiter_without_submission_test() {
   http_gun.stop(client)
 }
 
+fn wait_for_connections(
+  client: http_gun.Client,
+  count: Int,
+  tries: Int,
+) -> Bool {
+  let assert Ok(stats) = http_gun.stats(client)
+  case stats.connections == count, tries {
+    True, _ -> True
+    False, 0 -> False
+    False, _ -> wait_for_connections(client, count, tries - 1)
+  }
+}
+
 fn wait_for_queue(client: http_gun.Client, size: Int, tries: Int) -> Bool {
   let assert Ok(stats) = http_gun.stats(client)
   case stats.queued_requests == size, tries {
@@ -389,7 +402,9 @@ pub fn completed_http_survives_later_cancellation_test() {
   http_gun.stop(client)
 }
 
-pub fn last_queued_cancellation_releases_shared_connecting_socket_test() {
+// Each waiter prepares its own connection. Cancelling one keeps every
+// preparation while a waiter remains; cancelling the last releases them all.
+pub fn last_queued_cancellation_releases_every_preparing_socket_test() {
   let #(port, server) = gated()
   let assert Ok(client) =
     http_gun.start(
@@ -410,12 +425,12 @@ pub fn last_queued_cancellation_releases_shared_connecting_socket_test() {
         process.spawn_unlinked(fn() {
           process.send(results, http_gun.send(second_view, request))
         })
-      wait_for_queue(client, 1, 1000) |> should.be_true
+      wait_for_connections(client, 2, 1000) |> should.be_true
       cancellation.cancel(first)
       let assert Ok(Error(failure)) = process.receive(results, 1000)
       failure |> should.equal(error.new(error.Cancelled, error.NotSent))
       let assert Ok(stats) = http_gun.stats(client)
-      stats.connections |> should.equal(1)
+      stats.connections |> should.equal(2)
       cancellation.cancel(second)
       let assert Ok(Error(failure)) = process.receive(results, 1000)
       failure |> should.equal(error.new(error.Cancelled, error.NotSent))
