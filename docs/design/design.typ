@@ -497,7 +497,7 @@
     ])
     #subsection(title: "Failure meaning and serialization", [
       #points(
-        [#term("term-submission-evidence") is NotSent before the live Gun request call and MaybeSent afterward. One failure after the call is NotSent: Gun answers a request on a connection in its closing state, after the peer's GOAWAY, with `closing` and writes nothing, and it reports that reason for nothing else, so RequestFailed(PeerDraining) is NotSent. #adr(8) Offline scripted failures retain recorded evidence while their telemetry mode is Offline. Closing is local cancellation and never remote rollback.],
+        [#term("term-submission-evidence") is NotSent before the live Gun request call and MaybeSent afterward. One failure after the call is NotSent: Gun answers a request on a connection in its closing state, after the peer's GOAWAY, with `closing` and writes nothing, and it reports that reason for nothing else, so RequestFailed(PeerDraining) is NotSent. #adr(8) #adr(23) Offline scripted failures retain recorded evidence while their telemetry mode is Offline. Closing is local cancellation and never remote rollback.],
       )
       #facts(([Closed Kind], [Reasons grouped here], [Caller action]), (
         ([InvalidInput], [InvalidRequest], [Correct input or settings]),
