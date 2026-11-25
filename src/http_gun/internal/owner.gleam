@@ -475,6 +475,12 @@ fn handle(state: State, message: Message) -> actor.Next(State, Message) {
             True -> {
               let state = finish(state, Error(failure(state, error.Closed)))
               flush_capture(state.capture)
+              // Gun has no closing timer of its own: with the client gone,
+              // nothing else would close a connection still streaming to us.
+              case pid == state.client, state.source {
+                True, Gun(connection, _) -> bridge.close(connection)
+                _, _ -> Nil
+              }
               actor.stop()
             }
             False ->

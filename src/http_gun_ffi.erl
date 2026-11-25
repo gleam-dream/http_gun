@@ -60,8 +60,12 @@ open(Address, ServerName, Port, Tls, Protocol, Trust, CipherSuites, Identity, Ti
             retry => 0, protocols => Protocols, connect_timeout => Timeout,
             domain_lookup_timeout => Timeout, tls_handshake_timeout => Timeout,
             tcp_opts => [{send_timeout, Send}, {send_timeout_close, true}],
-            http_opts => #{flow => 1, max_headers => HeaderCount},
+            %% No closing timer: the caller's deadline alone ends a call,
+            %% even after `connection: close` or GOAWAY.
+            http_opts => #{flow => 1, max_headers => HeaderCount,
+                closing_timeout => infinity},
             http2_opts => #{flow => 1, notify_settings_changed => true,
+                closing_timeout => infinity,
                 %% HPACK includes :status; application header counts do not.
                 max_headers => HeaderCount + 1,
                 initial_stream_window_size => 16384,
