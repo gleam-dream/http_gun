@@ -222,6 +222,7 @@ pub fn start(
   timing: Timing,
   limits: settings.Limits,
   reply: fn(Result(response.Response(Body), Failure)) -> Nil,
+  launched: fn() -> Nil,
   release: fn(Bool) -> Nil,
   closed: fn() -> Nil,
   capture: Option(recorder.Capture),
@@ -302,6 +303,9 @@ pub fn start(
       |> process.select(subject)
       |> process.select_monitors(Lost)
       |> process.select_other(fn(value) { Wire(bridge.decode(value)) })
+    // Nothing below can fail: from here this process alone answers `reply`,
+    // so it tells the caller whom to monitor before any answer can be sent.
+    launched()
     Ok(
       actor.initialised(state)
       |> actor.selecting(selector)
@@ -323,13 +327,49 @@ fn wire_headers(req: request.Request(a)) -> List(#(String, String)) {
 
 // Connection persistence is application policy over already parsed headers.
 // A close token wins even when mixed with other comma-separated tokens.
+// Response headers arrive as the peer's bytes, which need not be UTF-8, so
+// this compares bytes and never calls a Unicode string function.
 fn wants_close(headers: List(#(String, String))) -> Bool {
   list.any(headers, fn(header) {
-    string.lowercase(header.0) == "connection"
-    && list.any(string.split(header.1, ","), fn(token) {
-      string.lowercase(string.trim(token)) == "close"
-    })
+    ascii_lowercase(bit_array.from_string(header.0), <<>>) == <<"connection">>
+    && close_token(ascii_lowercase(bit_array.from_string(header.1), <<>>))
   })
+}
+
+fn ascii_lowercase(bytes: BitArray, folded: BitArray) -> BitArray {
+  case bytes {
+    <<byte, rest:bytes>> if byte >= 65 && byte <= 90 ->
+      ascii_lowercase(rest, <<folded:bits, { byte + 32 }>>)
+    <<byte, rest:bytes>> -> ascii_lowercase(rest, <<folded:bits, byte>>)
+    _ -> folded
+  }
+}
+
+// Whether one comma-separated element, optional whitespace aside, is `close`.
+fn close_token(value: BitArray) -> Bool {
+  case optional_whitespace(value) {
+    <<"close", rest:bytes>> ->
+      case optional_whitespace(rest) {
+        <<>> | <<",", _:bytes>> -> True
+        other -> next_element(other)
+      }
+    other -> next_element(other)
+  }
+}
+
+fn next_element(value: BitArray) -> Bool {
+  case value {
+    <<",", rest:bytes>> -> close_token(rest)
+    <<_, rest:bytes>> -> next_element(rest)
+    _ -> False
+  }
+}
+
+fn optional_whitespace(value: BitArray) -> BitArray {
+  case value {
+    <<byte, rest:bytes>> if byte == 32 || byte == 9 -> optional_whitespace(rest)
+    _ -> value
+  }
 }
 
 pub fn authority(req: request.Request(a)) -> String {
