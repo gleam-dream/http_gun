@@ -1,8 +1,9 @@
 //// Cold-start latency: N concurrent requests to an origin the client has
 //// never connected to, against a local TLS server that waits a fixed delay
-//// before each handshake. Each run starts a new client, so every run is
-//// cold. Prints one JSON line per run with the wall time until the last
-//// response.
+//// before each handshake and another before each response, so a connection
+//// stays busy while it serves a request. Each run starts a new client, so
+//// every run is cold. Prints one JSON line per run with the wall time until
+//// the last response.
 ////
 //// Run with `gleam run -m http_gun_cold_start_benchmark`.
 
@@ -16,7 +17,7 @@ import http_gun
 import http_gun/config
 
 @external(erlang, "http_gun_tls_test_server", "slow_handshake")
-fn server(delay_ms: Int) -> Int
+fn server(handshake_ms: Int, response_ms: Int) -> Int
 
 @external(erlang, "http_gun_tls_test_server", "anchors")
 fn anchors(name: String) -> List(BitArray)
@@ -26,10 +27,12 @@ fn now() -> Int
 
 const delay_ms = 100
 
+const response_ms = 50
+
 const runs = 5
 
 pub fn main() -> Nil {
-  let port = server(delay_ms)
+  let port = server(delay_ms, response_ms)
   let assert Ok(req) = request.to("https://localhost:" <> int.to_string(port))
   let req = req |> request.set_scheme(http.Https) |> request.set_body(<<>>)
   list.each([1, 4, 8], fn(concurrency) {
@@ -60,6 +63,8 @@ fn run(req: request.Request(BitArray), concurrency: Int) -> Nil {
   io.println(
     "{\"handshake_delay_ms\":"
     <> int.to_string(delay_ms)
+    <> ",\"response_delay_ms\":"
+    <> int.to_string(response_ms)
     <> ",\"concurrency\":"
     <> int.to_string(concurrency)
     <> ",\"elapsed_us\":"

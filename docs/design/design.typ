@@ -364,7 +364,7 @@
       #points(
         [Live/recording scheduling uses one FIFO #term("term-origin-lane") per canonical origin. An admission pass stops at a blocked lane head and considers other lanes. Lanes that make progress rotate their position. Playback uses one global session lane to preserve matching order.],
         [Reuse comes before opening another connection. If global capacity is full, an unused ready connection for another origin may be evicted when that origin has no waiter. Idle sockets are a cache rather than a permanent capacity claim. #adr(3)],
-        [Resolving/connecting/checking slots are finite. Only one new preparation exists per origin while that origin already prepares a connection. At most one H1 readiness job exists per connection. A readiness job also reserves an open body slot to preserve admission order at capacity one.],
+        [Resolving/connecting/checking slots are finite. An origin prepares at most one new connection per waiting request, within its per-origin and the total connection limits. Behind a waiting lane head, requests without a preparation start one, oldest first, but never launch: the head takes the first connection that becomes ready. At most one H1 readiness job exists per connection. A readiness job also reserves an open body slot to preserve admission order at capacity one. #adr(22)],
         [Work crossing process boundaries captures only required values. A batch worker captures one input and its operation. Release/capture callbacks capture message destinations. They do not capture pool pending queues or completed batch results.],
       )
     ])
