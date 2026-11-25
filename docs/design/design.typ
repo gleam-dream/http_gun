@@ -461,7 +461,7 @@
     #facts(([Boundary], [Effect committed or observed], [Failure and uncertainty]), (
       ([Validated invocation], [No network action], [Invalid/refused/capacity failure has NotSent]),
       ([Resolution admitted], [Address set authorized; no HTTP submission], [Connecting failure remains NotSent]),
-      ([Gun request invoked], [One asynchronous transport request issued], [Every later live failure is MaybeSent; return proves no socket write or remote receipt]),
+      ([Gun request invoked], [One asynchronous transport request issued], [Every later live failure is MaybeSent, except Gun's refusal on a closing connection, which is NotSent; return proves no socket write or remote receipt]),
       ([Final head admitted], [Status and headers observed], [Streaming caller owns head; collection failures retain redacted headers/status]),
       ([HTTP EOF], [Transport lease may release], [Application consumption and capture finalization may remain incomplete]),
       ([Capture acknowledgment], [Writer fragment and close completed], [No fsync or power-loss persistence established]),
@@ -497,7 +497,7 @@
     ])
     #subsection(title: "Failure meaning and serialization", [
       #points(
-        [#term("term-submission-evidence") is NotSent before the live Gun request call and MaybeSent afterward. Offline scripted failures retain recorded evidence while their telemetry mode is Offline. Closing is local cancellation and never remote rollback.],
+        [#term("term-submission-evidence") is NotSent before the live Gun request call and MaybeSent afterward. One failure after the call is NotSent: Gun answers a request on a connection in its closing state, after the peer's GOAWAY, with `closing` and writes nothing, and it reports that reason for nothing else, so RequestFailed(PeerDraining) is NotSent. #adr(8) Offline scripted failures retain recorded evidence while their telemetry mode is Offline. Closing is local cancellation and never remote rollback.],
       )
       #facts(([Closed Kind], [Reasons grouped here], [Caller action]), (
         ([InvalidInput], [InvalidRequest], [Correct input or settings]),
@@ -712,6 +712,7 @@
         ([Structured `gun_error` and `gun_down` reasons], [`cause/1`, `decode/1`], [UnknownTransport loses detail; an unknown reason never yields NotSent]),
         ([Gun calls its event handler with the terminal reason before process exit], [`src/http_gun_event_h.erl:terminate/2`; Gun `terminate/3`], [The original owner and typed reason are retained when the owner installs its monitor after Gun exits]),
         ([The request call returns asynchronously before socket processing], [`request/5`; reviewed Gun request implementation], [MaybeSent begins at invocation; no hidden retry]),
+        ([With reconnection disabled, a connection in its closing state answers each request with `{gun_error, _, StreamRef, closing}` and writes nothing; no other path reports `closing`], [Gun 2.6.0 `gun:closing/3` request and headers clauses; `cause/1`], [RequestFailed(PeerDraining) is NotSent and retryable for any method]),
         ([H2 header count includes `:status`], [`open/10`; Gun and Cowlib source], [Ordinary-header admission stays exact after parsing]),
         ([Settings-change notification and peer stream capacity], [`decode/1`; `internal/pool.gleam`], [No H2 stream opens before initial SETTINGS; a reduction blocks new admission]),
         ([Test-only `cow_http2` and `cow_hpack` operations], [`test/http_gun_h2_server.erl`], [The H2 test server is requalified before any H2 behavior claim]),

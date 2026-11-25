@@ -20,3 +20,23 @@
 - docs/DESIGN and BOUNDS record owner acceptance of reason-phrase limits on 2026-10-01. `369da4f` records Hellhound feedback corrections; exact approval transcript is not tracked.
 - `http_gun_ffi.erl:reusable/1,cause/1,decode/1`, `internal/preparation.gleam`, `pool.gleam:checked`, `owner.gleam:check_headers`, wire/reuse/H2 tests.
 - The parser and send-deadline receipts and the Hellhound-feedback qualification receipts are retained in repository history at commit `1549541` and earlier. Accepting this boundary does not turn an independently stricter downstream framing expectation into a passing claim.
+
+## Amendment of 2026-11-25: a refusal on a closing connection is NotSent
+
+- Gun's refusal of a request on a connection in its closing state is
+  `RequestFailed(PeerDraining)` with NotSent instead of MaybeSent. The owner
+  ruled this change; the rest of this record stands, including MaybeSent for
+  every other failure after the Gun request call.
+- Evidence: in Gun 2.6.0, `gun:closing/3` answers the `request` and `headers`
+  casts with `{gun_error, self(), StreamRef, closing}` and keeps its state when
+  `retry` is 0, which HTTP Gun always sets. The clause runs in place of the
+  protocol module's request function, so no byte of that request reaches the
+  socket. Gun enters the closing state after it has processed a peer GOAWAY on
+  HTTP/2 or begun a graceful close, and no other Gun path reports the reason
+  `closing`, which `http_gun_ffi:cause/1` maps to PeerDraining.
+- A request that Gun accepted before it processed the GOAWAY is written and
+  fails with another reason, which stays MaybeSent.
+- `test/http_gun_h2_test.gleam` (`draining_connection_admits_no_stream_after_a_refusal_test`)
+  observes the refusal from a server that sends GOAWAY while an earlier stream
+  stays open, and checks NotSent and that `error.is_retryable` allows a
+  non-idempotent retry.

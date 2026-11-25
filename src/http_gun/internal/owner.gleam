@@ -14,7 +14,7 @@ import gleam/option.{type Option, None, Some}
 import gleam/otp/actor
 import gleam/result
 import gleam/string
-import http_gun/error.{type Failure, MaybeSent}
+import http_gun/error.{type Failure, MaybeSent, NotSent}
 import http_gun/internal/bridge
 import http_gun/internal/call
 import http_gun/internal/lifecycle
@@ -636,6 +636,18 @@ fn wire(state: State, event: bridge.Event) -> State {
             Ok(Nil) -> State(..state, activity: bridge.now())
             Error(reason) -> finish(state, Error(failure(state, reason)))
           }
+        // Gun answers a request on a connection in its closing state with
+        // `closing` instead of writing it (gun 2.6.0, `gun:closing/3`, with
+        // reconnection disabled), and reports `closing` for nothing else. The
+        // request never left this client.
+        bridge.Failed(ref, error.PeerDraining) if ref == expected ->
+          observe(
+            state,
+            obs.Failed(with_status(
+              state,
+              error.new(error.RequestFailed(error.PeerDraining), NotSent),
+            )),
+          )
         bridge.Failed(ref, cause) if ref == expected ->
           observe(state, obs.Failed(failure(state, error.RequestFailed(cause))))
         _ -> state

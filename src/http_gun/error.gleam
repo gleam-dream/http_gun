@@ -123,6 +123,8 @@ pub type TransportCause {
   TlsFailed
   ConnectionReset
   PeerClosed
+  /// The connection was going away, so Gun refused the request before
+  /// writing it. The failure is NotSent.
   PeerDraining
   ProtocolError
   /// Gun refused a response header or trailer list over its count limit
