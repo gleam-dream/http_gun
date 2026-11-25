@@ -107,6 +107,11 @@ loop(S, B, Decode, Encode, Id, Observer, Pending) ->
                                        ssl:send(S, [cow_http2:goaway(Stream, no_error, <<>>),
                                            [cow_http2:data(Id0, fin, <<"tail">>) || {Id0, slow} <- maps:to_list(Pending)],
                                            cow_http2:data(Stream, fin, <<"done">>)]);
+                                   <<"/goaway-hold">> ->
+                                       %% Earlier streams stay open: the connection drains.
+                                       ssl:send(S,
+                                                [cow_http2:goaway(Stream, no_error, <<>>),
+                                                 cow_http2:data(Stream, fin, <<"done">>)]);
                                    <<"/goaway">> ->
                                        ssl:send(S,
                                                 [cow_http2:goaway(Stream, no_error, <<>>),

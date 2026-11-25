@@ -57,6 +57,17 @@ type Waiting {
   )
 }
 
+/// What a finished exchange tells the pool about its connection lease.
+pub type Released {
+  /// The exchange completed and the connection may carry another.
+  Reusable
+  /// The exchange ended early; an HTTP/1.1 connection cannot be reused.
+  Spent
+  /// The connection refused the stream because its peer is going away. It
+  /// accepts no further stream, while streams it already carries may finish.
+  GoingAway
+}
+
 pub type Input {
   Live(process.Pid, settings.Negotiated)
   Script(script.Reply)
@@ -100,7 +111,7 @@ type State {
     queued: Int,
     credit: Int,
     waiting: Option(Waiting),
-    release: fn(Bool) -> Nil,
+    release: fn(Released) -> Nil,
     closed: fn() -> Nil,
     observation: lifecycle.Context,
   )
@@ -222,7 +233,7 @@ pub fn start(
   timing: Timing,
   limits: settings.Limits,
   reply: fn(Result(response.Response(Body), Failure)) -> Nil,
-  release: fn(Bool) -> Nil,
+  release: fn(Released) -> Nil,
   closed: fn() -> Nil,
   capture: Option(recorder.Capture),
   tokens: List(token.Token),
@@ -738,9 +749,11 @@ fn finish(
           error.new(error.RequestFailed(error.UnknownTransport), MaybeSent)
       }
       lifecycle.emit(state.observation, lifecycle.termination(Error(failure)))
+      // Release first: a caller that sends again on this failure then finds
+      // the pool already knows what the failure says about the connection.
+      release(state, outcome)
       reply(Error(failure))
       let state = capture_event(state, obs.Failed(failure))
-      release(state, outcome)
       State(..state, phase: Rejected(failure))
     }
     Reading -> {
@@ -766,7 +779,15 @@ fn release(state: State, outcome: Result(a, Failure)) -> Nil {
     Error(_), Gun(connection, stream) -> bridge.cancel(connection, stream)
     _, _ -> Nil
   }
-  state.release(result.is_ok(outcome) && state.persistent)
+  state.release(case outcome {
+    Ok(_) if state.persistent -> Reusable
+    Ok(_) -> Spent
+    Error(failure) ->
+      case error.reason(failure) {
+        error.RequestFailed(error.PeerDraining) -> GoingAway
+        _ -> Spent
+      }
+  })
 }
 
 pub type HeaderKind {

@@ -59,6 +59,8 @@ type Status {
   Ready(settings.Negotiated, Int)
   Checking(process.Pid)
   Checked
+  /// The peer is going away: no new stream, closed once it carries none.
+  GoingAway
 }
 
 type Connection {
@@ -185,7 +187,7 @@ pub opaque type Message {
   Expire(reference.Reference)
   ConnectExpired(process.Pid)
   IdleConnection(process.Pid, reference.Reference)
-  Release(process.Pid, Option(process.Pid), Bool)
+  Release(process.Pid, Option(process.Pid), owner.Released)
   OwnerClosed(process.Pid)
 }
 
@@ -452,8 +454,8 @@ fn handle(state: State, message: Message) -> actor.Next(State, Message) {
         }
         _ -> actor.continue(state)
       }
-    Release(pid, connection, clean) ->
-      release_body(state, pid, connection, clean)
+    Release(pid, connection, released) ->
+      release_body(state, pid, connection, released)
     // A closed body no longer counts as open, before its process exits.
     OwnerClosed(pid) ->
       case dict.get(state.owners, pid) {
@@ -507,8 +509,9 @@ fn handle(state: State, message: Message) -> actor.Next(State, Message) {
     Wire(bridge.Capacity(pid, capacity)) -> {
       let connections =
         list.map(state.connections, fn(c) {
-          case c.pid == pid {
-            True ->
+          case c.pid == pid, c.status {
+            True, GoingAway -> c
+            True, _ ->
               Connection(
                 ..c,
                 status: Ready(
@@ -516,7 +519,7 @@ fn handle(state: State, message: Message) -> actor.Next(State, Message) {
                   int.min(capacity, state.config.limits.streams_per_connection),
                 ),
               )
-            False -> c
+            False, _ -> c
           }
         })
       actor.continue(dispatch(State(..state, connections: connections)))
@@ -696,7 +699,7 @@ fn admit_connection(state: State, p: Pending) -> Admission {
     list.find(state.connections, fn(c) {
       c.origin == p.origin
       && case c.status {
-        Resolving | Connecting | Checking(_) -> False
+        Resolving | Connecting | Checking(_) | GoingAway -> False
         Checked -> True
         Ready(_, capacity) -> c.used < capacity
       }
@@ -819,14 +822,14 @@ fn launch(state: State, p: Pending, connection: Connection) -> State {
   lifecycle.emit(p.observation, telemetry.AdmissionGranted)
   let protocol = case connection.status {
     Ready(protocol, _) -> protocol
-    Resolving | Connecting | Checking(_) | Checked -> settings.H1
+    Resolving | Connecting | Checking(_) | Checked | GoingAway -> settings.H1
   }
   // This callback crosses a process boundary. Capture only its destinations,
   // never the pool state (which also contains every queued request).
   let self = state.self
   let connection_pid = connection.pid
-  let release = fn(clean) {
-    process.send(self, Release(process.self(), Some(connection_pid), clean))
+  let release = fn(released) {
+    process.send(self, Release(process.self(), Some(connection_pid), released))
   }
   case
     owner.start(
@@ -977,8 +980,8 @@ fn admit_playback(state: State, p: Pending, replay: Replay) -> State {
         True -> {
           lifecycle.emit(p.observation, telemetry.AdmissionGranted)
           let self = state.self
-          let release = fn(clean) {
-            process.send(self, Release(process.self(), None, clean))
+          let release = fn(released) {
+            process.send(self, Release(process.self(), None, released))
           }
           case
             owner.start(
@@ -1218,30 +1221,38 @@ fn release_body(
   state: State,
   pid: process.Pid,
   connection: Option(process.Pid),
-  clean: Bool,
+  released: owner.Released,
 ) -> actor.Next(State, Message) {
   case dict.get(state.owners, pid) {
     Error(_) | Ok(Owned(released: True, ..)) -> actor.continue(state)
-    Ok(owner) -> {
+    Ok(owned) -> {
       let connections =
         list.filter_map(state.connections, fn(c) {
           case Some(c.pid) == connection {
             False -> Ok(c)
-            True ->
-              case c.status, clean {
-                Ready(settings.H1, _), False -> {
+            True -> {
+              let used = int.max(0, c.used - 1)
+              let status = case released {
+                owner.GoingAway -> GoingAway
+                owner.Reusable | owner.Spent -> c.status
+              }
+              case status, released, used {
+                // An HTTP/1.1 connection that ended an exchange early, or a
+                // draining connection that carries nothing, is of no use.
+                Ready(settings.H1, _), owner.Spent, _ | GoingAway, _, 0 -> {
                   bridge.close(c.pid)
                   Error(Nil)
                 }
-                _, _ -> Ok(Connection(..c, used: int.max(0, c.used - 1)))
+                _, _, _ -> Ok(Connection(..c, used:, status:))
               }
+            }
           }
         })
       let state =
         State(
           ..state,
           connections: connections,
-          owners: dict.insert(state.owners, pid, Owned(..owner, released: True)),
+          owners: dict.insert(state.owners, pid, Owned(..owned, released: True)),
         )
       case state.phase {
         Draining(replies) ->
@@ -1281,7 +1292,7 @@ fn connection_lost(
             error.TransportTimeout -> error.ConnectTimeout
             _ -> error.ConnectionFailed(cause)
           })
-        Ready(_, _) | Checking(_) | Checked -> state
+        Ready(_, _) | Checking(_) | Checked | GoingAway -> state
       }
     }
   }
@@ -1344,7 +1355,7 @@ fn discard_reservation(state: State, p: Pending) -> State {
 fn preparing(status: Status) -> Bool {
   case status {
     Resolving | Connecting | Checking(_) -> True
-    Ready(_, _) | Checked -> False
+    Ready(_, _) | Checked | GoingAway -> False
   }
 }
 
@@ -1355,7 +1366,8 @@ fn close_connection(connection: Connection) -> Nil {
       process.kill(worker)
       bridge.close(connection.pid)
     }
-    Connecting | Ready(_, _) | Checked -> bridge.close(connection.pid)
+    Connecting | Ready(_, _) | Checked | GoingAway ->
+      bridge.close(connection.pid)
   }
 }
 

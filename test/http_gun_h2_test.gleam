@@ -292,6 +292,35 @@ pub fn goaway_allows_existing_sibling_to_finish_without_replay_test() {
   http_gun.stop(client)
 }
 
+// The peer announced GOAWAY while an earlier stream still runs, so Gun keeps
+// the connection and refuses new streams on it. Gun reports no GOAWAY event,
+// so one request can still meet the refusal; none after it may.
+pub fn draining_connection_admits_no_stream_after_a_refusal_test() {
+  let port = server()
+  let assert Ok(client) =
+    http_gun.start(
+      settings()
+      |> config.with_max_connections(2)
+      |> config.with_max_connections_per_origin(2),
+    )
+  let assert Ok(slow) = http_gun.open(client, req(port, "/slow"))
+  next(slow.body) |> should.equal(Ok(body.Chunk(<<"first":utf8>>)))
+  let assert Ok(_) = http_gun.send(client, req(port, "/goaway-hold"))
+  let assert Error(refused) = http_gun.send(client, req(port, "/fast"))
+  error.reason(refused) |> should.equal(error.RequestFailed(error.PeerDraining))
+  let assert Ok(fresh) = http_gun.send(client, req(port, "/fast"))
+  {
+    response_header(fresh.response.headers, "x-connection")
+    != response_header(slow.headers, "x-connection")
+  }
+  |> should.be_true
+  // The accepted stream is undisturbed and still holds its connection.
+  let assert Ok(stats) = http_gun.stats(client)
+  stats.connections |> should.equal(2)
+  body.close(slow.body)
+  http_gun.stop(client)
+}
+
 pub fn cancellation_token_preserves_h2_sibling_and_connection_test() {
   let port = server()
   let assert Ok(client) = http_gun.start(settings())
