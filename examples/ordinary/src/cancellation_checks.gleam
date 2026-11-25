@@ -4,7 +4,6 @@ import gleam/erlang/process
 import gleam/http/request
 import gleam/http/response
 import gleam/int
-import gleam/time/duration
 import http_gun
 import http_gun/body
 import http_gun/cancellation

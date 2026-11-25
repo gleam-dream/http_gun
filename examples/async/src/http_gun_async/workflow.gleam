@@ -11,7 +11,6 @@ import gleam/result
 import gleam/time/duration
 import http_gun
 import http_gun/body
-import http_gun/config
 import http_gun/deadline
 import http_gun/error
 
