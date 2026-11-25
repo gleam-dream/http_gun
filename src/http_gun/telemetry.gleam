@@ -15,6 +15,10 @@
 //// })
 //// ```
 ////
+//// The attachment belongs to the process that calls `sinal.observe` and is
+//// removed when that process exits, so attach from a long-lived process,
+//// such as one the application supervises, not from a request.
+////
 //// Without a route, handlers run synchronously in the pool and body
 //// processes, and a slow handler slows requests. `config.with_observations`
 //// sends one client's events to a forwarder directly instead, and
