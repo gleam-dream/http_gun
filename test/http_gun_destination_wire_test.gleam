@@ -263,3 +263,58 @@ pub fn cancellation_and_body_deadline_leave_long_lived_caller_clean_test() {
     })
   })
 }
+
+fn header(headers: List(#(String, String)), name: String) -> String {
+  let assert Ok(value) = list.key_find(headers, name)
+  value
+}
+
+// A header value is typed String, so it must be text whatever the peer sent.
+// Bytes that are not UTF-8 are read as ISO-8859-1, the historical encoding
+// of field values; UTF-8 is kept as sent.
+pub fn response_header_values_are_always_text_test() {
+  let assert Ok(client) = http_gun.start(settings())
+  let port =
+    serve(<<
+      "HTTP/1.1 200 OK\r\nX-Latin: caf":utf8, 233, "\r\nX-Utf8: caf":utf8, 195,
+      169, "\r\nContent-Length: 0\r\n\r\n":utf8,
+    >>)
+  let assert Ok(buffered) = http_gun.send(client, req(port))
+  header(buffered.response.headers, "x-latin") |> should.equal("café")
+  header(buffered.response.headers, "x-utf8") |> should.equal("café")
+  http_gun.stop(client)
+}
+
+pub fn trailer_values_are_always_text_test() {
+  let assert Ok(client) = http_gun.start(settings())
+  let port =
+    serve(<<
+      "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n0\r\nx-final: ":utf8,
+      255, "\r\n\r\n":utf8,
+    >>)
+  let assert Ok(buffered) = http_gun.send(client, req(port))
+  header(buffered.trailers, "x-final") |> should.equal("ÿ")
+  http_gun.stop(client)
+}
+
+// A field name outside the token alphabet is refused, never delivered.
+pub fn non_token_response_header_name_is_a_protocol_error_test() {
+  let assert Ok(client) = http_gun.start(settings())
+  let port =
+    serve(<<
+      "HTTP/1.1 200 OK\r\nX-":utf8, 255, ": a\r\nContent-Length: 0\r\n\r\n":utf8,
+    >>)
+  // Sent from another process so a caller that is never answered fails the
+  // test instead of hanging it.
+  let outcome = process.new_subject()
+  process.spawn_unlinked(fn() {
+    process.send(outcome, http_gun.send(client, req(port)))
+  })
+  process.receive(outcome, 2000)
+  |> should.equal(
+    Ok(
+      Error(error.new(error.RequestFailed(error.ProtocolError), error.MaybeSent)),
+    ),
+  )
+  http_gun.stop(client)
+}

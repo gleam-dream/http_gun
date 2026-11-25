@@ -113,7 +113,7 @@
     #subsection(title: "Values and refinements", [
       #facts(([Value], [Meaning and refinement], [Ownership]), (
         ([Request], [`Request(BitArray)` preserves method, scheme, host, port, target, ordered headers and whole body bytes. Construction is pure.], [Caller authors; admission validates]),
-        ([Response], [Final status and ordered duplicate headers plus a body capability or collected bytes. Trailers remain separate. Non-success statuses remain data.], [Body owner observes]),
+        ([Response], [Final status and ordered duplicate headers plus a body capability or collected bytes. Trailers remain separate. Non-success statuses remain data. Header and trailer names and values are text: bytes a peer sent that are not UTF-8 are read as ISO-8859-1, and UTF-8 is kept as sent.], [Body owner observes]),
         ([Origin], [Lowercase unbracketed host, effective 80/443 or explicit port, TLS choice. Port is 1–65535.], [Pool derives at validation]),
         ([Config and view], [Opaque immutable configuration and per-handle overrides. A view contains optional timeout, deadline, idle bound, cancellation, body limit, policies and correlation.], [Caller authors; client startup validates config]),
         ([Address], [IPv4/IPv6 integer components. Invalid components classify Reserved. Policy uses Public, Loopback, Private or Reserved.], [Resolver observes; destination policy decides]),
