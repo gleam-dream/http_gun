@@ -306,8 +306,10 @@ pub fn draining_connection_admits_no_stream_after_a_refusal_test() {
   let assert Ok(slow) = http_gun.open(client, req(port, "/slow"))
   next(slow.body) |> should.equal(Ok(body.Chunk(<<"first":utf8>>)))
   let assert Ok(_) = http_gun.send(client, req(port, "/goaway-hold"))
+  let assert Ok(before) = http_gun.stats(client)
   let assert Error(refused) = http_gun.send(client, req(port, "/fast"))
-  error.reason(refused) |> should.equal(error.RequestFailed(error.PeerDraining))
+  #(error.reason(refused), error.evidence(refused), before.connections)
+  |> should.equal(#(error.RequestFailed(error.PeerDraining), error.MaybeSent, 1))
   let assert Ok(fresh) = http_gun.send(client, req(port, "/fast"))
   {
     response_header(fresh.response.headers, "x-connection")
