@@ -5,6 +5,7 @@
 
 import gleam/bit_array
 import gleam/dict.{type Dict}
+import gleam/erlang/atom
 import gleam/erlang/process
 import gleam/erlang/reference
 import gleam/http/request
@@ -171,13 +172,21 @@ pub type Opened {
   )
 }
 
+/// What a caller waiting in `open` receives. The body owner announces itself
+/// before it can answer, so the caller monitors the only process that still
+/// holds its reply and turns that process's death into a failure.
+pub type Answer {
+  Launched(process.Pid)
+  Answered(Result(Opened, Failure))
+}
+
 pub opaque type Message {
   Resolved(process.Pid, Result(resolution.Resolved, error.Reason))
   CheckedConnection(process.Pid, process.Pid, Result(Bool, error.Reason))
   Inspect(process.Subject(Result(#(Int, Int, Int), Failure)))
   Verify(process.Subject(Result(Option(script.Report), Failure)))
   Configuration(process.Subject(Result(Settings, Failure)))
-  Open(Invocation, process.Subject(Result(Opened, Failure)))
+  Open(Invocation, process.Subject(Answer))
   Stop(process.Subject(Result(Nil, Failure)))
   ShutdownExpired
   Wire(bridge.Event)
@@ -240,14 +249,70 @@ pub fn open(
     _ -> req
   }
   use origin <- result.try(validate_target(req))
-  // Nothing was sent when the client is not registered or already dead; a
-  // client that exits while handling the call may have submitted it.
-  call.with_failures(
-    client.subject,
-    Open(Invocation(fn() { req }, origin, entered, view, process.self()), _),
-    not_running: error.new(error.ClientClosed, NotSent),
-    lost: error.new(error.ClientClosed, MaybeSent),
-  )
+  case process.subject_owner(client.subject) {
+    Error(Nil) -> Error(error.new(error.ClientClosed, NotSent))
+    Ok(pool) -> {
+      let reply = process.new_subject()
+      let monitor = process.monitor(pool)
+      process.send(
+        client.subject,
+        Open(
+          Invocation(fn() { req }, origin, entered, view, process.self()),
+          reply,
+        ),
+      )
+      let outcome = await(reply, monitor, None)
+      process.demonitor_process(monitor)
+      outcome
+    }
+  }
+}
+
+type Waited {
+  Reply(Answer)
+  PoolDown(process.Down)
+  OwnerDown
+}
+
+// Wait for the one answer to `Open`. Before launch the pool holds the reply;
+// after it only the body owner does, so both are monitored and neither death
+// leaves the caller waiting. A reply the owner sent before dying precedes its
+// exit signal and is still taken.
+fn await(
+  reply: process.Subject(Answer),
+  pool: process.Monitor,
+  owner: Option(process.Monitor),
+) -> Result(Opened, Failure) {
+  let selector =
+    process.new_selector()
+    |> process.select_map(reply, Reply)
+    |> process.select_specific_monitor(pool, PoolDown)
+  let selector = case owner {
+    Some(monitor) ->
+      process.select_specific_monitor(selector, monitor, fn(_) { OwnerDown })
+    None -> selector
+  }
+  case process.selector_receive_forever(selector) {
+    Reply(Launched(pid)) -> await(reply, pool, Some(process.monitor(pid)))
+    Reply(Answered(outcome)) -> {
+      option.map(owner, process.demonitor_process)
+      outcome
+    }
+    // Nothing was sent when the client is not registered or already dead; a
+    // client that exits while handling the call may have submitted it.
+    PoolDown(down) -> {
+      option.map(owner, process.demonitor_process)
+      let noproc = process.Abnormal(atom.to_dynamic(atom.create("noproc")))
+      case down {
+        process.ProcessDown(reason:, ..) if reason == noproc ->
+          Error(error.new(error.ClientClosed, NotSent))
+        _ -> Error(error.new(error.ClientClosed, MaybeSent))
+      }
+    }
+    // The owner had submitted the request and can no longer answer.
+    OwnerDown ->
+      Error(error.new(error.RequestFailed(error.UnknownTransport), MaybeSent))
+  }
 }
 
 /// Stop a client, letting open bodies finish within the shutdown timeout.
@@ -397,7 +462,10 @@ fn handle(state: State, message: Message) -> actor.Next(State, Message) {
     Open(invocation, reply) ->
       case state.phase {
         Draining(_) -> {
-          process.send(reply, Error(error.new(error.ClientClosed, NotSent)))
+          process.send(
+            reply,
+            Answered(Error(error.new(error.ClientClosed, NotSent))),
+          )
           actor.continue(state)
         }
         Running -> open_request(state, invocation, reply)
@@ -837,6 +905,7 @@ fn launch(state: State, p: Pending, connection: Connection) -> State {
       timing(p),
       state.config.limits,
       p.reply,
+      p.launched,
       release,
       fn() { process.send(self, OwnerClosed(process.self())) },
       p.capture,
@@ -989,6 +1058,7 @@ fn admit_playback(state: State, p: Pending, replay: Replay) -> State {
               timing(p),
               state.config.limits,
               p.reply,
+              p.launched,
               release,
               fn() { process.send(self, OwnerClosed(process.self())) },
               None,
@@ -1112,7 +1182,7 @@ fn effective_deadline(config: Settings, invocation: Invocation) -> Option(Int) {
 fn open_request(
   state: State,
   invocation: Invocation,
-  reply: process.Subject(Result(Opened, Failure)),
+  reply: process.Subject(Answer),
 ) -> actor.Next(State, Message) {
   let view = invocation.view
   let observation =
@@ -1133,7 +1203,11 @@ fn open_request(
   let relay = fn(outcome) {
     process.send(
       reply,
-      result.map(outcome, fn(response) { Opened(response, body_limit, redact) }),
+      Answered(
+        result.map(outcome, fn(response) {
+          Opened(response, body_limit, redact)
+        }),
+      ),
     )
   }
   let req = invocation.request()
@@ -1151,7 +1225,7 @@ fn open_request(
   case early {
     Error(failure) -> {
       lifecycle.emit(observation, lifecycle.termination(Error(failure)))
-      process.send(reply, Error(failure))
+      process.send(reply, Answered(Error(failure)))
       actor.continue(state)
     }
     Ok(capture) -> {
@@ -1172,6 +1246,7 @@ fn open_request(
           request: invocation.request,
           origin: invocation.origin,
           reply: relay,
+          launched: fn() { process.send(reply, Launched(process.self())) },
           deadline:,
           pool_until:,
           idle: option.unwrap(view.idle, state.config.idle_timeout),
