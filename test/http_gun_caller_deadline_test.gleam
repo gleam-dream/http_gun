@@ -244,3 +244,21 @@ pub fn local_wait_ends_on_a_blocked_owner_and_keeps_its_chunk_test() {
   process.send(commands, Finish)
   http_gun.stop(client)
 }
+
+pub fn a_pool_resumed_after_the_deadline_submits_nothing_test() {
+  let port = serve(<<"HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n":utf8>>)
+  let assert Ok(req) = request.to("http://localhost:" <> int.to_string(port))
+  let req = request.set_body(req, <<>>)
+  let #(client, pool) = blocked_client()
+  suspend(pool)
+  let assert Error(failure) =
+    http_gun.send(
+      http_gun.with_timeout(client, duration.milliseconds(100)),
+      req,
+    )
+  error.reason(failure) |> should.equal(error.DeadlineExceeded)
+  resume(pool)
+  // The pool meets the request only after its deadline, so it opens no
+  // connection and starts no body owner for it.
+  http_gun.stats(client) |> should.equal(Ok(http_gun.Stats(0, 0, 0)))
+}
