@@ -57,6 +57,10 @@ const no_view = View(None, None, None, [], None, [], None)
 type Status {
   Resolving
   Connecting
+  /// HTTP/2 is up but the peer's initial SETTINGS, which give its stream
+  /// capacity, have not arrived. It carries no stream and is still being
+  /// prepared.
+  Settling
   Ready(settings.Negotiated, Int)
   Checking(process.Pid)
   Checked
@@ -604,17 +608,13 @@ fn handle(state: State, message: Message) -> actor.Next(State, Message) {
         True -> handle(state, Wire(bridge.Down(pid, error.UnexpectedProtocol)))
         False -> {
           // Wait for initial SETTINGS before admitting H2 application streams.
-          let capacity = case protocol {
-            settings.H1 -> 1
-            _ -> 0
-          }
           let connections =
             list.map(state.connections, fn(c) {
               case c.pid == pid {
                 True ->
                   Connection(..c, status: case protocol {
                     settings.H1 -> Checked
-                    settings.H2 | settings.Offline -> Ready(protocol, capacity)
+                    settings.H2 | settings.Offline -> Settling
                   })
                 False -> c
               }
@@ -752,7 +752,7 @@ fn dispatch(state: State) -> State {
 // connection in use loses it.
 fn idle_timer(state: State, c: Connection) -> Connection {
   case c.status, c.used, c.idle_ref {
-    Ready(..), 0, None -> {
+    Ready(..), 0, None | Settling, 0, None -> {
       let id = reference.new()
       let _ =
         process.send_after(
@@ -816,7 +816,7 @@ fn admit_connection(state: State, p: Pending) -> Admission {
     list.find(state.connections, fn(c) {
       c.origin == p.origin
       && case c.status {
-        Resolving | Connecting | Checking(_) | GoingAway -> False
+        Resolving | Connecting | Settling | Checking(_) | GoingAway -> False
         Checked -> True
         Ready(_, capacity) -> c.used < capacity
       }
@@ -1003,7 +1003,8 @@ fn launch(state: State, p: Pending, connection: Connection) -> State {
   lifecycle.emit(p.observation, telemetry.AdmissionGranted)
   let protocol = case connection.status {
     Ready(protocol, _) -> protocol
-    Resolving | Connecting | Checking(_) | Checked | GoingAway -> settings.H1
+    Resolving | Connecting | Settling | Checking(_) | Checked | GoingAway ->
+      settings.H1
   }
   // This callback crosses a process boundary. Capture only its destinations,
   // never the pool state (which also contains every queued request).
@@ -1461,7 +1462,7 @@ fn connection_lost(
             error.TransportTimeout -> error.ConnectTimeout
             _ -> error.ConnectionFailed(cause)
           })
-        Ready(_, _) | Checking(_) | Checked | GoingAway -> state
+        Settling | Ready(_, _) | Checking(_) | Checked | GoingAway -> state
       }
     }
   }
@@ -1523,7 +1524,7 @@ fn discard_reservation(state: State, p: Pending) -> State {
 
 fn preparing(status: Status) -> Bool {
   case status {
-    Resolving | Connecting | Checking(_) -> True
+    Resolving | Connecting | Settling | Checking(_) -> True
     Ready(_, _) | Checked | GoingAway -> False
   }
 }
@@ -1535,7 +1536,7 @@ fn close_connection(connection: Connection) -> Nil {
       process.kill(worker)
       bridge.close(connection.pid)
     }
-    Connecting | Ready(_, _) | Checked | GoingAway ->
+    Connecting | Settling | Ready(_, _) | Checked | GoingAway ->
       bridge.close(connection.pid)
   }
 }

@@ -90,6 +90,49 @@ fn response_header(
 @external(erlang, "http_gun_h2_server", "controlled")
 fn controlled() -> Int
 
+@external(erlang, "http_gun_h2_server", "held")
+fn held() -> Int
+
+@external(erlang, "http_gun_h2_server", "await_held")
+fn await_held() -> process.Pid
+
+@external(erlang, "http_gun_h2_server", "release")
+fn release(connection: process.Pid) -> Nil
+
+pub fn connection_awaiting_settings_counts_as_preparing_test() {
+  let port = held()
+  let assert Ok(client) =
+    http_gun.start(
+      settings()
+      |> config.with_max_connections(4)
+      |> config.with_max_connections_per_origin(4),
+    )
+  let outcome = process.new_subject()
+  process.spawn(fn() {
+    process.send(outcome, http_gun.send(client, req(port, "/fast")))
+  })
+  let first = await_held()
+  // The one waiting request already has a connection on its way: up, but
+  // without the peer's SETTINGS. The pool must not open another for it.
+  await_connections(client, 2, 20)
+  let assert Ok(stats) = http_gun.stats(client)
+  stats.connections |> should.equal(1)
+  release(first)
+  let assert Ok(Ok(_)) = process.receive(outcome, 2000)
+  http_gun.stop(client)
+}
+
+fn await_connections(client: http_gun.Client, count: Int, tries: Int) -> Nil {
+  let assert Ok(stats) = http_gun.stats(client)
+  case stats.connections >= count || tries == 0 {
+    True -> Nil
+    False -> {
+      process.sleep(25)
+      await_connections(client, count, tries - 1)
+    }
+  }
+}
+
 pub fn h2_window_credit_after_buffered_frames_test() {
   let port = controlled()
   let config = settings()
