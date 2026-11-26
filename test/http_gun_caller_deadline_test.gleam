@@ -4,8 +4,9 @@
 import gleam/erlang/process
 import gleam/http/request
 import gleam/int
-import gleam/option
+import gleam/option.{None, Some}
 import gleam/otp/static_supervisor
+import gleam/result
 import gleam/time/duration
 import gleeunit/should
 import http_gun
@@ -31,6 +32,9 @@ fn serve(bytes: BitArray) -> Int
 
 @external(erlang, "http_gun_test_server", "controlled")
 fn controlled() -> #(Int, process.Pid)
+
+@external(erlang, "http_gun_test_server", "send_control")
+fn send_control(server: process.Pid, bytes: BitArray) -> Nil
 
 @external(erlang, "http_gun_owner_fault_test_ffi", "monitored_by")
 fn monitored_by(pid: process.Pid) -> List(process.Pid)
@@ -176,4 +180,67 @@ fn await_queued(pid: process.Pid, count: Int, tries: Int) -> Nil {
       await_queued(pid, count, tries - 1)
     }
   }
+}
+
+type Command {
+  Next
+  NextWithin(Int)
+  Finish
+}
+
+fn reader(
+  commands: process.Subject(Command),
+  stream: body.Body,
+  results: process.Subject(Result(option.Option(body.Event), error.Failure)),
+) -> Nil {
+  case process.receive_forever(commands) {
+    Next -> {
+      process.send(results, result.map(body.next(stream), Some))
+      reader(commands, stream, results)
+    }
+    NextWithin(ms) -> {
+      process.send(results, body.next_within(stream, duration.milliseconds(ms)))
+      reader(commands, stream, results)
+    }
+    Finish -> body.close(stream)
+  }
+}
+
+pub fn local_wait_ends_on_a_blocked_owner_and_keeps_its_chunk_test() {
+  let #(port, server) = controlled()
+  let assert Ok(req) = request.to("http://localhost:" <> int.to_string(port))
+  let req = request.set_body(req, <<>>)
+  let assert Ok(client) =
+    http_gun.start(config.allow_loopback(config.default()))
+  let results = process.new_subject()
+  let opened = process.new_subject()
+  let caller =
+    process.spawn(fn() {
+      let client = http_gun.with_timeout(client, duration.seconds(10))
+      let assert Ok(response) = http_gun.open(client, req)
+      let commands = process.new_subject()
+      process.send(opened, commands)
+      reader(commands, response.body, results)
+    })
+  let assert Ok(commands) = process.receive(opened, 2000)
+  let assert [owner] = monitored_by(caller)
+  suspend(owner)
+  // The chunk reaches the owner's mailbox ahead of the read.
+  send_control(server, <<"3\r\nabc\r\n":utf8>>)
+  await_queued(owner, 1, 40)
+  process.send(commands, NextWithin(100))
+  // The owner cannot answer, so the reader's own wait ends the read, long
+  // before the request deadline.
+  process.receive(results, 2000) |> should.equal(Ok(Ok(None)))
+  resume(owner)
+  // The owner now handles the chunk and then the abandoned read.
+  handled(owner)
+  process.send(commands, Next)
+  process.receive(results, 2000)
+  |> should.equal(Ok(Ok(Some(body.Chunk(<<"abc":utf8>>)))))
+  send_control(server, <<"0\r\n\r\n":utf8>>)
+  process.send(commands, Next)
+  process.receive(results, 2000) |> should.equal(Ok(Ok(Some(body.End([])))))
+  process.send(commands, Finish)
+  http_gun.stop(client)
 }

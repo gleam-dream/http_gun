@@ -22,8 +22,8 @@
 //// `close` ends the stream early and is idempotent.
 ////
 //// The process that opened the response owns it: a read from another process
-//// fails with `WrongOwner`, and a read while another is pending fails with
-//// `ReadConflict`. Copies of a `Body` share one cursor.
+//// fails with `WrongOwner`, or with `ReadConflict` while the owner's own read
+//// is pending. Copies of a `Body` share one cursor.
 
 import gleam/option.{type Option, None, Some}
 import gleam/result
@@ -61,7 +61,9 @@ pub fn next(body: Body) -> Result(Event, Failure) {
 
 /// Wait at most `wait` for the next chunk or the end of the body. `None`
 /// means nothing arrived in time; the stream stays intact and a later read
-/// continues it. A zero or negative wait polls once.
+/// continues it, with no chunk skipped. The wait ends within `wait` plus
+/// half a second even when the client cannot answer. A zero or negative wait
+/// polls once.
 pub fn next_within(
   body: Body,
   wait: Duration,

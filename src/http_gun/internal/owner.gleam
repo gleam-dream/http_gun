@@ -32,6 +32,10 @@ pub opaque type Body {
     status: Int,
     /// The request deadline, which also bounds each wait for this owner.
     deadline: Int,
+    /// How many chunks the reader has received, shared by every copy. Each
+    /// read tells the owner this count, so the owner learns whether the
+    /// chunk it last sent arrived.
+    received: bridge.Counter,
   )
 }
 
@@ -48,6 +52,13 @@ type Phase {
   Reading
   Finished(Result(List(#(String, String)), Failure))
   Rejected(Failure)
+}
+
+/// The chunk the owner last sent, kept until a later read shows the reader
+/// received it. A read the reader abandoned may have taken it to a reply
+/// subject nobody reads; the next read then gets it again.
+type Unconfirmed {
+  Unconfirmed(position: Int, bytes: BitArray)
 }
 
 type Waiting {
@@ -113,6 +124,10 @@ type State {
     queued: Int,
     credit: Int,
     waiting: Option(Waiting),
+    /// Chunks sent to the reader so far.
+    sent: Int,
+    unconfirmed: Option(Unconfirmed),
+    received: bridge.Counter,
     release: fn(Released) -> Nil,
     closed: fn() -> Nil,
     observation: lifecycle.Context,
@@ -122,7 +137,9 @@ type State {
 pub opaque type Message {
   Captured(Result(Nil, recorder.CaptureError))
   Advance
-  Read(process.Pid, Option(Int), Reply)
+  /// The reader, the end of its local wait, and how many chunks it has
+  /// received.
+  Read(process.Pid, Option(Int), Int, Reply)
   Close(process.Subject(Result(Nil, Failure)))
   Wire(bridge.Event)
   Deadline
@@ -132,16 +149,29 @@ pub opaque type Message {
 }
 
 /// Wait for the next event. `until` bounds this wait only: when it passes,
-/// `Ok(None)` returns and the stream stays intact.
+/// `Ok(None)` returns and the stream stays intact. The caller enforces
+/// `until` too, so an owner that cannot answer holds the reader no longer
+/// than `until` plus the grace.
 pub fn read(body: Body, until: Option(Int)) -> Result(Option(Event), Failure) {
-  case
-    call.ask(body.subject, Read(process.self(), until, _), wait_until(body))
-  {
+  let seen = bridge.counter_add(body.received, 0)
+  let request_bound = wait_until(body)
+  let #(bound, local) = case until {
+    Some(at) if at < request_bound -> #(at, True)
+    _ -> #(request_bound, False)
+  }
+  case call.ask(body.subject, Read(process.self(), until, seen, _), bound) {
+    Ok(Ok(Some(Chunk(_))) as answer) -> {
+      bridge.counter_add(body.received, 1)
+      answer
+    }
     Ok(answer) -> answer
     Error(call.NotRunning) | Error(call.Lost) ->
       Error(
         error.new(error.Closed, MaybeSent) |> error.with_status(body.status),
       )
+    // The owner is alive but did not answer by the local wait's end; the
+    // chunk it may send later is sent again to the next read.
+    Error(call.Expired) if local -> Ok(None)
     // The owner is alive but did not answer by the deadline.
     Error(call.Expired) ->
       Error(
@@ -267,6 +297,7 @@ pub fn start(
       None -> Nil
     }
     let request = req()
+    let received = bridge.counter_new()
     use #(source, protocol) <- result.try(case input {
       Live(connection, protocol) -> {
         let _ = process.monitor(connection)
@@ -318,6 +349,9 @@ pub fn start(
         queued: 0,
         credit: 1,
         waiting: None,
+        sent: 0,
+        unconfirmed: None,
+        received:,
         release:,
         closed:,
         observation:,
@@ -333,7 +367,7 @@ pub fn start(
     Ok(
       actor.initialised(state)
       |> actor.selecting(selector)
-      |> actor.returning(Body(subject, protocol, 0, timing.deadline)),
+      |> actor.returning(Body(subject, protocol, 0, timing.deadline, received)),
     )
   })
   |> actor.on_message(handle)
@@ -526,8 +560,8 @@ fn handle(state: State, message: Message) -> actor.Next(State, Message) {
         }
         _, _ -> continue(state)
       }
-    Read(caller, until, reply) ->
-      read_request(state, caller, until, reply) |> continue
+    Read(caller, until, seen, reply) ->
+      read_request(state, caller, until, seen, reply) |> continue
     WaitExpired(id) ->
       case state.waiting {
         Some(Waiting(reply, _, expected, _)) if id == expected -> {
@@ -555,20 +589,29 @@ fn read_request(
   state: State,
   caller: process.Pid,
   until: Option(Int),
+  seen: Int,
   reply: Reply,
 ) -> State {
-  case state.waiting {
-    Some(_) -> {
+  case caller == state.owner, state.waiting {
+    False, Some(_) -> {
       process.send(reply, Error(failure(state, error.ReadConflict)))
       state
     }
-    None ->
-      case caller == state.owner {
-        False -> {
-          process.send(reply, Error(failure(state, error.WrongOwner)))
+    False, None -> {
+      process.send(reply, Error(failure(state, error.WrongOwner)))
+      state
+    }
+    // The reader waits for one read at a time, so a read it sends while an
+    // earlier one waits here means it gave the earlier one up.
+    True, waiting -> {
+      option.map(waiting, fn(old) { cancel_timer(old.timer) })
+      let state = State(..state, activity: bridge.now(), waiting: None)
+      case state.unconfirmed {
+        Some(Unconfirmed(position, bytes)) if position == seen -> {
+          process.send(reply, Ok(Some(Chunk(bytes))))
           state
         }
-        True -> {
+        _ -> {
           let id = reference.new()
           let timer =
             option.map(until, fn(at) {
@@ -581,12 +624,13 @@ fn read_request(
           deliver(
             State(
               ..state,
-              activity: bridge.now(),
+              unconfirmed: None,
               waiting: Some(Waiting(reply, until, id, timer)),
             ),
           )
         }
       }
+    }
   }
 }
 
@@ -624,6 +668,8 @@ fn deliver_ready(state: State) -> State {
             queue: rest,
             queued: state.queued - bit_array.byte_size(bytes),
             waiting: None,
+            sent: state.sent + 1,
+            unconfirmed: Some(Unconfirmed(state.sent, bytes)),
           )
         }
         [] ->
@@ -755,6 +801,7 @@ fn observe(state: State, event: obs.Observation) -> State {
                         state.protocol,
                         status,
                         state.deadline,
+                        state.received,
                       ),
                     )),
                   )
