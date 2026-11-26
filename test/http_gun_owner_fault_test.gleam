@@ -82,6 +82,9 @@ pub fn body_owner_death_before_the_head_is_a_typed_failure_test() {
   // The server holds the request without answering, so the caller is waiting
   // for the head and only its body owner monitors it.
   await_request(server)
+  // The pool answers only after the body owner's start has returned and the
+  // pool has dropped its own monitor of the caller.
+  let _ = http_gun.stats(client)
   let assert [owner] = monitored_by(caller)
   process.kill(owner)
   let assert Ok(Error(failure)) = process.receive(outcome, 2000)

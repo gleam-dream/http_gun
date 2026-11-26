@@ -19,6 +19,9 @@ fn suspend(pid: process.Pid) -> Nil
 @external(erlang, "http_gun_caller_deadline_test_ffi", "resume")
 fn resume(pid: process.Pid) -> Nil
 
+@external(erlang, "http_gun_caller_deadline_test_ffi", "handled")
+fn handled(pid: process.Pid) -> Nil
+
 @external(erlang, "http_gun_caller_deadline_test_ffi", "queued")
 fn queued(pid: process.Pid) -> Int
 
@@ -103,7 +106,8 @@ pub fn blocked_body_owner_cannot_hold_a_reader_past_its_deadline_test() {
   error.status(failure) |> should.equal(option.Some(200))
   resume(owner)
   // The owner now answers the abandoned read; the answer must not arrive.
-  let _ = http_gun.stats(client)
+  // `handled` returns only after the owner has processed that read.
+  handled(owner)
   process.sleep(50)
   queued(caller) |> should.equal(0)
   process.send(go, Nil)
