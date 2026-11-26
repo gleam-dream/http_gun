@@ -44,7 +44,12 @@ accept(L, Observer, Hold) ->
                                               case Hold of
                                                   true ->
                                                       Observer ! {settings_held, self()},
-                                                      receive release -> ok end;
+                                                      receive
+                                                          release -> ok
+                                                      after 5000 ->
+                                                          ssl:close(S),
+                                                          exit(normal)
+                                                      end;
                                                   false -> ok
                                               end,
                                               ok = ssl:send(S,
