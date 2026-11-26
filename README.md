@@ -4,7 +4,7 @@
 >
 > - Every call has a finite deadline, 30 seconds by default, and the calling process enforces it.
 > - `config.with_request_timeout` is removed, and `http_gun.with_timeout` takes a `Duration`; `config.Infinity` no longer lifts the request bound.
-> - Gun's own 15-second closing timer is off, so only the caller's deadline ends a response after `connection: close` or an HTTP/2 GOAWAY.
+> - Gun's own 15-second closing timer is off, so a response after `connection: close` or an HTTP/2 GOAWAY is no longer cut at 15 seconds; the call's deadline, idle timeout and cancellation still bound it.
 > - A request refused on a closing connection is `NotSent`, so it may be sent again whatever its method.
 > - HTTP Gun depends on `sinal >= 0.2.0 and < 0.3.0`.
 

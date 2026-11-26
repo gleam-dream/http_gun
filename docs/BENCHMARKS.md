@@ -63,6 +63,7 @@ Run of 2026-11-25, for [ADR 0022](adr/0022-prepare-one-connection-per-waiting-re
 ```
 
 - **Environment:** OTP 29, macOS ARM64, Apple M4, 10 cores, shared with other builds during the run, so absolute times are noisy.
+- **Sources:** "One preparation per origin" is commit `7e71650`, and "One per waiting request" is commit `ac88c47`, its child. The benchmark is `dev/http_gun_cold_start_benchmark.gleam` as of `ac88c47`.
 - Three invocations of each version alternated back to back, five runs each. Median wall time until the last response, in milliseconds, with minimum and maximum:
 
 | Concurrent requests | One preparation per origin | One per waiting request |

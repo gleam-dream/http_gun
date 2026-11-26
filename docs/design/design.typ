@@ -463,7 +463,7 @@
     #facts(([Boundary], [Effect committed or observed], [Failure and uncertainty]), (
       ([Validated invocation], [No network action], [Invalid/refused/capacity failure has NotSent]),
       ([Resolution admitted], [Address set authorized; no HTTP submission], [Connecting failure remains NotSent]),
-      ([Gun request invoked], [One asynchronous transport request issued], [Every later live failure is MaybeSent, except Gun's refusal on a closing connection, which is NotSent; return proves no socket write or remote receipt]),
+      ([Gun request invoked], [One asynchronous transport request issued], [Every later live failure is MaybeSent, except Gun's refusal on a closing connection, which is NotSent; the return does not establish whether a socket write or remote receipt occurred]),
       ([Final head admitted], [Status and headers observed], [Streaming caller owns head; collection failures retain redacted headers/status]),
       ([HTTP EOF], [Transport lease may release], [Application consumption and capture finalization may remain incomplete]),
       ([Capture acknowledgment], [Writer fragment and close completed], [No fsync or power-loss persistence established]),
