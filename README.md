@@ -1,5 +1,13 @@
 # HTTP Gun
 
+> **HTTP Gun 0.4.0 is a breaking release.** Read the [migration guide](https://github.com/gleam-dream/http_gun/blob/main/docs/MIGRATION.md) before you upgrade from 0.3.
+>
+> - Every call has a finite deadline, 30 seconds by default, and the calling process enforces it.
+> - `config.with_request_timeout` is removed, and `http_gun.with_timeout` takes a `Duration`; `config.Infinity` no longer lifts the request bound.
+> - Gun's own 15-second closing timer is off, so only the caller's deadline ends a response after `connection: close` or an HTTP/2 GOAWAY.
+> - A request refused on a closing connection is `NotSent`, so it may be sent again whatever its method.
+> - HTTP Gun depends on `sinal >= 0.2.0 and < 0.3.0`.
+
 [![CI](https://github.com/gleam-dream/http_gun/actions/workflows/check.yml/badge.svg?branch=main)](https://github.com/gleam-dream/http_gun/actions/workflows/check.yml)
 [![http_gun on Hex](https://img.shields.io/hexpm/v/http_gun?label=Hex%3A%20http_gun)](https://hex.pm/packages/http_gun)
 [![Gleam](https://img.shields.io/badge/Gleam-FFAFF3?logo=gleam&logoColor=000000)](https://gleam.run/)
@@ -21,7 +29,8 @@ or response body means.
 - Collected responses with per-response and batch limits, plus streamed bodies
   with explicit ownership, trailers, and close behavior.
 - Ordered batches with a caller-selected concurrency bound.
-- Per-call deadlines, request and idle timeouts, and cancellation tokens.
+- A finite deadline on every call (30 seconds unless the call sets one),
+  enforced by the calling process, plus idle timeouts and cancellation tokens.
 - Typed failures with submission evidence (`NotSent` or `MaybeSent`) and any
   response status and headers already received.
 - Ordered offline scripts and local cassette recording, loading, playback, and

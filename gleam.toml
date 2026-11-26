@@ -38,3 +38,8 @@ gleeunit = ">= 1.0.0 and < 2.0.0"
 title = "Changelog"
 path = "changelog.html"
 source = "./CHANGELOG.md"
+
+[[documentation.pages]]
+title = "Migrating from 0.3"
+path = "migration.html"
+source = "./docs/MIGRATION.md"

@@ -1,5 +1,50 @@
 # Changelog
 
+## Unreleased
+
+> [!WARNING]
+> This release breaks the request timeout API and changes when calls end.
+> Read the [migration guide](https://github.com/gleam-dream/http_gun/blob/main/docs/MIGRATION.md)
+> before upgrading from 0.3.
+
+### Changed
+
+- Every call has a finite deadline that the calling process enforces: the
+  view's deadline, its timeout, the earlier of the two, or 30 seconds from the
+  call. The caller waits until the deadline plus 500 ms and then returns
+  `DeadlineExceeded` with `MaybeSent`; body reads, body closes and pool
+  queries are bounded the same way, and a late reply never reaches the
+  caller's mailbox. A timeout of zero or less fails at once with `NotSent`.
+  See ADR 0021.
+- `http_gun.with_timeout` takes a `Duration` instead of a `config.Timeout`;
+  `config.Infinity` no longer lifts the request bound.
+- Gun's own closing timer is off (`closing_timeout => infinity`), so a
+  streamed response after `connection: close` or an HTTP/2 GOAWAY is no
+  longer cut at 15 seconds. A body owner that loses its client closes its
+  connection. See ADR 0024.
+- A request Gun refuses on a closing connection fails with
+  `RequestFailed(PeerDraining)` and `NotSent` instead of `MaybeSent`, so
+  `error.is_retryable` allows it for any method. See ADR 0023.
+- The pool admits no new stream to a connection whose peer is going away and
+  closes it when its last stream ends.
+- Response, informational and trailer header names and values that are not
+  UTF-8 are read as ISO-8859-1, so every header string is text.
+- A cold origin prepares up to its per-origin limit of connections at once.
+  See ADR 0022.
+- HTTP Gun depends on `sinal >= 0.2.0 and < 0.3.0`, which removes a handler
+  when the process that attached it exits.
+
+### Removed
+
+- `config.with_request_timeout` and the `config.RequestTimeout` setting. Set
+  the timeout on the client handle with `http_gun.with_timeout`.
+
+### Fixed
+
+- A body owner that exits before the response head no longer leaves its
+  caller waiting; the call fails with `RequestFailed(UnknownTransport)` and
+  `MaybeSent`.
+
 ## 0.3.0 - 2026-11-23
 
 ### Added
