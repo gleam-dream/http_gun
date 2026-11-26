@@ -292,21 +292,25 @@ pub fn with_response(
 /// own position. Bodies retained across results are bounded by
 /// `config.with_max_batch_bytes`: once reached, the response being collected
 /// fails and requests not yet sent fail with `LimitExceeded(BatchBytes, ..)`
-/// and `NotSent`.
+/// and `NotSent`. The batch reads that limit from the client first; when the
+/// client does not answer by the view's deadline, no request runs and every
+/// position fails with `DeadlineExceeded` and `NotSent`.
 pub fn batch(
   client: Client,
   requests: List(Request(BitArray)),
   concurrency: Int,
 ) -> Result(List(Result(Buffered, Failure)), Failure) {
-  let limit = case pool.settings(client) {
-    Ok(current) -> current.limits.batch_bytes
-    // A closed client fails every request on its own.
-    Error(_) -> 0
-  }
+  // Without the limit no request runs: each position carries the failure
+  // that withheld it, `ClientClosed` from a stopped client or
+  // `DeadlineExceeded` from one that did not answer in time.
+  let limit =
+    pool.settings(client)
+    |> result.map(fn(current) { current.limits.batch_bytes })
   let counter = bridge.counter_new()
   batch.run(requests, concurrency, fn(req) {
+    use limit <- result.try(limit)
     case bridge.counter_add(counter, 0) {
-      total if total > limit && limit > 0 ->
+      total if total > limit ->
         Error(error.new(
           error.LimitExceeded(error.BatchBytes, limit, total),
           error.NotSent,
@@ -314,7 +318,7 @@ pub fn batch(
       _ ->
         collect(client, req, fn(bytes) {
           case bridge.counter_add(counter, bytes) {
-            total if total > limit && limit > 0 ->
+            total if total > limit ->
               Error(error.new(
                 error.LimitExceeded(error.BatchBytes, limit, total),
                 error.MaybeSent,

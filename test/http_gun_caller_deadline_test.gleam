@@ -35,13 +35,16 @@ fn controlled() -> #(Int, process.Pid)
 fn monitored_by(pid: process.Pid) -> List(process.Pid)
 
 fn blocked_client() -> #(http_gun.Client, process.Pid) {
+  blocked_client_with(config.allow_loopback(config.default()))
+}
+
+fn blocked_client_with(
+  settings: config.Config,
+) -> #(http_gun.Client, process.Pid) {
   let name = process.new_name("http_gun_caller_deadline")
   let assert Ok(_) =
     static_supervisor.new(static_supervisor.OneForOne)
-    |> static_supervisor.add(http_gun.supervised(
-      config.allow_loopback(config.default()),
-      name,
-    ))
+    |> static_supervisor.add(http_gun.supervised(settings, name))
     |> static_supervisor.start
   let assert Ok(pool) = process.named(name)
   #(http_gun.named(name), pool)
@@ -126,4 +129,41 @@ pub fn zero_timeout_fails_before_anything_is_sent_test() {
   error.reason(failure) |> should.equal(error.DeadlineExceeded)
   error.evidence(failure) |> should.equal(error.NotSent)
   http_gun.stop(client)
+}
+
+pub fn batch_never_runs_without_its_byte_limit_test() {
+  let port = serve(<<"HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nabcde":utf8>>)
+  let assert Ok(req) = request.to("http://localhost:" <> int.to_string(port))
+  let req = request.set_body(req, <<>>)
+  let #(client, pool) =
+    blocked_client_with(
+      config.default()
+      |> config.allow_loopback
+      |> config.with_max_batch_bytes(4),
+    )
+  suspend(pool)
+  let outcome = process.new_subject()
+  process.spawn(fn() {
+    let client = http_gun.with_timeout(client, duration.milliseconds(100))
+    process.send(outcome, http_gun.batch(client, [req], 1))
+  })
+  // The batch's lookup of its byte limit expires on the suspended pool. A
+  // request reaching the pool after it means the batch went on without the
+  // limit; let the pool answer that request.
+  await_queued(pool, 2, 40)
+  resume(pool)
+  let assert Ok(Ok([only])) = process.receive(outcome, 2000)
+  // Without its limit the batch would have kept this five-byte body.
+  only
+  |> should.equal(Error(error.new(error.DeadlineExceeded, error.NotSent)))
+}
+
+fn await_queued(pid: process.Pid, count: Int, tries: Int) -> Nil {
+  case queued(pid) >= count || tries == 0 {
+    True -> Nil
+    False -> {
+      process.sleep(50)
+      await_queued(pid, count, tries - 1)
+    }
+  }
 }
