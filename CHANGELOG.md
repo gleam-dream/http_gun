@@ -34,6 +34,14 @@
 - HTTP Gun depends on `sinal >= 0.2.0 and < 0.3.0`, which removes a handler
   when the process that attached it exits.
 
+- `testing.VerifyError` gains `NotAnswered` for a client that does not
+  answer before the view's deadline; `ClientStopped` means only a stopped
+  client. See ADR 0026.
+- `body.next_within` ends within its wait plus the grace even when the body
+  owner cannot answer, and a chunk sent to a read the reader gave up is
+  delivered to the next read. A read from the owning process replaces a read
+  it gave up instead of failing with `ReadConflict`. See ADR 0025.
+
 ### Removed
 
 - `config.with_request_timeout` and the `config.RequestTimeout` setting. Set
@@ -41,6 +49,14 @@
 
 ### Fixed
 
+- `http_gun.batch` no longer runs without its byte limit when the client does
+  not report the limit in time; every position then fails with
+  `DeadlineExceeded` and `NotSent`.
+- An HTTP/2 connection waiting for the peer's first SETTINGS counts as a
+  preparation, so the pool does not open more connections for the same
+  waiters meanwhile.
+- A connection prepared for one request is bounded by its own connect budget,
+  not by the deadline of the request at the head of the lane.
 - A body owner that exits before the response head no longer leaves its
   caller waiting; the call fails with `RequestFailed(UnknownTransport)` and
   `MaybeSent`.

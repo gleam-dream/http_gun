@@ -9,7 +9,7 @@ HTTP Gun 0.4.0 is a breaking release. Change the dependency to `http_gun >= 0.4.
 | [A refusal on a closing connection is not sent](#a-refusal-on-a-closing-connection-is-not-sent) | Retry code that matches `PeerDraining` or `MaybeSent`                                                                   |
 | [Gun's closing timer is off](#guns-closing-timer-is-off)                                        | Code that relied on a response being cut 15 seconds after `connection: close`                                           |
 | [Header names and values are always text](#header-names-and-values-are-always-text)             | Code that reads raw bytes from response header or trailer values                                                        |
-| [Other behaviour changes](#other-behaviour-changes)                                             | Code that depends on 0.3 failure timing after GOAWAY, or on `stats.queued_requests`                                     |
+| [Other behaviour changes](#other-behaviour-changes)                                             | Code that matches `testing.VerifyError`, or depends on 0.3 read, batch, GOAWAY or queue behaviour                       |
 
 ## Every call has a deadline its caller enforces
 
@@ -88,6 +88,10 @@ A caller that retries on `DeadlineExceeded` must treat the new `MaybeSent` answe
 
 ## Other behaviour changes
 
+- `testing.VerifyError` has a new variant, `NotAnswered`: the client did not answer before the view's deadline. In 0.3 such a call waited without a bound. A `case` over `VerifyError` must handle it; `ClientStopped` now means only that the client has stopped.
+- `body.next_within` ends within its wait plus half a second even when the body owner cannot answer, and returns `None`. A chunk the owner sent to a read that had already given up is delivered to the next read, so no chunk is skipped.
+- A read from the process that owns the body replaces a read it gave up on, instead of failing with `ReadConflict`. A read from another process still fails with `ReadConflict` while a read is pending.
+- When `http_gun.batch` cannot read its byte limit from the client before the view's deadline, it runs no request and every position fails with `DeadlineExceeded` and `NotSent`.
 - A body owner that exits before it sends the response head no longer leaves the caller waiting. The call fails with `RequestFailed(UnknownTransport)` and `MaybeSent`.
 - With a per-origin connection limit of 1, a request that finds the only connection going away waits in the queue for a new connection, and fails with the pool timeout and `NotSent` if none becomes free. In 0.3 it failed at once with `PeerDraining` and `MaybeSent`.
-- A burst of requests to an origin with no connection now prepares up to the per-origin limit of connections at once, within the total limit, instead of one at a time. `stats.queued_requests` counts only requests that hold no preparation, so it falls sooner during such a burst. A preparation that fails still fails every request waiting in its lane.
+- A burst of requests to an origin with no connection now prepares up to the per-origin limit of connections at once, within the total limit, instead of one at a time. `stats.queued_requests` counts only requests that hold no preparation, so it falls sooner during such a burst. A preparation that fails still fails every request waiting in its lane. A preparation's connect timeout is its own; a request near its deadline at the head of the lane no longer shortens or discards a connection that a later request could use. An HTTP/2 connection waiting for the peer's first SETTINGS counts as a preparation, so a single request no longer opens a second connection meanwhile.
