@@ -22,6 +22,12 @@ fn emit(server: process.Pid, bytes: BitArray) -> Nil
 @external(erlang, "http_gun_test_server", "persistent")
 fn persistent() -> Int
 
+@external(erlang, "http_gun_tls_test_server", "slow_handshake")
+fn slow_handshake(handshake_ms: Int, response_ms: Int) -> Int
+
+@external(erlang, "http_gun_tls_test_server", "anchors")
+fn anchors(name: String) -> List(BitArray)
+
 @external(erlang, "http_gun_measure_ffi", "reductions")
 fn reductions() -> Int
 
@@ -662,5 +668,46 @@ pub fn cold_origin_prepares_connections_concurrently_test() {
   // A connection that finishes after the last waiter left is not kept.
   let assert Ok(stats) = http_gun.stats(client)
   { stats.connections <= 3 } |> should.be_true
+  http_gun.stop(client)
+}
+
+pub fn a_preparation_keeps_its_own_connect_budget_test() {
+  // Every TLS handshake takes 150 ms.
+  let port = slow_handshake(150, 0)
+  let entered = process.new_subject()
+  let assert Ok(client) =
+    local_config()
+    |> config.with_trust(config.Anchors(anchors("ca")))
+    |> config.with_max_connections_per_origin(2)
+    |> config.with_resolver(fn(_, _) {
+      let gate = process.new_subject()
+      process.send(entered, gate)
+      let _ = process.receive(gate, 5000)
+      Ok([destination.Ipv4(127, 0, 0, 1)])
+    })
+    |> http_gun.start
+  let assert Ok(secure) =
+    request.to("https://localhost:" <> int.to_string(port) <> "/")
+  let secure = request.set_body(secure, <<>>)
+  let first = process.new_subject()
+  let second = process.new_subject()
+  process.spawn(fn() {
+    let client = http_gun.with_timeout(client, duration.milliseconds(250))
+    process.send(first, http_gun.send(client, secure))
+  })
+  let assert Ok(first_gate) = process.receive(entered, 1000)
+  process.spawn(fn() {
+    let client = http_gun.with_timeout(client, duration.seconds(5))
+    process.send(second, http_gun.send(client, secure))
+  })
+  let assert Ok(second_gate) = process.receive(entered, 1000)
+  // The second preparation's address arrives while the lane head has about
+  // 100 ms left, less than one handshake. The second request has seconds.
+  process.sleep(150)
+  process.send(second_gate, Nil)
+  let assert Ok(Ok(_)) = process.receive(second, 3000)
+  let assert Ok(Error(failure)) = process.receive(first, 3000)
+  error.reason(failure) |> should.equal(error.DeadlineExceeded)
+  process.send(first_gate, Nil)
   http_gun.stop(client)
 }

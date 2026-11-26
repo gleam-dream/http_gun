@@ -1576,59 +1576,52 @@ fn resolved(
         Error(error.DeadlineExceeded), _ ->
           fail_reason(without, group, error.ConnectTimeout)
         Error(reason), _ -> fail_reason(without, group, reason)
-        Ok(target), Ok(p) -> {
-          let remaining = p.deadline - bridge.now()
-          case remaining <= 0 {
-            True -> without
-            False ->
-              case
-                bridge.open(
-                  target.address,
-                  target.server_name,
-                  p.origin.port,
-                  p.origin.tls,
-                  state.config.protocol,
-                  state.config.trust,
-                  state.config.cipher_suites,
-                  state.config.client_identity,
-                  int.max(
-                    1,
-                    int.min(connection.connect_until - bridge.now(), remaining),
-                  ),
-                  case state.config.idle_timeout {
-                    settings.Within(ms) -> bridge.SendWithin(ms)
-                    settings.Unbounded -> bridge.SendUnbounded
-                  },
-                  state.config.limits.header_count,
+        // The connection serves whichever waiter takes it first, so only its
+        // own connect budget bounds it, never a waiter's deadline.
+        Ok(target), Ok(_) ->
+          case
+            bridge.open(
+              target.address,
+              target.server_name,
+              connection.origin.port,
+              connection.origin.tls,
+              state.config.protocol,
+              state.config.trust,
+              state.config.cipher_suites,
+              state.config.client_identity,
+              int.max(1, connection.connect_until - bridge.now()),
+              case state.config.idle_timeout {
+                settings.Within(ms) -> bridge.SendWithin(ms)
+                settings.Unbounded -> bridge.SendUnbounded
+              },
+              state.config.limits.header_count,
+            )
+          {
+            Error(cause) ->
+              fail_reason(without, group, error.ConnectionFailed(cause))
+            Ok(connected) -> {
+              let _ = process.monitor(connected)
+              // The connect timer follows the connection to its new pid.
+              let _ =
+                process.send_after(
+                  state.self,
+                  int.max(0, connection.connect_until - bridge.now()),
+                  ConnectExpired(connected),
                 )
-              {
-                Error(cause) ->
-                  fail_reason(without, group, error.ConnectionFailed(cause))
-                Ok(connected) -> {
-                  let _ = process.monitor(connected)
-                  // The connect timer follows the connection to its new pid.
-                  let _ =
-                    process.send_after(
-                      state.self,
-                      int.max(0, connection.connect_until - bridge.now()),
-                      ConnectExpired(connected),
-                    )
-                  State(..without, connections: [
-                    Connection(
-                      connected,
-                      connection.origin,
-                      Connecting,
-                      0,
-                      target.addresses,
-                      None,
-                      connection.connect_until,
-                    ),
-                    ..without.connections
-                  ])
-                }
-              }
+              State(..without, connections: [
+                Connection(
+                  connected,
+                  connection.origin,
+                  Connecting,
+                  0,
+                  target.addresses,
+                  None,
+                  connection.connect_until,
+                ),
+                ..without.connections
+              ])
+            }
           }
-        }
       }
     }
   }
