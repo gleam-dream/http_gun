@@ -8,9 +8,9 @@ HTTP Gun 0.4.0 is a breaking release. Change the dependency to `http_gun >= 0.4.
 | [Sinal 0.2 binds handlers to their process](#sinal-02-binds-handlers-to-their-process)          | Applications that attach HTTP Gun lifecycle handlers                                                                    |
 | [A refusal on a closing connection is not sent](#a-refusal-on-a-closing-connection-is-not-sent) | Retry code that matches `PeerDraining` or `MaybeSent`                                                                   |
 | [Gun's closing timer is off](#guns-closing-timer-is-off)                                        | Code that relied on a response being cut 15 seconds after `connection: close`                                           |
-| [A verify call can end with `NotAnswered`](#a-verify-call-can-end-with-notanswered) | Code that matches `testing.VerifyError` exhaustively |
+| [A verify call can end with `NotAnswered`](#a-verify-call-can-end-with-notanswered)             | Code that matches `testing.VerifyError` exhaustively                                                                    |
 | [Header names and values are always text](#header-names-and-values-are-always-text)             | Code that reads raw bytes from response header or trailer values                                                        |
-| [Other behaviour changes](#other-behaviour-changes)                                             | Code that depends on 0.3 read, batch, GOAWAY or queue behaviour                       |
+| [Other behaviour changes](#other-behaviour-changes)                                             | Code that depends on 0.3 read, batch, GOAWAY or queue behaviour                                                         |
 
 ## Every call has a deadline its caller enforces
 
