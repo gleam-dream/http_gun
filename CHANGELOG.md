@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.4.0 - 2026-11-26
 
 > [!WARNING]
 > This release breaks the request timeout API and changes when calls end.
