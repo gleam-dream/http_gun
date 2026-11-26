@@ -12,6 +12,7 @@ import http_gun
 import http_gun/body
 import http_gun/config
 import http_gun/error
+import http_gun/testing
 
 @external(erlang, "http_gun_caller_deadline_test_ffi", "suspend")
 fn suspend(pid: process.Pid) -> Nil
@@ -129,6 +130,15 @@ pub fn zero_timeout_fails_before_anything_is_sent_test() {
   error.reason(failure) |> should.equal(error.DeadlineExceeded)
   error.evidence(failure) |> should.equal(error.NotSent)
   http_gun.stop(client)
+}
+
+pub fn verify_on_a_blocked_pool_is_not_a_stopped_client_test() {
+  let #(client, pool) = blocked_client()
+  suspend(pool)
+  // The pool is alive: it only failed to answer by the view's deadline.
+  testing.verify(http_gun.with_timeout(client, duration.milliseconds(100)))
+  |> should.equal(Error(testing.NotAnswered))
+  resume(pool)
 }
 
 pub fn batch_never_runs_without_its_byte_limit_test() {

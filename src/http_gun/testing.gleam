@@ -244,6 +244,9 @@ pub type VerifyError {
   NotPlayback
   /// The client has stopped; ask before `http_gun.stop`.
   ClientStopped
+  /// The client did not answer before the deadline of the view `verify` was
+  /// given. It may still be running, and a later `verify` may answer.
+  NotAnswered
 }
 
 /// Report what this playback client met so far that did not match its
@@ -254,7 +257,11 @@ pub type VerifyError {
 /// until it stops and counts the rest in `dropped`.
 pub fn verify(client: http_gun.Client) -> Result(Verdict, VerifyError) {
   case pool.verify(client) {
-    Error(_) -> Error(ClientStopped)
+    Error(failure) ->
+      case error.reason(failure) {
+        error.DeadlineExceeded -> Error(NotAnswered)
+        _ -> Error(ClientStopped)
+      }
     Ok(option.None) -> Error(NotPlayback)
     Ok(Some(report)) ->
       Ok(Verdict(
