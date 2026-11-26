@@ -5,6 +5,7 @@
 
 import gleam/bit_array
 import gleam/dict.{type Dict}
+import gleam/erlang/atom
 import gleam/erlang/process
 import gleam/erlang/reference
 import gleam/http/request
@@ -37,7 +38,7 @@ import sinal/correlation.{type Correlation}
 /// token and destination lists retain independent view constraints.
 pub type View {
   View(
-    timeout: Option(settings.Bound),
+    timeout: Option(Int),
     deadline: Option(Int),
     idle: Option(settings.Bound),
     tokens: List(token.Token),
@@ -56,9 +57,15 @@ const no_view = View(None, None, None, [], None, [], None)
 type Status {
   Resolving
   Connecting
+  /// HTTP/2 is up but the peer's initial SETTINGS, which give its stream
+  /// capacity, have not arrived. It carries no stream and is still being
+  /// prepared.
+  Settling
   Ready(settings.Negotiated, Int)
   Checking(process.Pid)
   Checked
+  /// The peer is going away: no new stream, closed once it carries none.
+  GoingAway
 }
 
 type Connection {
@@ -158,6 +165,7 @@ type Invocation {
     request: fn() -> request.Request(BitArray),
     origin: Origin,
     entered: Int,
+    deadline: Int,
     view: View,
     owner: process.Pid,
   )
@@ -171,13 +179,21 @@ pub type Opened {
   )
 }
 
+/// What a caller waiting in `open` receives. The body owner announces itself
+/// before it can answer, so the caller monitors the only process that still
+/// holds its reply and turns that process's death into a failure.
+pub type Answer {
+  Launched(process.Pid)
+  Answered(Result(Opened, Failure))
+}
+
 pub opaque type Message {
   Resolved(process.Pid, Result(resolution.Resolved, error.Reason))
   CheckedConnection(process.Pid, process.Pid, Result(Bool, error.Reason))
   Inspect(process.Subject(Result(#(Int, Int, Int), Failure)))
   Verify(process.Subject(Result(Option(script.Report), Failure)))
   Configuration(process.Subject(Result(Settings, Failure)))
-  Open(Invocation, process.Subject(Result(Opened, Failure)))
+  Open(Invocation, process.Subject(Answer))
   Stop(process.Subject(Result(Nil, Failure)))
   ShutdownExpired
   Wire(bridge.Event)
@@ -185,7 +201,7 @@ pub opaque type Message {
   Expire(reference.Reference)
   ConnectExpired(process.Pid)
   IdleConnection(process.Pid, reference.Reference)
-  Release(process.Pid, Option(process.Pid), Bool)
+  Release(process.Pid, Option(process.Pid), owner.Released)
   OwnerClosed(process.Pid)
 }
 
@@ -194,17 +210,31 @@ pub fn named(name: process.Name(Message)) -> Client {
 }
 
 pub fn stats(client: Client) -> Result(#(Int, Int, Int), Failure) {
-  call.run(client.subject, Inspect)
+  query(client, Inspect)
 }
 
 /// What a playback client met that did not match its script; `None` for a
 /// client that does not play back.
 pub fn verify(client: Client) -> Result(Option(script.Report), Failure) {
-  call.run(client.subject, Verify)
+  query(client, Verify)
 }
 
 pub fn settings(client: Client) -> Result(Settings, Failure) {
-  call.run(client.subject, Configuration)
+  query(client, Configuration)
+}
+
+// Ask the pool a question that submits nothing, bounded by the deadline a
+// request through the same view would have.
+fn query(
+  client: Client,
+  make: fn(process.Subject(Result(value, Failure))) -> Message,
+) -> Result(value, Failure) {
+  case call.ask(client.subject, make, deadline(client.view, bridge.now())) {
+    Ok(answer) -> answer
+    Error(call.NotRunning) | Error(call.Lost) ->
+      Error(error.new(error.ClientClosed, NotSent))
+    Error(call.Expired) -> Error(error.new(error.DeadlineExceeded, NotSent))
+  }
 }
 
 pub fn view(client: Client) -> View {
@@ -221,14 +251,14 @@ pub fn open(
 ) -> Result(Opened, Failure) {
   let view = client.view
   let entered = bridge.now()
+  let deadline = deadline(view, entered)
   use Nil <- result.try(case list.any(view.tokens, token.is_cancelled) {
     True -> Error(error.new(error.Cancelled, NotSent))
     False -> Ok(Nil)
   })
-  use Nil <- result.try(case view.deadline {
-    Some(at) if at <= entered ->
-      Error(error.new(error.DeadlineExceeded, NotSent))
-    _ -> Ok(Nil)
+  use Nil <- result.try(case deadline <= entered {
+    True -> Error(error.new(error.DeadlineExceeded, NotSent))
+    False -> Ok(Nil)
   })
   use Nil <- result.try(case view.body_limit {
     Some(#(limit, _)) if limit < 0 ->
@@ -240,14 +270,103 @@ pub fn open(
     _ -> req
   }
   use origin <- result.try(validate_target(req))
-  // Nothing was sent when the client is not registered or already dead; a
-  // client that exits while handling the call may have submitted it.
-  call.with_failures(
-    client.subject,
-    Open(Invocation(fn() { req }, origin, entered, view, process.self()), _),
-    not_running: error.new(error.ClientClosed, NotSent),
-    lost: error.new(error.ClientClosed, MaybeSent),
-  )
+  case process.subject_owner(client.subject) {
+    Error(Nil) -> Error(error.new(error.ClientClosed, NotSent))
+    Ok(pool) -> {
+      let reply = call.reply()
+      let monitor = process.monitor(pool)
+      process.send(
+        client.subject,
+        Open(
+          Invocation(
+            fn() { req },
+            origin,
+            entered,
+            deadline,
+            view,
+            process.self(),
+          ),
+          reply,
+        ),
+      )
+      let outcome = await(reply, monitor, None, deadline + call.grace)
+      process.demonitor_process(monitor)
+      // Whatever ended the wait, a later answer is dropped by the runtime.
+      call.retire(reply)
+      outcome
+    }
+  }
+}
+
+/// The request timeout when the view sets neither a timeout nor a deadline.
+const default_timeout = 30_000
+
+// The absolute time by which a request made through `view` ends. Every
+// request has one: the caller's own process stops waiting shortly after it.
+fn deadline(view: View, entered: Int) -> Int {
+  case view.deadline, view.timeout {
+    Some(at), Some(timeout) -> int.min(at, entered + timeout)
+    Some(at), None -> at
+    None, Some(timeout) -> entered + timeout
+    None, None -> entered + default_timeout
+  }
+}
+
+type Waited {
+  Reply(Answer)
+  PoolDown(process.Down)
+  OwnerDown
+}
+
+// Wait for the one answer to `Open`. Before launch the pool holds the reply;
+// after it only the body owner does, so both are monitored and neither death
+// leaves the caller waiting. A reply the owner sent before dying precedes its
+// exit signal and is still taken. The pool and the owner answer at the
+// deadline; `until` lies a little later, so the caller ends a wait that a
+// live but stuck process never answers.
+fn await(
+  reply: process.Subject(Answer),
+  pool: process.Monitor,
+  owner: Option(process.Monitor),
+  until: Int,
+) -> Result(Opened, Failure) {
+  let selector =
+    process.new_selector()
+    |> process.select_map(reply, Reply)
+    |> process.select_specific_monitor(pool, PoolDown)
+  let selector = case owner {
+    Some(monitor) ->
+      process.select_specific_monitor(selector, monitor, fn(_) { OwnerDown })
+    None -> selector
+  }
+  case call.receive_until(selector, until) {
+    Ok(Reply(Launched(pid))) ->
+      await(reply, pool, Some(process.monitor(pid)), until)
+    Ok(Reply(Answered(outcome))) -> {
+      option.map(owner, process.demonitor_process)
+      outcome
+    }
+    // Nothing was sent when the client is not registered or already dead; a
+    // client that exits while handling the call may have submitted it.
+    Ok(PoolDown(down)) -> {
+      option.map(owner, process.demonitor_process)
+      let noproc = process.Abnormal(atom.to_dynamic(atom.create("noproc")))
+      case down {
+        process.ProcessDown(reason:, ..) if reason == noproc ->
+          Error(error.new(error.ClientClosed, NotSent))
+        _ -> Error(error.new(error.ClientClosed, MaybeSent))
+      }
+    }
+    // The owner had submitted the request and can no longer answer.
+    Ok(OwnerDown) ->
+      Error(error.new(error.RequestFailed(error.UnknownTransport), MaybeSent))
+    // The process holding the reply is alive but did not answer by the
+    // deadline. It may have submitted the request.
+    Error(Nil) -> {
+      option.map(owner, process.demonitor_process)
+      Error(error.new(error.DeadlineExceeded, MaybeSent))
+    }
+  }
 }
 
 /// Stop a client, letting open bodies finish within the shutdown timeout.
@@ -397,7 +516,10 @@ fn handle(state: State, message: Message) -> actor.Next(State, Message) {
     Open(invocation, reply) ->
       case state.phase {
         Draining(_) -> {
-          process.send(reply, Error(error.new(error.ClientClosed, NotSent)))
+          process.send(
+            reply,
+            Answered(Error(error.new(error.ClientClosed, NotSent))),
+          )
           actor.continue(state)
         }
         Running -> open_request(state, invocation, reply)
@@ -408,9 +530,9 @@ fn handle(state: State, message: Message) -> actor.Next(State, Message) {
         None -> actor.continue(state)
         Some(p) -> {
           let now = bridge.now()
-          let reason = case p.deadline {
-            Some(at) if at <= now -> error.DeadlineExceeded
-            _ -> error.PoolTimeout
+          let reason = case p.deadline <= now {
+            True -> error.DeadlineExceeded
+            False -> error.PoolTimeout
           }
           reject(p, reason)
           actor.continue(
@@ -452,8 +574,8 @@ fn handle(state: State, message: Message) -> actor.Next(State, Message) {
         }
         _ -> actor.continue(state)
       }
-    Release(pid, connection, clean) ->
-      release_body(state, pid, connection, clean)
+    Release(pid, connection, released) ->
+      release_body(state, pid, connection, released)
     // A closed body no longer counts as open, before its process exits.
     OwnerClosed(pid) ->
       case dict.get(state.owners, pid) {
@@ -486,17 +608,13 @@ fn handle(state: State, message: Message) -> actor.Next(State, Message) {
         True -> handle(state, Wire(bridge.Down(pid, error.UnexpectedProtocol)))
         False -> {
           // Wait for initial SETTINGS before admitting H2 application streams.
-          let capacity = case protocol {
-            settings.H1 -> 1
-            _ -> 0
-          }
           let connections =
             list.map(state.connections, fn(c) {
               case c.pid == pid {
                 True ->
                   Connection(..c, status: case protocol {
                     settings.H1 -> Checked
-                    settings.H2 | settings.Offline -> Ready(protocol, capacity)
+                    settings.H2 | settings.Offline -> Settling
                   })
                 False -> c
               }
@@ -507,8 +625,9 @@ fn handle(state: State, message: Message) -> actor.Next(State, Message) {
     Wire(bridge.Capacity(pid, capacity)) -> {
       let connections =
         list.map(state.connections, fn(c) {
-          case c.pid == pid {
-            True ->
+          case c.pid == pid, c.status {
+            True, GoingAway -> c
+            True, _ ->
               Connection(
                 ..c,
                 status: Ready(
@@ -516,7 +635,7 @@ fn handle(state: State, message: Message) -> actor.Next(State, Message) {
                   int.min(capacity, state.config.limits.streams_per_connection),
                 ),
               )
-            False -> c
+            False, _ -> c
           }
         })
       actor.continue(dispatch(State(..state, connections: connections)))
@@ -633,7 +752,7 @@ fn dispatch(state: State) -> State {
 // connection in use loses it.
 fn idle_timer(state: State, c: Connection) -> Connection {
   case c.status, c.used, c.idle_ref {
-    Ready(..), 0, None -> {
+    Ready(..), 0, None | Settling, 0, None -> {
       let id = reference.new()
       let _ =
         process.send_after(
@@ -655,6 +774,7 @@ fn dispatch_group(state: State, group: pending.Group) -> State {
       case admit(state, p) {
         Deferred(next, p) ->
           State(..next, pending: pending.replace(next.pending, p))
+          |> prepare_ahead(group)
         Taken(next) -> {
           let #(_, queue) = pending.remove(next.pending, p.id)
           dispatch_group(
@@ -696,7 +816,7 @@ fn admit_connection(state: State, p: Pending) -> Admission {
     list.find(state.connections, fn(c) {
       c.origin == p.origin
       && case c.status {
-        Resolving | Connecting | Checking(_) -> False
+        Resolving | Connecting | Settling | Checking(_) | GoingAway -> False
         Checked -> True
         Ready(_, capacity) -> c.used < capacity
       }
@@ -720,57 +840,121 @@ fn admit_connection(state: State, p: Pending) -> Admission {
         Ok(Nil) -> admit_eligible(state, p, connection)
       }
     Error(Nil) -> {
+      // A request that arrives with an empty lane is not queued yet.
+      let waiting = int.max(1, pending.size(state.pending, group(state, p)))
       let state = make_room(state, p.origin)
-      let same = list.filter(state.connections, fn(c) { c.origin == p.origin })
-      case
-        list.length(state.connections) < state.config.limits.connections
-        && list.length(same) < state.config.limits.per_origin
-        && !list.any(same, fn(c) { preparing(c.status) })
-      {
+      case room(state, p.origin, waiting) > 0 {
         False -> Deferred(state, p)
         True -> {
-          let self = state.self
-          let connect_until = bridge.now() + state.config.connect_timeout
-          let pid =
-            resolution.start(
-              process.self(),
-              policies(state, p),
-              state.config.resolver,
-              p.origin.host,
-              p.origin.port,
-              p.origin.tls,
-              connect_until,
-              fn(pid, result) { process.send(self, Resolved(pid, result)) },
-            )
-          let _ = process.monitor(pid)
-          let _ =
-            process.send_after(
-              state.self,
-              state.config.connect_timeout,
-              ConnectExpired(pid),
-            )
-          // The request that opens a connection may wait for it to connect.
-          let _ = process.cancel_timer(p.timer)
-          let until = case p.deadline {
-            Some(at) -> int.min(at, int.max(p.pool_until, connect_until + 1))
-            None -> int.max(p.pool_until, connect_until + 1)
-          }
-          let timer =
-            process.send_after(
-              state.self,
-              int.max(0, until - bridge.now()),
-              Expire(p.id),
-            )
-          Deferred(
-            State(..state, connections: [
-              Connection(pid, p.origin, Resolving, 0, [], None, connect_until),
-              ..state.connections
-            ]),
-            Pending(..p, reservation: Some(pid), timer:),
-          )
+          let #(state, p) = prepare(state, p)
+          Deferred(state, p)
         }
       }
     }
+  }
+}
+
+// How many more connections the origin may start now: one preparation per
+// waiting request, within the per-origin and total connection limits.
+fn room(state: State, origin: Origin, waiting: Int) -> Int {
+  int.min(
+    wanted(state, origin, waiting),
+    state.config.limits.connections - list.length(state.connections),
+  )
+}
+
+// The same, ignoring the total connection limit.
+fn wanted(state: State, origin: Origin, waiting: Int) -> Int {
+  let same = list.filter(state.connections, fn(c) { c.origin == origin })
+  int.min(
+    state.config.limits.per_origin - list.length(same),
+    waiting - list.count(same, fn(c) { preparing(c.status) }),
+  )
+}
+
+// Start preparing a new connection on behalf of `p`. The connection is not
+// bound to `p`: the lane head takes the first connection that becomes ready.
+fn prepare(state: State, p: Pending) -> #(State, Pending) {
+  let self = state.self
+  let connect_until = bridge.now() + state.config.connect_timeout
+  let pid =
+    resolution.start(
+      process.self(),
+      policies(state, p),
+      state.config.resolver,
+      p.origin.host,
+      p.origin.port,
+      p.origin.tls,
+      connect_until,
+      fn(pid, result) { process.send(self, Resolved(pid, result)) },
+    )
+  let _ = process.monitor(pid)
+  let _ =
+    process.send_after(
+      state.self,
+      state.config.connect_timeout,
+      ConnectExpired(pid),
+    )
+  // The request that opens a connection may wait for it to connect.
+  let _ = process.cancel_timer(p.timer)
+  let until = int.min(p.deadline, int.max(p.pool_until, connect_until + 1))
+  let timer =
+    process.send_after(
+      state.self,
+      int.max(0, until - bridge.now()),
+      Expire(p.id),
+    )
+  #(
+    State(..state, connections: [
+      Connection(pid, p.origin, Resolving, 0, [], None, connect_until),
+      ..state.connections
+    ]),
+    Pending(..p, reservation: Some(pid), timer:),
+  )
+}
+
+// Behind a deferred lane head, start connections for the requests that wait
+// without one, oldest first. Nothing here launches a request, so no request
+// overtakes the head; it only shortens the wait of the head and its
+// followers. The walk visits at most the requests it prepares for, after
+// those already holding a reservation, so a long lane costs nothing extra.
+fn prepare_ahead(state: State, group: pending.Group) -> State {
+  case group, state.mode {
+    pending.ForOrigin(origin), Live | pending.ForOrigin(origin), Record(_) -> {
+      let waiting = pending.size(state.pending, group)
+      // Evict an idle connection of another origin only when this origin
+      // could use the slot.
+      let state = case wanted(state, origin, waiting) > 0 {
+        True -> make_room(state, origin)
+        False -> state
+      }
+      let room = room(state, origin, waiting)
+      let bodies =
+        state.config.limits.open_bodies
+        - dict.size(state.owners)
+        - checking_count(state)
+      case room > 0 && bodies > 0 {
+        False -> state
+        True ->
+          pending.unreserved(state.pending, group, room)
+          |> list.filter(fn(p) {
+            !list.any(p.cancellation, token.is_cancelled)
+            && resolution.admit(
+              policies(state, p),
+              origin.host,
+              origin.port,
+              origin.tls,
+              [],
+            )
+            == Ok(Nil)
+          })
+          |> list.fold(state, fn(state, p) {
+            let #(state, p) = prepare(state, p)
+            State(..state, pending: pending.replace(state.pending, p))
+          })
+      }
+    }
+    _, _ -> state
   }
 }
 
@@ -819,14 +1003,15 @@ fn launch(state: State, p: Pending, connection: Connection) -> State {
   lifecycle.emit(p.observation, telemetry.AdmissionGranted)
   let protocol = case connection.status {
     Ready(protocol, _) -> protocol
-    Resolving | Connecting | Checking(_) | Checked -> settings.H1
+    Resolving | Connecting | Settling | Checking(_) | Checked | GoingAway ->
+      settings.H1
   }
   // This callback crosses a process boundary. Capture only its destinations,
   // never the pool state (which also contains every queued request).
   let self = state.self
   let connection_pid = connection.pid
-  let release = fn(clean) {
-    process.send(self, Release(process.self(), Some(connection_pid), clean))
+  let release = fn(released) {
+    process.send(self, Release(process.self(), Some(connection_pid), released))
   }
   case
     owner.start(
@@ -837,6 +1022,7 @@ fn launch(state: State, p: Pending, connection: Connection) -> State {
       timing(p),
       state.config.limits,
       p.reply,
+      p.launched,
       release,
       fn() { process.send(self, OwnerClosed(process.self())) },
       p.capture,
@@ -898,10 +1084,7 @@ fn settle(p: Pending) -> Nil {
 
 fn admit(state: State, p: Pending) -> Admission {
   let cancelled = list.any(p.cancellation, token.is_cancelled)
-  let expired = case p.deadline {
-    Some(at) -> bridge.now() >= at
-    None -> False
-  }
+  let expired = bridge.now() >= p.deadline
   case cancelled, expired {
     True, _ -> {
       reject(p, error.Cancelled)
@@ -977,8 +1160,8 @@ fn admit_playback(state: State, p: Pending, replay: Replay) -> State {
         True -> {
           lifecycle.emit(p.observation, telemetry.AdmissionGranted)
           let self = state.self
-          let release = fn(clean) {
-            process.send(self, Release(process.self(), None, clean))
+          let release = fn(released) {
+            process.send(self, Release(process.self(), None, released))
           }
           case
             owner.start(
@@ -989,6 +1172,7 @@ fn admit_playback(state: State, p: Pending, replay: Replay) -> State {
               timing(p),
               state.config.limits,
               p.reply,
+              p.launched,
               release,
               fn() { process.send(self, OwnerClosed(process.self())) },
               None,
@@ -1095,24 +1279,10 @@ fn make_room(state: State, wanted: Origin) -> State {
   }
 }
 
-fn effective_deadline(config: Settings, invocation: Invocation) -> Option(Int) {
-  let view = invocation.view
-  case view.deadline, view.timeout {
-    Some(at), Some(timeout) ->
-      case settings.until(timeout, invocation.entered) {
-        Some(until) -> Some(int.min(at, until))
-        None -> Some(at)
-      }
-    Some(at), None -> Some(at)
-    None, Some(timeout) -> settings.until(timeout, invocation.entered)
-    None, None -> settings.until(config.request_timeout, invocation.entered)
-  }
-}
-
 fn open_request(
   state: State,
   invocation: Invocation,
-  reply: process.Subject(Result(Opened, Failure)),
+  reply: process.Subject(Answer),
 ) -> actor.Next(State, Message) {
   let view = invocation.view
   let observation =
@@ -1133,7 +1303,11 @@ fn open_request(
   let relay = fn(outcome) {
     process.send(
       reply,
-      result.map(outcome, fn(response) { Opened(response, body_limit, redact) }),
+      Answered(
+        result.map(outcome, fn(response) {
+          Opened(response, body_limit, redact)
+        }),
+      ),
     )
   }
   let req = invocation.request()
@@ -1151,17 +1325,14 @@ fn open_request(
   case early {
     Error(failure) -> {
       lifecycle.emit(observation, lifecycle.termination(Error(failure)))
-      process.send(reply, Error(failure))
+      process.send(reply, Answered(Error(failure)))
       actor.continue(state)
     }
     Ok(capture) -> {
-      let deadline = effective_deadline(state.config, invocation)
+      let deadline = invocation.deadline
       let now = bridge.now()
       let pool_until = now + state.config.pool_timeout
-      let first = case deadline {
-        Some(at) -> int.min(at, pool_until)
-        None -> pool_until
-      }
+      let first = int.min(deadline, pool_until)
       let id = reference.new()
       let timer =
         process.send_after(state.self, int.max(0, first - now), Expire(id))
@@ -1172,6 +1343,7 @@ fn open_request(
           request: invocation.request,
           origin: invocation.origin,
           reply: relay,
+          launched: fn() { process.send(reply, Launched(process.self())) },
           deadline:,
           pool_until:,
           idle: option.unwrap(view.idle, state.config.idle_timeout),
@@ -1205,7 +1377,8 @@ fn open_request(
             False -> {
               lifecycle.emit(p.observation, telemetry.AdmissionWaiting)
               actor.continue(
-                State(..next, pending: pending.push(next.pending, group, p)),
+                State(..next, pending: pending.push(next.pending, group, p))
+                |> prepare_ahead(group),
               )
             }
           }
@@ -1218,30 +1391,38 @@ fn release_body(
   state: State,
   pid: process.Pid,
   connection: Option(process.Pid),
-  clean: Bool,
+  released: owner.Released,
 ) -> actor.Next(State, Message) {
   case dict.get(state.owners, pid) {
     Error(_) | Ok(Owned(released: True, ..)) -> actor.continue(state)
-    Ok(owner) -> {
+    Ok(owned) -> {
       let connections =
         list.filter_map(state.connections, fn(c) {
           case Some(c.pid) == connection {
             False -> Ok(c)
-            True ->
-              case c.status, clean {
-                Ready(settings.H1, _), False -> {
+            True -> {
+              let used = int.max(0, c.used - 1)
+              let status = case released {
+                owner.GoingAway -> GoingAway
+                owner.Reusable | owner.Spent -> c.status
+              }
+              case status, released, used {
+                // An HTTP/1.1 connection that ended an exchange early, or a
+                // draining connection that carries nothing, is of no use.
+                Ready(settings.H1, _), owner.Spent, _ | GoingAway, _, 0 -> {
                   bridge.close(c.pid)
                   Error(Nil)
                 }
-                _, _ -> Ok(Connection(..c, used: int.max(0, c.used - 1)))
+                _, _, _ -> Ok(Connection(..c, used:, status:))
               }
+            }
           }
         })
       let state =
         State(
           ..state,
           connections: connections,
-          owners: dict.insert(state.owners, pid, Owned(..owner, released: True)),
+          owners: dict.insert(state.owners, pid, Owned(..owned, released: True)),
         )
       case state.phase {
         Draining(replies) ->
@@ -1281,7 +1462,7 @@ fn connection_lost(
             error.TransportTimeout -> error.ConnectTimeout
             _ -> error.ConnectionFailed(cause)
           })
-        Ready(_, _) | Checking(_) | Checked -> state
+        Settling | Ready(_, _) | Checking(_) | Checked | GoingAway -> state
       }
     }
   }
@@ -1343,8 +1524,8 @@ fn discard_reservation(state: State, p: Pending) -> State {
 
 fn preparing(status: Status) -> Bool {
   case status {
-    Resolving | Connecting | Checking(_) -> True
-    Ready(_, _) | Checked -> False
+    Resolving | Connecting | Settling | Checking(_) -> True
+    Ready(_, _) | Checked | GoingAway -> False
   }
 }
 
@@ -1355,7 +1536,8 @@ fn close_connection(connection: Connection) -> Nil {
       process.kill(worker)
       bridge.close(connection.pid)
     }
-    Connecting | Ready(_, _) | Checked -> bridge.close(connection.pid)
+    Connecting | Settling | Ready(_, _) | Checked | GoingAway ->
+      bridge.close(connection.pid)
   }
 }
 
@@ -1395,62 +1577,52 @@ fn resolved(
         Error(error.DeadlineExceeded), _ ->
           fail_reason(without, group, error.ConnectTimeout)
         Error(reason), _ -> fail_reason(without, group, reason)
-        Ok(target), Ok(p) -> {
-          let remaining = case p.deadline {
-            Some(at) -> at - bridge.now()
-            None -> state.config.connect_timeout
-          }
-          case remaining <= 0 {
-            True -> without
-            False ->
-              case
-                bridge.open(
-                  target.address,
-                  target.server_name,
-                  p.origin.port,
-                  p.origin.tls,
-                  state.config.protocol,
-                  state.config.trust,
-                  state.config.cipher_suites,
-                  state.config.client_identity,
-                  int.max(
-                    1,
-                    int.min(connection.connect_until - bridge.now(), remaining),
-                  ),
-                  case state.config.idle_timeout {
-                    settings.Within(ms) -> bridge.SendWithin(ms)
-                    settings.Unbounded -> bridge.SendUnbounded
-                  },
-                  state.config.limits.header_count,
+        // The connection serves whichever waiter takes it first, so only its
+        // own connect budget bounds it, never a waiter's deadline.
+        Ok(target), Ok(_) ->
+          case
+            bridge.open(
+              target.address,
+              target.server_name,
+              connection.origin.port,
+              connection.origin.tls,
+              state.config.protocol,
+              state.config.trust,
+              state.config.cipher_suites,
+              state.config.client_identity,
+              int.max(1, connection.connect_until - bridge.now()),
+              case state.config.idle_timeout {
+                settings.Within(ms) -> bridge.SendWithin(ms)
+                settings.Unbounded -> bridge.SendUnbounded
+              },
+              state.config.limits.header_count,
+            )
+          {
+            Error(cause) ->
+              fail_reason(without, group, error.ConnectionFailed(cause))
+            Ok(connected) -> {
+              let _ = process.monitor(connected)
+              // The connect timer follows the connection to its new pid.
+              let _ =
+                process.send_after(
+                  state.self,
+                  int.max(0, connection.connect_until - bridge.now()),
+                  ConnectExpired(connected),
                 )
-              {
-                Error(cause) ->
-                  fail_reason(without, group, error.ConnectionFailed(cause))
-                Ok(connected) -> {
-                  let _ = process.monitor(connected)
-                  // The connect timer follows the connection to its new pid.
-                  let _ =
-                    process.send_after(
-                      state.self,
-                      int.max(0, connection.connect_until - bridge.now()),
-                      ConnectExpired(connected),
-                    )
-                  State(..without, connections: [
-                    Connection(
-                      connected,
-                      connection.origin,
-                      Connecting,
-                      0,
-                      target.addresses,
-                      None,
-                      connection.connect_until,
-                    ),
-                    ..without.connections
-                  ])
-                }
-              }
+              State(..without, connections: [
+                Connection(
+                  connected,
+                  connection.origin,
+                  Connecting,
+                  0,
+                  target.addresses,
+                  None,
+                  connection.connect_until,
+                ),
+                ..without.connections
+              ])
+            }
           }
-        }
       }
     }
   }

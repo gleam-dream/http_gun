@@ -45,7 +45,6 @@ pub fn main() -> Nil {
   let inputs = list.repeat(req, 256)
   let settings =
     local_config()
-    |> config.with_request_timeout(config.After(duration.seconds(60)))
     |> config.with_max_connections(4)
     |> config.with_max_connections_per_origin(4)
   let assert Ok(recorded) =

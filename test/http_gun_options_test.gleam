@@ -225,6 +225,19 @@ pub fn queued_cancellation_removes_waiter_without_submission_test() {
   http_gun.stop(client)
 }
 
+fn wait_for_connections(
+  client: http_gun.Client,
+  count: Int,
+  tries: Int,
+) -> Bool {
+  let assert Ok(stats) = http_gun.stats(client)
+  case stats.connections == count, tries {
+    True, _ -> True
+    False, 0 -> False
+    False, _ -> wait_for_connections(client, count, tries - 1)
+  }
+}
+
 fn wait_for_queue(client: http_gun.Client, size: Int, tries: Int) -> Bool {
   let assert Ok(stats) = http_gun.stats(client)
   case stats.queued_requests == size, tries {
@@ -283,51 +296,14 @@ pub fn supplied_deadline_covers_body_test() {
   http_gun.stop(client)
 }
 
-// Regression: a view deadline replaces the client's request timeout instead
-// of taking the earlier of the two, so a per-call budget may exceed the
-// client's default.
-pub fn view_deadline_longer_than_client_request_timeout_succeeds_test() {
-  let #(port, server) = controlled()
+pub fn long_view_timeout_does_not_lift_the_idle_timeout_test() {
   let assert Ok(client) =
     http_gun.start(
       local_config()
-      |> config.with_request_timeout(config.After(duration.milliseconds(100))),
-    )
-  let assert Ok(response) =
-    http_gun.open(
-      client
-        |> http_gun.with_deadline(deadline.after(duration.milliseconds(5000))),
-      req(port),
-    )
-  // Outlive the client's 100 ms request timeout before the body arrives.
-  process.sleep(300)
-  send_control(server, <<"3\r\nabc\r\n0\r\n\r\n":utf8>>)
-  body.collect(response.body, 100)
-  |> should.equal(Ok(body.Collected(<<"abc":utf8>>, [])))
-  body.close(response.body)
-  // The same wait through the client itself still meets its own timeout.
-  let #(port, server) = controlled()
-  let assert Ok(response) = http_gun.open(client, req(port))
-  process.sleep(300)
-  body.next_within(response.body, duration.milliseconds(1000))
-  |> should.equal(Error(
-    error.new(error.DeadlineExceeded, error.MaybeSent)
-    |> error.with_status(200),
-  ))
-  closed(server) |> should.be_true
-  body.close(response.body)
-  http_gun.stop(client)
-}
-
-pub fn infinite_view_timeout_outlives_request_timeout_but_not_idle_timeout_test() {
-  let assert Ok(client) =
-    http_gun.start(
-      local_config()
-      |> config.with_request_timeout(config.After(duration.milliseconds(200)))
       |> config.with_idle_timeout(config.After(duration.milliseconds(300))),
     )
-  let stream = client |> http_gun.with_timeout(config.Infinity)
-  // A body that keeps flowing for longer than the request timeout.
+  let stream = client |> http_gun.with_timeout(duration.hours(1))
+  // A body that keeps flowing for longer than the idle timeout.
   let #(port, server) = controlled()
   let before = now()
   let assert Ok(response) = http_gun.open(stream, req(port))
@@ -426,7 +402,9 @@ pub fn completed_http_survives_later_cancellation_test() {
   http_gun.stop(client)
 }
 
-pub fn last_queued_cancellation_releases_shared_connecting_socket_test() {
+// Each waiter prepares its own connection. Cancelling one keeps every
+// preparation while a waiter remains; cancelling the last releases them all.
+pub fn last_queued_cancellation_releases_every_preparing_socket_test() {
   let #(port, server) = gated()
   let assert Ok(client) =
     http_gun.start(
@@ -447,12 +425,12 @@ pub fn last_queued_cancellation_releases_shared_connecting_socket_test() {
         process.spawn_unlinked(fn() {
           process.send(results, http_gun.send(second_view, request))
         })
-      wait_for_queue(client, 1, 1000) |> should.be_true
+      wait_for_connections(client, 2, 1000) |> should.be_true
       cancellation.cancel(first)
       let assert Ok(Error(failure)) = process.receive(results, 1000)
       failure |> should.equal(error.new(error.Cancelled, error.NotSent))
       let assert Ok(stats) = http_gun.stats(client)
-      stats.connections |> should.equal(1)
+      stats.connections |> should.equal(2)
       cancellation.cancel(second)
       let assert Ok(Error(failure)) = process.receive(results, 1000)
       failure |> should.equal(error.new(error.Cancelled, error.NotSent))

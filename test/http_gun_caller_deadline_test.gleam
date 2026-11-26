@@ -1,0 +1,264 @@
+//// A caller's own process ends its wait at the request deadline, even when
+//// the pool is alive but handles no messages.
+
+import gleam/erlang/process
+import gleam/http/request
+import gleam/int
+import gleam/option.{None, Some}
+import gleam/otp/static_supervisor
+import gleam/result
+import gleam/time/duration
+import gleeunit/should
+import http_gun
+import http_gun/body
+import http_gun/config
+import http_gun/error
+import http_gun/testing
+
+@external(erlang, "http_gun_caller_deadline_test_ffi", "suspend")
+fn suspend(pid: process.Pid) -> Nil
+
+@external(erlang, "http_gun_caller_deadline_test_ffi", "resume")
+fn resume(pid: process.Pid) -> Nil
+
+@external(erlang, "http_gun_caller_deadline_test_ffi", "handled")
+fn handled(pid: process.Pid) -> Nil
+
+@external(erlang, "http_gun_caller_deadline_test_ffi", "queued")
+fn queued(pid: process.Pid) -> Int
+
+@external(erlang, "http_gun_test_server", "serve")
+fn serve(bytes: BitArray) -> Int
+
+@external(erlang, "http_gun_test_server", "controlled")
+fn controlled() -> #(Int, process.Pid)
+
+@external(erlang, "http_gun_test_server", "send_control")
+fn send_control(server: process.Pid, bytes: BitArray) -> Nil
+
+@external(erlang, "http_gun_owner_fault_test_ffi", "monitored_by")
+fn monitored_by(pid: process.Pid) -> List(process.Pid)
+
+fn blocked_client() -> #(http_gun.Client, process.Pid) {
+  blocked_client_with(config.allow_loopback(config.default()))
+}
+
+fn blocked_client_with(
+  settings: config.Config,
+) -> #(http_gun.Client, process.Pid) {
+  let name = process.new_name("http_gun_caller_deadline")
+  let assert Ok(_) =
+    static_supervisor.new(static_supervisor.OneForOne)
+    |> static_supervisor.add(http_gun.supervised(settings, name))
+    |> static_supervisor.start
+  let assert Ok(pool) = process.named(name)
+  #(http_gun.named(name), pool)
+}
+
+pub fn blocked_pool_cannot_hold_a_caller_past_its_deadline_test() {
+  let port = serve(<<"HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n":utf8>>)
+  let assert Ok(req) = request.to("http://localhost:" <> int.to_string(port))
+  let req = request.set_body(req, <<>>)
+  let #(client, pool) = blocked_client()
+  suspend(pool)
+  // A question that submits nothing is bounded the same way.
+  http_gun.stats(http_gun.with_timeout(client, duration.milliseconds(100)))
+  |> should.equal(Error(error.new(error.DeadlineExceeded, error.NotSent)))
+  let outcome = process.new_subject()
+  let caller =
+    process.spawn(fn() {
+      let done = process.new_subject()
+      let client = http_gun.with_timeout(client, duration.milliseconds(200))
+      process.send(outcome, #(done, http_gun.send(client, req)))
+      // Stay alive so the test can look for a late reply in this mailbox.
+      process.receive_forever(done)
+    })
+  let assert Ok(#(done, Error(failure))) = process.receive(outcome, 2000)
+  error.reason(failure) |> should.equal(error.DeadlineExceeded)
+  error.evidence(failure) |> should.equal(error.MaybeSent)
+  // The pool now handles the abandoned request; its answer must not reach
+  // the caller. Two round trips let any reply the pool owes be sent first.
+  resume(pool)
+  let assert Ok(_) = http_gun.stats(client)
+  let assert Ok(_) = http_gun.stats(client)
+  queued(caller) |> should.equal(0)
+  process.send(done, Nil)
+}
+
+pub fn blocked_body_owner_cannot_hold_a_reader_past_its_deadline_test() {
+  let #(port, _server) = controlled()
+  let assert Ok(req) = request.to("http://localhost:" <> int.to_string(port))
+  let req = request.set_body(req, <<>>)
+  let assert Ok(client) =
+    http_gun.start(config.allow_loopback(config.default()))
+  let outcome = process.new_subject()
+  let opened = process.new_subject()
+  let caller =
+    process.spawn(fn() {
+      let go = process.new_subject()
+      let client = http_gun.with_timeout(client, duration.milliseconds(300))
+      let assert Ok(response) = http_gun.open(client, req)
+      process.send(opened, go)
+      process.receive_forever(go)
+      process.send(outcome, body.next(response.body))
+      process.receive_forever(go)
+    })
+  let assert Ok(go) = process.receive(opened, 2000)
+  // Only the body owner monitors the caller once the head has arrived.
+  let assert [owner] = monitored_by(caller)
+  suspend(owner)
+  process.send(go, Nil)
+  let assert Ok(Error(failure)) = process.receive(outcome, 2000)
+  error.reason(failure) |> should.equal(error.DeadlineExceeded)
+  error.evidence(failure) |> should.equal(error.MaybeSent)
+  error.status(failure) |> should.equal(option.Some(200))
+  resume(owner)
+  // The owner now answers the abandoned read; the answer must not arrive.
+  // `handled` returns only after the owner has processed that read.
+  handled(owner)
+  process.sleep(50)
+  queued(caller) |> should.equal(0)
+  process.send(go, Nil)
+  http_gun.stop(client)
+}
+
+pub fn zero_timeout_fails_before_anything_is_sent_test() {
+  let assert Ok(client) =
+    http_gun.start(config.allow_loopback(config.default()))
+  let assert Ok(req) = request.to("http://localhost:1/")
+  let assert Error(failure) =
+    http_gun.send(
+      http_gun.with_timeout(client, duration.milliseconds(0)),
+      request.set_body(req, <<>>),
+    )
+  error.reason(failure) |> should.equal(error.DeadlineExceeded)
+  error.evidence(failure) |> should.equal(error.NotSent)
+  http_gun.stop(client)
+}
+
+pub fn verify_on_a_blocked_pool_is_not_a_stopped_client_test() {
+  let #(client, pool) = blocked_client()
+  suspend(pool)
+  // The pool is alive: it only failed to answer by the view's deadline.
+  testing.verify(http_gun.with_timeout(client, duration.milliseconds(100)))
+  |> should.equal(Error(testing.NotAnswered))
+  resume(pool)
+}
+
+pub fn batch_never_runs_without_its_byte_limit_test() {
+  let port = serve(<<"HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nabcde":utf8>>)
+  let assert Ok(req) = request.to("http://localhost:" <> int.to_string(port))
+  let req = request.set_body(req, <<>>)
+  let #(client, pool) =
+    blocked_client_with(
+      config.default()
+      |> config.allow_loopback
+      |> config.with_max_batch_bytes(4),
+    )
+  suspend(pool)
+  let outcome = process.new_subject()
+  process.spawn(fn() {
+    let client = http_gun.with_timeout(client, duration.milliseconds(100))
+    process.send(outcome, http_gun.batch(client, [req], 1))
+  })
+  // The batch's lookup of its byte limit expires on the suspended pool. A
+  // request reaching the pool after it means the batch went on without the
+  // limit; let the pool answer that request.
+  await_queued(pool, 2, 40)
+  resume(pool)
+  let assert Ok(Ok([only])) = process.receive(outcome, 2000)
+  // Without its limit the batch would have kept this five-byte body.
+  only
+  |> should.equal(Error(error.new(error.DeadlineExceeded, error.NotSent)))
+}
+
+fn await_queued(pid: process.Pid, count: Int, tries: Int) -> Nil {
+  case queued(pid) >= count || tries == 0 {
+    True -> Nil
+    False -> {
+      process.sleep(50)
+      await_queued(pid, count, tries - 1)
+    }
+  }
+}
+
+type Command {
+  Next
+  NextWithin(Int)
+  Finish
+}
+
+fn reader(
+  commands: process.Subject(Command),
+  stream: body.Body,
+  results: process.Subject(Result(option.Option(body.Event), error.Failure)),
+) -> Nil {
+  case process.receive_forever(commands) {
+    Next -> {
+      process.send(results, result.map(body.next(stream), Some))
+      reader(commands, stream, results)
+    }
+    NextWithin(ms) -> {
+      process.send(results, body.next_within(stream, duration.milliseconds(ms)))
+      reader(commands, stream, results)
+    }
+    Finish -> body.close(stream)
+  }
+}
+
+pub fn local_wait_ends_on_a_blocked_owner_and_keeps_its_chunk_test() {
+  let #(port, server) = controlled()
+  let assert Ok(req) = request.to("http://localhost:" <> int.to_string(port))
+  let req = request.set_body(req, <<>>)
+  let assert Ok(client) =
+    http_gun.start(config.allow_loopback(config.default()))
+  let results = process.new_subject()
+  let opened = process.new_subject()
+  let caller =
+    process.spawn(fn() {
+      let client = http_gun.with_timeout(client, duration.seconds(10))
+      let assert Ok(response) = http_gun.open(client, req)
+      let commands = process.new_subject()
+      process.send(opened, commands)
+      reader(commands, response.body, results)
+    })
+  let assert Ok(commands) = process.receive(opened, 2000)
+  let assert [owner] = monitored_by(caller)
+  suspend(owner)
+  // The chunk reaches the owner's mailbox ahead of the read.
+  send_control(server, <<"3\r\nabc\r\n":utf8>>)
+  await_queued(owner, 1, 40)
+  process.send(commands, NextWithin(100))
+  // The owner cannot answer, so the reader's own wait ends the read, long
+  // before the request deadline.
+  process.receive(results, 2000) |> should.equal(Ok(Ok(None)))
+  resume(owner)
+  // The owner now handles the chunk and then the abandoned read.
+  handled(owner)
+  process.send(commands, Next)
+  process.receive(results, 2000)
+  |> should.equal(Ok(Ok(Some(body.Chunk(<<"abc":utf8>>)))))
+  send_control(server, <<"0\r\n\r\n":utf8>>)
+  process.send(commands, Next)
+  process.receive(results, 2000) |> should.equal(Ok(Ok(Some(body.End([])))))
+  process.send(commands, Finish)
+  http_gun.stop(client)
+}
+
+pub fn a_pool_resumed_after_the_deadline_submits_nothing_test() {
+  let port = serve(<<"HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n":utf8>>)
+  let assert Ok(req) = request.to("http://localhost:" <> int.to_string(port))
+  let req = request.set_body(req, <<>>)
+  let #(client, pool) = blocked_client()
+  suspend(pool)
+  let assert Error(failure) =
+    http_gun.send(
+      http_gun.with_timeout(client, duration.milliseconds(100)),
+      req,
+    )
+  error.reason(failure) |> should.equal(error.DeadlineExceeded)
+  resume(pool)
+  // The pool meets the request only after its deadline, so it opens no
+  // connection and starts no body owner for it.
+  http_gun.stats(client) |> should.equal(Ok(http_gun.Stats(0, 0, 0)))
+}

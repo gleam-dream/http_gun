@@ -10,6 +10,7 @@ import gleeunit/should
 import http_gun
 import http_gun/body
 import http_gun/config
+import http_gun/destination
 import http_gun/error
 
 @external(erlang, "http_gun_test_server", "controlled")
@@ -20,6 +21,12 @@ fn emit(server: process.Pid, bytes: BitArray) -> Nil
 
 @external(erlang, "http_gun_test_server", "persistent")
 fn persistent() -> Int
+
+@external(erlang, "http_gun_tls_test_server", "slow_handshake")
+fn slow_handshake(handshake_ms: Int, response_ms: Int) -> Int
+
+@external(erlang, "http_gun_tls_test_server", "anchors")
+fn anchors(name: String) -> List(BitArray)
 
 @external(erlang, "http_gun_measure_ffi", "reductions")
 fn reductions() -> Int
@@ -103,9 +110,9 @@ pub fn queued_deadline_is_not_submitted_test() {
   let assert Ok(client) =
     http_gun.start(
       local_config()
-      |> config.with_request_timeout(config.After(duration.milliseconds(150)))
       |> config.with_max_open_bodies(1),
     )
+  let client = http_gun.with_timeout(client, duration.milliseconds(150))
   let assert Ok(slow) = http_gun.open(client, req(port))
   let assert Error(failure) = http_gun.send(client, req(port))
   error.evidence(failure) |> should.equal(error.NotSent)
@@ -434,9 +441,9 @@ pub fn idle_connection_yields_capacity_to_other_origin_test() {
   let assert Ok(client) =
     http_gun.start(
       local_config()
-      |> config.with_request_timeout(config.After(duration.milliseconds(500)))
       |> config.with_max_connections(1),
     )
+  let client = http_gun.with_timeout(client, duration.milliseconds(500))
   let assert Ok(_) = http_gun.send(client, req(persistent()))
   let assert Ok(_) = http_gun.send(client, req(persistent()))
   http_gun.stop(client)
@@ -463,9 +470,6 @@ pub fn burst_work_scales_with_requests_test() {
   let assert Ok(client) =
     http_gun.start(
       local_config()
-      |> config.with_request_timeout(
-        config.After(duration.milliseconds(10_000)),
-      )
       |> config.with_max_connections(4)
       |> config.with_max_connections_per_origin(4)
       |> config.with_max_open_bodies(1024)
@@ -569,10 +573,10 @@ pub fn queued_deadlines_remove_entries_and_restore_capacity_test() {
   let assert Ok(client) =
     http_gun.start(
       local_config()
-      |> config.with_request_timeout(config.After(duration.milliseconds(150)))
       |> config.with_max_open_bodies(1)
       |> config.with_max_queued_requests(32),
     )
+  let client = http_gun.with_timeout(client, duration.milliseconds(150))
   let port = persistent()
   let assert Ok(held) = http_gun.open(client, req(port))
   let done = process.new_subject()
@@ -630,4 +634,80 @@ pub fn eligible_origins_take_turns_under_shared_body_capacity_test() {
 // These exercises connect only to explicitly permitted local test servers.
 fn local_config() -> config.Config {
   config.default() |> config.allow_loopback
+}
+
+// A burst to a fresh origin prepares one connection per waiter, up to the
+// per-origin limit, at the same time instead of one after another.
+pub fn cold_origin_prepares_connections_concurrently_test() {
+  let port = persistent()
+  let entered = process.new_subject()
+  let assert Ok(client) =
+    local_config()
+    |> config.with_max_connections_per_origin(3)
+    |> config.with_resolver(fn(_, _) {
+      // Each preparation announces itself, then waits for the test.
+      let gate = process.new_subject()
+      process.send(entered, gate)
+      let _ = process.receive(gate, 5000)
+      Ok([destination.Ipv4(127, 0, 0, 1)])
+    })
+    |> http_gun.start
+  let done = process.new_subject()
+  list.each(list.repeat(Nil, 5), fn(_) {
+    process.spawn(fn() { process.send(done, http_gun.send(client, req(port))) })
+  })
+  // Three preparations start without waiting for one another; the other
+  // two waiters do not add a fourth.
+  let gates =
+    list.filter_map(list.repeat(Nil, 4), fn(_) { process.receive(entered, 500) })
+  list.length(gates) |> should.equal(3)
+  list.each(gates, fn(gate) { process.send(gate, Nil) })
+  list.each(list.repeat(Nil, 5), fn(_) {
+    let assert Ok(Ok(_)) = process.receive(done, 5000)
+  })
+  // A connection that finishes after the last waiter left is not kept.
+  let assert Ok(stats) = http_gun.stats(client)
+  { stats.connections <= 3 } |> should.be_true
+  http_gun.stop(client)
+}
+
+pub fn a_preparation_keeps_its_own_connect_budget_test() {
+  // Every TLS handshake takes 150 ms.
+  let port = slow_handshake(150, 0)
+  let entered = process.new_subject()
+  let assert Ok(client) =
+    local_config()
+    |> config.with_trust(config.Anchors(anchors("ca")))
+    |> config.with_max_connections_per_origin(2)
+    |> config.with_resolver(fn(_, _) {
+      let gate = process.new_subject()
+      process.send(entered, gate)
+      let _ = process.receive(gate, 5000)
+      Ok([destination.Ipv4(127, 0, 0, 1)])
+    })
+    |> http_gun.start
+  let assert Ok(secure) =
+    request.to("https://localhost:" <> int.to_string(port) <> "/")
+  let secure = request.set_body(secure, <<>>)
+  let first = process.new_subject()
+  let second = process.new_subject()
+  process.spawn(fn() {
+    let client = http_gun.with_timeout(client, duration.milliseconds(250))
+    process.send(first, http_gun.send(client, secure))
+  })
+  let assert Ok(first_gate) = process.receive(entered, 1000)
+  process.spawn(fn() {
+    let client = http_gun.with_timeout(client, duration.seconds(5))
+    process.send(second, http_gun.send(client, secure))
+  })
+  let assert Ok(second_gate) = process.receive(entered, 1000)
+  // The second preparation's address arrives while the lane head has about
+  // 100 ms left, less than one handshake. The second request has seconds.
+  process.sleep(150)
+  process.send(second_gate, Nil)
+  let assert Ok(Ok(_)) = process.receive(second, 3000)
+  let assert Ok(Error(failure)) = process.receive(first, 3000)
+  error.reason(failure) |> should.equal(error.DeadlineExceeded)
+  process.send(first_gate, Nil)
+  http_gun.stop(client)
 }

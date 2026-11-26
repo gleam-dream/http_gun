@@ -35,7 +35,6 @@ fn remove(path: String) -> Nil
 
 fn settings() -> config.Config {
   config.default()
-  |> config.with_request_timeout(config.After(duration.milliseconds(1000)))
   |> config.allow_loopback
 }
 

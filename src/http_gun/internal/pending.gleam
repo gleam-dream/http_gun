@@ -35,7 +35,9 @@ pub type Pending {
     request: fn() -> request.Request(BitArray),
     origin: Origin,
     reply: fn(Result(response.Response(owner.Body), Failure)) -> Nil,
-    deadline: Option(Int),
+    /// Run by the body owner, in its own process, once it holds `reply`.
+    launched: fn() -> Nil,
+    deadline: Int,
     pool_until: Int,
     idle: settings.Bound,
     policies: List(destination.Policy),
@@ -59,7 +61,7 @@ type Entry {
 }
 
 type Ends {
-  Ends(first: Reference, last: Reference)
+  Ends(first: Reference, last: Reference, size: Int)
 }
 
 pub opaque type Queue {
@@ -122,6 +124,41 @@ pub fn first(queue: Queue, group: Group) -> Result(Pending, Nil) {
   }
 }
 
+/// How many requests wait in one group.
+pub fn size(queue: Queue, group: Group) -> Int {
+  case dict.get(queue.groups, group) {
+    Error(_) -> 0
+    Ok(ends) -> ends.size
+  }
+}
+
+/// Up to `limit` requests of one group that hold no reservation, oldest
+/// first. The walk stops once it has them.
+pub fn unreserved(queue: Queue, group: Group, limit: Int) -> List(Pending) {
+  case dict.get(queue.groups, group) {
+    Error(_) -> []
+    Ok(ends) -> walk(queue, Some(ends.first), limit, [])
+  }
+}
+
+fn walk(
+  queue: Queue,
+  id: Option(Reference),
+  limit: Int,
+  acc: List(Pending),
+) -> List(Pending) {
+  case id, limit {
+    None, _ | _, 0 -> list.reverse(acc)
+    Some(id), _ -> {
+      let assert Ok(entry) = dict.get(queue.entries, id)
+      case entry.value.reservation {
+        None -> walk(queue, entry.next, limit - 1, [entry.value, ..acc])
+        Some(_) -> walk(queue, entry.next, limit, acc)
+      }
+    }
+  }
+}
+
 fn counted(p: Pending) -> Int {
   case p.reservation {
     None -> 1
@@ -132,12 +169,12 @@ fn counted(p: Pending) -> Int {
 // Public open waits for its reply, so a caller has at most one pending open.
 pub fn push(queue: Queue, group: Group, p: Pending) -> Queue {
   let #(entries, ends, previous) = case dict.get(queue.groups, group) {
-    Error(_) -> #(queue.entries, Ends(p.id, p.id), None)
+    Error(_) -> #(queue.entries, Ends(p.id, p.id, 1), None)
     Ok(ends) -> {
       let assert Ok(last) = dict.get(queue.entries, ends.last)
       #(
         dict.insert(queue.entries, ends.last, Entry(..last, next: Some(p.id))),
-        Ends(..ends, last: p.id),
+        Ends(..ends, last: p.id, size: ends.size + 1),
         Some(ends.last),
       )
     }
@@ -188,10 +225,23 @@ pub fn remove(queue: Queue, id: Reference) -> #(Option(Pending), Queue) {
       let groups = case entry.previous, entry.next {
         None, None -> dict.delete(queue.groups, entry.group)
         None, Some(first) ->
-          dict.insert(queue.groups, entry.group, Ends(..ends, first: first))
+          dict.insert(
+            queue.groups,
+            entry.group,
+            Ends(..ends, first: first, size: ends.size - 1),
+          )
         Some(last), None ->
-          dict.insert(queue.groups, entry.group, Ends(..ends, last: last))
-        Some(_), Some(_) -> queue.groups
+          dict.insert(
+            queue.groups,
+            entry.group,
+            Ends(..ends, last: last, size: ends.size - 1),
+          )
+        Some(_), Some(_) ->
+          dict.insert(
+            queue.groups,
+            entry.group,
+            Ends(..ends, size: ends.size - 1),
+          )
       }
       #(
         Some(entry.value),

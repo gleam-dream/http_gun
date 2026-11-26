@@ -50,7 +50,6 @@ pub fn configure_test() {
   let settings =
     config.default()
     |> config.with_protocol(config.PreferHttp2)
-    |> config.with_request_timeout(config.After(duration.seconds(10)))
     |> config.with_max_response_body_bytes(1_048_576)
   config.validate(settings) |> should.be_ok
   config.default()
@@ -68,7 +67,7 @@ pub fn client_views_and_streaming_test() {
   let order = correlation.unique()
   let stream =
     client
-    |> http_gun.with_timeout(config.Infinity)
+    |> http_gun.with_timeout(duration.hours(1))
     |> http_gun.with_idle_timeout(config.After(duration.seconds(60)))
     |> http_gun.with_correlation(order)
   let counted = {

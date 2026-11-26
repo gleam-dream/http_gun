@@ -61,7 +61,7 @@ pub fn scripted_lifecycle_has_correlation_without_network_submission_test() {
   let client = http_gun.with_correlation(shared, correlation)
   // A library given this view reads the caller's correlation from it.
   http_gun.correlation(client) |> should.equal(Some(correlation))
-  http_gun.correlation(client |> http_gun.with_timeout(config.Infinity))
+  http_gun.correlation(client |> http_gun.with_timeout(duration.hours(1)))
   |> should.equal(Some(correlation))
   let assert Ok(result) = http_gun.send(client, req)
   result.response |> should.equal(response.Response(201, [], <<0, 255>>))

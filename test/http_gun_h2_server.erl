@@ -1,12 +1,23 @@
 -module(http_gun_h2_server).
 
--export([start/0, controlled/0]).
+-export([start/0, controlled/0, held/0, await_held/0, release/1]).
 
-start() -> start(none).
+start() -> start(none, false).
 
-controlled() -> start(self()).
+controlled() -> start(self(), false).
 
-start(Observer) ->
+%% Each connection reads the client preface, tells the caller
+%% {settings_held, Pid}, and sends its initial SETTINGS only after `release`.
+held() -> start(self(), true).
+
+await_held() ->
+    receive {settings_held, P} -> P after 2000 -> error(no_connection) end.
+
+release(P) ->
+    P ! release,
+    nil.
+
+start(Observer, Hold) ->
     application:ensure_all_started(ssl),
     {ok, L} = ssl:listen(0,
                          [binary,
@@ -17,10 +28,10 @@ start(Observer) ->
                           {keyfile, "test/fixtures/localhost.key"},
                           {alpn_preferred_protocols, [<<"h2">>]}]),
     {ok, {_, Port}} = ssl:sockname(L),
-    spawn(fun () -> accept(L, Observer) end),
+    spawn(fun () -> accept(L, Observer, Hold) end),
     Port.
 
-accept(L, Observer) ->
+accept(L, Observer, Hold) ->
     case ssl:transport_accept(L, 5000) of
         {ok, S} ->
             case ssl:handshake(S, 5000) of
@@ -30,6 +41,17 @@ accept(L, Observer) ->
                                           go ->
                                               {ok, <<"PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n">>} =
                                                   ssl:recv(S, 24, 5000),
+                                              case Hold of
+                                                  true ->
+                                                      Observer ! {settings_held, self()},
+                                                      receive
+                                                          release -> ok
+                                                      after 5000 ->
+                                                          ssl:close(S),
+                                                          exit(normal)
+                                                      end;
+                                                  false -> ok
+                                              end,
                                               ok = ssl:send(S,
                                                             cow_http2:settings(#{max_concurrent_streams
                                                                                      => 1000})),
@@ -43,10 +65,10 @@ accept(L, Observer) ->
                               end),
                     ok = ssl:controlling_process(S, P),
                     P ! go,
-                    accept(L, Observer);
+                    accept(L, Observer, Hold);
                 {error, _} ->
                     ssl:close(S),
-                    accept(L, Observer)
+                    accept(L, Observer, Hold)
             end;
         _ -> ssl:close(L)
     end.
@@ -107,6 +129,11 @@ loop(S, B, Decode, Encode, Id, Observer, Pending) ->
                                        ssl:send(S, [cow_http2:goaway(Stream, no_error, <<>>),
                                            [cow_http2:data(Id0, fin, <<"tail">>) || {Id0, slow} <- maps:to_list(Pending)],
                                            cow_http2:data(Stream, fin, <<"done">>)]);
+                                   <<"/goaway-hold">> ->
+                                       %% Earlier streams stay open: the connection drains.
+                                       ssl:send(S,
+                                                [cow_http2:goaway(Stream, no_error, <<>>),
+                                                 cow_http2:data(Stream, fin, <<"done">>)]);
                                    <<"/goaway">> ->
                                        ssl:send(S,
                                                 [cow_http2:goaway(Stream, no_error, <<>>),

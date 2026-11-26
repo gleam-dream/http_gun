@@ -113,7 +113,7 @@
     #subsection(title: "Values and refinements", [
       #facts(([Value], [Meaning and refinement], [Ownership]), (
         ([Request], [`Request(BitArray)` preserves method, scheme, host, port, target, ordered headers and whole body bytes. Construction is pure.], [Caller authors; admission validates]),
-        ([Response], [Final status and ordered duplicate headers plus a body capability or collected bytes. Trailers remain separate. Non-success statuses remain data.], [Body owner observes]),
+        ([Response], [Final status and ordered duplicate headers plus a body capability or collected bytes. Trailers remain separate. Non-success statuses remain data. Header and trailer names and values are text: bytes a peer sent that are not UTF-8 are read as ISO-8859-1, and UTF-8 is kept as sent.], [Body owner observes]),
         ([Origin], [Lowercase unbracketed host, effective 80/443 or explicit port, TLS choice. Port is 1–65535.], [Pool derives at validation]),
         ([Config and view], [Opaque immutable configuration and per-handle overrides. A view contains optional timeout, deadline, idle bound, cancellation, body limit, policies and correlation.], [Caller authors; client startup validates config]),
         ([Address], [IPv4/IPv6 integer components. Invalid components classify Reserved. Policy uses Public, Loopback, Private or Reserved.], [Resolver observes; destination policy decides]),
@@ -139,7 +139,7 @@
         #relates(cardinality: "1 : 0..n")[tracks body owners until close or process death]
       ]
       #state-machine(id: "client-lifetime", subject: "client", state-field: "phase", state-type: "client-phase", title: "Client draining", caption: [Closed includes an absent process. A named handle reaches a replacement pool without reviving old exchanges.], states: ("running", "draining", "closed"), initial: "running", accepting: ("closed",), transitions: (("running", "draining", "stop"), ("draining", "closed", "active leases settle or grace expires"), ("running", "closed", "process loss")))
-      #state-type(id: "connection-phase", title: "Connection phase", variants: ("resolving", "connecting", "ready", "checking", "checked", "removed"))
+      #state-type(id: "connection-phase", title: "Connection phase", variants: ("resolving", "connecting", "ready", "checking", "checked", "going-away", "removed"))
       #entity(id: "connection", title: "Connection reservation", description: [A pool-owned identity for preparation and a native connection's capacity.], kind: "entity", owner: "HTTP exchange", lifecycle: "stateful", domain: "HTTP exchange", tint: "teal")[
         #attribute(id: "phase", name: "Phase", type: "Connection phase", provenance: "derived", state-type: "connection-phase", state-machine: "connection-lifetime")[A transition-derived scheduling state; removed means absent from the pool.]
         #attribute(name: "Origin", type: "Canonical origin", provenance: "derived")[Derived from the first request without changing original HTTP authority.]
@@ -148,10 +148,10 @@
         #relates(cardinality: "n : 1")[belongs to one client pool]
         #relates(cardinality: "1 : 0..n")[carries stream leases]
       ]
-      #state-machine(id: "connection-lifetime", subject: "connection", state-field: "phase", state-type: "connection-phase", title: "Connection preparation and reuse", caption: [Checking and Checked apply to H1. A checked observation is consumed by one admission pass.], states: ("resolving", "connecting", "ready", "checking", "checked", "removed"), initial: "resolving", accepting: ("removed",), flow: "top-to-bottom", transitions: (("resolving", "connecting", "whole answer admitted"), ("resolving", "removed", "refusal / expiry / no waiter"), ("connecting", "ready", "H2 up"), ("connecting", "checked", "H1 up"), ("ready", "checking", "H1 reuse candidate"), ("checking", "checked", "connected H1 observed"), ("checking", "removed", "unusable / job loss"), ("checked", "ready", "launch or admission pass ends"), ("connecting", "removed", "connect failure"), ("ready", "removed", "down / idle / dirty H1 release"), ("checked", "removed", "shutdown / loss")))
+      #state-machine(id: "connection-lifetime", subject: "connection", state-field: "phase", state-type: "connection-phase", title: "Connection preparation and reuse", caption: [Checking and Checked apply to H1. A checked observation is consumed by one admission pass.], states: ("resolving", "connecting", "ready", "checking", "checked", "going-away", "removed"), initial: "resolving", accepting: ("removed",), flow: "top-to-bottom", transitions: (("resolving", "connecting", "whole answer admitted"), ("resolving", "removed", "refusal / expiry / no waiter"), ("connecting", "ready", "H2 up"), ("connecting", "checked", "H1 up"), ("ready", "checking", "H1 reuse candidate"), ("checking", "checked", "connected H1 observed"), ("checking", "removed", "unusable / job loss"), ("checked", "ready", "launch or admission pass ends"), ("connecting", "removed", "connect failure"), ("ready", "removed", "down / idle / dirty H1 release"), ("checked", "removed", "shutdown / loss"), ("ready", "going-away", "stream refused as peer draining"), ("going-away", "removed", "last lease released / down")))
       #points(
         [A vacant client/connection is represented by process absence or removed membership. Restart creates new authority. Checked readiness can be revoked by job failure or discarded at the end of an admission pass.],
-        [H2 Ready includes protocol and capacity. Initial capacity is zero until peer SETTINGS. Existing used streams may exceed a newly reduced peer limit; the pool admits no additional stream until usage falls below it.],
+        [An H2 connection that is up but has not received the peer's initial SETTINGS is settling: it carries no stream and counts as a preparation. SETTINGS make it Ready with protocol and capacity; a peer that later advertises zero capacity leaves it Ready and full, no longer preparing. Existing used streams may exceed a newly reduced peer limit; the pool admits no additional stream until usage falls below it.],
       )
     ])
 
@@ -195,7 +195,7 @@
     #subsection(title: "Configuration validation and mode choice", [
       #points(
         [`Config`, `Policy`, `Redaction` and `RecordOptions` are opaque caller-built values. Value-first setters permit extension without forcing callers to construct all fields. Returned Buffered and Stats records are read by label; consumers leave room for added fields. #adr(2)],
-        [Positive capacities are required for connections, per-origin connections, H2 streams, open bodies, header bytes/count, buffered bytes and batch bytes. Queue, request-body and response-body limits may be zero. Connect, pool and pooled-idle timeouts are positive; shutdown may be zero. Request/idle timeout may be explicit Infinity.],
+        [Positive capacities are required for connections, per-origin connections, H2 streams, open bodies, header bytes/count, buffered bytes and batch bytes. Queue, request-body and response-body limits may be zero. Connect, pool and pooled-idle timeouts are positive; shutdown may be zero. The idle timeout may be explicit Infinity. The request timeout is not configuration: it belongs to each call.],
         [In-memory trust anchors must be nonempty whole-byte values and their list must be nonempty. Invalid host-list entries fail configuration validation. Actual certificate or CA-file validity is established by OTP when connecting, rather than by pure settings construction.],
         [Live startup, offline startup and recording startup return the same Client type. Recording also returns a Recording capability. Application startup chooses a mode explicitly; requests read no environment variables and contain no automatic mode fallback.],
       )
@@ -208,7 +208,7 @@
     ])
     #subsection(title: "Default settings", [
       #points(
-        [Every timeout, deadline and wait is a `gleam/time/duration.Duration` held as whole milliseconds; a sub-millisecond remainder rounds away from zero. Unbounded request or idle timeout is `config.Infinity`; a bounded one is `config.After(duration)`. Lifting the request timeout never lifts the connect, pool or idle timeout, and each request phase is also capped by the time left in the request.],
+        [Every timeout, deadline and wait is a `gleam/time/duration.Duration` held as whole milliseconds; a sub-millisecond remainder rounds away from zero. An unbounded idle timeout is `config.Infinity`; a bounded one is `config.After(duration)`. Every request has a finite deadline, and each request phase is also capped by the time left in the request.],
         [`config.validate` checks settings without starting a process. `start` returns InvalidConfig for an out-of-range value. Capacity and timeout defaults appear in Budgets and effect timing.],
       )
       #facts(([Setting], [Default], [Selected with]), (
@@ -261,7 +261,8 @@
         [A #term("term-client-view") copies only a handle and its view values. Scalar setters replace their prior value. Destination setters append policies whose intersection is the #term("term-destination-policy") applied at every operation. Later correlation replaces earlier correlation.],
         [with_cancellation replaces the view's cancellation tokens with one token. with_additional_cancellation retains existing tokens and adds a distinct token. Any retained token can cancel requests through that view without cancelling another token or changing another view.],
         [`cancellation.with_token` creates one #term("term-cancellation-token") process for its lexical scope. Cancellation kills the token process, which makes every copy remain cancelled. Current pending and body owners receive their monitors' death signal; a later attempt sees the dead token before submission. Pending rejection, admission handoff and body termination remove every owned token monitor. Adding cancellation creates no process and takes no token lifetime ownership. #adr(12) records the library-composition requirement. Callback return, exception or creator death ends the token. Applications bound the number and lifetime of token scopes.],
-        [A view's relative request timeout or absolute deadline replaces the startup request timeout, whether shorter or longer. With both supplied, the earlier applies. With neither, the startup timeout starts from the invocation's monotonic entry instant before admission.],
+        [Every request has a finite deadline, fixed by the calling process at the invocation's monotonic entry instant before admission: the view's absolute deadline, the view's relative timeout from entry, the earlier of the two when both are set, or 30 seconds from entry when neither is. A timeout of zero or less fails before admission with DeadlineExceeded and NotSent. #adr(21)],
+        [The calling process enforces the deadline. It waits for the pool and then the body owner until the deadline plus a short grace, and on expiry returns DeadlineExceeded with MaybeSent, because the process holding the reply may have submitted the request. Body reads and closes wait until the later of the deadline and the call, plus the same grace. Replies reach the caller through a per-call alias that the caller deactivates when its wait ends, so no reply of an abandoned call stays in its mailbox.],
         [The absolute Deadline is VM-local and cannot be serialized as durable policy. Reading remaining duration never renews it. Every public duration is converted to whole milliseconds with sub-millisecond remainders rounded away from zero. Nonpositive Deadline creation is immediately expired.],
         [Views do not change immutable client identity, connection trust, protocol, resolver or startup socket timeout options. Idle read can be replaced per view; pooled socket send settings continue to use startup idle timeout. The body owner's independent overall timer still cancels an earlier request budget.],
         [`with_body_limit` replaces collection policy only. Negative view collection limits fail before submission. A zero limit permits an empty body; Truncate can return an empty prefix on overflow.],
@@ -280,7 +281,7 @@
         [`start` links the pool to its caller. `supervised(config, name)` supplies a child specification; `named(name)` is pure and targets the current registered process. During restart absence, operations return ClientClosed with NotSent. An old body is never revived by pool restart.],
         [`stop` refuses new admission, fails queued work with ClientClosed/NotSent and waits for active leases within the #term("term-shutdown-grace"). Grace expiry locally closes unfinished bodies and native connections. Completed retained body actors lose the client authority when the pool exits. Repeated stop is harmless.],
         [Shutdown grace bounds the planned drain. Serial body close calls, actor scheduling and synchronous observation handlers are additional work; this is not a hard real-time stop bound.],
-        [Pool notifications go to the pool actor. Gun replies go directly to the body owner. Public calls monitor only their own target, consume the typed result and flush that monitor on completion. Response data and stale monitor notifications are not forwarded to the HTTP caller.],
+        [Pool notifications go to the pool actor. Gun replies go directly to the body owner. Public calls monitor only their own target, consume the typed result and flush that monitor on completion. An open call waits on two targets in turn: the pool until admission, then also the body owner, which announces itself to the caller before it can answer. A body owner that exits before answering yields RequestFailed(UnknownTransport) with MaybeSent, and one that stays alive without answering is bounded by the caller's deadline, so no fault in the process holding the reply leaves the caller waiting. Response data and stale monitor notifications are not forwarded to the HTTP caller.],
       )
       #behavior(title: "Stop ends admission before draining", level: "boundary", area: "Client lifecycle")[
         #given[the client has pending and active work]
@@ -364,7 +365,7 @@
       #points(
         [Live/recording scheduling uses one FIFO #term("term-origin-lane") per canonical origin. An admission pass stops at a blocked lane head and considers other lanes. Lanes that make progress rotate their position. Playback uses one global session lane to preserve matching order.],
         [Reuse comes before opening another connection. If global capacity is full, an unused ready connection for another origin may be evicted when that origin has no waiter. Idle sockets are a cache rather than a permanent capacity claim. #adr(3)],
-        [Resolving/connecting/checking slots are finite. Only one new preparation exists per origin while that origin already prepares a connection. At most one H1 readiness job exists per connection. A readiness job also reserves an open body slot to preserve admission order at capacity one.],
+        [Resolving/connecting/checking slots are finite. An origin prepares at most one new connection per waiting request, within its per-origin and the total connection limits. Behind a waiting lane head, requests without a preparation start one, oldest first, but never launch: the head takes the first connection that becomes ready. A preparation's own connect budget bounds its connection; no waiting request's deadline shortens it or discards it, and each request's deadline is checked when it takes a lease. At most one H1 readiness job exists per connection. A readiness job also reserves an open body slot to preserve admission order at capacity one. #adr(22)],
         [Work crossing process boundaries captures only required values. A batch worker captures one input and its operation. Release/capture callbacks capture message destinations. They do not capture pool pending queues or completed batch results.],
       )
     ])
@@ -373,7 +374,7 @@
         [An H1 lease is exclusive; the package does not pipeline independent requests. Before idle reuse, a bounded Gleam job calls supported `gun:info` and accepts connected HTTP state. Checking never blocks the pool. Checked is valid for one immediate admission pass and is reset if a body cannot launch.],
         [An unusable idle H1 connection is discarded before Gun request invocation. The original request retains position, deadline and cancellation while replacement preparation proceeds. A peer may still close after inspection; that submitted failure remains MaybeSent without retry.],
         [Http1 selects H1. PreferHttp2 negotiates H2 over TLS with H1 fallback; plaintext uses H1. RequireHttp2 refuses H1 negotiation and supports plaintext H2 prior knowledge. HTTP/2 receives no application stream before initial peer SETTINGS. Capacity is the lower of peer and configured stream limits.],
-        [Gun owns H2 flow control, framing, GOAWAY and stream state. The pool uses supported up/settings/down events. Eligibility inspection is not atomic with GOAWAY or request submission. A race returns conservative failure and performs no hidden replay. #adr(8)],
+        [Gun owns H2 flow control, framing, GOAWAY and stream state. The pool uses supported up/settings/down events. Eligibility inspection is not atomic with GOAWAY or request submission. A race returns conservative failure and performs no hidden replay. Gun reports no GOAWAY event, so the pool learns that a connection is going away from the first body owner whose stream Gun refuses as PeerDraining. From then the connection admits no stream, keeps the streams it carries and is closed when the last of them is released. #adr(8)],
         [An unexpected body-owner initialization failure may lack a stream reference; the pool closes that connection and affected siblings can fail. Healthy H2 sibling preservation applies to ordinary stream cancellation, not to lost connection ownership.],
       )
     ])
@@ -382,6 +383,7 @@
         [#term("term-http-termination") releases the #term("term-stream-lease") exactly once. The #term("term-open-body-slot") remains occupied for a finished explicit handle until close or process death. Stats therefore distinguish finished handles from used transport streams.],
         [Clean H1 completion allows reuse unless request or response contains a case-insensitive comma-separated Connection close token. Early H1 cancel/failure retires the exclusive connection. H2 cancellation cancels that stream and preserves healthy siblings.],
         [Retained bytes/trailers and terminal failure are readable after HTTP completion, even if the deadline subsequently passes. Closing clears cursor authority and is idempotent. Owner death and client loss converge on the same local cleanup.],
+        [Gun's own closing timer never ends a call: a call ends at its deadline, its idle bound, its cancellation, its body close, the end of the response, a transport failure or the loss of its client. The closing timer is disabled for H1 and H2, so a response that announces `connection: close` or arrives after GOAWAY streams until it ends or its call ends. A connection never outlives its client: a body owner that loses its client closes its connection. #adr(24)],
         [A ready unused connection gets one generation-marked idle timer. Reuse invalidates its old idle reference. Stale timers cannot close an in-use connection.],
       )
       #behavior(title: "Closing one H2 body preserves siblings", level: "boundary", area: "Connection leases")[
@@ -405,8 +407,9 @@
     ])
     #subsection(title: "Demand reads and terminal arbitration", [
       #points(
-        [The opener is the sole read owner. If a #term("term-read-wait") already exists, another read returns ReadConflict before owner validation. Otherwise another process returns WrongOwner. Another capability holder may close the shared body.],
-        [`next` waits for Chunk, End(trailers) or Failure. `next_within` adds a local wait; expiry returns None and removes only that read wait. Already admitted bytes and outstanding credit remain. A polling read still grants demand before local expiry is honored.],
+        [The opener is the sole read owner. If a #term("term-read-wait") already exists, a read from another process returns ReadConflict before owner validation. Otherwise another process returns WrongOwner. A read from the opener replaces a read wait it left behind, because the opener waits for one read at a time. Another capability holder may close the shared body. #adr(25)],
+        [`next` waits for Chunk, End(trailers) or Failure. `next_within` adds a local wait; expiry returns None and removes only that read wait. The reading process enforces the local wait too, so an owner that cannot answer holds it no longer than the local wait plus the grace. Already admitted bytes and outstanding credit remain. A polling read still grants demand before local expiry is honored.],
+        [Each read carries how many chunks the reader has received. The owner keeps the last chunk it sent until a later read shows it arrived, and sends it again to a read whose count shows it did not, so a read the reader gave up loses no chunk. #adr(25)],
         [The owner maintains one outstanding #term("term-flow-credit"). A reader drains admitted queued bytes before requesting more data. There is no actor that eagerly reads and forwards chunks into another unbounded mailbox.],
         [Every delivered data event decrements credit and undergoes buffered-byte admission before retention. A single chunk must fit. Message credit and supported H2 receive windows do not establish a byte-allocation bound inside Gun/Cowlib/OTP.],
         [Overall expiry, idle expiry, cancellation, close, owner/client death and native failure settle through the owner. Queued accepted bytes can be delivered before the terminal failure; a failed stream does not fabricate successful trailers. HTTP completion cancels its deadline timer unless capture is still pending.],
@@ -449,19 +452,19 @@
       ([Recording], [16 MiB stored; 10,000 exchanges], [At start for the envelope, then before reservation/fragment enqueue, on the bytes the file holds; held redaction bodies charged]),
       ([Connect], [5 seconds], [One absolute budget from DNS start through TCP/TLS]),
       ([Pool wait], [5 seconds], [Admission to lease; new connection starter can use connect wait]),
-      ([Request], [30 seconds or view replacement], [Invocation entry through response consumption; Infinity explicit]),
+      ([Request], [30 seconds or view replacement], [Invocation entry through response consumption; always finite, enforced by the caller with a short grace]),
       ([Idle read], [30 seconds or view replacement], [While opener waits for head or reader waits on empty queue; events reset activity]),
       ([Pooled idle / shutdown drain], [60 seconds / 5 seconds], [Ready unused connection / stop before forced local close]),
       ([Recording waiter], [One], [Wait timeout/death clears only the waiter; finalization continues]),
     ))
     #points(
       [The connect timer includes DNS, TCP and TLS. Native connect/handshake limits receive its remainder. DNS worker lifetime ends under the connection budget; pending request expiry discards unused preparation. Idle read is active only while demand is outstanding, rather than while application code holds a chunk.],
-      [Native TCP/TLS send_timeout and send_timeout_close use startup idle timeout. Request-owner expiry independently bounds fresh and reused buffered uploads. H1 expiry closes its exclusive connection; H2 stream cancellation preserves healthy siblings. No bound is claimed when the corresponding option is Infinity.],
+      [Native TCP/TLS send_timeout and send_timeout_close use startup idle timeout. Request-owner expiry independently bounds fresh and reused buffered uploads. H1 expiry closes its exclusive connection; H2 stream cancellation preserves healthy siblings. No idle bound is claimed when the idle timeout is Infinity.],
     )
     #facts(([Boundary], [Effect committed or observed], [Failure and uncertainty]), (
       ([Validated invocation], [No network action], [Invalid/refused/capacity failure has NotSent]),
       ([Resolution admitted], [Address set authorized; no HTTP submission], [Connecting failure remains NotSent]),
-      ([Gun request invoked], [One asynchronous transport request issued], [Every later live failure is MaybeSent; return proves no socket write or remote receipt]),
+      ([Gun request invoked], [One asynchronous transport request issued], [Every later live failure is MaybeSent, except Gun's refusal on a closing connection, which is NotSent; the return does not establish whether a socket write or remote receipt occurred]),
       ([Final head admitted], [Status and headers observed], [Streaming caller owns head; collection failures retain redacted headers/status]),
       ([HTTP EOF], [Transport lease may release], [Application consumption and capture finalization may remain incomplete]),
       ([Capture acknowledgment], [Writer fragment and close completed], [No fsync or power-loss persistence established]),
@@ -491,13 +494,13 @@
       #points(
         [A #term("term-batch") validates input count and concurrency before scheduler startup. Workers own one request's open/read/close lifecycle. At most requested concurrency workers run. Caller death kills its workers; body ownership then releases their HTTP resources.],
         [Results preserve input order regardless of completion order. One request failure occupies only its position. Worker crash conservatively yields RequestFailed(UnknownTransport)/MaybeSent at that position and releases its worker slot.],
-        [One shared atomic counter charges retained body bytes before collection keeps a chunk. Overflow fails the crossing response. Once crossed, positions not yet sent fail with BatchBytes/NotSent. Existing workers can settle independently. The counter is monotonic and does not refund failed-response bytes.],
+        [One shared atomic counter charges retained body bytes before collection keeps a chunk. Overflow fails the crossing response. Once crossed, positions not yet sent fail with BatchBytes/NotSent. Existing workers can settle independently. The counter is monotonic and does not refund failed-response bytes. The batch reads its budget from the client before any worker sends; when the client does not answer by the view's deadline, no request runs and every position carries that DeadlineExceeded/NotSent failure.],
         [The 64 MiB budget measures charged body bytes, not headers, input values, worker stacks or transient concatenation copies. The rejected crossing chunk has already been delivered to a worker. It is not a whole-batch VM allocation certificate.],
       )
     ])
     #subsection(title: "Failure meaning and serialization", [
       #points(
-        [#term("term-submission-evidence") is NotSent before the live Gun request call and MaybeSent afterward. Offline scripted failures retain recorded evidence while their telemetry mode is Offline. Closing is local cancellation and never remote rollback.],
+        [#term("term-submission-evidence") is NotSent before the live Gun request call and MaybeSent afterward. One failure after the call is NotSent: Gun answers a request on a connection in its closing state, after the peer's GOAWAY, with `closing` and writes nothing, and it reports that reason for nothing else, so RequestFailed(PeerDraining) is NotSent. #adr(8) #adr(23) Offline scripted failures retain recorded evidence while their telemetry mode is Offline. Closing is local cancellation and never remote rollback.],
       )
       #facts(([Closed Kind], [Reasons grouped here], [Caller action]), (
         ([InvalidInput], [InvalidRequest], [Correct input or settings]),
@@ -530,7 +533,7 @@
         [A loaded `testing.Script` (#term("term-script")) is immutable input. Each `testing.playback` call starts a separate client at its first exchange, so one script serves independent runs. Client views share their client's cursor; `with_correlation` changes observation metadata and selects no sequence. Concurrent requests on one client consume exchanges in admission order.],
         [Offline requests skip destination resolution/address authorization and open no network socket. Required-view selection still applies. Bodies pass the same post-delivery header/byte admission and collection logic with negotiated protocol Offline.],
         [A playback session keeps the first 64 requests it refused by mismatch, with the position and the request of the exchange it was compared against, the first 64 it refused by exhaustion, and a count of every refusal of either kind beyond those. Kept requests, actual and expected, are in match-key form without the headers the script ignores (`testing.ignoring_headers`), so they carry only what the configured redaction leaves. Requests refused before matching, such as invalid, cancelled or expired ones, are not kept.],
-        [`testing.verify` returns the kept requests oldest first, the exchanges not yet used in their stored form, and the count of refusals not kept, as a `Verdict`. It reports what reached matching before the call; code under test finishes its requests first. The caller of the refused request still receives its failure. A live or recording client returns `NotPlayback`, a stopped one `ClientStopped`. Views share one report. Once released, the verdict types are closed: later additions arrive as separate functions, never as new fields or variants. #adr(18)],
+        [`testing.verify` returns the kept requests oldest first, the exchanges not yet used in their stored form, and the count of refusals not kept, as a `Verdict`. It reports what reached matching before the call; code under test finishes its requests first. The caller of the refused request still receives its failure. A live or recording client returns `NotPlayback`, a stopped one `ClientStopped`, and one that does not answer before the view's deadline `NotAnswered`. Views share one report. Once released, the verdict types are closed: later additions arrive as separate functions, never as new fields or variants; 0.4.0 adds `NotAnswered` as the one exception. #adr(18) #adr(26)],
       )
       #behavior(title: "Playback mismatch preserves the next exchange", level: "boundary", area: "Playback matching")[
         #given[an offline session has an unused next exchange]
@@ -712,6 +715,7 @@
         ([Structured `gun_error` and `gun_down` reasons], [`cause/1`, `decode/1`], [UnknownTransport loses detail; an unknown reason never yields NotSent]),
         ([Gun calls its event handler with the terminal reason before process exit], [`src/http_gun_event_h.erl:terminate/2`; Gun `terminate/3`], [The original owner and typed reason are retained when the owner installs its monitor after Gun exits]),
         ([The request call returns asynchronously before socket processing], [`request/5`; reviewed Gun request implementation], [MaybeSent begins at invocation; no hidden retry]),
+        ([With reconnection disabled, a connection in its closing state answers each request with `{gun_error, _, StreamRef, closing}` and writes nothing; no other path reports `closing`], [Gun 2.6.0 `gun:closing/3` request and headers clauses; `cause/1`], [RequestFailed(PeerDraining) is NotSent and retryable for any method]),
         ([H2 header count includes `:status`], [`open/10`; Gun and Cowlib source], [Ordinary-header admission stays exact after parsing]),
         ([Settings-change notification and peer stream capacity], [`decode/1`; `internal/pool.gleam`], [No H2 stream opens before initial SETTINGS; a reduction blocks new admission]),
         ([Test-only `cow_http2` and `cow_hpack` operations], [`test/http_gun_h2_server.erl`], [The H2 test server is requalified before any H2 behavior claim]),

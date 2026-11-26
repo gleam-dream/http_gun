@@ -5,6 +5,21 @@
 -export([parse_address/1, lookup/3, client_identity/2, certificates/1]).
 -export([reusable/1]).
 -export([counter_new/0, counter_add/2]).
+-export([reply_alias/0, retire_alias/1]).
+%% A reply subject addressed to a process alias. Once retired, the runtime
+%% drops every message sent to it, so a reply that arrives after its caller
+%% stopped waiting never reaches the mailbox. The tuple is gleam_erlang's
+%% subject representation, with the alias as both destination and tag.
+reply_alias() ->
+    Alias = erlang:alias([explicit_unalias]),
+    {subject, Alias, Alias}.
+retire_alias({subject, Alias, Alias}) ->
+    erlang:unalias(Alias),
+    flush(Alias).
+flush(Alias) ->
+    receive {Alias, _} -> flush(Alias)
+    after 0 -> nil
+    end.
 counter_new() -> atomics:new(1, [{signed, true}]).
 counter_add(Ref, Amount) -> atomics:add_get(Ref, 1, Amount).
 reusable(Pid) ->
@@ -45,8 +60,12 @@ open(Address, ServerName, Port, Tls, Protocol, Trust, CipherSuites, Identity, Ti
             retry => 0, protocols => Protocols, connect_timeout => Timeout,
             domain_lookup_timeout => Timeout, tls_handshake_timeout => Timeout,
             tcp_opts => [{send_timeout, Send}, {send_timeout_close, true}],
-            http_opts => #{flow => 1, max_headers => HeaderCount},
+            %% No closing timer: the caller's deadline alone ends a call,
+            %% even after `connection: close` or GOAWAY.
+            http_opts => #{flow => 1, max_headers => HeaderCount,
+                closing_timeout => infinity},
             http2_opts => #{flow => 1, notify_settings_changed => true,
+                closing_timeout => infinity,
                 %% HPACK includes :status; application header counts do not.
                 max_headers => HeaderCount + 1,
                 initial_stream_window_size => 16384,
@@ -107,13 +126,24 @@ decode({gun_down, P, _, Reason, _}) -> {down, P, cause(Reason)};
 decode({gun_error, P, Reason}) -> {down, P, cause(Reason)};
 decode({gun_notify, P, settings_changed, Settings}) ->
     {capacity, P, maps:get(max_concurrent_streams, Settings, 2147483647)};
-decode({gun_response, _, R, Fin, Status, Headers}) -> {head, R, Fin =:= fin, Status, Headers};
+decode({gun_response, _, R, Fin, Status, Headers}) -> {head, R, Fin =:= fin, Status, text(Headers)};
 decode({gun_data, _, R, Fin, Bytes}) -> {data, R, Fin =:= fin, Bytes};
-decode({gun_trailers, _, R, Headers}) -> {trailers, R, Headers};
+decode({gun_trailers, _, R, Headers}) -> {trailers, R, text(Headers)};
 decode({gun_error, _, R, Reason}) -> {failed, R, cause(Reason)};
-decode({gun_inform, _, R, _, H}) -> {inform, R, H};
+decode({gun_inform, _, R, _, H}) -> {inform, R, text(H)};
 decode({gun_upgrade, _, R, _, _}) -> {failed, R, unexpected_protocol};
 decode(_) -> ignore.
+
+%% Gun delivers header names and values as the peer's bytes, and Gleam types
+%% them String, which must be UTF-8. Bytes that are not UTF-8 are read as
+%% ISO-8859-1, which maps every byte to one code point, so no value is lost
+%% or refused and no Gleam string function meets an invalid binary.
+text(Headers) -> [{text_value(Name), text_value(Value)} || {Name, Value} <- Headers].
+text_value(Bytes) ->
+    case unicode:characters_to_binary(Bytes, utf8, utf8) of
+        Bytes -> Bytes;
+        _ -> unicode:characters_to_binary(Bytes, latin1, utf8)
+    end.
 
 %% ssl calls this as public_key:sign/4 does, in the connection's ssl process,
 %% for each full handshake that signs. The message, options, signature and any

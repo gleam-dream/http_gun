@@ -8,12 +8,13 @@
 ////   config.default()
 ////   |> config.allow_loopback
 ////   |> config.with_protocol(config.PreferHttp2)
-////   |> config.with_request_timeout(config.After(duration.seconds(10)))
+////   |> config.with_connect_timeout(duration.seconds(2))
 //// let assert Ok(client) = http_gun.start(settings)
 //// ```
 ////
-//// Every timeout is a `gleam/time/duration.Duration`; a timeout that may be
-//// lifted takes a `Timeout`, where `Infinity` must be chosen explicitly.
+//// Every timeout is a `gleam/time/duration.Duration`; the idle timeout may
+//// be lifted with `Infinity`, which must be chosen explicitly. The request
+//// timeout belongs to each call: see `http_gun.with_timeout`.
 //// HTTP Gun keeps whole milliseconds, rounding a sub-millisecond remainder
 //// away from zero.
 ////
@@ -34,7 +35,6 @@
 //// | TLS cipher suites | OTP defaults | `with_cipher_suites` |
 //// | connect, including DNS and TLS | `duration.seconds(5)` | `with_connect_timeout` |
 //// | waiting for a pooled connection | `duration.seconds(5)` | `with_pool_timeout` |
-//// | request, admission to last byte | `After(duration.seconds(30))` | `with_request_timeout` |
 //// | idle read, no bytes while reading | `After(duration.seconds(30))` | `with_idle_timeout` |
 //// | idle pooled connection | `duration.seconds(60)` | `with_connection_idle_timeout` |
 //// | draining on `stop` | `duration.seconds(5)` | `with_shutdown_timeout` |
@@ -128,7 +128,6 @@ pub type Resolver =
 pub type Setting {
   ConnectTimeout
   PoolTimeout
-  RequestTimeout
   IdleTimeout
   ConnectionIdleTimeout
   ShutdownTimeout
@@ -171,7 +170,6 @@ pub fn default() -> Config {
     client_identity: None,
     connect_timeout: 5000,
     pool_timeout: 5000,
-    request_timeout: settings.Within(30_000),
     idle_timeout: settings.Within(30_000),
     connection_idle_timeout: 60_000,
     shutdown_timeout: 5000,
@@ -337,14 +335,6 @@ pub fn with_pool_timeout(config: Config, timeout: Duration) -> Config {
   Settings(..config, pool_timeout: settings.milliseconds(timeout))
 }
 
-/// Bound each request from admission to the last body byte. Default 30 s.
-/// `http_gun.with_timeout` and `http_gun.with_deadline` replace it for one
-/// client view, shorter or longer. `Infinity` lifts it; the connect, pool
-/// and idle timeouts still apply.
-pub fn with_request_timeout(config: Config, timeout: Timeout) -> Config {
-  Settings(..config, request_timeout: bound(timeout))
-}
-
 /// Fail a response when no bytes arrive for this long while its owner waits
 /// for the head or reads the body. A reader that pauses is not idle. Also
 /// bounds a stalled socket write. Default 30 s; `http_gun.with_idle_timeout`
@@ -460,7 +450,6 @@ pub fn validate(config: Config) -> Result(Config, ConfigError) {
   let timeouts = [
     #(ConnectTimeout, config.connect_timeout, 1),
     #(PoolTimeout, config.pool_timeout, 1),
-    #(RequestTimeout, bound_value(config.request_timeout), 1),
     #(IdleTimeout, bound_value(config.idle_timeout), 1),
     #(ConnectionIdleTimeout, config.connection_idle_timeout, 1),
     #(ShutdownTimeout, config.shutdown_timeout, 0),
@@ -526,7 +515,6 @@ fn setting_name(setting: Setting) -> String {
   case setting {
     ConnectTimeout -> "connect timeout"
     PoolTimeout -> "pool timeout"
-    RequestTimeout -> "request timeout"
     IdleTimeout -> "idle timeout"
     ConnectionIdleTimeout -> "connection idle timeout"
     ShutdownTimeout -> "shutdown timeout"

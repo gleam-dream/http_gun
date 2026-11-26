@@ -14,7 +14,7 @@ import gleam/option.{type Option, None, Some}
 import gleam/otp/actor
 import gleam/result
 import gleam/string
-import http_gun/error.{type Failure, MaybeSent}
+import http_gun/error.{type Failure, MaybeSent, NotSent}
 import http_gun/internal/bridge
 import http_gun/internal/call
 import http_gun/internal/lifecycle
@@ -30,6 +30,12 @@ pub opaque type Body {
     subject: process.Subject(Message),
     protocol: settings.Negotiated,
     status: Int,
+    /// The request deadline, which also bounds each wait for this owner.
+    deadline: Int,
+    /// How many chunks the reader has received, shared by every copy. Each
+    /// read tells the owner this count, so the owner learns whether the
+    /// chunk it last sent arrived.
+    received: bridge.Counter,
   )
 }
 
@@ -48,6 +54,13 @@ type Phase {
   Rejected(Failure)
 }
 
+/// The chunk the owner last sent, kept until a later read shows the reader
+/// received it. A read the reader abandoned may have taken it to a reply
+/// subject nobody reads; the next read then gets it again.
+type Unconfirmed {
+  Unconfirmed(position: Int, bytes: BitArray)
+}
+
 type Waiting {
   Waiting(
     reply: Reply,
@@ -55,6 +68,17 @@ type Waiting {
     id: reference.Reference,
     timer: Option(process.Timer),
   )
+}
+
+/// What a finished exchange tells the pool about its connection lease.
+pub type Released {
+  /// The exchange completed and the connection may carry another.
+  Reusable
+  /// The exchange ended early; an HTTP/1.1 connection cannot be reused.
+  Spent
+  /// The connection refused the stream because its peer is going away. It
+  /// accepts no further stream, while streams it already carries may finish.
+  GoingAway
 }
 
 pub type Input {
@@ -75,7 +99,7 @@ type CaptureState {
 
 /// Request timing as the pool resolved it for one invocation.
 pub type Timing {
-  Timing(deadline: Option(Int), idle: settings.Bound)
+  Timing(deadline: Int, idle: settings.Bound)
 }
 
 type State {
@@ -87,7 +111,7 @@ type State {
     capture: CaptureState,
     protocol: settings.Negotiated,
     persistent: Bool,
-    deadline: Option(Int),
+    deadline: Int,
     deadline_timer: Option(process.Timer),
     idle: settings.Bound,
     idle_ref: Option(reference.Reference),
@@ -100,7 +124,11 @@ type State {
     queued: Int,
     credit: Int,
     waiting: Option(Waiting),
-    release: fn(Bool) -> Nil,
+    /// Chunks sent to the reader so far.
+    sent: Int,
+    unconfirmed: Option(Unconfirmed),
+    received: bridge.Counter,
+    release: fn(Released) -> Nil,
     closed: fn() -> Nil,
     observation: lifecycle.Context,
   )
@@ -109,7 +137,9 @@ type State {
 pub opaque type Message {
   Captured(Result(Nil, recorder.CaptureError))
   Advance
-  Read(process.Pid, Option(Int), Reply)
+  /// The reader, the end of its local wait, and how many chunks it has
+  /// received.
+  Read(process.Pid, Option(Int), Int, Reply)
   Close(process.Subject(Result(Nil, Failure)))
   Wire(bridge.Event)
   Deadline
@@ -119,21 +149,48 @@ pub opaque type Message {
 }
 
 /// Wait for the next event. `until` bounds this wait only: when it passes,
-/// `Ok(None)` returns and the stream stays intact.
+/// `Ok(None)` returns and the stream stays intact. The caller enforces
+/// `until` too, so an owner that cannot answer holds the reader no longer
+/// than `until` plus the grace.
 pub fn read(body: Body, until: Option(Int)) -> Result(Option(Event), Failure) {
-  call.run(body.subject, Read(process.self(), until, _))
-  |> result.map_error(fn(failure) {
-    case error.reason(failure) {
-      error.ClientClosed ->
-        error.new(error.Closed, MaybeSent) |> error.with_status(body.status)
-      _ -> failure
+  let seen = bridge.counter_add(body.received, 0)
+  let request_bound = wait_until(body)
+  let #(bound, local) = case until {
+    Some(at) if at < request_bound -> #(at, True)
+    _ -> #(request_bound, False)
+  }
+  case call.ask(body.subject, Read(process.self(), until, seen, _), bound) {
+    Ok(Ok(Some(Chunk(_))) as answer) -> {
+      bridge.counter_add(body.received, 1)
+      answer
     }
-  })
+    Ok(answer) -> answer
+    Error(call.NotRunning) | Error(call.Lost) ->
+      Error(
+        error.new(error.Closed, MaybeSent) |> error.with_status(body.status),
+      )
+    // The owner is alive but did not answer by the local wait's end; the
+    // chunk it may send later is sent again to the next read.
+    Error(call.Expired) if local -> Ok(None)
+    // The owner is alive but did not answer by the deadline.
+    Error(call.Expired) ->
+      Error(
+        error.new(error.DeadlineExceeded, MaybeSent)
+        |> error.with_status(body.status),
+      )
+  }
 }
 
 pub fn close(body: Body) -> Nil {
-  let _ = call.run(body.subject, Close)
+  let _ = call.ask(body.subject, Close, wait_until(body))
   Nil
+}
+
+// The owner answers by the deadline; after it, an owner that has finished
+// still answers at once with what it holds, so the caller allows a grace
+// period from now.
+fn wait_until(body: Body) -> Int {
+  int.max(body.deadline, bridge.now())
 }
 
 pub fn protocol(body: Body) -> settings.Negotiated {
@@ -222,7 +279,8 @@ pub fn start(
   timing: Timing,
   limits: settings.Limits,
   reply: fn(Result(response.Response(Body), Failure)) -> Nil,
-  release: fn(Bool) -> Nil,
+  launched: fn() -> Nil,
+  release: fn(Released) -> Nil,
   closed: fn() -> Nil,
   capture: Option(recorder.Capture),
   tokens: List(token.Token),
@@ -239,6 +297,7 @@ pub fn start(
       None -> Nil
     }
     let request = req()
+    let received = bridge.counter_new()
     use #(source, protocol) <- result.try(case input {
       Live(connection, protocol) -> {
         let _ = process.monitor(connection)
@@ -264,10 +323,7 @@ pub fn start(
       Script(reply) -> Ok(#(Scripted(script_steps(reply)), settings.Offline))
     })
     process.send(subject, Advance)
-    let deadline_timer =
-      option.map(timing.deadline, fn(at) {
-        process.send_after(subject, int.max(0, at - bridge.now()), Deadline)
-      })
+    let deadline_timer = Some(deadline_timer(subject, timing.deadline))
     let state =
       State(
         subject:,
@@ -293,6 +349,9 @@ pub fn start(
         queued: 0,
         credit: 1,
         waiting: None,
+        sent: 0,
+        unconfirmed: None,
+        received:,
         release:,
         closed:,
         observation:,
@@ -302,10 +361,13 @@ pub fn start(
       |> process.select(subject)
       |> process.select_monitors(Lost)
       |> process.select_other(fn(value) { Wire(bridge.decode(value)) })
+    // Nothing below can fail: from here this process alone answers `reply`,
+    // so it tells the caller whom to monitor before any answer can be sent.
+    launched()
     Ok(
       actor.initialised(state)
       |> actor.selecting(selector)
-      |> actor.returning(Body(subject, protocol, 0)),
+      |> actor.returning(Body(subject, protocol, 0, timing.deadline, received)),
     )
   })
   |> actor.on_message(handle)
@@ -323,13 +385,49 @@ fn wire_headers(req: request.Request(a)) -> List(#(String, String)) {
 
 // Connection persistence is application policy over already parsed headers.
 // A close token wins even when mixed with other comma-separated tokens.
+// Response headers arrive as the peer's bytes, which need not be UTF-8, so
+// this compares bytes and never calls a Unicode string function.
 fn wants_close(headers: List(#(String, String))) -> Bool {
   list.any(headers, fn(header) {
-    string.lowercase(header.0) == "connection"
-    && list.any(string.split(header.1, ","), fn(token) {
-      string.lowercase(string.trim(token)) == "close"
-    })
+    ascii_lowercase(bit_array.from_string(header.0), <<>>) == <<"connection">>
+    && close_token(ascii_lowercase(bit_array.from_string(header.1), <<>>))
   })
+}
+
+fn ascii_lowercase(bytes: BitArray, folded: BitArray) -> BitArray {
+  case bytes {
+    <<byte, rest:bytes>> if byte >= 65 && byte <= 90 ->
+      ascii_lowercase(rest, <<folded:bits, { byte + 32 }>>)
+    <<byte, rest:bytes>> -> ascii_lowercase(rest, <<folded:bits, byte>>)
+    _ -> folded
+  }
+}
+
+// Whether one comma-separated element, optional whitespace aside, is `close`.
+fn close_token(value: BitArray) -> Bool {
+  case optional_whitespace(value) {
+    <<"close", rest:bytes>> ->
+      case optional_whitespace(rest) {
+        <<>> | <<",", _:bytes>> -> True
+        other -> next_element(other)
+      }
+    other -> next_element(other)
+  }
+}
+
+fn next_element(value: BitArray) -> Bool {
+  case value {
+    <<",", rest:bytes>> -> close_token(rest)
+    <<_, rest:bytes>> -> next_element(rest)
+    _ -> False
+  }
+}
+
+fn optional_whitespace(value: BitArray) -> BitArray {
+  case value {
+    <<byte, rest:bytes>> if byte == 32 || byte == 9 -> optional_whitespace(rest)
+    _ -> value
+  }
 }
 
 pub fn authority(req: request.Request(a)) -> String {
@@ -345,10 +443,17 @@ pub fn authority(req: request.Request(a)) -> String {
 }
 
 fn expired(state: State) -> Bool {
-  case state.deadline {
-    Some(at) -> bridge.now() >= at
-    None -> False
-  }
+  bridge.now() >= state.deadline
+}
+
+// A timer delay is at most 2^32 - 1 ms, so a far deadline fires early and
+// is armed again.
+fn deadline_timer(subject: process.Subject(Message), at: Int) -> process.Timer {
+  process.send_after(
+    subject,
+    int.clamp(at - bridge.now(), min: 0, max: 86_400_000),
+    Deadline,
+  )
 }
 
 fn failure(state: State, reason: error.Reason) -> Failure {
@@ -404,6 +509,12 @@ fn handle(state: State, message: Message) -> actor.Next(State, Message) {
             True -> {
               let state = finish(state, Error(failure(state, error.Closed)))
               flush_capture(state.capture)
+              // Gun has no closing timer of its own: with the client gone,
+              // nothing else would close a connection still streaming to us.
+              case pid == state.client, state.source {
+                True, Gun(connection, _) -> bridge.close(connection)
+                _, _ -> Nil
+              }
               actor.stop()
             }
             False ->
@@ -422,7 +533,17 @@ fn handle(state: State, message: Message) -> actor.Next(State, Message) {
               }
           }
       }
-    Deadline -> continue(deliver(state))
+    Deadline ->
+      case expired(state) {
+        True -> continue(deliver(state))
+        False ->
+          continue(
+            State(
+              ..state,
+              deadline_timer: Some(deadline_timer(state.subject, state.deadline)),
+            ),
+          )
+      }
     IdleExpired(id) ->
       case state.idle_ref, state.idle {
         Some(expected), settings.Within(ms) if id == expected -> {
@@ -439,8 +560,8 @@ fn handle(state: State, message: Message) -> actor.Next(State, Message) {
         }
         _, _ -> continue(state)
       }
-    Read(caller, until, reply) ->
-      read_request(state, caller, until, reply) |> continue
+    Read(caller, until, seen, reply) ->
+      read_request(state, caller, until, seen, reply) |> continue
     WaitExpired(id) ->
       case state.waiting {
         Some(Waiting(reply, _, expected, _)) if id == expected -> {
@@ -468,20 +589,29 @@ fn read_request(
   state: State,
   caller: process.Pid,
   until: Option(Int),
+  seen: Int,
   reply: Reply,
 ) -> State {
-  case state.waiting {
-    Some(_) -> {
+  case caller == state.owner, state.waiting {
+    False, Some(_) -> {
       process.send(reply, Error(failure(state, error.ReadConflict)))
       state
     }
-    None ->
-      case caller == state.owner {
-        False -> {
-          process.send(reply, Error(failure(state, error.WrongOwner)))
+    False, None -> {
+      process.send(reply, Error(failure(state, error.WrongOwner)))
+      state
+    }
+    // The reader waits for one read at a time, so a read it sends while an
+    // earlier one waits here means it gave the earlier one up.
+    True, waiting -> {
+      option.map(waiting, fn(old) { cancel_timer(old.timer) })
+      let state = State(..state, activity: bridge.now(), waiting: None)
+      case state.unconfirmed {
+        Some(Unconfirmed(position, bytes)) if position == seen -> {
+          process.send(reply, Ok(Some(Chunk(bytes))))
           state
         }
-        True -> {
+        _ -> {
           let id = reference.new()
           let timer =
             option.map(until, fn(at) {
@@ -494,12 +624,13 @@ fn read_request(
           deliver(
             State(
               ..state,
-              activity: bridge.now(),
+              unconfirmed: None,
               waiting: Some(Waiting(reply, until, id, timer)),
             ),
           )
         }
       }
+    }
   }
 }
 
@@ -537,6 +668,8 @@ fn deliver_ready(state: State) -> State {
             queue: rest,
             queued: state.queued - bit_array.byte_size(bytes),
             waiting: None,
+            sent: state.sent + 1,
+            unconfirmed: Some(Unconfirmed(state.sent, bytes)),
           )
         }
         [] ->
@@ -625,6 +758,18 @@ fn wire(state: State, event: bridge.Event) -> State {
             Ok(Nil) -> State(..state, activity: bridge.now())
             Error(reason) -> finish(state, Error(failure(state, reason)))
           }
+        // Gun answers a request on a connection in its closing state with
+        // `closing` instead of writing it (gun 2.6.0, `gun:closing/3`, with
+        // reconnection disabled), and reports `closing` for nothing else. The
+        // request never left this client.
+        bridge.Failed(ref, error.PeerDraining) if ref == expected ->
+          observe(
+            state,
+            obs.Failed(with_status(
+              state,
+              error.new(error.RequestFailed(error.PeerDraining), NotSent),
+            )),
+          )
         bridge.Failed(ref, cause) if ref == expected ->
           observe(state, obs.Failed(failure(state, error.RequestFailed(cause))))
         _ -> state
@@ -651,7 +796,13 @@ fn observe(state: State, event: obs.Observation) -> State {
                     Ok(response.Response(
                       status,
                       headers,
-                      Body(state.subject, state.protocol, status),
+                      Body(
+                        state.subject,
+                        state.protocol,
+                        status,
+                        state.deadline,
+                        state.received,
+                      ),
                     )),
                   )
                   capture_event(
@@ -738,9 +889,11 @@ fn finish(
           error.new(error.RequestFailed(error.UnknownTransport), MaybeSent)
       }
       lifecycle.emit(state.observation, lifecycle.termination(Error(failure)))
+      // Release first: a caller that sends again on this failure then finds
+      // the pool already knows what the failure says about the connection.
+      release(state, outcome)
       reply(Error(failure))
       let state = capture_event(state, obs.Failed(failure))
-      release(state, outcome)
       State(..state, phase: Rejected(failure))
     }
     Reading -> {
@@ -766,7 +919,15 @@ fn release(state: State, outcome: Result(a, Failure)) -> Nil {
     Error(_), Gun(connection, stream) -> bridge.cancel(connection, stream)
     _, _ -> Nil
   }
-  state.release(result.is_ok(outcome) && state.persistent)
+  state.release(case outcome {
+    Ok(_) if state.persistent -> Reusable
+    Ok(_) -> Spent
+    Error(failure) ->
+      case error.reason(failure) {
+        error.RequestFailed(error.PeerDraining) -> GoingAway
+        _ -> Spent
+      }
+  })
 }
 
 pub type HeaderKind {

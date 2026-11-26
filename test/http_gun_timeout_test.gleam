@@ -73,16 +73,15 @@ pub fn a_shorter_view_timeout_bounds_dns_too_test() {
     )
   let assert Error(failure) =
     client
-    |> http_gun.with_timeout(config.After(duration.milliseconds(100)))
+    |> http_gun.with_timeout(duration.milliseconds(100))
     |> http_gun.send(named(port))
   error.reason(failure) |> should.equal(error.DeadlineExceeded)
   error.evidence(failure) |> should.equal(error.NotSent)
   http_gun.stop(client)
 }
 
-pub fn infinite_client_timeout_is_explicit_and_valid_test() {
+pub fn infinite_idle_timeout_is_explicit_and_valid_test() {
   config.default()
-  |> config.with_request_timeout(config.Infinity)
   |> config.with_idle_timeout(config.Infinity)
   |> config.validate
   |> should.be_ok

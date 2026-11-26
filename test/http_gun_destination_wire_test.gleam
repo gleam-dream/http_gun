@@ -19,7 +19,6 @@ fn serve(bytes: BitArray) -> Int
 
 fn settings() -> config.Config {
   config.default()
-  |> config.with_request_timeout(config.After(duration.milliseconds(1000)))
   |> config.allow_loopback
 }
 
@@ -152,9 +151,6 @@ pub fn stalled_sends_end_and_leave_no_caller_messages_test() {
       let baseline = mailbox_size()
       let c =
         settings()
-        |> config.with_request_timeout(
-          config.After(duration.milliseconds(5000)),
-        )
         |> config.with_trust(config.CustomCa("test/fixtures/ip_ca.crt"))
         |> config.with_max_request_body_bytes(16_777_216)
       let assert Ok(client) = http_gun.start(c)
@@ -175,7 +171,7 @@ pub fn stalled_sends_end_and_leave_no_caller_messages_test() {
       let bytes = payload(16_777_216)
       let budget = deadline.after(duration.milliseconds(300))
       let before = now()
-      // The view deadline replaces the client's 5 s request timeout.
+      // The view deadline replaces the default request timeout.
       let assert Error(failure) =
         http_gun.send(
           client |> http_gun.with_deadline(budget),
@@ -225,11 +221,8 @@ fn await_closed(server: process.Pid) -> Bool
 
 pub fn cancellation_and_body_deadline_leave_long_lived_caller_clean_test() {
   list.each([True, False], fn(cancel) {
-    let assert Ok(client) =
-      http_gun.start(
-        settings()
-        |> config.with_request_timeout(config.After(duration.milliseconds(300))),
-      )
+    let assert Ok(client) = http_gun.start(settings())
+    let client = http_gun.with_timeout(client, duration.milliseconds(300))
     let #(port, server) = controlled()
     let finished = process.new_subject()
     let inspect = process.new_subject()
@@ -269,4 +262,59 @@ pub fn cancellation_and_body_deadline_leave_long_lived_caller_clean_test() {
       process.receive(inspect, 1000) |> should.equal(Ok(0))
     })
   })
+}
+
+fn header(headers: List(#(String, String)), name: String) -> String {
+  let assert Ok(value) = list.key_find(headers, name)
+  value
+}
+
+// A header value is typed String, so it must be text whatever the peer sent.
+// Bytes that are not UTF-8 are read as ISO-8859-1, the historical encoding
+// of field values; UTF-8 is kept as sent.
+pub fn response_header_values_are_always_text_test() {
+  let assert Ok(client) = http_gun.start(settings())
+  let port =
+    serve(<<
+      "HTTP/1.1 200 OK\r\nX-Latin: caf":utf8, 233, "\r\nX-Utf8: caf":utf8, 195,
+      169, "\r\nContent-Length: 0\r\n\r\n":utf8,
+    >>)
+  let assert Ok(buffered) = http_gun.send(client, req(port))
+  header(buffered.response.headers, "x-latin") |> should.equal("café")
+  header(buffered.response.headers, "x-utf8") |> should.equal("café")
+  http_gun.stop(client)
+}
+
+pub fn trailer_values_are_always_text_test() {
+  let assert Ok(client) = http_gun.start(settings())
+  let port =
+    serve(<<
+      "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n0\r\nx-final: ":utf8,
+      255, "\r\n\r\n":utf8,
+    >>)
+  let assert Ok(buffered) = http_gun.send(client, req(port))
+  header(buffered.trailers, "x-final") |> should.equal("ÿ")
+  http_gun.stop(client)
+}
+
+// A field name outside the token alphabet is refused, never delivered.
+pub fn non_token_response_header_name_is_a_protocol_error_test() {
+  let assert Ok(client) = http_gun.start(settings())
+  let port =
+    serve(<<
+      "HTTP/1.1 200 OK\r\nX-":utf8, 255, ": a\r\nContent-Length: 0\r\n\r\n":utf8,
+    >>)
+  // Sent from another process so a caller that is never answered fails the
+  // test instead of hanging it.
+  let outcome = process.new_subject()
+  process.spawn_unlinked(fn() {
+    process.send(outcome, http_gun.send(client, req(port)))
+  })
+  process.receive(outcome, 2000)
+  |> should.equal(
+    Ok(
+      Error(error.new(error.RequestFailed(error.ProtocolError), error.MaybeSent)),
+    ),
+  )
+  http_gun.stop(client)
 }

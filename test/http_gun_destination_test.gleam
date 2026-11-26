@@ -59,11 +59,7 @@ fn echo_authority(ipv6: Bool) -> Int
 
 pub fn default_refuses_loopback_before_connecting_test() {
   let #(port, listener) = listen()
-  let assert Ok(client) =
-    http_gun.start(
-      config.default()
-      |> config.with_request_timeout(config.After(duration.milliseconds(300))),
-    )
+  let assert Ok(client) = http_gun.start(config.default())
   let assert Ok(req) = request.to("http://127.0.0.1:" <> int.to_string(port))
   let result = http_gun.send(client, request.set_body(req, <<>>))
   let observed = connected(listener)
@@ -81,7 +77,6 @@ pub fn allow_loopback_helper_admits_only_loopback_test() {
     |> destination.only_hosts(["localhost", "127.0.0.1"])
   let base =
     config.default()
-    |> config.with_request_timeout(config.After(duration.milliseconds(1000)))
     |> config.with_destination(hosts)
   let opened = config.allow_loopback(base)
   // allow_loopback keeps every other destination setting.
@@ -394,14 +389,6 @@ pub fn resolution_lifetime_cleanup_test() {
       let ready = process.new_subject()
       let settings =
         local_config()
-        |> config.with_request_timeout(
-          config.After(
-            duration.milliseconds(case mode {
-              "deadline" -> 150
-              _ -> 5000
-            }),
-          ),
-        )
         |> config.with_resolver(fn(_, budget) {
           { duration.to_milliseconds(budget) > 0 } |> should.be_true
           process.send(entered, process.self())
@@ -425,7 +412,14 @@ pub fn resolution_lifetime_cleanup_test() {
             process.send(
               result,
               http_gun.send(
-                http_gun.with_cancellation(client, token),
+                client
+                  |> http_gun.with_cancellation(token)
+                  |> http_gun.with_timeout(
+                    duration.milliseconds(case mode {
+                      "deadline" -> 150
+                      _ -> 5000
+                    }),
+                  ),
                 local_request(port, "localhost"),
               ),
             )
@@ -1008,14 +1002,13 @@ pub fn required_view_destination_refuses_a_bare_client_test() {
   let assert Ok(client) =
     local_config()
     |> config.require_view_destination
-    |> config.with_request_timeout(config.After(duration.milliseconds(1000)))
     |> http_gun.start
   let required = Error(error.new(error.ViewDestinationRequired, error.NotSent))
   let req = local_request(port, "127.0.0.1")
   http_gun.send(client, req) |> should.equal(required)
   // Other view settings do not count as a destination.
   http_gun.send(
-    client |> http_gun.with_timeout(config.After(duration.milliseconds(500))),
+    client |> http_gun.with_timeout(duration.milliseconds(500)),
     req,
   )
   |> should.equal(required)

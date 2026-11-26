@@ -90,14 +90,53 @@ fn response_header(
 @external(erlang, "http_gun_h2_server", "controlled")
 fn controlled() -> Int
 
+@external(erlang, "http_gun_h2_server", "held")
+fn held() -> Int
+
+@external(erlang, "http_gun_h2_server", "await_held")
+fn await_held() -> process.Pid
+
+@external(erlang, "http_gun_h2_server", "release")
+fn release(connection: process.Pid) -> Nil
+
+pub fn connection_awaiting_settings_counts_as_preparing_test() {
+  let port = held()
+  let assert Ok(client) =
+    http_gun.start(
+      settings()
+      |> config.with_max_connections(4)
+      |> config.with_max_connections_per_origin(4),
+    )
+  let outcome = process.new_subject()
+  process.spawn(fn() {
+    process.send(outcome, http_gun.send(client, req(port, "/fast")))
+  })
+  let first = await_held()
+  // The one waiting request already has a connection on its way: up, but
+  // without the peer's SETTINGS. The pool must not open another for it.
+  await_connections(client, 2, 20)
+  let assert Ok(stats) = http_gun.stats(client)
+  stats.connections |> should.equal(1)
+  release(first)
+  let assert Ok(Ok(_)) = process.receive(outcome, 2000)
+  http_gun.stop(client)
+}
+
+fn await_connections(client: http_gun.Client, count: Int, tries: Int) -> Nil {
+  let assert Ok(stats) = http_gun.stats(client)
+  case stats.connections >= count || tries == 0 {
+    True -> Nil
+    False -> {
+      process.sleep(25)
+      await_connections(client, count, tries - 1)
+    }
+  }
+}
+
 pub fn h2_window_credit_after_buffered_frames_test() {
   let port = controlled()
   let config = settings()
-  let assert Ok(client) =
-    http_gun.start(
-      config
-      |> config.with_request_timeout(config.After(duration.milliseconds(1000))),
-    )
+  let assert Ok(client) = http_gun.start(config)
   let assert Ok(value) = http_gun.send(client, req(port, "/window-demand"))
   bit_array.byte_size(value.response.body) |> should.equal(16_387)
   http_gun.stop(client)
@@ -106,10 +145,8 @@ pub fn h2_window_credit_after_buffered_frames_test() {
 pub fn zero_peer_capacity_expires_without_submission_test() {
   let port = server()
   let c = settings()
-  let assert Ok(client) =
-    http_gun.start(
-      c |> config.with_request_timeout(config.After(duration.milliseconds(300))),
-    )
+  let assert Ok(client) = http_gun.start(c)
+  let client = http_gun.with_timeout(client, duration.milliseconds(300))
   let assert Ok(_) = http_gun.send(client, req(port, "/capacity-zero"))
   let assert Error(failure) = http_gun.send(client, req(port, "/fast"))
   error.evidence(failure) |> should.equal(error.NotSent)
@@ -123,8 +160,7 @@ pub fn untrusted_tls_fails_without_submission_test() {
   let assert Ok(client) =
     http_gun.start(
       c
-      |> config.with_trust(config.SystemTrust)
-      |> config.with_request_timeout(config.After(duration.milliseconds(1000))),
+      |> config.with_trust(config.SystemTrust),
     )
   let assert Error(failure) = http_gun.send(client, req(port, "/fast"))
   error.evidence(failure) |> should.equal(error.NotSent)
@@ -290,6 +326,72 @@ pub fn goaway_allows_existing_sibling_to_finish_without_replay_test() {
       panic as "GOAWAY sibling test reused the draining connection for a fresh request"
   }
   http_gun.stop(client)
+}
+
+// The peer announced GOAWAY while an earlier stream still runs, so Gun keeps
+// the connection and refuses new streams on it. Gun reports no GOAWAY event,
+// so one request can still meet the refusal; none after it may. With one
+// connection allowed, the next request waits for the going-away connection
+// to end and then uses a fresh one.
+pub fn draining_connection_admits_no_stream_after_a_refusal_test() {
+  let port = server()
+  let assert Ok(client) = http_gun.start(settings())
+  let assert Ok(slow) = http_gun.open(client, req(port, "/slow"))
+  next(slow.body) |> should.equal(Ok(body.Chunk(<<"first":utf8>>)))
+  let assert Ok(_) = http_gun.send(client, req(port, "/goaway-hold"))
+  let assert Error(refused) = http_gun.send(client, req(port, "/fast"))
+  #(error.reason(refused), error.evidence(refused))
+  |> should.equal(#(error.RequestFailed(error.PeerDraining), error.NotSent))
+  // Gun refused it before writing it, so even a POST may be sent again.
+  error.is_retryable(refused, idempotent: False) |> should.be_true
+  let outcome = process.new_subject()
+  process.spawn_unlinked(fn() {
+    process.send(outcome, http_gun.send(client, req(port, "/fast")))
+  })
+  // The request waits in the queue instead of being refused; the accepted
+  // stream is undisturbed and still holds the connection.
+  await_stats(client, 1000, fn(stats) { stats.queued_requests == 1 })
+  |> should.equal(Ok(http_gun.Stats(1, 1, 1)))
+  body.close(slow.body)
+  let assert Ok(Ok(fresh)) = process.receive(outcome, 2000)
+  {
+    response_header(fresh.response.headers, "x-connection")
+    != response_header(slow.headers, "x-connection")
+  }
+  |> should.be_true
+  http_gun.stop(client)
+}
+
+// The first stats that satisfy `wanted`, or the last seen when the wait ends.
+fn await_stats(
+  client: http_gun.Client,
+  wait_ms: Int,
+  wanted: fn(http_gun.Stats) -> Bool,
+) -> Result(http_gun.Stats, http_gun.Stats) {
+  await_stats_until(
+    client,
+    deadline.after(duration.milliseconds(wait_ms)),
+    wanted,
+  )
+}
+
+fn await_stats_until(
+  client: http_gun.Client,
+  budget: deadline.Deadline,
+  wanted: fn(http_gun.Stats) -> Bool,
+) -> Result(http_gun.Stats, http_gun.Stats) {
+  let assert Ok(stats) = http_gun.stats(client)
+  case
+    wanted(stats),
+    duration.to_milliseconds(deadline.remaining(budget)) <= 0
+  {
+    True, _ -> Ok(stats)
+    False, True -> Error(stats)
+    False, False -> {
+      process.sleep(1)
+      await_stats_until(client, budget, wanted)
+    }
+  }
 }
 
 pub fn cancellation_token_preserves_h2_sibling_and_connection_test() {
