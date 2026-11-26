@@ -33,7 +33,6 @@
   See ADR 0022.
 - HTTP Gun depends on `sinal >= 0.2.0 and < 0.3.0`, which removes a handler
   when the process that attached it exits.
-
 - `testing.VerifyError` gains `NotAnswered` for a client that does not
   answer before the view's deadline; `ClientStopped` means only a stopped
   client. See ADR 0026.

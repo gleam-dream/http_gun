@@ -6,7 +6,8 @@
 > - `config.with_request_timeout` is removed, and `http_gun.with_timeout` takes a `Duration`; `config.Infinity` no longer lifts the request bound.
 > - Gun's own 15-second closing timer is off, so a response after `connection: close` or an HTTP/2 GOAWAY is no longer cut at 15 seconds; the call's deadline, idle timeout and cancellation still bound it.
 > - A request refused on a closing connection is `NotSent`, so it may be sent again whatever its method.
-> - HTTP Gun depends on `sinal >= 0.2.0 and < 0.3.0`.
+> - `testing.VerifyError` has a new variant, `NotAnswered`, so a `case` over it must handle it.
+- HTTP Gun depends on `sinal >= 0.2.0 and < 0.3.0`, which removes a handler when the process that attached it exits.
 
 [![CI](https://github.com/gleam-dream/http_gun/actions/workflows/check.yml/badge.svg?branch=main)](https://github.com/gleam-dream/http_gun/actions/workflows/check.yml)
 [![http_gun on Hex](https://img.shields.io/hexpm/v/http_gun?label=Hex%3A%20http_gun)](https://hex.pm/packages/http_gun)

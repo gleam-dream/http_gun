@@ -8,8 +8,9 @@ HTTP Gun 0.4.0 is a breaking release. Change the dependency to `http_gun >= 0.4.
 | [Sinal 0.2 binds handlers to their process](#sinal-02-binds-handlers-to-their-process)          | Applications that attach HTTP Gun lifecycle handlers                                                                    |
 | [A refusal on a closing connection is not sent](#a-refusal-on-a-closing-connection-is-not-sent) | Retry code that matches `PeerDraining` or `MaybeSent`                                                                   |
 | [Gun's closing timer is off](#guns-closing-timer-is-off)                                        | Code that relied on a response being cut 15 seconds after `connection: close`                                           |
+| [A verify call can end with `NotAnswered`](#a-verify-call-can-end-with-notanswered) | Code that matches `testing.VerifyError` exhaustively |
 | [Header names and values are always text](#header-names-and-values-are-always-text)             | Code that reads raw bytes from response header or trailer values                                                        |
-| [Other behaviour changes](#other-behaviour-changes)                                             | Code that matches `testing.VerifyError`, or depends on 0.3 read, batch, GOAWAY or queue behaviour                       |
+| [Other behaviour changes](#other-behaviour-changes)                                             | Code that depends on 0.3 read, batch, GOAWAY or queue behaviour                       |
 
 ## Every call has a deadline its caller enforces
 
@@ -80,6 +81,21 @@ A caller that retries on `DeadlineExceeded` must treat the new `MaybeSent` answe
 
 **What to do.** Nothing, unless the application relied on the 15-second cut. Such an application sets the bound it wants with `http_gun.with_timeout` or `config.with_idle_timeout`.
 
+## A verify call can end with `NotAnswered`
+
+**What changed.** `testing.verify` is bounded by the view's deadline. When the client does not answer in time it returns `Error(testing.NotAnswered)`, a new `VerifyError` variant. The client may still be running, and a later `verify` may answer. `ClientStopped` now means only that the client has stopped; in 0.3 a call to a client that did not answer waited without a bound.
+
+**What to do.** Add the variant to every `case` over `VerifyError`, or the code no longer compiles:
+
+```gleam
+case testing.verify(client) {
+  Ok(verdict) -> verdict
+  Error(testing.NotPlayback) -> panic as "not a playback client"
+  Error(testing.ClientStopped) -> panic as "client stopped"
+  Error(testing.NotAnswered) -> panic as "client did not answer in time"
+}
+```
+
 ## Header names and values are always text
 
 **What changed.** Response, informational and trailer header names and values are `String`s, and a Gleam `String` must be UTF-8. In 0.3 HTTP Gun passed on the bytes the peer sent, so a value such as an ISO-8859-1 filename reached the caller as a `String` that was not text, and `string.lowercase` on it raised. In 0.4 a name or value that is valid UTF-8 is kept as sent, and any other is read as ISO-8859-1, which maps every byte to one code point. A header name with such a byte still fails the token check, and the request ends with `RequestFailed(ProtocolError)`.
@@ -88,7 +104,6 @@ A caller that retries on `DeadlineExceeded` must treat the new `MaybeSent` answe
 
 ## Other behaviour changes
 
-- `testing.VerifyError` has a new variant, `NotAnswered`: the client did not answer before the view's deadline. In 0.3 such a call waited without a bound. A `case` over `VerifyError` must handle it; `ClientStopped` now means only that the client has stopped.
 - `body.next_within` ends within its wait plus half a second even when the body owner cannot answer, and returns `None`. A chunk the owner sent to a read that had already given up is delivered to the next read, so no chunk is skipped.
 - A read from the process that owns the body replaces a read it gave up on, instead of failing with `ReadConflict`. A read from another process still fails with `ReadConflict` while a read is pending.
 - When `http_gun.batch` cannot read its byte limit from the client before the view's deadline, it runs no request and every position fails with `DeadlineExceeded` and `NotSent`.
