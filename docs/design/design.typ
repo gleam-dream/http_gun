@@ -65,8 +65,8 @@
       pending-entry(title: "Decide the release version for the record and replay additions", kind: "ruling", since: "2026-11-18", adr: 18)[
         The verify call, the masking additions, the verdict's dropped count and schema 3 are unreleased; schema 3 breaks older readers of new files, anyone comparing `cassette.encode` output to a stored string, recordings with a budget below the envelope, and recordings near their budget. `cassette.encode` stops removing credentials from hand-built scripts, and retiring the schema 2 reader makes every 0.1.x cassette unreadable until converted. The owner decides the version at release.
       ],
-      pending-entry(title: "Check carried-over defaults and native claims against code", kind: "verify", since: "2026-10-17")[
-        The default-settings table, the native assumption inventory and the destination and offline-playback rules were carried over from the retired usage, testing and dependency-upgrade guides. The compiled usage examples exercise the public paths. The stated default values, budgets and native assumptions have not been compared with the source.
+      pending-entry(title: "Check carried-over native claims against code", kind: "verify", since: "2026-10-17")[
+        The native assumption inventory and the destination and offline-playback rules were carried over from the retired usage, testing and dependency-upgrade guides. The compiled usage examples exercise the public paths. The stated native assumptions and those rules have not been compared with the source; the default-settings table has been compared with `config.default()` and the pool, codec, script, batch and recorder limits.
       ],
   )
 
