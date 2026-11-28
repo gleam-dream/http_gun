@@ -2,6 +2,8 @@
 
 <a id="adr-0005"></a>
 
+> Note: [ADR 0019](0019-store-cassettes-as-readable-lines-in-schema-3.md) supersedes the schema marker in this record's first decision. The current schema is `http_gun: 3`, the only marker HTTP Gun writes and reads; schema 2 is retired. The rule that an unsupported version fails, with no legacy decoder or live fallback, still holds.
+
 ## Decision
 
 - Use one current schema marked `http_gun: 2`. Unsupported versions fail rather than entering a legacy decoder or live fallback.
