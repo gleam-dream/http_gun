@@ -2,6 +2,8 @@
 
 <a id="adr-0006"></a>
 
+> Note: the last Evidence item's statement that Sinal is consumed as a Git dependency on `main` is out of date. Since `6a16c11`, Sinal is a Hex dependency declared in `gleam.toml`, and `manifest.toml` holds the resolved version. The decision is unchanged.
+
 ## Decision
 
 - Use typed Sinal lifecycle events, caller correlation and independent per-invocation identity. Add no HTTP-specific collector or retained observation history.
