@@ -559,14 +559,11 @@ fn signer_schemes() {
       let client = signer_client(protocol, signer_identity(key))
       let assert Ok(Receipt("a", _)) = fetch(client, req(port))
       let _ = await_request()
-      // One handshake signs once. Over HTTP/2 the pool can open further
-      // connections to the origin until the first one receives the server's
-      // SETTINGS, and each of those handshakes signs too.
+      // One request opens one connection and its handshake signs once. Over
+      // HTTP/2 a connection still waiting for the server's SETTINGS counts as
+      // a preparation, so the waiting request opens no further connection.
       let requests = asked(key)
-      let assert True = case protocol {
-        H2 -> requests != []
-        _ -> list.length(requests) == 1
-      }
+      let assert True = list.length(requests) == 1
       list.each(requests, fn(request) {
         let #(hash, scheme) = request
         let assert True = hash == expected_hash

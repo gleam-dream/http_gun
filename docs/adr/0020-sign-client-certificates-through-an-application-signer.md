@@ -5,6 +5,8 @@
 Date: 2026-11-19
 Status: Accepted
 
+> Note: the Evidence item explaining why one request can cost more than one signature over HTTP/2 describes the pool before `e5b1585`. An HTTP/2 connection that is up but still waiting for the server's first SETTINGS is now Settling and counts as a preparation, so a single waiting request opens one connection and signs once; `connection_awaiting_settings_counts_as_preparing_test` in `test/http_gun_h2_test.gleam` covers it. The design's connection lifetime states the current rule. The decision is unchanged.
+
 ## Decision
 
 - Add `client_identity.from_signer(certificates, signer)` beside `from_pem`.
